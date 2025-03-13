@@ -29,6 +29,7 @@ const MainTabs = () => {
 
 const AppNavigator = () => {
   const { token } = useSelector((state: RootState) => state.auth);
+  console.log('Token:', token);
 
   return (
     <NavigationContainer>
@@ -40,8 +41,7 @@ const AppNavigator = () => {
           </>
         ) : (
           <>
-            <Stack.Screen name="Map" component={MapScreen} />
-            <Stack.Screen name="Missions" component={MissionsScreen} />
+            <Stack.Screen name="Main" component={MainTabs} />
           </>
         )}
       </Stack.Navigator>

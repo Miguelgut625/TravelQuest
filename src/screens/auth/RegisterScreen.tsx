@@ -1,40 +1,53 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setUser, setToken } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 
 const RegisterScreen = ({ navigation }: any) => {
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const dispatch = useDispatch();
 
   const handleRegister = async () => {
+    setLoading(true);
+    setError('');
+
     try {
-      const { user, error } = await supabase.auth.signUp({
+      // Crear un nuevo usuario en Supabase
+      const { user, error: signupError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      console.log('Respuesta de Supabase:', { user, error });
+      if (signupError) throw signupError;
 
-      if (error) {
-        setError(error.message);
-        return;
-      }
-
-      // Guardar el usuario en la tabla de usuarios
-      const { error: insertError } = await supabase
+      // Insertar el usuario en la tabla 'users' incluyendo la contraseña
+      const { data, error: insertError } = await supabase
         .from('users')
-        .insert([{ id: user.id, email, username }]);
+        .insert([
+          { email, username, password } // Asegúrate de que 'password' sea el nombre correcto de la columna
+        ]);
 
       if (insertError) throw insertError;
 
-      navigation.navigate('Login'); // Redirigir a la pantalla de inicio de sesión
+      // Guardar el usuario en Redux
+      dispatch(setUser({
+        id: user?.id, // Usar el ID del usuario creado por Supabase
+        email: user?.email!,
+        username: username,
+      }));
+      dispatch(setToken('fake_access_token')); // Puedes establecer un token real si lo tienes
+
+      // Redirigir a la pantalla de inicio de sesión
+      navigation.replace('Login');
     } catch (error: any) {
       setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,8 +75,12 @@ const RegisterScreen = ({ navigation }: any) => {
         secureTextEntry
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Registrarse</Text>
+      <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.buttonText}>Registrarse</Text>
+        )}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>

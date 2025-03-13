@@ -16,21 +16,30 @@ const LoginScreen = ({ navigation }: any) => {
     setError('');
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Verificar las credenciales en la tabla 'users'
+      const { data, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password) // Asegúrate de que las contraseñas estén en texto plano
+        .single(); // Obtener un solo registro
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
-      // Guardar el usuario en el estado de Redux
-      dispatch(setUser({
-        id: data.user?.id,
-        email: data.user?.email!,
-        username: data.user?.user_metadata.username || '',
-      }));
-      dispatch(setToken(data.session?.access_token)); // Guarda el token si es necesario
-      navigation.replace('MainApp'); // Redirigir a la pantalla principal
+      if (data) {
+        // Si se encuentra el usuario, guardar en Redux
+        dispatch(setUser({
+          id: data.id, // Asegúrate de que 'id' sea el nombre correcto de la columna
+          email: data.email,
+          username: data.username || 'Usuario', // Cambia esto si tienes un campo de nombre de usuario
+        }));
+        dispatch(setToken('fake_access_token')); // Puedes establecer un token real si lo tienes
+
+        // Redirigir a la pantalla principal
+        navigation.replace('Main');
+      } else {
+        setError('Credenciales incorrectas');
+      }
     } catch (error: any) {
       setError(error.message);
     } finally {
