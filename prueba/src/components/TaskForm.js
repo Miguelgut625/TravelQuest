@@ -1,0 +1,29 @@
+import { useState } from "react"
+import { useTasks } from "../context/TaskContext";
+
+function TaskForm() {
+const [taskName,setTaskName]=useState('');  
+const {createTask,adding}= useTasks ()
+  
+const handleSubmit= async e=> {
+    e.preventDefault()
+    createTask(taskName);
+    
+};  
+
+return (
+    <div>
+        <form onSubmit={handleSubmit}>
+            <input type="text" name="taskName" placeholder="Escribe tu tarea"
+            onChange={e =>setTaskName(e.target.value)}/>
+
+        <button disabled= {adding}>
+        {adding ? "Añadiendo.." : "Añadir Tarea"}
+        </button>    
+
+        </form>
+    </div>
+  )
+}
+
+export default TaskForm

@@ -1,0 +1,88 @@
+import { createContext, useContext, useState } from "react";
+import { supabase } from "../supabase/client";
+
+export const TaskContext= createContext()
+
+export const useTasks = ()=>{
+    const context = useContext(TaskContext)
+    if(!context) throw new Error ('useTaks debe estar dentro de un TaskContext Provider')
+    return context
+}
+
+export const TaskContextProvider =({children}) =>{
+
+    const [tasks,setTasks]= useState([]);
+    const [adding,setAdding]= useState(false);
+    const [loading,setLoading]= useState(false);
+
+    const getTasks = async (done = false)=>{
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser();    
+    const {error,data}= await supabase
+    .from("tareas")
+    .select()
+    .eq("userId",user.id)
+    .eq("done",done)
+    .order("id",{ascending:true});
+    
+
+    if(error) throw error;
+
+    setTasks(data);
+    setLoading(false);
+    };
+
+    const createTask = async (taskName) => {
+    setAdding(true);    
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const {error,data}= await supabase.from("tareas").insert({
+                name: taskName,
+                userId:user.id 
+                });
+            if (error) throw error;
+            console.log(data);
+            setTasks([...tasks,...data])
+        } catch (error) {
+            console.error(error);
+        } finally{
+        setAdding(false);
+        }
+    };
+    
+    const deleteTask = async (id)=>{
+    
+    const { data: { user } } = await supabase.auth.getUser();    
+    
+    const {error, data} = await supabase
+    .from("tareas")
+    .delete()
+    .eq("userId",user.id)
+    .eq("id",id);
+
+    if(error) throw error
+
+    setTasks(tasks.filter((task)=>task.id!==id));
+
+    console.log(data);
+    }
+
+    const updateTask = async (id, updateFields)=>{
+      
+        const { data: { user } } = await supabase.auth.getUser();
+        const {error, data} = await supabase
+        .from("tareas")
+        .update(updateFields)
+        .eq("userId",user.id)
+        .eq("id",id);
+
+        if(error) throw error;
+       
+        setTasks(tasks.filter(task=>task.id==id));
+    }
+
+    
+    return <TaskContext.Provider value={{tasks,getTasks,createTask,adding,loading,deleteTask,updateTask}}>
+        {children}
+    </TaskContext.Provider>
+}
