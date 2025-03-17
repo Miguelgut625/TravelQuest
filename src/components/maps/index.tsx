@@ -2,7 +2,25 @@ import React from 'react';
 import { Platform, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
-export const MapMarker = Marker;
+interface MapMarkerProps {
+  coordinate: {
+    latitude: number;
+    longitude: number;
+  };
+  title: string;
+  description: string;
+  [key: string]: any;
+}
+
+export const MapMarker: React.FC<MapMarkerProps> = ({ coordinate, title, description, ...props }) => (
+  <Marker
+    coordinate={coordinate}
+    title={title}
+    description={description}
+    pinColor="#4CAF50"
+    {...props}
+  />
+);
 
 interface MapProps {
   children?: React.ReactNode;
@@ -22,6 +40,7 @@ interface MapProps {
   };
   showsUserLocation?: boolean;
   showsMyLocationButton?: boolean;
+  onPress?: (event: any) => void;
 }
 
 const Map = ({ 
@@ -31,7 +50,8 @@ const Map = ({
   onRegionChangeComplete, 
   initialRegion, 
   showsUserLocation, 
-  showsMyLocationButton 
+  showsMyLocationButton,
+  onPress 
 }: MapProps) => {
   if (Platform.OS === 'web') {
     return (
@@ -45,6 +65,7 @@ const Map = ({
           showsMyLocationButton={showsMyLocationButton}
           provider={PROVIDER_GOOGLE}
           mapType="standard"
+          onPress={onPress}
         >
           {children}
         </MapView>
@@ -60,6 +81,7 @@ const Map = ({
       initialRegion={initialRegion}
       showsUserLocation={showsUserLocation}
       showsMyLocationButton={showsMyLocationButton}
+      onPress={onPress}
     >
       {children}
     </MapView>
