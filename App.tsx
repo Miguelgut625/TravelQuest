@@ -3,6 +3,7 @@ import { Provider } from 'react-redux';
 import { store } from './src/features/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { testSupabaseConnection } from './src/services/testConnection';
+import { linking } from './src/navigation/linking';
 
 const App = () => {
   useEffect(() => {
@@ -16,7 +17,7 @@ const App = () => {
 
   return (
     <Provider store={store}>
-      <AppNavigator />
+      <AppNavigator linking={linking} />
     </Provider>
   );
 };

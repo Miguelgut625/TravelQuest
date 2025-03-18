@@ -8,6 +8,7 @@ import { RootState } from '../features/store';
 // Importar pantallas (las crearemos después)
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import MapScreen from '../screens/main/MapScreen';
 import MissionsScreen from '../screens/main/MissionsScreen';
 import JournalScreen from '../screens/main/JournalScreen';
@@ -27,17 +28,22 @@ const MainTabs = () => {
   );
 };
 
-const AppNavigator = () => {
+interface AppNavigatorProps {
+  linking?: any;
+}
+
+const AppNavigator = ({ linking }: AppNavigatorProps) => {
   const { token } = useSelector((state: RootState) => state.auth);
   console.log('Token:', token);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!token ? (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
         ) : (
           <>
