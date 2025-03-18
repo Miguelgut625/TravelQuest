@@ -197,6 +197,7 @@ const MapScreen = () => {
     if (searchCity && durationNum && missionCountNum) {
       try {
         await getCityCoordinates(searchCity);
+        //Aqui tengo que crear los viajes
         await generateMission(searchCity, durationNum, missionCountNum);
         navigation.navigate('Missions');
       } catch (error) {

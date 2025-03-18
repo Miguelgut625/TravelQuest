@@ -19,71 +19,45 @@ const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          switch (route.name) {
-            case 'Map':
-              iconName = focused ? 'map' : 'map-outline';
-              break;
-            case 'Missions':
-              iconName = focused ? 'flag' : 'flag-outline';
-              break;
-            case 'Journal':
-              iconName = focused ? 'book' : 'book-outline';
-              break;
-            case 'Profile':
-              iconName = focused ? 'person' : 'person-outline';
-              break;
-            default:
-              iconName = 'help-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: 'gray',
-        tabBarStyle: {
-          paddingBottom: 5,
-          height: 60
-        },
-        headerStyle: {
-          backgroundColor: '#4CAF50',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-      })}
-    >
+    <Tab.Navigator>
       <Tab.Screen 
         name="Map" 
         component={MapScreen}
         options={{
-          title: 'Mapa'
+          title: 'Mapa',
+          tabBarIcon: ({ focused}) => (
+            <Ionicons name={focused ? 'map' : 'map-outline'} size={24} color={focused ? 'green' : 'gray'} />
+          )
         }}
       />
       <Tab.Screen 
         name="Missions" 
         component={MissionsScreen}
         options={{
-          title: 'Misiones'
+          title: 'Misiones',
+          tabBarIcon: ({ focused}) => (
+            <Ionicons name={focused ? 'flag' : 'flag-outline'}  size={24} color={focused ? 'green' : 'gray'} />
+          )
         }}
       />
       <Tab.Screen 
         name="Journal" 
         component={JournalScreen}
         options={{
-          title: 'Diario'
+          title: 'Diario',
+          tabBarIcon: ({ focused}) => (
+            <Ionicons name={focused ? 'book' : 'book-outline'}  size={24} color={focused ? 'green' : 'gray'} />
+          )
         }}
       />
       <Tab.Screen 
         name="Profile" 
         component={ProfileScreen}
         options={{
-          title: 'Perfil'
+          title: 'Perfil',
+          tabBarIcon: ({ focused}) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'}  size={24} color={focused ? 'green' : 'gray'} />
+          )
         }}
       />
     </Tab.Navigator>

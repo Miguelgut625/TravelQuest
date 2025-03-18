@@ -1,8 +1,13 @@
 import React from 'react';
 import { Platform, View } from 'react-native';
-import MapView, { Marker, MapViewProps } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 
-const Map = (props: MapViewProps) => {
+const Map = Platform.select({
+  web: MapView,
+  default: MapView,
+});
+
+const MapComponent = (props: MapViewProps) => {
   if (Platform.OS === 'web') {
     return (
       <View style={{ height: '100%', width: '100%' }}>
@@ -17,6 +22,9 @@ const Map = (props: MapViewProps) => {
   return <MapView {...props} />;
 };
 
-export const MapMarker = Marker;
+export const MapMarker = Platform.select({
+  web: Marker,
+  default: Marker,
+});
 
-export default Map;
+export default MapComponent;
