@@ -3,22 +3,8 @@ module.exports = function (api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      'nativewind/babel',
       'react-native-reanimated/plugin',
-      ['module-resolver', {
-        alias: {
-          '@': './src',
-          'assets': './assets'
-        },
-        extensions: [
-          '.ios.js',
-          '.android.js',
-          '.js',
-          '.ts',
-          '.tsx',
-          '.json',
-        ],
-      }],
+      '@babel/plugin-proposal-export-namespace-from',
     ],
   };
 }; 

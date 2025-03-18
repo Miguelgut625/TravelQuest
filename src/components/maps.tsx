@@ -1,30 +1,44 @@
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
-const Map = Platform.select({
-  web: MapView,
-  default: MapView,
-});
+interface MapProps {
+  initialRegion: {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  };
+  markers?: Array<{
+    coordinate: {
+      latitude: number;
+      longitude: number;
+    };
+    title?: string;
+    description?: string;
+  }>;
+  onMarkerPress?: (marker: any) => void;
+}
 
-const MapComponent = (props: MapViewProps) => {
-  if (Platform.OS === 'web') {
-    return (
-      <View style={{ height: '100%', width: '100%' }}>
-        <MapView
-          {...props}
-          style={[{ height: '100%', width: '100%' }, props.style]}
+const Map: React.FC<MapProps> = ({ initialRegion, markers, onMarkerPress }) => {
+  return (
+    <MapView
+      style={{ flex: 1 }}
+      initialRegion={initialRegion}
+      showsUserLocation
+      showsMyLocationButton
+    >
+      {markers?.map((marker, index) => (
+        <Marker
+          key={index}
+          coordinate={marker.coordinate}
+          title={marker.title}
+          description={marker.description}
+          onPress={() => onMarkerPress?.(marker)}
         />
-      </View>
-    );
-  }
-
-  return <MapView {...props} />;
+      ))}
+    </MapView>
+  );
 };
 
-export const MapMarker = Platform.select({
-  web: Marker,
-  default: Marker,
-});
-
-export default MapComponent;
+export default Map;
