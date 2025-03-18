@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, FlatList } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { Mission } from '../../features/missionSlice';
@@ -19,17 +19,6 @@ interface CityMarker {
   description: string;
 }
 
-interface CitySuggestion {
-  display_name: string;
-  lat: string;
-  lon: string;
-  address?: {
-    city?: string;
-    town?: string;
-    village?: string;
-  };
-}
-
 const { width, height } = Dimensions.get('window');
 
 const MapScreen = () => {
@@ -46,8 +35,6 @@ const MapScreen = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [cityMarker, setCityMarker] = useState<CityMarker | null>(null);
-  const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const missionsFromRedux = useSelector((state: RootState) => state.missions.missions);
 
@@ -73,21 +60,19 @@ const MapScreen = () => {
     try {
       console.log('Obteniendo nombre de ciudad para coordenadas:', latitude, longitude);
       
-      // Primero mostrar las coordenadas mientras se obtiene el nombre
       setCityMarker({
         coordinate: { latitude, longitude },
         title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
         description: 'Obteniendo nombre de la ciudad...'
       });
 
-      // Agregar un delay para respetar los límites de la API
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&accept-language=es`,
         {
           headers: {
-            'User-Agent': 'TravelQuest/1.0' // Identificador para la API
+            'User-Agent': 'TravelQuest/1.0'
           }
         }
       );
@@ -100,6 +85,14 @@ const MapScreen = () => {
       console.log('Respuesta de la API:', data);
       
       if (data.address) {
+        // Verificar si la ubicación está en España
+        if (data.address.country_code !== 'es') {
+          setErrorMsg('Esta ubicación está fuera de nuestra zona de influencia. Por favor, selecciona una ciudad en España.');
+          setCityMarker(null);
+          setSearchCity('');
+          return;
+        }
+
         const cityName = data.address.city || data.address.town || data.address.village || data.address.suburb || 'Ubicación desconocida';
         console.log('Nombre de ciudad encontrado:', cityName);
 
@@ -109,6 +102,7 @@ const MapScreen = () => {
           description: 'Ciudad seleccionada'
         });
         setSearchCity(cityName);
+        setErrorMsg(null);
       } else {
         console.log('No se encontraron resultados para las coordenadas');
         setCityMarker({
@@ -132,24 +126,49 @@ const MapScreen = () => {
 
   const getCityCoordinates = async (cityName: string) => {
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cityName)}&key=AIzaSyBIcgxbRUUIOuQ01SdaiBh-vZh4b2pDHGI`
-      );
-      const data = await response.json();
+      console.log('Buscando coordenadas para:', cityName);
       
-      if (data.results && data.results[0]) {
-        const { lat, lng } = data.results[0].geometry.location;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityName)}&limit=1&addressdetails=1&accept-language=es&featuretype=city&countrycodes=es`,
+        {
+          headers: {
+            'User-Agent': 'TravelQuest/1.0'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Error de la API: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Respuesta de la API:', data);
+      
+      if (data && data[0]) {
+        const { lat, lon } = data[0];
+        const cityName = data[0].address.city || data[0].address.town || data[0].address.village || data[0].display_name.split(',')[0];
+        console.log('Nombre de ciudad encontrado:', cityName);
+        
         setCityMarker({
-          coordinate: { latitude: lat, longitude: lng },
+          coordinate: { 
+            latitude: parseFloat(lat), 
+            longitude: parseFloat(lon) 
+          },
           title: cityName,
           description: 'Ciudad seleccionada'
         });
+        
         setRegion({
-          latitude: lat,
-          longitude: lng,
+          latitude: parseFloat(lat),
+          longitude: parseFloat(lon),
           latitudeDelta: 0.0922,
           longitudeDelta: 0.0421,
         });
+        
+        setSearchCity(cityName);
+        setErrorMsg(null);
+      } else {
+        setErrorMsg('No se encontró la ciudad en España. Por favor, intenta con otra ciudad.');
       }
     } catch (error) {
       console.error('Error al obtener coordenadas:', error);
@@ -188,128 +207,15 @@ const MapScreen = () => {
     }
   };
 
-  const getCitySuggestions = async (query: string) => {
-    if (query.length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-  
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=20&addressdetails=1&accept-language=es&featuretype=city&countrycodes=es,fr,it,de,pt,uk,us,ca,au,nz,ar,br,cl,co,mx,pe,ve,ec,bo,py,uy,cr,pa,do,pr,gt,hn,sv,ni,cu,ht,jm,tr,gr,ru,cn,jp,kr,in,th,vn,my,sg,id,ae,sa,qa,bh,kw,om,ye,eg,ma,dz,tn,ly,ke,za,ng,gh,ci,cm,sen`,
-        {
-          headers: { 'User-Agent': 'TravelQuest/1.0' }
-        }
-      );
-  
-      if (!response.ok) throw new Error(`Error de la API: ${response.status}`);
-  
-      const data = await response.json();
-  
-      // Filtrar y ordenar resultados por relevancia
-      const cities = data
-        .filter((item: any) => {
-          // Verificar que el resultado sea una ciudad o equivalente
-          const isCity =
-            item.type === 'city' ||
-            item.class === 'place' ||
-            (item.address && (item.address.city || item.address.town || item.address.village));
-  
-          if (!isCity) return false;
-  
-          // Normalizar nombres para comparación
-          const searchTerm = query.toLowerCase();
-          const displayName = item.display_name.toLowerCase();
-          const addressName = (
-            item.address?.city || item.address?.town || item.address?.village || ''
-          ).toLowerCase();
-  
-          // Coincidencias exactas y parciales
-          const exactMatch = addressName === searchTerm || displayName === searchTerm;
-          const partialMatch = displayName.includes(searchTerm) || addressName.includes(searchTerm);
-  
-          return exactMatch || partialMatch;
-        })
-        .map((item: any) => {
-          // Obtener el mejor nombre posible de la ciudad
-          const cityName =
-            item.address?.city ||
-            item.address?.town ||
-            item.address?.village ||
-            item.display_name.split(',')[0];
-  
-          // Mejor puntuación de relevancia
-          let relevance = 2; // Por defecto, menos relevante
-          if (cityName.toLowerCase() === query.toLowerCase()) relevance = 0; // Coincidencia exacta
-          else if (cityName.toLowerCase().includes(query.toLowerCase())) relevance = 1; // Coincidencia parcial
-  
-          return {
-            ...item,
-            display_name: cityName,
-            relevance
-          };
-        })
-        .sort((a: any, b: any) => a.relevance - b.relevance) // Priorizar las más relevantes
-        .slice(0, 5); // Limitar a 5 resultados
-  
-      setSuggestions(cities);
-      setShowSuggestions(true);
-    } catch (error) {
-      console.error('Error al obtener sugerencias:', error);
-    }
-  };
-  const handleCitySelect = (suggestion: CitySuggestion) => {
-    const cityName = suggestion.address?.city || suggestion.address?.town || suggestion.address?.village || suggestion.display_name.split(',')[0];
-    setSearchCity(cityName);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    setCityMarker({
-      coordinate: { 
-        latitude: parseFloat(suggestion.lat), 
-        longitude: parseFloat(suggestion.lon) 
-      },
-      title: cityName,
-      description: 'Ciudad seleccionada'
-    });
-    setRegion({
-      latitude: parseFloat(suggestion.lat),
-      longitude: parseFloat(suggestion.lon),
-      latitudeDelta: 0.0922,
-      longitudeDelta: 0.0421,
-    });
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Buscar ciudad"
-            value={searchCity}
-            onChangeText={(text) => {
-              setSearchCity(text);
-              getCitySuggestions(text);
-            }}
-            onFocus={() => setShowSuggestions(true)}
-          />
-          {showSuggestions && suggestions.length > 0 && (
-            <FlatList
-              data={suggestions}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.suggestionItem}
-                  onPress={() => handleCitySelect(item)}
-                >
-                  <Text>{item.display_name}</Text>
-                </TouchableOpacity>
-              )}
-              style={styles.suggestionsList}
-            />
-          )}
-        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Buscar ciudad"
+          value={searchCity}
+          onChangeText={setSearchCity}
+        />
         <TextInput
           style={styles.input}
           placeholder="Duración (días)"
@@ -427,28 +333,7 @@ const styles = StyleSheet.create({
     color: 'red',
     marginTop: 10,
     textAlign: 'center',
-  },
-  searchInputContainer: {
-    position: 'relative',
-    zIndex: 2,
-  },
-  suggestionsList: {
-    position: 'absolute',
-    top: 45,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    maxHeight: 200,
-    zIndex: 1000,
-  },
-  suggestionItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
+  }
 });
 
 export default MapScreen; 
