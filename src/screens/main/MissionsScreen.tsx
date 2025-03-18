@@ -24,7 +24,7 @@ interface JourneyMission {
   };
 }
 
-const MissionsScreen = () => {
+const MissionsScreen = () => {  
   const [journeyMissions, setJourneyMissions] = useState<JourneyMission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

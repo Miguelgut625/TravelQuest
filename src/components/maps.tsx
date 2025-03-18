@@ -21,22 +21,35 @@ interface MapProps {
 }
 
 const Map: React.FC<MapProps> = ({ initialRegion, markers, onMarkerPress }) => {
+  console.log('Map render - initialRegion:', initialRegion);
+  console.log('Map render - markers:', markers);
+
   return (
     <MapView
       style={{ flex: 1 }}
       initialRegion={initialRegion}
       showsUserLocation
       showsMyLocationButton
+      onPress={(event) => {
+        console.log('Map pressed:', event.nativeEvent);
+        onMarkerPress?.(event.nativeEvent);
+      }}
     >
-      {markers?.map((marker, index) => (
-        <Marker
-          key={index}
-          coordinate={marker.coordinate}
-          title={marker.title}
-          description={marker.description}
-          onPress={() => onMarkerPress?.(marker)}
-        />
-      ))}
+      {markers?.map((marker, index) => {
+        console.log('Rendering marker:', marker);
+        return (
+          <Marker
+            key={index}
+            coordinate={marker.coordinate}
+            title={marker.title}
+            description={marker.description}
+            onPress={() => {
+              console.log('Marker pressed:', marker);
+              onMarkerPress?.(marker);
+            }}
+          />
+        );
+      })}
     </MapView>
   );
 };

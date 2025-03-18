@@ -3,7 +3,8 @@ import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platfo
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { Mission } from '../../features/missionSlice';
-import Map, { MapMarker } from '../../components/maps';
+import Map from '../../components/maps';
+import { MapMarker } from '../../components/maps/index';
 import * as Location from 'expo-location';
 import { getMissionsByCityAndDuration } from '../../services/missionService';
 import { useNavigation } from '@react-navigation/native';
@@ -239,31 +240,20 @@ const MapScreen = () => {
       
       <View style={styles.mapContainer}>
         <Map
-          style={styles.map}
-          region={region}
-          onRegionChangeComplete={setRegion}
           initialRegion={region}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
-          onPress={handleMapPress}
-        >
-          {cityMarker && (
-            <MapMarker
-              key="city-marker"
-              coordinate={cityMarker.coordinate}
-              title={cityMarker.title}
-              description={cityMarker.description}
-            />
-          )}
-          {missions.map((mission) => (
-            <MapMarker
-              key={mission.id}
-              coordinate={mission.location}
-              title={mission.title}
-              description={mission.description}
-            />
-          ))}
-        </Map>
+          markers={[
+            ...(cityMarker ? [cityMarker] : []),
+            ...missions.map((mission) => ({
+              coordinate: mission.location,
+              title: mission.title,
+              description: mission.description
+            }))
+          ]}
+          onMarkerPress={(marker) => {
+            console.log('Marker pressed in MapScreen:', marker);
+            handleMapPress({ nativeEvent: marker });
+          }}
+        />
       </View>
     </View>
   );
