@@ -12,11 +12,16 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "react-native/Libraries/Image/AssetRegistry": ["node_modules/react-native-web/dist/modules/AssetRegistry"],
+      "@/*": ["src/*"]
+    }
   },
   "include": [
     "src/**/*",
-    "src/types/**/*" // Asegúrate de incluir esta línea
+    "src/types/**/*"
   ],
   "extends": "expo/tsconfig.base",
   "exclude": ["node_modules"]

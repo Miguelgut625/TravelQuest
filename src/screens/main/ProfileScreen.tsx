@@ -1,22 +1,92 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout } from '../../features/authSlice';
+import { supabase } from '../../services/supabase';
+import { getUserPoints } from '../../services/pointsService';
+import { useFocusEffect } from '@react-navigation/native';
+
+interface UserStats {
+  points: number;
+  completedMissions: number;
+  citiesWithMissions: number;
+}
+
+interface CompletedMission {
+  challenge: {
+    cityId: string;
+  };
+}
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { completedMissions } = useSelector((state: RootState) => state.missions);
-  const entries = useSelector((state: RootState) => state.journal.entries);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<UserStats>({
+    points: 0,
+    completedMissions: 0,
+    citiesWithMissions: 0
+  });
 
-  const totalPoints = completedMissions.reduce((sum, mission) => sum + mission.points, 0);
-  const totalCities = Object.keys(entries).length;
-  const totalEntries = Object.values(entries).flat().length;
+  const fetchUserStats = async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      // Obtener puntos del usuario
+      const points = await getUserPoints(user.id);
+
+      // Obtener misiones completadas y ciudades
+      const { data: completedMissions, error: missionsError } = await supabase
+        .from('journeys_missions')
+        .select(`
+          id,
+          completed,
+          challenge:challenges!inner(
+            cityId
+          ),
+          journey:journeys!inner(
+            userId
+          )
+        `)
+        .eq('journey.userId', user.id)
+        .eq('completed', true);
+
+      if (missionsError) throw missionsError;
+
+      // Obtener ciudades únicas donde el usuario ha completado misiones
+      const uniqueCities = new Set(completedMissions?.map((mission: CompletedMission) => mission.challenge.cityId) || []);
+
+      setStats({
+        points: points,
+        completedMissions: completedMissions?.length || 0,
+        citiesWithMissions: uniqueCities.size
+      });
+    } catch (error) {
+      console.error('Error obteniendo estadísticas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserStats();
+    }, [user?.id])
+  );
 
   const handleLogout = () => {
     dispatch(logout());
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -31,24 +101,25 @@ const ProfileScreen = () => {
 
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{totalPoints}</Text>
+          <Text style={styles.statNumber}>{stats.points}</Text>
           <Text style={styles.statLabel}>Puntos</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{completedMissions.length}</Text>
+          <Text style={styles.statNumber}>{stats.completedMissions}</Text>
           <Text style={styles.statLabel}>Misiones</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{totalCities}</Text>
+          <Text style={styles.statNumber}>{stats.citiesWithMissions}</Text>
           <Text style={styles.statLabel}>Ciudades</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Estadísticas del Diario</Text>
+        <Text style={styles.sectionTitle}>Estadísticas de Aventuras</Text>
         <View style={styles.journalStats}>
-          <Text style={styles.journalStat}>Total de entradas: {totalEntries}</Text>
-          <Text style={styles.journalStat}>Ciudades visitadas: {totalCities}</Text>
+          <Text style={styles.journalStat}>Misiones completadas: {stats.completedMissions}</Text>
+          <Text style={styles.journalStat}>Ciudades exploradas: {stats.citiesWithMissions}</Text>
+          <Text style={styles.journalStat}>Puntos totales: {stats.points}</Text>
         </View>
       </View>
 
@@ -152,6 +223,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

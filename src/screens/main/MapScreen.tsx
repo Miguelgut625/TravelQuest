@@ -6,13 +6,31 @@ import { Mission } from '../../features/missionSlice';
 import Map, { MapMarker } from '../../components/maps';
 import * as Location from 'expo-location';
 import { getMissionsByCityAndDuration } from '../../services/missionService';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import generateMission from '../../services/missionGenerator';
 
 const { width, height } = Dimensions.get('window');
 
+// Definir los tipos de las rutas
+type RootStackParamList = {
+  Missions: { refresh: number; city: string };
+  // ... otras rutas si las hay
+};
+
+// Añade esta interfaz cerca del inicio del archivo
+interface MapMission {
+  id: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  title: string;
+  description: string;
+}
+
 const MapScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const userId = useSelector((state: RootState) => state.auth.user?.id);
   const [region, setRegion] = useState({
     latitude: 40.416775,
     longitude: -3.703790,
@@ -23,7 +41,7 @@ const MapScreen = () => {
   const [duration, setDuration] = useState('');
   const [missionCount, setMissionCount] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [missions, setMissions] = useState([]);
+  const [missions, setMissions] = useState<MapMission[]>([]);
 
   const missionsFromRedux = useSelector((state: RootState) => state.missions.missions);
 
@@ -48,20 +66,28 @@ const MapScreen = () => {
   const handleSearch = async () => {
     const durationNum = parseInt(duration);
     const missionCountNum = parseInt(missionCount);
-    console.log('Ciudad:', searchCity, 'Duración:', durationNum, 'Número de misiones:', missionCountNum);
     
     if (searchCity && durationNum && missionCountNum) {
       try {
+        if (!userId) {
+          setErrorMsg('Usuario no autenticado');
+          return;
+        }
+
         // Generar y guardar las misiones
-        await generateMission(searchCity, durationNum, missionCountNum);
+        await generateMission(searchCity, durationNum, missionCountNum, userId);
         
-        // Navegar a la pantalla de misiones
-        navigation.navigate('Missions');
+        // Navegar a la pantalla de misiones con un parámetro para forzar la actualización
+        navigation.navigate('Missions', { 
+          refresh: Date.now(),
+          city: searchCity
+        });
       } catch (error) {
         console.error('Error generating missions:', error);
+        setErrorMsg('Error al generar misiones');
       }
     } else {
-      console.log('Por favor, ingresa una ciudad, duración y número de misiones válidos.');
+      setErrorMsg('Por favor, ingresa una ciudad, duración y número de misiones válidos.');
     }
   };
 
