@@ -194,57 +194,71 @@ const MapScreen = () => {
       setShowSuggestions(false);
       return;
     }
-
+  
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=20&addressdetails=1&accept-language=es&featuretype=city&countrycodes=es,fr,it,de,pt,uk,us,ca,au,nz,ar,br,cl,co,mx,pe,ve,ec,bo,py,uy,cr,pa,do,pr,gt,hn,sv,ni,cu,ht,jm,tr,gr,ru,cn,jp,kr,in,th,vn,my,sg,id,ae,sa,qa,bh,kw,om,ye,eg,ma,dz,tn,ly,dz,ma,ke,za,ng,gh,ci,cm,sen`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=20&addressdetails=1&accept-language=es&featuretype=city&countrycodes=es,fr,it,de,pt,uk,us,ca,au,nz,ar,br,cl,co,mx,pe,ve,ec,bo,py,uy,cr,pa,do,pr,gt,hn,sv,ni,cu,ht,jm,tr,gr,ru,cn,jp,kr,in,th,vn,my,sg,id,ae,sa,qa,bh,kw,om,ye,eg,ma,dz,tn,ly,ke,za,ng,gh,ci,cm,sen`,
         {
-          headers: {
-            'User-Agent': 'TravelQuest/1.0'
-          }
+          headers: { 'User-Agent': 'TravelQuest/1.0' }
         }
       );
-
-      if (!response.ok) {
-        throw new Error(`Error de la API: ${response.status}`);
-      }
-
+  
+      if (!response.ok) throw new Error(`Error de la API: ${response.status}`);
+  
       const data = await response.json();
-      
+  
       // Filtrar y ordenar resultados por relevancia
       const cities = data
         .filter((item: any) => {
-          // Verificar que sea una ciudad
-          const isCity = item.type === 'city' || 
-                        item.class === 'place' || 
-                        (item.address && (item.address.city || item.address.town || item.address.village));
-          
-          // Verificar que el nombre coincida con la búsqueda
+          // Verificar que el resultado sea una ciudad o equivalente
+          const isCity =
+            item.type === 'city' ||
+            item.class === 'place' ||
+            (item.address && (item.address.city || item.address.town || item.address.village));
+  
+          if (!isCity) return false;
+  
+          // Normalizar nombres para comparación
           const searchTerm = query.toLowerCase();
           const displayName = item.display_name.toLowerCase();
-          const addressName = (item.address?.city || item.address?.town || item.address?.village || '').toLowerCase();
-          
-          // Priorizar coincidencias exactas
+          const addressName = (
+            item.address?.city || item.address?.town || item.address?.village || ''
+          ).toLowerCase();
+  
+          // Coincidencias exactas y parciales
           const exactMatch = addressName === searchTerm || displayName === searchTerm;
           const partialMatch = displayName.includes(searchTerm) || addressName.includes(searchTerm);
-          
-          return isCity && (exactMatch || partialMatch);
+  
+          return exactMatch || partialMatch;
         })
-        .map((item: any) => ({
-          ...item,
-          display_name: item.address?.city || item.address?.town || item.address?.village || item.display_name.split(',')[0],
-          relevance: item.address?.city === query || item.address?.town === query || item.address?.village === query ? 0 : 1
-        }))
-        .sort((a: any, b: any) => a.relevance - b.relevance)
-        .slice(0, 5);
-
+        .map((item: any) => {
+          // Obtener el mejor nombre posible de la ciudad
+          const cityName =
+            item.address?.city ||
+            item.address?.town ||
+            item.address?.village ||
+            item.display_name.split(',')[0];
+  
+          // Mejor puntuación de relevancia
+          let relevance = 2; // Por defecto, menos relevante
+          if (cityName.toLowerCase() === query.toLowerCase()) relevance = 0; // Coincidencia exacta
+          else if (cityName.toLowerCase().includes(query.toLowerCase())) relevance = 1; // Coincidencia parcial
+  
+          return {
+            ...item,
+            display_name: cityName,
+            relevance
+          };
+        })
+        .sort((a: any, b: any) => a.relevance - b.relevance) // Priorizar las más relevantes
+        .slice(0, 5); // Limitar a 5 resultados
+  
       setSuggestions(cities);
       setShowSuggestions(true);
     } catch (error) {
       console.error('Error al obtener sugerencias:', error);
     }
   };
-
   const handleCitySelect = (suggestion: CitySuggestion) => {
     const cityName = suggestion.address?.city || suggestion.address?.town || suggestion.address?.village || suggestion.display_name.split(',')[0];
     setSearchCity(cityName);

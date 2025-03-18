@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSelector } from 'react-redux';
 import { RootState } from '../features/store';
+import { Ionicons } from '@expo/vector-icons';
 
 // Importar pantallas (las crearemos después)
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -18,11 +19,73 @@ const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
   return (
-    <Tab.Navigator>
-      <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Missions" component={MissionsScreen} />
-      <Tab.Screen name="Journal" component={JournalScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap;
+
+          switch (route.name) {
+            case 'Map':
+              iconName = focused ? 'map' : 'map-outline';
+              break;
+            case 'Missions':
+              iconName = focused ? 'flag' : 'flag-outline';
+              break;
+            case 'Journal':
+              iconName = focused ? 'book' : 'book-outline';
+              break;
+            case 'Profile':
+              iconName = focused ? 'person' : 'person-outline';
+              break;
+            default:
+              iconName = 'help-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#4CAF50',
+        tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          paddingBottom: 5,
+          height: 60
+        },
+        headerStyle: {
+          backgroundColor: '#4CAF50',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      })}
+    >
+      <Tab.Screen 
+        name="Map" 
+        component={MapScreen}
+        options={{
+          title: 'Mapa'
+        }}
+      />
+      <Tab.Screen 
+        name="Missions" 
+        component={MissionsScreen}
+        options={{
+          title: 'Misiones'
+        }}
+      />
+      <Tab.Screen 
+        name="Journal" 
+        component={JournalScreen}
+        options={{
+          title: 'Diario'
+        }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{
+          title: 'Perfil'
+        }}
+      />
     </Tab.Navigator>
   );
 };
