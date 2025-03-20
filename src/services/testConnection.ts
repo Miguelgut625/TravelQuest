@@ -2,20 +2,21 @@ import { supabase } from './supabase';
 
 export const testSupabaseConnection = async () => {
   try {
+    console.log('Probando conexión con Supabase...');
     const { data, error } = await supabase
-      .from('missions') // Cambia 'missions' por cualquier tabla que tengas
+      .from('missions')
       .select('*')
-      .limit(1); // Limitar a 1 para una prueba rápida
+      .limit(1);
 
     if (error) {
-      console.error('Error fetching data:', error);
-      return false; // Conexión fallida
+      console.error('Error de conexión:', error);
+      return false;
     }
 
-    console.log('Data fetched successfully:', data);
-    return true; // Conexión exitosa
+    console.log('Conexión exitosa con Supabase');
+    return true;
   } catch (error) {
-    console.error('Error connecting to Supabase:', error);
-    return false; // Conexión fallida
+    console.error('Error al conectar con Supabase:', error);
+    return false;
   }
 };

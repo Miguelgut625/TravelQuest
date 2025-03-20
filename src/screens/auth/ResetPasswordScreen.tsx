@@ -1,205 +1,265 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { useDispatch } from 'react-redux';
-import { setUser, setToken } from '../../features/authSlice';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { supabase } from '../../services/supabase';
+import { useDispatch } from 'react-redux';
+import { setUser, setToken, setAuthState } from '../../features/authSlice';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/types';
+import { useRoute } from '@react-navigation/native';
+import { Linking } from 'react-native';
 
-const ResetPasswordScreen = ({ navigation }: any) => {
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState({ type: '', text: '' });
-    const dispatch = useDispatch();
+type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ResetPassword'>;
 
-    const handleResetPassword = async () => {
-        if (!newPassword || !confirmPassword) {
-            setMessage({ type: 'error', text: 'Por favor completa todos los campos' });
-            return;
-        }
+export const ResetPasswordScreen = () => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const dispatch = useDispatch();
+  const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
+  const route = useRoute();
 
-        if (newPassword.length < 6) {
-            setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' });
-            return;
-        }
+  useEffect(() => {
+    const checkSession = async () => {
+      console.log('Verificando sesión en ResetPasswordScreen...');
+      
+      // Obtener la URL actual
+      const url = await Linking.getInitialURL();
+      console.log('URL actual:', url);
 
-        if (newPassword !== confirmPassword) {
-            setMessage({ type: 'error', text: 'Las contraseñas no coinciden' });
-            return;
-        }
+      if (url?.includes('type=recovery')) {
+        console.log('Enlace de recuperación detectado');
+        return; // Permitir continuar con el proceso de recuperación
+      }
 
-        setLoading(true);
-        setMessage({ type: '', text: '' });
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error al verificar sesión:', error);
+        Alert.alert('Error', 'No se pudo verificar la sesión');
+        return;
+      }
 
-        try {
-            const { data, error } = await supabase.auth.updateUser({
-                password: newPassword
-            });
-
-            if (error) {
-                // Manejar específicamente el error de contraseña igual a la anterior en español
-                if (error.message.includes('New password should be different from the old password')) {
-                    throw new Error('La contraseña nueve debe ser diferente a la anterior');
-                }
-                throw error;
-            }
-
-            // Obtener la sesión actual después de actualizar la contraseña
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-            if (sessionError) throw sessionError;
-
-            if (session) {
-                // Actualizar el estado de autenticación en Redux
-                dispatch(setUser({
-                    id: session.user.id,
-                    email: session.user.email!,
-                    username: session.user.user_metadata.username || session.user.email!.split('@')[0],
-                }));
-                dispatch(setToken(session.access_token));
-
-                setMessage({
-                    type: 'success',
-                    text: 'Tu contraseña ha sido actualizada correctamente'
-                });
-
-                // Redirigir a la pantalla principal después de 2 segundos
-                setTimeout(() => {
-                    navigation.replace('Main');
-                }, 2000);
-            }
-
-        } catch (error: any) {
-            console.error('Error al actualizar contraseña:', error);
-            setMessage({
-                type: 'error',
-                text: error.message || 'Error al actualizar la contraseña'
-            });
-        } finally {
-            setLoading(false);
-        }
+      if (!session) {
+        console.log('No hay sesión activa ni enlace de recuperación');
+        Alert.alert(
+          'Error',
+          'No hay una sesión activa de recuperación de contraseña. Por favor, solicita un nuevo enlace.',
+          [{ text: 'OK', onPress: () => navigation.replace('Login') }]
+        );
+      }
     };
 
-    return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Nueva Contraseña</Text>
+    checkSession();
+  }, []);
 
-            {message.text ? (
-                <Text style={[
-                    styles.messageText,
-                    message.type === 'error' ? styles.errorMessage : styles.successMessage
-                ]}>
-                    {message.text}
-                </Text>
-            ) : null}
+  const handleResetPassword = async () => {
+    console.log('handleResetPassword llamado');
+    console.log('Nueva contraseña:', newPassword);
+    console.log('Confirmar contraseña:', confirmPassword);
+    
+    if (!newPassword || !confirmPassword) {
+      console.log('Error: Campos vacíos');
+      Alert.alert('Error', 'Por favor, completa todos los campos');
+      return;
+    }
 
-            <TextInput
-                style={styles.input}
-                placeholder="Nueva contraseña"
-                value={newPassword}
-                onChangeText={(text) => {
-                    setNewPassword(text);
-                    setMessage({ type: '', text: '' });
-                }}
-                secureTextEntry
-            />
+    if (newPassword.length < 6) {
+      console.log('Error: Contraseña demasiado corta');
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
 
-            <TextInput
-                style={styles.input}
-                placeholder="Confirmar nueva contraseña"
-                value={confirmPassword}
-                onChangeText={(text) => {
-                    setConfirmPassword(text);
-                    setMessage({ type: '', text: '' });
-                }}
-                secureTextEntry
-            />
+    if (newPassword !== confirmPassword) {
+      console.log('Error: Las contraseñas no coinciden');
+      Alert.alert('Error', 'Las contraseñas no coinciden');
+      return;
+    }
 
-            <TouchableOpacity
-                style={[styles.button, loading && styles.disabledButton]}
-                onPress={handleResetPassword}
-                disabled={loading}
-            >
-                {loading ? (
-                    <ActivityIndicator color="white" />
-                ) : (
-                    <Text style={styles.buttonText}>Guardar Nueva Contraseña</Text>
-                )}
-            </TouchableOpacity>
+    setLoading(true);
+    console.log('Iniciando actualización de contraseña...');
 
-            <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => navigation.navigate('Login')}
-            >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-            </TouchableOpacity>
-        </View>
-    );
+    try {
+      // Primero verificar la sesión actual
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Error al obtener sesión:', sessionError);
+        Alert.alert('Error', 'No se pudo obtener la sesión actual');
+        return;
+      }
+
+      if (!session) {
+        console.error('No hay sesión activa');
+        Alert.alert('Error', 'No hay una sesión activa. Por favor, solicita un nuevo enlace.');
+        return;
+      }
+
+      console.log('Actualizando contraseña para usuario:', session.user.email);
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) {
+        console.error('Error al actualizar contraseña:', updateError);
+        Alert.alert('Error', updateError.message);
+        return;
+      }
+
+      console.log('Contraseña actualizada exitosamente');
+      
+      // Obtener la sesión actualizada
+      const { data: { session: updatedSession }, error: updatedSessionError } = await supabase.auth.getSession();
+      
+      if (updatedSessionError) {
+        console.error('Error al obtener sesión actualizada:', updatedSessionError);
+        Alert.alert('Error', 'No se pudo obtener la sesión actualizada');
+        return;
+      }
+
+      if (updatedSession?.user) {
+        console.log('Configurando usuario en Redux...');
+        dispatch(setUser({
+          id: updatedSession.user.id,
+          email: updatedSession.user.email!,
+          username: updatedSession.user.user_metadata.username || updatedSession.user.email!.split('@')[0],
+        }));
+        dispatch(setToken(updatedSession.access_token));
+        dispatch(setAuthState('authenticated'));
+        
+        Alert.alert(
+          'Éxito',
+          'Contraseña actualizada correctamente',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                console.log('Navegando a la pantalla principal...');
+                navigation.replace('Main');
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error en handleResetPassword:', error);
+      Alert.alert('Error', 'Ocurrió un error al actualizar la contraseña');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    console.log('Cancelando recuperación de contraseña...');
+    dispatch(setAuthState('unauthenticated'));
+    navigation.replace('Login');
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Recuperar Contraseña</Text>
+      <Text style={styles.subtitle}>
+        Por favor, ingresa tu nueva contraseña
+      </Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Nueva contraseña"
+        value={newPassword}
+        onChangeText={setNewPassword}
+        secureTextEntry
+        autoCapitalize="none"
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Confirmar contraseña"
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+        secureTextEntry
+        autoCapitalize="none"
+      />
+
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleResetPassword}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.buttonText}>Actualizar Contraseña</Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.cancelButton}
+        onPress={handleCancel}
+      >
+        <Text style={styles.cancelButtonText}>Cancelar</Text>
+      </TouchableOpacity>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#f5f5f5',
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        marginBottom: 30,
-        color: '#333',
-    },
-    input: {
-        width: '100%',
-        height: 50,
-        backgroundColor: 'white',
-        borderRadius: 10,
-        paddingHorizontal: 15,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#ddd',
-    },
-    button: {
-        width: '100%',
-        height: 50,
-        backgroundColor: '#4CAF50',
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    buttonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    cancelButton: {
-        marginTop: 15,
-        padding: 10,
-    },
-    cancelButtonText: {
-        color: '#666',
-        fontSize: 14,
-    },
-    messageText: {
-        textAlign: 'center',
-        marginBottom: 20,
-        padding: 10,
-        borderRadius: 5,
-        width: '100%',
-    },
-    errorMessage: {
-        backgroundColor: '#ffebee',
-        color: '#c62828',
-    },
-    successMessage: {
-        backgroundColor: '#e8f5e9',
-        color: '#2e7d32',
-    },
-    disabledButton: {
-        opacity: 0.7,
-    },
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+    color: '#333',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  button: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonDisabled: {
+    backgroundColor: '#cccccc',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cancelButton: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+  },
 });
 
 export default ResetPasswordScreen; 
