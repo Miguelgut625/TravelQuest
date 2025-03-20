@@ -1,24 +1,23 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { persistReducer } from 'redux-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface User {
   id: string;
   email: string;
   username: string;
-  profilePicture?: string;
 }
 
 interface AuthState {
   user: User | null;
   token: string | null;
-  isLoading: boolean;
-  error: string | null;
+  authState: 'idle' | 'loading' | 'authenticated' | 'unauthenticated' | 'password_recovery';
 }
 
 const initialState: AuthState = {
   user: null,
   token: null,
-  isLoading: false,
-  error: null,
+  authState: 'idle'
 };
 
 const authSlice = createSlice({
@@ -27,23 +26,27 @@ const authSlice = createSlice({
   reducers: {
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
+      state.authState = 'authenticated';
     },
     setToken: (state, action: PayloadAction<string>) => {
       state.token = action.payload;
     },
-    setLoading: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = action.payload;
-    },
-    setError: (state, action: PayloadAction<string | null>) => {
-      state.error = action.payload;
+    setAuthState: (state, action: PayloadAction<AuthState['authState']>) => {
+      state.authState = action.payload;
     },
     logout: (state) => {
       state.user = null;
       state.token = null;
-      state.error = null;
+      state.authState = 'unauthenticated';
     },
   },
 });
 
-export const { setUser, setToken, setLoading, setError, logout } = authSlice.actions;
-export default authSlice.reducer; 
+const persistConfig = {
+  key: 'auth',
+  storage: AsyncStorage,
+  whitelist: ['user', 'token', 'authState'],
+};
+
+export const { setUser, setToken, logout, setAuthState } = authSlice.actions;
+export default persistReducer(persistConfig, authSlice.reducer); 

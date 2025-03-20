@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { setUser, setToken } from '../../features/authSlice';
+import { setUser, setToken, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
@@ -15,6 +15,14 @@ const LoginScreen = ({ navigation }: any) => {
   const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
   const dispatch = useDispatch();
 
+  useEffect(() => {
+    console.log('LoginScreen montado');
+    // Verificar el estado inicial de autenticación
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Estado de sesión:', session ? 'Activa' : 'Inactiva');
+    });
+  }, []);
+
   const handleLogin = async () => {
     if (!email || !password) {
       setError('Por favor ingresa email y contraseña');
@@ -25,14 +33,14 @@ const LoginScreen = ({ navigation }: any) => {
     setError('');
 
     try {
-      // Iniciamos sesión usando el sistema de autenticación de Supabase
+      console.log('Intentando iniciar sesión...');
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) {
-        // Verificar si el error es de credenciales inválidas
+        console.error('Error de autenticación:', error);
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Contraseña Incorrecta');
         }
@@ -40,15 +48,13 @@ const LoginScreen = ({ navigation }: any) => {
       }
 
       if (data.user && data.session) {
-        // Guardamos los datos del usuario en Redux
+        console.log('Inicio de sesión exitoso');
         dispatch(setUser({
           id: data.user.id,
           email: data.user.email!,
           username: data.user.user_metadata.username || email.split('@')[0],
         }));
         dispatch(setToken(data.session.access_token));
-
-        // Navegamos a la pantalla principal
         navigation.replace('Main');
       }
     } catch (error: any) {
@@ -71,9 +77,18 @@ const LoginScreen = ({ navigation }: any) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: 'travelquest://reset-password',
+        options: {
+          emailRedirectTo: 'travelquest://reset-password',
+          shouldCreateUser: false
+        }
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('rate limit')) {
+          throw new Error('Has alcanzado el límite de intentos. Por favor, espera unos minutos antes de intentar nuevamente.');
+        }
+        throw error;
+      }
 
       setResetMessage({
         type: 'success',
@@ -101,59 +116,69 @@ const LoginScreen = ({ navigation }: any) => {
   // Efecto para manejar el enlace de restablecimiento de contraseña
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+      console.log('Evento de autenticación:', event);
       if (event === 'PASSWORD_RECOVERY') {
-        navigation.navigate('ResetPassword');
+        console.log('Estado de recuperación de contraseña detectado');
+        dispatch(setAuthState('password_recovery'));
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'ResetPassword' }],
+        });
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigation]);
+  }, [dispatch, navigation]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Iniciar Sesión</Text>
+      <View style={styles.logoContainer}>
+        <Text style={styles.title}>TravelQuest</Text>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+      <View style={styles.formContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Correo electrónico"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Contraseña"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Contraseña"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.buttonText}>Iniciar Sesión</Text>
-        )}
-      </TouchableOpacity>
-
-      <View style={styles.linksContainer}>
-        <TouchableOpacity onPress={() => setIsResetPasswordVisible(true)}>
-          <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Iniciar Sesión</Text>
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
-        </TouchableOpacity>
+        <View style={styles.linksContainer}>
+          <TouchableOpacity onPress={() => setIsResetPasswordVisible(true)}>
+            <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal
@@ -222,16 +247,22 @@ const LoginScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
     backgroundColor: '#f5f5f5',
+    padding: 20,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: 60,
+    marginBottom: 40,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 40,
-    color: '#333',
+    color: '#4CAF50',
+  },
+  formContainer: {
+    flex: 1,
+    justifyContent: 'center',
   },
   input: {
     width: '100%',
@@ -263,7 +294,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   link: {
-    color: '#2196F3',
+    color: '#4CAF50',
     fontSize: 14,
     marginVertical: 5,
     textDecorationLine: 'underline',
@@ -271,6 +302,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#f44336',
     marginBottom: 10,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -290,6 +322,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -309,6 +342,9 @@ const styles = StyleSheet.create({
   sendButton: {
     backgroundColor: '#4CAF50',
   },
+  disabledButton: {
+    opacity: 0.7,
+  },
   modalButtonText: {
     color: 'white',
     fontSize: 16,
@@ -322,14 +358,11 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     backgroundColor: '#ffebee',
-    color: '#c62828',
+    color: '#f44336',
   },
   successMessage: {
     backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-  },
-  disabledButton: {
-    opacity: 0.7,
+    color: '#4CAF50',
   },
 });
 
