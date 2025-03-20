@@ -4,13 +4,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { Mission } from '../../features/missionSlice';
 import Map from '../../components/maps';
-import { MapMarker } from '../../components/maps/index';
 import * as Location from 'expo-location';
-import { getMissionsByCityAndDuration } from '../../services/missionService';
 import { useNavigation } from '@react-navigation/native';
 import { MainTabNavigationProp } from '../../types/navigation';
 import generateMission from '../../services/missionGenerator';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../services/supabase';
 import { setCityMissionData } from '../../features/cityMissionSlice';
 
@@ -32,10 +29,6 @@ const MapScreen = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const cityMarker = useSelector((state: RootState) => state.cityMission.cityMarker);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const { user } = useSelector((state: RootState) => state.auth);
   const [cityId, setCityId] = useState<string | null>(null);
 
@@ -207,32 +200,12 @@ const MapScreen = () => {
     }
   };
 
-  const handleStartDateChange = (event: any, selectedDate?: Date) => {
-    console.log('Evento DatePicker inicio:', event);
-    console.log('Fecha seleccionada inicio:', selectedDate);
-    if (Platform.OS === 'android') {
-      setShowStartDatePicker(false);
-    }
-    if (selectedDate) {
-      setStartDate(selectedDate);
-      if (selectedDate > endDate) {
-        setEndDate(selectedDate);
-      }
-    }
-  };
-
-  const handleEndDateChange = (event: any, selectedDate?: Date) => {
-    console.log('Evento DatePicker fin:', event);
-    console.log('Fecha seleccionada fin:', selectedDate);
-    if (Platform.OS === 'android') {
-      setShowEndDatePicker(false);
-    }
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    }
-  };
-
   const handleSearch = async () => {
+    if (!user?.id) {
+      setErrorMsg('Debes iniciar sesión para generar misiones');
+      return;
+    }
+
     const durationNum = parseInt(duration);
     const missionCountNum = parseInt(missionCount);
     
@@ -262,8 +235,7 @@ const MapScreen = () => {
         .eq('name', searchCity)
         .single();
 
-      if (cityError) 
-        {
+      if (cityError) {
         throw new Error('Error al obtener el ID de la ciudad');
       }
 
@@ -276,8 +248,8 @@ const MapScreen = () => {
 
       await getCityCoordinates(searchCity);
       //ZONA INICIO
-      const startDateString = startDate.toISOString().split('T')[0];
-      const endDateString = endDate.toISOString().split('T')[0];
+      const startDateString = new Date().toISOString().split('T')[0];
+      const endDateString = new Date(new Date().getTime() + durationNum * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       // Crear el journey con el ID del usuario actual
       const { error: journeyError } = await supabase
@@ -295,7 +267,7 @@ const MapScreen = () => {
       }
 
       //ZONA FIN
-      await generateMission(searchCity, durationNum, missionCountNum);
+      await generateMission(searchCity, durationNum, missionCountNum, user.id);
       navigation.navigate('Missions');
     } catch (error) {
       console.error('Error:', error);
@@ -312,43 +284,13 @@ const MapScreen = () => {
           value={searchCity}
           onChangeText={setSearchCity}
         />
-        <TouchableOpacity 
-          style={styles.dateButton}
-          onPress={() => {
-            console.log('Abriendo DatePicker inicio');
-            setShowStartDatePicker(true);
-          }}
-        >
-          <Text>Fecha inicio: {startDate.toLocaleDateString()}</Text>
-        </TouchableOpacity>
-        {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleStartDateChange}
-            minimumDate={new Date()}
-            maximumDate={endDate}
-          />
-        )}
-        <TouchableOpacity 
-          style={styles.dateButton}
-          onPress={() => {
-            console.log('Abriendo DatePicker fin');
-            setShowEndDatePicker(true);
-          }}
-        >
-          <Text>Fecha fin: {endDate.toLocaleDateString()}</Text>
-        </TouchableOpacity>
-        {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleEndDateChange}
-            minimumDate={startDate}
-          />
-        )}
+        <TextInput
+          style={styles.input}
+          placeholder="Duración (días)"
+          value={duration}
+          onChangeText={setDuration}
+          keyboardType="numeric"
+        />
         <TextInput
           style={styles.input}
           placeholder="Número de misiones"
@@ -371,7 +313,7 @@ const MapScreen = () => {
         {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
       </View>
       
-      <View style={styles.mapContainer}>
+      <View style={styles.map}>
         <Map
           initialRegion={region}
           markers={[
@@ -395,12 +337,18 @@ const MapScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+  },
+  map: {
+    width: width,
+    height: height * 0.7,
   },
   searchContainer: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    right: 20,
     backgroundColor: 'white',
     padding: 15,
-    margin: 10,
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: {
@@ -412,28 +360,6 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 1,
   },
-  mapContainer: {
-    flex: 1,
-    margin: 10,
-    height: Platform.OS === 'web' ? height * 0.6 : height * 0.5,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  map: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    borderRadius: 10,
-  },
   input: {
     height: 40,
     borderColor: '#ddd',
@@ -441,13 +367,15 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 10,
     paddingHorizontal: 10,
-    backgroundColor: 'white',
   },
   button: {
     backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 5,
     alignItems: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#cccccc',
   },
   buttonText: {
     color: 'white',
@@ -457,16 +385,6 @@ const styles = StyleSheet.create({
     color: 'red',
     marginTop: 10,
     textAlign: 'center',
-  },
-  dateButton: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-    backgroundColor: 'white',
-    justifyContent: 'center',
   },
   descriptionInput: {
     height: 100,

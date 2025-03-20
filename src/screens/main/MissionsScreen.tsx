@@ -1,352 +1,328 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
-import { supabase } from '../../services/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
+import { Mission } from '../../features/missionSlice';
+import { supabase } from '../../services/supabase';
+import { completeMission, getUserPoints } from '../../services/pointsService';
+import { RouteProp } from '@react-navigation/native';
 
 interface JourneyMission {
-  id: number;
-  created_at: string;
+  id: string;
+  challengeId: string;
   completed: boolean;
-  journeyId: number;
-  challengeId: number;
-  userId: string;
-  journeys: {
-    description: string;
-  };
-  challenges: {
+  challenge: {
     title: string;
     description: string;
-  };
-  user: {
-    username: string;
+    difficulty: string;
+    points: number;
   };
 }
 
-const MissionsScreen = () => {  
-  const [journeyMissions, setJourneyMissions] = useState<JourneyMission[]>([]);
+type MissionsScreenRouteProp = RouteProp<{
+  Missions: {
+    journeyId: string;
+    challenges: JourneyMission[];
+  };
+}, 'Missions'>;
+
+interface MissionsScreenProps {
+  route: MissionsScreenRouteProp;
+}
+
+const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onComplete: () => void }) => (
+  <TouchableOpacity
+    style={[styles.card, mission.completed && styles.completedCard]}
+    onPress={() => !mission.completed && onComplete()}
+    disabled={mission.completed}
+  >
+    <View style={styles.cardHeader}>
+      <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
+      <Text style={[styles.badge, { backgroundColor: mission.completed ? '#4CAF50' : '#FFA000' }]}>
+        {mission.completed ? 'Completada' : 'Pendiente'}
+      </Text>
+    </View>
+    <Text style={styles.cardDescription}>{mission.challenge.description}</Text>
+    <View style={styles.cardFooter}>
+      <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
+      <Text style={styles.points}>{mission.challenge.points} puntos</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+const MissionsScreen = ({ route }: MissionsScreenProps) => {
+  const { journeyId, challenges } = route.params || {};
+  const { user } = useSelector((state: RootState) => state.auth);
+  const [missions, setMissions] = useState<JourneyMission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingMission, setUpdatingMission] = useState<number | null>(null);
-  const { user } = useSelector((state: RootState) => state.auth);
-  const [username, setUsername] = useState<string>('');
+  const [userPoints, setUserPoints] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchUsername = async () => {
-      if (!user?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('username')
-          .eq('id', user.id)
-          .single();
+  const fetchMissions = async () => {
+    console.log('Parámetros recibidos:', { journeyId, challenges });
 
-        if (error) throw error;
-        if (data) {
-          setUsername(data.username);
-        }
-      } catch (err: any) {
-        console.error('Error al obtener el username:', err.message);
-      }
-    };
+    if (!journeyId) {
+      console.log('No se encontró journeyId en los parámetros de ruta');
+      setError('No se encontró el viaje');
+      setLoading(false);
+      return;
+    }
 
-    fetchUsername();
-  }, [user]);
-
-  useEffect(() => {
-    const fetchUserMissions = async () => {
-      if (!user?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('journeys_missions')
-          .select(`
-            *,
-            journeys (
-              description
-            ),
-            challenges (
-              title,
-              description
-            ),
-            user:users (
-              username
-            )
-          `)
-          .eq('userId', user.id);
-
-        if (error) throw error;
-
-        console.log('Misiones del usuario:', data);
-        setJourneyMissions(data || []);
-      } catch (err: any) {
-        console.error('Error al obtener las misiones:', err.message);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserMissions();
-  }, [user]);
-
-  const handleCompleteMission = async (missionId: number) => {
     try {
-      setUpdatingMission(missionId);
-      
-      const { error } = await supabase
+      console.log('Buscando misiones para journeyId:', journeyId);
+      const { data, error } = await supabase
         .from('journeys_missions')
-        .update({ completed: true })
-        .eq('id', missionId);
+        .select(`
+          id,
+          challengeId,
+          completed,
+          challenge:challenges (
+            title,
+            description,
+            difficulty,
+            points
+          )
+        `)
+        .eq('journeyId', journeyId)
+        .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error en la consulta de misiones:', error);
+        throw error;
+      }
 
-      // Actualizar el estado local
-      setJourneyMissions(journeyMissions.map(mission => 
-        mission.id === missionId 
-          ? { ...mission, completed: true }
-          : mission
-      ));
-    } catch (err: any) {
-      console.error('Error al completar la misión:', err.message);
+      console.log('Misiones encontradas:', data);
+
+      if (!data || data.length === 0) {
+        console.log('No se encontraron misiones para este journey');
+        setError('No se encontraron misiones para este viaje');
+      } else {
+        // Mantener el estado anterior si hay datos nuevos
+        setMissions(prevMissions => {
+          const newMissions = [...prevMissions];
+          data.forEach((newMission: JourneyMission) => {
+            const existingIndex = newMissions.findIndex(m => m.id === newMission.id);
+            if (existingIndex === -1) {
+              newMissions.push(newMission);
+            } else {
+              newMissions[existingIndex] = newMission;
+            }
+          });
+          return newMissions;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching missions:', error);
+      setError('Error al cargar las misiones');
     } finally {
-      setUpdatingMission(null);
+      setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  if (loading) {
+  useEffect(() => {
+    if (journeyId) {
+      fetchMissions();
+    }
+  }, [journeyId]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchMissions();
+  };
+
+  const handleCompleteMission = async (missionId: string) => {
+    if (!user?.id) return;
+
+    try {
+      const points = await completeMission(missionId, user.id);
+      setUserPoints(prev => prev + points);
+
+      // Actualizar el estado local inmediatamente
+      setMissions(prevMissions =>
+        prevMissions.map(mission =>
+          mission.id === missionId
+            ? { ...mission, completed: true }
+            : mission
+        )
+      );
+
+      Alert.alert(
+        '¡Misión Completada!',
+        `Has ganado ${points} puntos por completar esta misión.`
+      );
+    } catch (error) {
+      console.error('Error completing mission:', error);
+      Alert.alert(
+        'Error',
+        'No se pudo completar la misión. Por favor, intenta de nuevo.'
+      );
+    }
+  };
+
+  if (loading && !isRefreshing) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.text}>Cargando misiones...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Cargando misiones...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Error: {error}</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+          <Text style={styles.retryButtonText}>Reintentar</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <LinearGradient
-        colors={['#4CAF50', '#2E7D32']}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>Misiones de Viaje</Text>
-        <Text style={styles.headerSubtitle}>¡Completa tus desafíos, {username}!</Text>
-      </LinearGradient>
-
-      {journeyMissions.map((mission) => (
-        <View key={mission.id} style={styles.missionCard}>
-          <LinearGradient
-            colors={['#ffffff', '#f8f8f8']}
-            style={styles.cardGradient}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.titleContainer}>
-                <Text style={styles.missionTitle}>{mission.challenges?.title || 'Sin título'}</Text>
-                <Text style={[
-                  styles.statusBadge,
-                  mission.completed ? styles.statusCompleted : styles.statusPending
-                ]}>
-                  {mission.completed ? '✓ Completada' : '⏳ Pendiente'}
-                </Text>
-              </View>
-              <Text style={styles.dateText}>
-                {new Date(mission.created_at).toLocaleDateString()}
-              </Text>
-            </View>
-
-            <View style={styles.detailsContainer}>
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Descripción del Viaje</Text>
-                <Text style={styles.detailValue}>{mission.journeys?.description || 'Sin descripción'}</Text>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Descripción del Desafío</Text>
-                <Text style={styles.detailValue}>{mission.challenges?.description || 'Sin descripción'}</Text>
-              </View>
-
-              <View style={styles.userInfo}>
-                <Text style={styles.userLabel}>Usuario:</Text>
-                <Text style={styles.userValue}>{mission.user?.username || username}</Text>
-              </View>
-            </View>
-
-            {!mission.completed && (
-              <TouchableOpacity 
-                style={styles.completeButton}
-                onPress={() => handleCompleteMission(mission.id)}
-                disabled={updatingMission === mission.id}
-              >
-                {updatingMission === mission.id ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.completeButtonText}>Completar Misión</Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </LinearGradient>
-        </View>
-      ))}
-      <View style={styles.bottomPadding} />
-    </ScrollView>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Tus Misiones</Text>
+        <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
+      </View>
+      {missions.length === 0 ? (
+        <Text style={styles.emptyText}>No hay misiones disponibles.</Text>
+      ) : (
+        <FlatList
+          data={missions}
+          renderItem={({ item }) => (
+            <MissionCard
+              mission={item}
+              onComplete={() => handleCompleteMission(item.id)}
+            />
+          )}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+        />
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 20,
     backgroundColor: '#f5f5f5',
   },
   header: {
-    padding: 24,
-    paddingTop: 40,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pointsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+    marginTop: 20,
+  },
+  list: {
+    flex: 1,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    opacity: 0.9,
-  },
-  missionCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardGradient: {
-    borderRadius: 16,
-    padding: 16,
+  completedCard: {
+    opacity: 0.8,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  titleContainer: {
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     flex: 1,
   },
-  missionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 8,
-  },
-  statusBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  statusCompleted: {
-    backgroundColor: '#E8F5E9',
-    color: '#2E7D32',
-  },
-  statusPending: {
-    backgroundColor: '#FFF3E0',
-    color: '#EF6C00',
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  detailsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-  },
-  detailSection: {
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 8,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  userLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 8,
-  },
-  userValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-  },
-  completeButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 16,
-    alignItems: 'center',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  completeButtonText: {
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
-  bottomPadding: {
-    height: 20,
+  cardDescription: {
+    color: '#666',
+    marginBottom: 10,
   },
-  text: {
-    fontSize: 16,
-    color: '#333',
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  difficulty: {
+    color: '#666',
+    fontSize: 12,
+  },
+  points: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  retryButtonText: {
+    color: 'white',
     textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#D32F2F',
-    textAlign: 'center',
-    padding: 16,
+    fontWeight: 'bold',
   },
 });
 
