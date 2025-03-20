@@ -1,8 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout } from '../../features/authSlice';
+
+const colors = {
+  primary: '#005F9E',
+  secondary: '#FFFFFF',
+  danger: '#D32F2F',
+  backgroundGradient: ['#005F9E', '#F0F0F0'],
+};
 
 const ProfileScreen = () => {
   const dispatch = useDispatch();
@@ -20,14 +28,14 @@ const ProfileScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <LinearGradient colors={colors.backgroundGradient} style={styles.header}>
         <Image
           source={user?.profilePicture ? { uri: user.profilePicture } : require('../../assets/icons/avatar.png')}
           style={styles.avatar}
         />
         <Text style={styles.username}>{user?.username}</Text>
         <Text style={styles.email}>{user?.email}</Text>
-      </View>
+      </LinearGradient>
 
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
@@ -62,12 +70,15 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.backgroundGradient[1],
   },
   header: {
-    backgroundColor: '#4CAF50',
-    padding: 20,
+    padding: 30,
+    paddingTop: 50,
     alignItems: 'center',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginBottom: 20,
   },
   avatar: {
     width: 100,
@@ -78,7 +89,7 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: colors.secondary,
     marginBottom: 5,
   },
   email: {
@@ -89,17 +100,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: colors.secondary,
     marginTop: -20,
     marginHorizontal: 20,
     borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
     elevation: 5,
   },
   statCard: {
@@ -108,7 +112,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: colors.primary,
   },
   statLabel: {
     fontSize: 14,
@@ -124,16 +128,9 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   journalStats: {
-    backgroundColor: 'white',
+    backgroundColor: colors.secondary,
     padding: 15,
     borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
     elevation: 3,
   },
   journalStat: {
@@ -143,16 +140,16 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     margin: 20,
-    backgroundColor: '#f44336',
+    backgroundColor: colors.danger,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
   },
   logoutButtonText: {
-    color: 'white',
+    color: colors.secondary,
     fontSize: 16,
     fontWeight: 'bold',
   },
 });
 
-export default ProfileScreen; 
+export default ProfileScreen;

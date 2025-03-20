@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch } from 'react-redux';
 import { setUser, setToken } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
+
+const colors = {
+  primary: '#005F9E',
+  secondary: '#FFFFFF',
+  danger: '#D32F2F',
+  backgroundGradient: ['#005F9E', '#FFFFFF', '#FFFFFF', '#005F9E'],
+};
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -16,26 +24,23 @@ const LoginScreen = ({ navigation }: any) => {
     setError('');
 
     try {
-      // Verificar las credenciales en la tabla 'users'
       const { data, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('email', email)
-        .eq('password', password) // Asegúrate de que las contraseñas estén en texto plano
-        .single(); // Obtener un solo registro
+        .eq('password', password)
+        .single();
 
       if (fetchError) throw fetchError;
 
       if (data) {
-        // Si se encuentra el usuario, guardar en Redux
         dispatch(setUser({
-          id: data.id, // Asegúrate de que 'id' sea el nombre correcto de la columna
+          id: data.id,
           email: data.email,
-          username: data.username || 'Usuario', // Cambia esto si tienes un campo de nombre de usuario
+          username: data.username || 'Usuario',
         }));
-        dispatch(setToken('fake_access_token')); // Puedes establecer un token real si lo tienes
+        dispatch(setToken('fake_access_token'));
 
-        // Redirigir a la pantalla principal
         navigation.replace('Main');
       } else {
         setError('Credenciales incorrectas');
@@ -48,7 +53,7 @@ const LoginScreen = ({ navigation }: any) => {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient colors={colors.backgroundGradient} style={styles.container}>
       <Text style={styles.title}>Iniciar Sesión</Text>
       <TextInput
         style={styles.input}
@@ -67,7 +72,7 @@ const LoginScreen = ({ navigation }: any) => {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
         {loading ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator color={colors.secondary} />
         ) : (
           <Text style={styles.buttonText}>Iniciar Sesión</Text>
         )}
@@ -75,7 +80,7 @@ const LoginScreen = ({ navigation }: any) => {
       <TouchableOpacity onPress={() => navigation.navigate('Register')}>
         <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 };
 
@@ -85,18 +90,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 40,
-    color: '#333',
+    color: colors.primary,
   },
   input: {
     width: '100%',
     height: 50,
-    backgroundColor: 'white',
+    backgroundColor: colors.secondary,
     borderRadius: 10,
     paddingHorizontal: 15,
     marginBottom: 15,
@@ -106,26 +110,26 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
   },
   buttonText: {
-    color: 'white',
+    color: colors.secondary,
     fontSize: 16,
     fontWeight: 'bold',
   },
   link: {
     marginTop: 20,
-    color: '#4CAF50',
+    color: colors.primary,
     textDecorationLine: 'underline',
   },
   errorText: {
-    color: 'red',
+    color: colors.danger,
     marginTop: 10,
   },
 });
 
-export default LoginScreen; 
+export default LoginScreen;

@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { JournalEntry } from '../../features/journalSlice';
+
+const colors = {
+  primary: '#005F9E',
+  secondary: '#FFFFFF',
+  danger: '#D32F2F',
+  backgroundGradient: ['#005F9E', '#F0F0F0'],
+};
 
 const JournalEntryCard = ({ entry }: { entry: JournalEntry }) => (
   <TouchableOpacity style={styles.card}>
@@ -57,7 +65,9 @@ const JournalScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Diario de Viaje</Text>
+      <LinearGradient colors={colors.backgroundGradient} style={styles.headerGradient}>
+        <Text style={styles.title}>Diario de Viaje</Text>
+      </LinearGradient>
       <View style={styles.cityTabs}>
         <FlatList
           horizontal
@@ -84,64 +94,59 @@ const JournalScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.backgroundGradient[1],
+  },
+  headerGradient: {
     padding: 20,
-    backgroundColor: '#f5f5f5',
+    paddingTop: 40,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
+    color: colors.secondary,
+    textAlign: 'center',
   },
   cityTabs: {
+    paddingHorizontal: 20,
     marginBottom: 20,
   },
   cityTab: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     marginRight: 10,
-    backgroundColor: 'white',
+    backgroundColor: colors.secondary,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
     elevation: 3,
   },
   selectedCityTab: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
   },
   cityTabText: {
     color: '#666',
     fontWeight: 'bold',
   },
   selectedCityTabText: {
-    color: 'white',
+    color: colors.secondary,
   },
   entriesList: {
     flex: 1,
+    paddingHorizontal: 20,
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: colors.secondary,
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
     elevation: 5,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 5,
+    color: colors.primary,
   },
   cardDate: {
     color: '#666',
@@ -171,7 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   morePhotosText: {
-    color: 'white',
+    color: colors.secondary,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -180,10 +185,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tag: {
-    color: '#4CAF50',
+    color: colors.primary,
     marginRight: 10,
     fontSize: 12,
   },
 });
 
-export default JournalScreen; 
+export default JournalScreen;

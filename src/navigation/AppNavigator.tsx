@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../features/store';
 import { Ionicons } from '@expo/vector-icons';
 
-// Importar pantallas (las crearemos después)
+// Importar pantallas
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import MapScreen from '../screens/main/MapScreen';
@@ -14,19 +14,30 @@ import MissionsScreen from '../screens/main/MissionsScreen';
 import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
+const colors = {
+  primary: '#005F9E',
+  secondary: '#FFFFFF',
+};
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
   return (
-    <Tab.Navigator>
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: 'gray',
+        headerShown: false,
+      }}
+    >
       <Tab.Screen 
         name="Map" 
         component={MapScreen}
         options={{
           title: 'Mapa',
-          tabBarIcon: ({ focused}) => (
-            <Ionicons name={focused ? 'map' : 'map-outline'} size={24} color={focused ? 'green' : 'gray'} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons name={focused ? 'map' : 'map-outline'} size={24} color={focused ? colors.primary : 'gray'} />
           )
         }}
       />
@@ -35,8 +46,8 @@ const MainTabs = () => {
         component={MissionsScreen}
         options={{
           title: 'Misiones',
-          tabBarIcon: ({ focused}) => (
-            <Ionicons name={focused ? 'flag' : 'flag-outline'}  size={24} color={focused ? 'green' : 'gray'} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons name={focused ? 'flag' : 'flag-outline'} size={24} color={focused ? colors.primary : 'gray'} />
           )
         }}
       />
@@ -45,8 +56,8 @@ const MainTabs = () => {
         component={JournalScreen}
         options={{
           title: 'Diario',
-          tabBarIcon: ({ focused}) => (
-            <Ionicons name={focused ? 'book' : 'book-outline'}  size={24} color={focused ? 'green' : 'gray'} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons name={focused ? 'book' : 'book-outline'} size={24} color={focused ? colors.primary : 'gray'} />
           )
         }}
       />
@@ -55,8 +66,8 @@ const MainTabs = () => {
         component={ProfileScreen}
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ focused}) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'}  size={24} color={focused ? 'green' : 'gray'} />
+          tabBarIcon: ({ focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={focused ? colors.primary : 'gray'} />
           )
         }}
       />
@@ -86,4 +97,4 @@ const AppNavigator = () => {
   );
 };
 
-export default AppNavigator; 
+export default AppNavigator;
