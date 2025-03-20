@@ -12,94 +12,50 @@ import { MainTabNavigationProp } from '../../types/navigation';
 import generateMission from '../../services/missionGenerator';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../services/supabase';
-
-interface CityMarker {
-  coordinate: {
-    latitude: number;
-    longitude: number;
-  };
-  title: string;
-  description: string;
-}
-
-interface FormState {
-  searchCity: string;
-  missionCount: string;
-  description: string;
-  errorMsg: string | null;
-}
-
-interface DateState {
-  start: Date;
-  end: Date;
-  showStartPicker: boolean;
-  showEndPicker: boolean;
-}
-
-interface MapState {
-  region: {
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
-  };
-  cityMarker: CityMarker | null;
-  missions: Mission[];
-}
+import { setCityMissionData } from '../../features/cityMissionSlice';
 
 const { width, height } = Dimensions.get('window');
 
 const MapScreen = () => {
+  const dispatch = useDispatch();
   const navigation = useNavigation<MainTabNavigationProp>();
+  const [region, setRegion] = useState({
+    latitude: 40.416775,
+    longitude: -3.703790,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
+  });
+  const [searchCity, setSearchCity] = useState('');
+  const [duration, setDuration] = useState('');
+  const [missionCount, setMissionCount] = useState('');
+  const [description, setDescription] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const cityMarker = useSelector((state: RootState) => state.cityMission.cityMarker);
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const { user } = useSelector((state: RootState) => state.auth);
-  const missionsFromRedux = useSelector((state: RootState) => state.missions.missions);
-
-  // Estados agrupados
-  const [form, setForm] = useState<FormState>({
-    searchCity: '',
-    missionCount: '',
-    description: '',
-    errorMsg: null
-  });
-
-  const [dates, setDates] = useState<DateState>({
-    start: new Date(),
-    end: new Date(),
-    showStartPicker: false,
-    showEndPicker: false
-  });
-
-  const [map, setMap] = useState<MapState>({
-    region: {
-      latitude: 40.416775,
-      longitude: -3.703790,
-      latitudeDelta: 0.0922,
-      longitudeDelta: 0.0421,
-    },
-    cityMarker: null,
-    missions: []
-  });
-
   const [cityId, setCityId] = useState<string | null>(null);
+
+  const missionsFromRedux = useSelector((state: RootState) => state.missions.missions);
 
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setForm(prev => ({ ...prev, errorMsg: 'Se requiere permiso para acceder a la ubicación' }));
+        setErrorMsg('Se requiere permiso para acceder a la ubicación');
         return;
       }
 
       let location = await Location.getCurrentPositionAsync({});
-      setMap(prev => ({
-        ...prev,
-        region: {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        }
-      }));
+      setRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
     })();
   }, []);
 
@@ -107,8 +63,7 @@ const MapScreen = () => {
     try {
       console.log('Obteniendo nombre de ciudad para coordenadas:', latitude, longitude);
       
-      setMap(prev => ({
-        ...prev,
+      dispatch(setCityMissionData({
         cityMarker: {
           coordinate: { latitude, longitude },
           title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
@@ -135,49 +90,50 @@ const MapScreen = () => {
       console.log('Respuesta de la API:', data);
       
       if (data.address) {
+        // Verificar si la ubicación está en España
         if (data.address.country_code !== 'es') {
-          setForm(prev => ({ ...prev, errorMsg: 'Esta ubicación está fuera de nuestra zona de influencia. Por favor, selecciona una ciudad en España.' }));
-          setMap(prev => ({ ...prev, cityMarker: null }));
-          setForm(prev => ({ ...prev, searchCity: '' }));
+          setErrorMsg('Esta ubicación está fuera de nuestra zona de influencia. Por favor, selecciona una ciudad en España.');
+          dispatch(setCityMissionData({
+            cityMarker: null
+          }));
+          setSearchCity('');
           return;
         }
 
         const cityName = data.address.city || data.address.town || data.address.village || data.address.suburb || 'Ubicación desconocida';
         console.log('Nombre de ciudad encontrado:', cityName);
 
-        setMap(prev => ({
-          ...prev,
+        dispatch(setCityMissionData({
           cityMarker: {
             coordinate: { latitude, longitude },
             title: cityName,
             description: 'Ciudad seleccionada'
           }
         }));
-        setForm(prev => ({ ...prev, searchCity: cityName, errorMsg: null }));
+        setSearchCity(cityName);
+        setErrorMsg(null);
       } else {
         console.log('No se encontraron resultados para las coordenadas');
-        setMap(prev => ({
-          ...prev,
+        dispatch(setCityMissionData({
           cityMarker: {
             coordinate: { latitude, longitude },
             title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
             description: 'Ubicación seleccionada'
           }
         }));
-        setForm(prev => ({ ...prev, searchCity: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}` }));
+        setSearchCity(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
       }
     } catch (error) {
       console.error('Error al obtener nombre de la ciudad:', error);
-      setForm(prev => ({ ...prev, errorMsg: 'Error al obtener el nombre de la ciudad. Por favor, inténtalo de nuevo.' }));
-      setMap(prev => ({
-        ...prev,
+      setErrorMsg('Error al obtener el nombre de la ciudad. Por favor, inténtalo de nuevo.');
+      dispatch(setCityMissionData({
         cityMarker: {
           coordinate: { latitude, longitude },
           title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
           description: 'Ubicación seleccionada'
         }
       }));
-      setForm(prev => ({ ...prev, searchCity: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}` }));
+      setSearchCity(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
     }
   };
 
@@ -186,7 +142,11 @@ const MapScreen = () => {
     const { coordinate } = event.nativeEvent;
     if (coordinate) {
       const { latitude, longitude } = coordinate;
-      setMap(prev => ({ ...prev, cityMarker: null }));
+      // Limpiar el marcador anterior
+      dispatch(setCityMissionData({
+        cityMarker: null
+      }));
+      // Aumentar el delay para asegurar que el marcador anterior se limpie
       setTimeout(() => {
         getCityNameFromCoordinates(latitude, longitude);
       }, 300);
@@ -218,8 +178,7 @@ const MapScreen = () => {
         const cityName = data[0].address.city || data[0].address.town || data[0].address.village || data[0].display_name.split(',')[0];
         console.log('Nombre de ciudad encontrado:', cityName);
         
-        setMap(prev => ({
-          ...prev,
+        dispatch(setCityMissionData({
           cityMarker: {
             coordinate: { 
               latitude: parseFloat(lat), 
@@ -230,23 +189,21 @@ const MapScreen = () => {
           }
         }));
         
-        setMap(prev => ({
-          ...prev,
-          region: {
-            latitude: parseFloat(lat),
-            longitude: parseFloat(lon),
-            latitudeDelta: 0.0922,
-            longitudeDelta: 0.0421,
-          }
-        }));
+        setRegion({
+          latitude: parseFloat(lat),
+          longitude: parseFloat(lon),
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        });
         
-        setForm(prev => ({ ...prev, searchCity: cityName, errorMsg: null }));
+        setSearchCity(cityName);
+        setErrorMsg(null);
       } else {
-        setForm(prev => ({ ...prev, errorMsg: 'No se encontró la ciudad en España. Por favor, intenta con otra ciudad.' }));
+        setErrorMsg('No se encontró la ciudad en España. Por favor, intenta con otra ciudad.');
       }
     } catch (error) {
       console.error('Error al obtener coordenadas:', error);
-      setForm(prev => ({ ...prev, errorMsg: 'Error al obtener las coordenadas de la ciudad' }));
+      setErrorMsg('Error al obtener las coordenadas de la ciudad');
     }
   };
 
@@ -254,14 +211,13 @@ const MapScreen = () => {
     console.log('Evento DatePicker inicio:', event);
     console.log('Fecha seleccionada inicio:', selectedDate);
     if (Platform.OS === 'android') {
-      setDates(prev => ({ ...prev, showStartPicker: false }));
+      setShowStartDatePicker(false);
     }
     if (selectedDate) {
-      setDates(prev => ({
-        ...prev,
-        start: selectedDate,
-        end: selectedDate > prev.end ? selectedDate : prev.end
-      }));
+      setStartDate(selectedDate);
+      if (selectedDate > endDate) {
+        setEndDate(selectedDate);
+      }
     }
   };
 
@@ -269,60 +225,65 @@ const MapScreen = () => {
     console.log('Evento DatePicker fin:', event);
     console.log('Fecha seleccionada fin:', selectedDate);
     if (Platform.OS === 'android') {
-      setDates(prev => ({ ...prev, showEndPicker: false }));
+      setShowEndDatePicker(false);
     }
     if (selectedDate) {
-      setDates(prev => ({ ...prev, end: selectedDate }));
+      setEndDate(selectedDate);
     }
   };
 
   const handleSearch = async () => {
-    const missionCountNum = parseInt(form.missionCount);
+    const durationNum = parseInt(duration);
+    const missionCountNum = parseInt(missionCount);
     
     // Validación específica de campos
-    if (!form.searchCity) {
-      setForm(prev => ({ ...prev, errorMsg: 'Por favor, selecciona una ciudad' }));
+    if (!searchCity) {
+      setErrorMsg('Por favor, selecciona una ciudad');
       return;
     }
     if (!missionCountNum) {
-      setForm(prev => ({ ...prev, errorMsg: 'Por favor, ingresa el número de misiones' }));
+      setErrorMsg('Por favor, ingresa el número de misiones');
       return;
     }
     if (!user?.id) {
-      setForm(prev => ({ ...prev, errorMsg: 'Error: No hay usuario autenticado' }));
+      setErrorMsg('Error: No hay usuario autenticado');
       return;
     }
-    if (!form.description) {
-      setForm(prev => ({ ...prev, errorMsg: 'Por favor, ingresa una descripción de la aventura' }));
+    if (!description) {
+      setErrorMsg('Por favor, ingresa una descripción de la aventura');
       return;
     }
 
     try {
+      // Primero obtenemos el ID de la ciudad
       const { data: cityData, error: cityError } = await supabase
         .from('cities')
         .select('id')
-        .eq('name', form.searchCity)
+        .eq('name', searchCity)
         .single();
 
-      if (cityError) {
+      if (cityError) 
+        {
         throw new Error('Error al obtener el ID de la ciudad');
       }
 
       if (!cityData) {
-        setForm(prev => ({ ...prev, errorMsg: 'No se encontró la ciudad en la base de datos' }));
+        setErrorMsg('No se encontró la ciudad en la base de datos');
         return;
       }
 
       setCityId(cityData.id);
 
-      await getCityCoordinates(form.searchCity);
-      const startDateString = dates.start.toISOString().split('T')[0];
-      const endDateString = dates.end.toISOString().split('T')[0];
+      await getCityCoordinates(searchCity);
+      //ZONA INICIO
+      const startDateString = startDate.toISOString().split('T')[0];
+      const endDateString = endDate.toISOString().split('T')[0];
 
+      // Crear el journey con el ID del usuario actual
       const { error: journeyError } = await supabase
         .from('journeys')
         .insert({
-          description: form.description,
+          description,
           start_date: startDateString,
           end_date: endDateString,
           cityId: cityData.id,
@@ -333,11 +294,12 @@ const MapScreen = () => {
         throw journeyError;
       }
 
-      await generateMission(form.searchCity, 1, missionCountNum);
+      //ZONA FIN
+      await generateMission(searchCity, durationNum, missionCountNum);
       navigation.navigate('Missions');
     } catch (error) {
       console.error('Error:', error);
-      setForm(prev => ({ ...prev, errorMsg: 'Error al crear la aventura. Por favor, inténtalo de nuevo.' }));
+      setErrorMsg('Error al crear la aventura. Por favor, inténtalo de nuevo.');
     }
   };
 
@@ -347,58 +309,58 @@ const MapScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Buscar ciudad"
-          value={form.searchCity}
-          onChangeText={(text) => setForm(prev => ({ ...prev, searchCity: text }))}
+          value={searchCity}
+          onChangeText={setSearchCity}
         />
         <TouchableOpacity 
           style={styles.dateButton}
           onPress={() => {
             console.log('Abriendo DatePicker inicio');
-            setDates(prev => ({ ...prev, showStartPicker: true }));
+            setShowStartDatePicker(true);
           }}
         >
-          <Text>Fecha inicio: {dates.start.toLocaleDateString()}</Text>
+          <Text>Fecha inicio: {startDate.toLocaleDateString()}</Text>
         </TouchableOpacity>
-        {dates.showStartPicker && (
+        {showStartDatePicker && (
           <DateTimePicker
-            value={dates.start}
+            value={startDate}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={handleStartDateChange}
             minimumDate={new Date()}
-            maximumDate={dates.end}
+            maximumDate={endDate}
           />
         )}
         <TouchableOpacity 
           style={styles.dateButton}
           onPress={() => {
             console.log('Abriendo DatePicker fin');
-            setDates(prev => ({ ...prev, showEndPicker: true }));
+            setShowEndDatePicker(true);
           }}
         >
-          <Text>Fecha fin: {dates.end.toLocaleDateString()}</Text>
+          <Text>Fecha fin: {endDate.toLocaleDateString()}</Text>
         </TouchableOpacity>
-        {dates.showEndPicker && (
+        {showEndDatePicker && (
           <DateTimePicker
-            value={dates.end}
+            value={endDate}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={handleEndDateChange}
-            minimumDate={dates.start}
+            minimumDate={startDate}
           />
         )}
         <TextInput
           style={styles.input}
           placeholder="Número de misiones"
-          value={form.missionCount}
-          onChangeText={(text) => setForm(prev => ({ ...prev, missionCount: text }))}
+          value={missionCount}
+          onChangeText={setMissionCount}
           keyboardType="numeric"
         />
         <TextInput
           style={[styles.input, styles.descriptionInput]}
           placeholder="Descripción de la aventura"
-          value={form.description}
-          onChangeText={(text) => setForm(prev => ({ ...prev, description: text }))}
+          value={description}
+          onChangeText={setDescription}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
@@ -406,15 +368,15 @@ const MapScreen = () => {
         <TouchableOpacity style={styles.button} onPress={handleSearch}>
           <Text style={styles.buttonText}>Buscar Aventuras</Text>
         </TouchableOpacity>
-        {form.errorMsg ? <Text style={styles.errorText}>{form.errorMsg}</Text> : null}
+        {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
       </View>
       
       <View style={styles.mapContainer}>
         <Map
-          initialRegion={map.region}
+          initialRegion={region}
           markers={[
-            ...(map.cityMarker ? [map.cityMarker] : []),
-            ...map.missions.map((mission) => ({
+            ...(cityMarker ? [cityMarker] : []),
+            ...missions.map((mission) => ({
               coordinate: mission.location,
               title: mission.title,
               description: mission.description
