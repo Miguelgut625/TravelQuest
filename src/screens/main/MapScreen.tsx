@@ -233,75 +233,78 @@ const MapScreen = () => {
   };
 
   const handleSearch = async () => {
-    const durationNum = parseInt(duration);
     const missionCountNum = parseInt(missionCount);
     
     // Validación específica de campos
     if (!searchCity) {
-      setErrorMsg('Por favor, selecciona una ciudad');
-      return;
+        setErrorMsg('Por favor, selecciona una ciudad');
+        return;
     }
     if (!missionCountNum) {
-      setErrorMsg('Por favor, ingresa el número de misiones');
-      return;
+        setErrorMsg('Por favor, ingresa el número de misiones');
+        return;
     }
     if (!user?.id) {
-      setErrorMsg('Error: No hay usuario autenticado');
-      return;
-    }
-    if (!description) {
-      setErrorMsg('Por favor, ingresa una descripción de la aventura');
-      return;
+        setErrorMsg('Error: No hay usuario autenticado');
+        return;
     }
 
     try {
-      // Primero obtenemos el ID de la ciudad
-      const { data: cityData, error: cityError } = await supabase
-        .from('cities')
-        .select('id')
-        .eq('name', searchCity)
-        .single();
+        // Calcular la diferencia en días entre startDate y endDate
+        const startTime = startDate.getTime();
+        const endTime = endDate.getTime();
+        const differenceInTime = endTime - startTime;
+        const durationNum = Math.round(differenceInTime / (1000 * 3600 * 24)); // Convertir milisegundos a días y redondear
 
-      if (cityError) 
-        {
-        throw new Error('Error al obtener el ID de la ciudad');
-      }
+        // Generar la descripción usando la diferencia en días
+        const generatedDescription = `Viaje a ${searchCity} por ${durationNum} días`;
 
-      if (!cityData) {
-        setErrorMsg('No se encontró la ciudad en la base de datos');
-        return;
-      }
+        // Primero obtenemos el ID de la ciudad
+        const { data: cityData, error: cityError } = await supabase
+            .from('cities')
+            .select('id')
+            .eq('name', searchCity)
+            .single();
 
-      setCityId(cityData.id);
+        if (cityError) {
+            throw new Error('Error al obtener el ID de la ciudad');
+        }
 
-      await getCityCoordinates(searchCity);
-      //ZONA INICIO
-      const startDateString = startDate.toISOString().split('T')[0];
-      const endDateString = endDate.toISOString().split('T')[0];
+        if (!cityData) {
+            setErrorMsg('No se encontró la ciudad en la base de datos');
+            return;
+        }
 
-      // Crear el journey con el ID del usuario actual
-      const { error: journeyError } = await supabase
-        .from('journeys')
-        .insert({
-          description,
-          start_date: startDateString,
-          end_date: endDateString,
-          cityId: cityData.id,
-          userId: user.id
-        });
+        setCityId(cityData.id);
 
-      if (journeyError) {
-        throw journeyError;
-      }
+        await getCityCoordinates(searchCity);
+        // ZONA INICIO
+        const startDateString = startDate.toISOString().split('T')[0];
+        const endDateString = endDate.toISOString().split('T')[0];
 
-      //ZONA FIN
-      await generateMission(searchCity, durationNum, missionCountNum);
-      navigation.navigate('Missions');
+        // Crear el journey con el ID del usuario actual
+        const { error: journeyError } = await supabase
+            .from('journeys')
+            .insert({
+                description: generatedDescription, // Usar la descripción generada
+                start_date: startDateString,
+                end_date: endDateString,
+                cityId: cityData.id,
+                userId: user.id
+            });
+
+        if (journeyError) {
+            throw journeyError;
+        }
+
+        // ZONA FIN
+        await generateMission(searchCity, durationNum, missionCountNum);
+        navigation.navigate('Missions');
     } catch (error) {
-      console.error('Error:', error);
-      setErrorMsg('Error al crear la aventura. Por favor, inténtalo de nuevo.');
+        console.error('Error:', error);
+        setErrorMsg('Error al crear la aventura. Por favor, inténtalo de nuevo.');
     }
-  };
+};
 
   return (
     <View style={styles.container}>
@@ -355,15 +358,6 @@ const MapScreen = () => {
           value={missionCount}
           onChangeText={setMissionCount}
           keyboardType="numeric"
-        />
-        <TextInput
-          style={[styles.input, styles.descriptionInput]}
-          placeholder="Descripción de la aventura"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
         />
         <TouchableOpacity style={styles.button} onPress={handleSearch}>
           <Text style={styles.buttonText}>Buscar Aventuras</Text>
