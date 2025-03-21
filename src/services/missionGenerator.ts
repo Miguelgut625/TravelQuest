@@ -208,7 +208,8 @@ const generateMission = async (cityName: string, duration: number, missionCount:
   ]
 }
 Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No incluyas explicaciones adicionales, solo el JSON.`;
-
+      
+      console.log('Prompt:', prompt);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const missionsData = response.text();

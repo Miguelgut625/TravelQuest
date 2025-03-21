@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
-import { Mission } from '../../features/missionSlice';
 import Map, { MapMarker } from '../../components/maps';
 import * as Location from 'expo-location';
 import { getMissionsByCityAndDuration } from '../../services/missionService';
@@ -35,7 +34,6 @@ const MapScreen = () => {
   const [duration, setDuration] = useState('');
   const [missionCount, setMissionCount] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [missions, setMissions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -74,30 +72,16 @@ const MapScreen = () => {
       setIsLoading(true);
       setErrorMsg(null);
 
-      console.log('Generando misiones para:', {
-        city: searchCity,
-        duration: durationNum,
-        count: missionCountNum,
-        userId: user.id
-      });
-
       const result = await generateMission(searchCity, durationNum, missionCountNum, user.id);
-      console.log('Misiones generadas:', result);
-
+      
       if (!result.journeyId) {
         throw new Error('No se recibió el ID del journey');
       }
 
-      // Asegurarnos de que tenemos todos los datos necesarios
-      const journeyData = {
+      navigation.navigate('Missions', {
         journeyId: result.journeyId,
         challenges: result.challenges || []
-      };
-
-      console.log('Navegando a Missions con:', journeyData);
-
-      // Navegar a la pantalla de misiones con los datos del journey
-      navigation.navigate('Missions', journeyData);
+      });
     } catch (error) {
       console.error('Error generando misiones:', error);
       setErrorMsg('Error al generar las misiones. Por favor, intenta de nuevo.');
@@ -141,10 +125,14 @@ const MapScreen = () => {
         {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
       </View>
 
-      <Map
-        region={region}
-        style={styles.map}
-      />
+      <View style={styles.mapContainer}>
+        <Map
+          region={region}
+          style={styles.map}
+          showsUserLocation={true}
+          showsMyLocationButton={true}
+        />
+      </View>
     </View>
   );
 };
@@ -152,19 +140,13 @@ const MapScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  map: {
-    width: width,
-    height: height * 0.7,
+    backgroundColor: '#f5f5f5',
   },
   searchContainer: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
     backgroundColor: 'white',
     padding: 15,
-    borderRadius: 10,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -173,7 +155,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    zIndex: 1,
+  },
+  mapContainer: {
+    flex: 1,
+    marginTop: 10,
+  },
+  map: {
+    width: '100%',
+    height: '100%',
   },
   input: {
     height: 40,
@@ -182,6 +171,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 10,
     paddingHorizontal: 10,
+    backgroundColor: 'white',
   },
   button: {
     backgroundColor: '#4CAF50',

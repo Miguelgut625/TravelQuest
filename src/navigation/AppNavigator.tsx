@@ -12,9 +12,27 @@ import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { ParamListBase } from '@react-navigation/native';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ResetPassword: undefined;
+  Main: undefined;
+};
+
+type TabParamList = {
+  Map: undefined;
+  Missions: {
+    journeyId: string;
+    challenges: any[];
+  };
+  Journal: undefined;
+  Profile: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
 
 const MainTabs = () => {
   return (

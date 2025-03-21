@@ -1,27 +1,90 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 const ProfileScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { completedMissions } = useSelector((state: RootState) => state.missions);
-  const entries = useSelector((state: RootState) => state.journal.entries);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [stats, setStats] = useState({
+    totalPoints: 0,
+    completedMissions: 0,
+    visitedCities: 0
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
 
-  const totalPoints = completedMissions.reduce((sum, mission) => sum + mission.points, 0);
-  const totalCities = Object.keys(entries).length;
-  const totalEntries = Object.values(entries).flat().length;
+  useEffect(() => {
+    fetchUserStats();
+  }, [user?.id]);
+
+  const fetchUserStats = async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoadingStats(true);
+
+      // Obtener los journeys del usuario con sus misiones completadas
+      const { data: journeys, error: journeysError } = await supabase
+        .from('journeys')
+        .select(`
+          id,
+          cityId,
+          journeys_missions!inner (
+            completed,
+            challenges!inner (
+              points
+            )
+          )
+        `)
+        .eq('userId', user.id);
+
+      if (journeysError) throw journeysError;
+
+      // Calcular estadísticas
+      const stats = {
+        totalPoints: 0,
+        completedMissions: 0,
+        visitedCities: new Set()
+      };
+
+      journeys?.forEach(journey => {
+        // Añadir la ciudad a las visitadas
+        if (journey.cityId) {
+          stats.visitedCities.add(journey.cityId);
+        }
+
+        // Contar misiones completadas y puntos
+        journey.journeys_missions.forEach(mission => {
+          if (mission.completed) {
+            stats.completedMissions++;
+            stats.totalPoints += mission.challenges.points;
+          }
+        });
+      });
+
+      setStats({
+        totalPoints: stats.totalPoints,
+        completedMissions: stats.completedMissions,
+        visitedCities: stats.visitedCities.size
+      });
+
+    } catch (error) {
+      console.error('Error obteniendo estadísticas:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const handleLogout = () => {
     dispatch(logout());
@@ -79,35 +142,39 @@ const ProfileScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Image
-          source={user?.profilePicture ? { uri: user.profilePicture } : require('../../assets/icons/avatar.png')}
-          style={styles.avatar}
-        />
-        <Text style={styles.username}>{user?.username}</Text>
+        {user?.profilePicture ? (
+          <Image
+            source={{ uri: user.profilePicture }}
+            style={styles.avatar}
+          />
+        ) : (
+          <View style={styles.avatarContainer}>
+            <Ionicons name="person-circle" size={100} color="white" />
+          </View>
+        )}
+        <Text style={styles.username}>{user?.username || user?.email}</Text>
         <Text style={styles.email}>{user?.email}</Text>
       </View>
 
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{totalPoints}</Text>
-          <Text style={styles.statLabel}>Puntos</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{completedMissions.length}</Text>
-          <Text style={styles.statLabel}>Misiones</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{totalCities}</Text>
-          <Text style={styles.statLabel}>Ciudades</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Estadísticas del Diario</Text>
-        <View style={styles.journalStats}>
-          <Text style={styles.journalStat}>Total de entradas: {totalEntries}</Text>
-          <Text style={styles.journalStat}>Ciudades visitadas: {totalCities}</Text>
-        </View>
+        {loadingStats ? (
+          <ActivityIndicator size="large" color="#4CAF50" />
+        ) : (
+          <>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.totalPoints}</Text>
+              <Text style={styles.statLabel}>Puntos</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.completedMissions}</Text>
+              <Text style={styles.statLabel}>Misiones Completadas</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.visitedCities}</Text>
+              <Text style={styles.statLabel}>Ciudades</Text>
+            </View>
+          </>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -231,6 +298,15 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: 10,
   },
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 10,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   username: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -278,24 +354,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     color: '#333',
-  },
-  journalStats: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  journalStat: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 5,
   },
   logoutButton: {
     margin: 20,

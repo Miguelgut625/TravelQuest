@@ -5,7 +5,43 @@ import 'react-native-url-polyfill/auto';
 const supabaseUrl = 'https://ynyxyzzpbyzyejgkfncm.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlueXh5enpwYnl6eWVqZ2tmbmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE3ODI4NDMsImV4cCI6MjA1NzM1ODg0M30.ntEnr5gFT5tllc0Z037LJPkPq60SM_RBLa6hct72xXs';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false
+  }
+});
+
+// Función para probar la autenticación
+export const testAuth = async (email: string, password: string) => {
+  try {
+    console.log('Probando autenticación con:', { email });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      console.error('Error en prueba de autenticación:', {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      });
+      return { success: false, error };
+    }
+
+    console.log('Prueba de autenticación exitosa:', {
+      user: data.user?.email,
+      session: !!data.session
+    });
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error inesperado en prueba de autenticación:', error);
+    return { success: false, error };
+  }
+};
 
 // Funciones auxiliares para interactuar con Supabase
 export const uploadImage = async (filePath: string, bucket: string) => {
@@ -53,5 +89,51 @@ export const updateMissionProgress = async (missionId: string, userId: string, c
   } catch (error) {
     console.error('Error updating mission progress:', error);
     throw error;
+  }
+};
+
+// Función para verificar credenciales de forma segura
+export const verifyCredentials = async (email: string, password: string) => {
+  try {
+    console.log('Verificando credenciales para:', email);
+    
+    // Usar el sistema de autenticación incorporado de Supabase
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (authError) {
+      console.error('Error en autenticación:', authError);
+      return { success: false, error: authError };
+    }
+
+    if (!authData.user) {
+      console.log('No se encontró el usuario');
+      return { success: false, error: new Error('Usuario no encontrado') };
+    }
+
+    // Obtener datos adicionales del usuario si es necesario
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (userError) {
+      console.error('Error obteniendo datos del usuario:', userError);
+      return { success: false, error: userError };
+    }
+
+    const userInfo = {
+      ...userData,
+      email: authData.user.email
+    };
+
+    console.log('Autenticación exitosa para:', email);
+    return { success: true, data: userInfo };
+  } catch (error) {
+    console.error('Error inesperado en autenticación:', error);
+    return { success: false, error };
   }
 }; 
