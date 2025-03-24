@@ -28,7 +28,6 @@ const MapScreen = () => {
   const [searchCity, setSearchCity] = useState('');
   const [duration, setDuration] = useState('');
   const [missionCount, setMissionCount] = useState('');
-  const [description, setDescription] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const cityMarker = useSelector((state: RootState) => state.cityMission.cityMarker);
@@ -249,10 +248,6 @@ const MapScreen = () => {
       setErrorMsg('Error: No hay usuario autenticado');
       return;
     }
-    if (!description) {
-      setErrorMsg('Por favor, ingresa una descripción de la aventura');
-      return;
-    }
 
     try {
       // Primero obtenemos el ID de la ciudad
@@ -262,8 +257,7 @@ const MapScreen = () => {
         .eq('name', searchCity)
         .single();
 
-      if (cityError) 
-        {
+      if (cityError) {
         throw new Error('Error al obtener el ID de la ciudad');
       }
 
@@ -279,11 +273,21 @@ const MapScreen = () => {
       const startDateString = startDate.toISOString().split('T')[0];
       const endDateString = endDate.toISOString().split('T')[0];
 
+      // Calcular la duración en días
+      const durationInDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+      if (!Number.isInteger(durationInDays) || durationInDays <= 0) {
+        setErrorMsg('La duración debe ser un número entero positivo.');
+        return;
+      }
+
+      // Generar la descripción
+      const generatedDescription = `Viaje a ${searchCity} por ${durationInDays} días`;
+
       // Crear el journey con el ID del usuario actual
       const { error: journeyError } = await supabase
         .from('journeys')
         .insert({
-          description,
+          description: generatedDescription,
           start_date: startDateString,
           end_date: endDateString,
           cityId: cityData.id,
@@ -355,15 +359,6 @@ const MapScreen = () => {
           value={missionCount}
           onChangeText={setMissionCount}
           keyboardType="numeric"
-        />
-        <TextInput
-          style={[styles.input, styles.descriptionInput]}
-          placeholder="Descripción de la aventura"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
         />
         <TouchableOpacity style={styles.button} onPress={handleSearch}>
           <Text style={styles.buttonText}>Buscar Aventuras</Text>
