@@ -13,9 +13,15 @@ import { useDispatch } from 'react-redux';
 import { setUser, setToken, setAuthState } from '../../features/authSlice';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/types';
 import { useRoute } from '@react-navigation/native';
 import { Linking } from 'react-native';
+
+// Definir el tipo para la navegación
+type RootStackParamList = {
+  ResetPassword: undefined;
+  Login: undefined;
+  Main: undefined;
+};
 
 type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ResetPassword'>;
 
@@ -23,36 +29,59 @@ export const ResetPasswordScreen = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSessionValid, setIsSessionValid] = useState(false);
   const dispatch = useDispatch();
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
-  const route = useRoute();
 
   useEffect(() => {
     const checkSession = async () => {
-      console.log('Verificando sesión en ResetPasswordScreen...');
-      
-      // Obtener la URL actual
-      const url = await Linking.getInitialURL();
-      console.log('URL actual:', url);
+      try {
+        console.log('Verificando sesión en ResetPasswordScreen...');
 
-      if (url?.includes('type=recovery')) {
-        console.log('Enlace de recuperación detectado');
-        return; // Permitir continuar con el proceso de recuperación
-      }
+        const url = await Linking.getInitialURL();
+        console.log('URL actual:', url);
 
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error al verificar sesión:', error);
-        Alert.alert('Error', 'No se pudo verificar la sesión');
-        return;
-      }
+        if (url?.includes('type=recovery')) {
+          console.log('Enlace de recuperación detectado');
 
-      if (!session) {
-        console.log('No hay sesión activa ni enlace de recuperación');
+          // Extraer tokens
+          const accessToken = url.split('access_token=')[1]?.split('&')[0];
+          const refreshToken = url.split('refresh_token=')[1]?.split('&')[0];
+
+          if (!accessToken) {
+            throw new Error('Token de acceso no encontrado en la URL');
+          }
+
+          // Intentar establecer la sesión directamente
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+
+          if (error) {
+            throw new Error(`Error al establecer la sesión: ${error.message}`);
+          }
+
+          if (data.session) {
+            console.log('Sesión establecida correctamente');
+            setIsSessionValid(true);
+
+            // Importante: Mantener el estado en password_recovery
+            dispatch(setAuthState('password_recovery'));
+
+            // No establecer el usuario completo aquí, solo lo necesario
+            dispatch(setToken(data.session.access_token));
+          } else {
+            throw new Error('No se pudo obtener la sesión después de establecerla');
+          }
+        } else {
+          throw new Error('No se encontró un enlace de recuperación válido');
+        }
+      } catch (error) {
+        console.error('Error en checkSession:', error);
         Alert.alert(
           'Error',
-          'No hay una sesión activa de recuperación de contraseña. Por favor, solicita un nuevo enlace.',
+          error instanceof Error ? error.message : 'Error al verificar la sesión',
           [{ text: 'OK', onPress: () => navigation.replace('Login') }]
         );
       }
@@ -62,78 +91,48 @@ export const ResetPasswordScreen = () => {
   }, []);
 
   const handleResetPassword = async () => {
-    console.log('handleResetPassword llamado');
-    console.log('Nueva contraseña:', newPassword);
-    console.log('Confirmar contraseña:', confirmPassword);
-    
+    if (!isSessionValid) {
+      Alert.alert('Error', 'No hay una sesión válida para actualizar la contraseña');
+      return;
+    }
+
     if (!newPassword || !confirmPassword) {
-      console.log('Error: Campos vacíos');
       Alert.alert('Error', 'Por favor, completa todos los campos');
       return;
     }
 
     if (newPassword.length < 6) {
-      console.log('Error: Contraseña demasiado corta');
       Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      console.log('Error: Las contraseñas no coinciden');
       Alert.alert('Error', 'Las contraseñas no coinciden');
       return;
     }
 
     setLoading(true);
-    console.log('Iniciando actualización de contraseña...');
 
     try {
-      // Primero verificar la sesión actual
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('Error al obtener sesión:', sessionError);
-        Alert.alert('Error', 'No se pudo obtener la sesión actual');
-        return;
-      }
-
-      if (!session) {
-        console.error('No hay sesión activa');
-        Alert.alert('Error', 'No hay una sesión activa. Por favor, solicita un nuevo enlace.');
-        return;
-      }
-
-      console.log('Actualizando contraseña para usuario:', session.user.email);
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { data, error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
-      if (updateError) {
-        console.error('Error al actualizar contraseña:', updateError);
-        Alert.alert('Error', updateError.message);
-        return;
-      }
+      if (error) throw error;
 
-      console.log('Contraseña actualizada exitosamente');
-      
-      // Obtener la sesión actualizada
-      const { data: { session: updatedSession }, error: updatedSessionError } = await supabase.auth.getSession();
-      
-      if (updatedSessionError) {
-        console.error('Error al obtener sesión actualizada:', updatedSessionError);
-        Alert.alert('Error', 'No se pudo obtener la sesión actualizada');
-        return;
-      }
+      // Obtener la sesión actual
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (updatedSession?.user) {
-        console.log('Configurando usuario en Redux...');
+      if (session && data.user) {
+        // Establecer el usuario y el token
         dispatch(setUser({
-          id: updatedSession.user.id,
-          email: updatedSession.user.email!,
-          username: updatedSession.user.user_metadata.username || updatedSession.user.email!.split('@')[0],
+          id: data.user.id,
+          email: data.user.email!,
+          username: data.user.user_metadata.username || data.user.email!.split('@')[0],
         }));
-        dispatch(setToken(updatedSession.access_token));
+        dispatch(setToken(session.access_token));
         dispatch(setAuthState('authenticated'));
-        
+
         Alert.alert(
           'Éxito',
           'Contraseña actualizada correctamente',
@@ -141,23 +140,27 @@ export const ResetPasswordScreen = () => {
             {
               text: 'OK',
               onPress: () => {
-                console.log('Navegando a la pantalla principal...');
-                navigation.replace('Main');
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Main' }],
+                });
               }
             }
           ]
         );
       }
     } catch (error) {
-      console.error('Error en handleResetPassword:', error);
-      Alert.alert('Error', 'Ocurrió un error al actualizar la contraseña');
+      console.error('Error al actualizar contraseña:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Error al actualizar la contraseña'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    console.log('Cancelando recuperación de contraseña...');
     dispatch(setAuthState('unauthenticated'));
     navigation.replace('Login');
   };
@@ -190,7 +193,7 @@ export const ResetPasswordScreen = () => {
       <TouchableOpacity
         style={[styles.button, loading && styles.buttonDisabled]}
         onPress={handleResetPassword}
-        disabled={loading}
+        disabled={loading || !isSessionValid}
       >
         {loading ? (
           <ActivityIndicator color="white" />
@@ -262,4 +265,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ResetPasswordScreen; 
+export default ResetPasswordScreen;

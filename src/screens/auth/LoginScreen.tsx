@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Alert } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setUser, setToken, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
@@ -18,10 +18,15 @@ const LoginScreen = ({ navigation }: any) => {
   useEffect(() => {
     console.log('LoginScreen montado');
     // Verificar el estado inicial de autenticación
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      const session = data.session;
       console.log('Estado de sesión:', session ? 'Activa' : 'Inactiva');
+      if (session) {
+        // Si hay una sesión activa, redirigir a Main
+        navigation.replace('Main');
+      }
     });
-  }, []);
+  }, [navigation]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -67,47 +72,24 @@ const LoginScreen = ({ navigation }: any) => {
   //Reset del password
   const handleResetPassword = async () => {
     if (!resetEmail) {
-      setResetMessage({ type: 'error', text: 'Por favor ingresa tu correo electrónico' });
+      Alert.alert('Error', 'Por favor ingresa tu correo electrónico.');
       return;
     }
 
-    setLoading(true);
-    setResetMessage({ type: '', text: '' });
-
     try {
+      setLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: 'travelquest://reset-password',
-        options: {
-          emailRedirectTo: 'travelquest://reset-password',
-          shouldCreateUser: false
-        }
       });
 
-      if (error) {
-        if (error.message.includes('rate limit')) {
-          throw new Error('Has alcanzado el límite de intentos. Por favor, espera unos minutos antes de intentar nuevamente.');
-        }
-        throw error;
-      }
+      if (error) throw error;
 
-      setResetMessage({
-        type: 'success',
-        text: 'Se ha enviado un enlace a tu correo para restablecer tu contraseña'
-      });
-
-      // Limpiar y cerrar el modal después de 3 segundos
-      setTimeout(() => {
-        setResetEmail('');
-        setIsResetPasswordVisible(false);
-        setResetMessage({ type: '', text: '' });
-      }, 3000);
+      setIsResetPasswordVisible(false);
+      navigation.replace('EmailSent');
 
     } catch (error: any) {
-      console.error('Error al enviar email de recuperación:', error);
-      setResetMessage({
-        type: 'error',
-        text: error.message || 'Error al enviar el correo de recuperación'
-      });
+      console.error('Error al enviar el enlace de recuperación:', error);
+      Alert.alert('Error', error.message || 'Error al enviar el enlace de recuperación.');
     } finally {
       setLoading(false);
     }

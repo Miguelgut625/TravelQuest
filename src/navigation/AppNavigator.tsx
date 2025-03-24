@@ -12,28 +12,50 @@ import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import EmailSentScreen from '../screens/auth/EmailSentScreen';
 
-const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+// Definir los tipos para la navegación
+type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ResetPassword: undefined;
+  Main: undefined;
+  EmailSent: undefined;
+};
+
+type TabParamList = {
+  Map: undefined;
+  Missions: undefined;
+  Journal: undefined;
+  Profile: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
 
 const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+          let iconName: keyof typeof Ionicons.glyphMap = 'help-outline';
 
-          if (route.name === 'Map') {
-            iconName = focused ? 'map' : 'map-outline';
-          } else if (route.name === 'Missions') {
-            iconName = focused ? 'list' : 'list-outline';
-          } else if (route.name === 'Journal') {
-            iconName = focused ? 'journal' : 'journal-outline';
-          } else if (route.name === 'Profile') {
-            iconName = focused ? 'person' : 'person-outline';
+          switch (route.name) {
+            case 'Map':
+              iconName = focused ? 'map' : 'map-outline';
+              break;
+            case 'Missions':
+              iconName = focused ? 'list' : 'list-outline';
+              break;
+            case 'Journal':
+              iconName = focused ? 'journal' : 'journal-outline';
+              break;
+            case 'Profile':
+              iconName = focused ? 'person' : 'person-outline';
+              break;
           }
 
-          return <Ionicons name={iconName as any} size={size} color={color} />;
+          return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#4CAF50',
         tabBarInactiveTintColor: 'gray',
@@ -47,28 +69,22 @@ const MainTabs = () => {
   );
 };
 
-const AppNavigator = ({ linking }: any) => {
+const AppNavigator = () => {
   const { user, authState } = useSelector((state: RootState) => state.auth);
-  console.log('Estado de navegación:', { user, authState });
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {authState === 'password_recovery' ? (
-          <Stack.Screen 
-            name="ResetPassword" 
+          <Stack.Screen
+            name="ResetPassword"
             component={ResetPasswordScreen}
-            options={{
-              headerShown: true,
-              title: 'Recuperar Contraseña',
-              headerBackTitle: 'Volver',
-              gestureEnabled: false
-            }}
           />
         ) : !user ? (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="EmailSent" component={EmailSentScreen} />
           </>
         ) : (
           <Stack.Screen name="Main" component={MainTabs} />
