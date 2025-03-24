@@ -1,0 +1,1 @@
+{"ast":null,"code":"export { default } from \"./uuid\";","map":{"version":3,"names":["default"],"sources":["C:/Users/PC/TravelQuest/node_modules/expo-modules-core/src/uuid/index.ts"],"sourcesContent":["export { default } from './uuid';\n"],"mappings":"AAAA,SAASA,OAAO","ignoreList":[]},"metadata":{},"sourceType":"module","externalDependencies":[]}

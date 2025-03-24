@@ -1,25 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Alert } from 'react-native';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setUser, setToken, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-const LoginScreen = ({ navigation }: any) => {
+type RootStackParamList = {
+  Main: undefined;
+  Login: undefined;
+  Register: undefined;
+  EmailSent: undefined;
+  ResetPassword: undefined;
+};
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isResetPasswordVisible, setIsResetPasswordVisible] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
-  const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
+  const [isResetPasswordVisible, setIsResetPasswordVisible] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dispatch = useDispatch();
+  const navigation = useNavigation<NavigationProp>();
 
   useEffect(() => {
     console.log('LoginScreen montado');
     // Verificar el estado inicial de autenticación
-    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
-      const session = data.session;
+    supabase.auth.getSession().then(({ data }) => {
+      const session = data?.session;
       console.log('Estado de sesión:', session ? 'Activa' : 'Inactiva');
       if (session) {
         // Si hay una sesión activa, redirigir a Main
@@ -35,7 +46,7 @@ const LoginScreen = ({ navigation }: any) => {
     }
 
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
       console.log('Intentando iniciar sesión...');
@@ -47,9 +58,11 @@ const LoginScreen = ({ navigation }: any) => {
       if (error) {
         console.error('Error de autenticación:', error);
         if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Contraseña Incorrecta');
+          setError('Contraseña Incorrecta');
+        } else {
+          setError(error.message);
         }
-        throw error;
+        return;
       }
 
       if (data.user && data.session) {
@@ -60,6 +73,7 @@ const LoginScreen = ({ navigation }: any) => {
           username: data.user.user_metadata.username || email.split('@')[0],
         }));
         dispatch(setToken(data.session.access_token));
+        dispatch(setAuthState('authenticated'));
         navigation.replace('Main');
       }
     } catch (error: any) {
@@ -69,7 +83,7 @@ const LoginScreen = ({ navigation }: any) => {
       setLoading(false);
     }
   };
-  //Reset del password
+
   const handleResetPassword = async () => {
     if (!resetEmail) {
       Alert.alert('Error', 'Por favor ingresa tu correo electrónico.');
@@ -138,7 +152,9 @@ const LoginScreen = ({ navigation }: any) => {
           secureTextEntry
         />
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error && (
+          <Text style={styles.errorText}>{error}</Text>
+        )}
 
         <TouchableOpacity
           style={styles.button}
@@ -152,73 +168,46 @@ const LoginScreen = ({ navigation }: any) => {
           )}
         </TouchableOpacity>
 
-        <View style={styles.linksContainer}>
-          <TouchableOpacity onPress={() => setIsResetPasswordVisible(true)}>
-            <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
-          </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+          <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => setIsResetPasswordVisible(true)}>
+          <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
+        </TouchableOpacity>
       </View>
 
       <Modal
         visible={isResetPasswordVisible}
-        transparent={true}
+        transparent
         animationType="slide"
+        onRequestClose={() => setIsResetPasswordVisible(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Recuperar Contraseña</Text>
-
-            {resetMessage.text ? (
-              <Text style={[
-                styles.messageText,
-                resetMessage.type === 'error' ? styles.errorMessage : styles.successMessage
-              ]}>
-                {resetMessage.text}
-              </Text>
-            ) : null}
-
             <TextInput
               style={styles.input}
-              placeholder="Ingresa tu correo electrónico"
+              placeholder="Correo electrónico"
               value={resetEmail}
-              onChangeText={(text) => {
-                setResetEmail(text);
-                setResetMessage({ type: '', text: '' });
-              }}
+              onChangeText={setResetEmail}
               autoCapitalize="none"
               keyboardType="email-address"
             />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setIsResetPasswordVisible(false);
-                  setResetEmail('');
-                  setResetMessage({ type: '', text: '' });
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  styles.sendButton,
-                  loading && styles.disabledButton
-                ]}
-                onPress={handleResetPassword}
-                disabled={loading}
-              >
-                <Text style={styles.modalButtonText}>
-                  {loading ? 'Enviando...' : 'Enviar'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleResetPassword}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.buttonText}>Enviar Enlace</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setIsResetPasswordVisible(false)}>
+              <Text style={styles.link}>Cancelar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -270,15 +259,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  linksContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 20,
-  },
   link: {
     color: '#4CAF50',
     fontSize: 14,
-    marginVertical: 5,
+    marginTop: 20,
+    textAlign: 'center',
     textDecorationLine: 'underline',
   },
   errorText: {
@@ -304,46 +289,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#333',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#f44336',
-  },
-  sendButton: {
-    backgroundColor: '#4CAF50',
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  modalButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  messageText: {
-    textAlign: 'center',
-    marginBottom: 15,
-    padding: 10,
-    borderRadius: 5,
-  },
-  errorMessage: {
-    backgroundColor: '#ffebee',
-    color: '#f44336',
-  },
-  successMessage: {
-    backgroundColor: '#e8f5e9',
     color: '#4CAF50',
   },
 });
