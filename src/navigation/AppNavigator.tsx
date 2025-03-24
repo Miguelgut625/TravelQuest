@@ -12,7 +12,7 @@ import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { ParamListBase } from '@react-navigation/native';
+import { useTheme } from 'react-native-paper';
 
 type RootStackParamList = {
   Login: undefined;
@@ -35,6 +35,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
 const MainTabs = () => {
+  const theme = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -53,31 +55,79 @@ const MainTabs = () => {
 
           return <Ionicons name={iconName as any} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#4CAF50',
+        tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#e0e0e0',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        headerStyle: {
+          backgroundColor: theme.colors.primary,
+        },
+        headerTintColor: 'white',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
       })}
     >
-      <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Missions" component={MissionsScreen} />
-      <Tab.Screen name="Journal" component={JournalScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Map" 
+        component={MapScreen}
+        options={{
+          title: 'Mapa',
+        }}
+      />
+      <Tab.Screen 
+        name="Missions" 
+        component={MissionsScreen}
+        options={{
+          title: 'Misiones',
+        }}
+      />
+      <Tab.Screen 
+        name="Journal" 
+        component={JournalScreen}
+        options={{
+          title: 'Diario',
+        }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{
+          title: 'Perfil',
+        }}
+      />
     </Tab.Navigator>
   );
 };
 
 const AppNavigator = ({ linking }: any) => {
   const { user, authState } = useSelector((state: RootState) => state.auth);
-  console.log('Estado de navegación:', { user, authState });
+  const theme = useTheme();
 
   return (
     <NavigationContainer linking={linking}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator 
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: theme.colors.primary,
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      >
         {authState === 'password_recovery' ? (
           <Stack.Screen 
             name="ResetPassword" 
             component={ResetPasswordScreen}
             options={{
-              headerShown: true,
               title: 'Recuperar Contraseña',
               headerBackTitle: 'Volver',
               gestureEnabled: false
@@ -85,11 +135,30 @@ const AppNavigator = ({ linking }: any) => {
           />
         ) : !user ? (
           <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen}
+              options={{
+                headerShown: false
+              }}
+            />
+            <Stack.Screen 
+              name="Register" 
+              component={RegisterScreen}
+              options={{
+                title: 'Registro',
+                headerBackTitle: 'Volver'
+              }}
+            />
           </>
         ) : (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen 
+            name="Main" 
+            component={MainTabs}
+            options={{
+              headerShown: false
+            }}
+          />
         )}
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,10 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { persistStore } from 'redux-persist';
-import authReducer from './authSlice';
+import authReducer from './auth/authSlice';
 import missionReducer from './missionSlice';
 import journalReducer from './journalSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { persistReducer } from 'redux-persist';
+import journeyReducer from './journey/journeySlice';
 
 const persistConfig = {
   key: 'root',
@@ -20,6 +21,7 @@ export const store = configureStore({
     auth: persistedAuthReducer,
     missions: missionReducer,
     journal: journalReducer,
+    journey: journeyReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

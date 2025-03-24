@@ -1,24 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
 import { completeMission } from '../../services/pointsService';
 import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-
-interface JourneyMission {
-  id: string;
-  challengeId: string;
-  completed: boolean;
-  challenge: {
-    title: string;
-    description: string;
-    difficulty: string;
-    points: number;
-  };
-  cityName: string;
-}
+import { Card, ProgressBar, useTheme, Surface } from 'react-native-paper';
+import { JourneyMission } from '../../types/journey';
+import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -36,6 +26,27 @@ interface CityMissions {
     completed: JourneyMission[];
     pending: JourneyMission[];
   };
+}
+
+interface Journey {
+  id: string;
+  description: string;
+  created_at: string;
+  cities?: {
+    name: string;
+  };
+  journeys_missions: {
+    id: string;
+    completed: boolean;
+    challengeId: string;
+    challenges: {
+      id: string;
+      title: string;
+      description: string;
+      difficulty: string;
+      points: number;
+    };
+  }[];
 }
 
 const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onComplete: () => void }) => (
@@ -94,6 +105,8 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
   const [userPoints, setUserPoints] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [cityMissions, setCityMissions] = useState<CityMissions>({});
+  const dispatch = useDispatch();
+  const theme = useTheme();
 
   const fetchMissions = async () => {
     if (!user?.id) {
@@ -136,8 +149,8 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
         return;
       }
 
-      const allMissions = journeys.flatMap(journey => 
-        journey.journeys_missions.map(jm => ({
+      const allMissions = journeys.flatMap((journey: Journey) => 
+        journey.journeys_missions.map((jm) => ({
           id: jm.id,
           completed: jm.completed,
           cityName: journey.cities?.name || 'Ciudad Desconocida',
@@ -152,7 +165,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
 
       // Organizar misiones por ciudad
       const missionsByCity: CityMissions = {};
-      allMissions.forEach(mission => {
+      allMissions.forEach((mission: JourneyMission) => {
         if (!missionsByCity[mission.cityName]) {
           missionsByCity[mission.cityName] = {
             completed: [],
@@ -215,6 +228,10 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
         'No se pudo completar la misión. Por favor, intenta de nuevo.'
       );
     }
+  };
+
+  const handleMissionComplete = (missionId: string) => {
+    dispatch(dispatchCompleteMission(missionId));
   };
 
   if (loading) {
@@ -284,7 +301,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
               <MissionCard
                 key={mission.id}
                 mission={mission}
-                onComplete={() => handleCompleteMission(mission.id)}
+                onComplete={() => handleMissionComplete(mission.id)}
               />
             ))}
           </>

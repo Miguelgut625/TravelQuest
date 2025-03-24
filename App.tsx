@@ -6,6 +6,20 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { ActivityIndicator, View, Text } from 'react-native';
 import { supabase } from './src/services/supabase';
 import { setAuthState } from './src/features/authSlice';
+import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+const theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: '#4CAF50',
+    secondary: '#FFA000',
+    background: '#f5f5f5',
+    surface: 'white',
+    error: '#f44336',
+  },
+};
 
 const App = () => {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -53,7 +67,11 @@ const App = () => {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <AppNavigator />
+        <PaperProvider theme={theme}>
+          <SafeAreaProvider>
+            <AppNavigator />
+          </SafeAreaProvider>
+        </PaperProvider>
       </PersistGate>
     </Provider>
   );
