@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { Mission } from '../../features/missionSlice';
@@ -37,6 +37,7 @@ const MapScreen = () => {
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const { user } = useSelector((state: RootState) => state.auth);
   const [cityId, setCityId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const missionsFromRedux = useSelector((state: RootState) => state.missions.missions);
 
@@ -59,6 +60,7 @@ const MapScreen = () => {
   }, []);
 
   const getCityNameFromCoordinates = async (latitude: number, longitude: number) => {
+    setLoading(true);
     try {
       console.log('Obteniendo nombre de ciudad para coordenadas:', latitude, longitude);
       
@@ -133,6 +135,8 @@ const MapScreen = () => {
         }
       }));
       setSearchCity(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -309,6 +313,11 @@ const MapScreen = () => {
 
   return (
     <View style={styles.container}>
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      )}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.input}
@@ -467,6 +476,17 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
     paddingTop: 10,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    zIndex: 2,
   },
 });
 
