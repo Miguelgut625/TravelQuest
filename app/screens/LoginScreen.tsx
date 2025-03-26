@@ -232,4 +232,8 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
   }
 };
 
+<<<<<<< HEAD
 export default generateMission;
+=======
+export default generateMission;
+>>>>>>> 581f4679a1d566b1b84a40d5957d78b326d9d65a
