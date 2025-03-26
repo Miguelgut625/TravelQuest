@@ -13,50 +13,27 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 
-type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-export const ResetPasswordScreen = () => {
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
+export const ForgotPasswordScreen = () => {
+    const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
-    const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
+    const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
 
-    const handleResetPassword = async () => {
-        if (!newPassword || !confirmPassword) {
-            Alert.alert('Error', 'Por favor, completa todos los campos');
-            return;
-        }
-
-        if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'Las contraseñas no coinciden');
-            return;
-        }
-
-        if (newPassword.length < 6) {
-            Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+    const handleSendCode = async () => {
+        if (!email) {
+            Alert.alert('Error', 'Por favor, ingresa tu correo electrónico');
             return;
         }
 
         setLoading(true);
 
         try {
-            // Verificar la sesión actual
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-            if (sessionError) {
-                Alert.alert('Error', 'Error al verificar la sesión');
-                return;
-            }
-
-            if (!session) {
-                Alert.alert('Error', 'Tu sesión ha expirado. Por favor, vuelve a iniciar sesión');
-                navigation.navigate('Login');
-                return;
-            }
-
-            // Actualizar la contraseña
-            const { error } = await supabase.auth.updateUser({
-                password: newPassword
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    shouldCreateUser: false
+                }
             });
 
             if (error) {
@@ -64,11 +41,11 @@ export const ResetPasswordScreen = () => {
                 return;
             }
 
-            Alert.alert('Éxito', 'Tu contraseña ha sido actualizada correctamente');
-            navigation.navigate('Login');
+            // Si el envío fue exitoso, navegamos a VerifyCode con el email
+            navigation.navigate('VerifyCode', { email });
         } catch (error) {
-            console.error('Error al cambiar contraseña:', error);
-            Alert.alert('Error', 'Ocurrió un error al cambiar la contraseña');
+            console.error('Error al enviar código de recuperación:', error);
+            Alert.alert('Error', 'Ocurrió un error al enviar el código de recuperación');
         } finally {
             setLoading(false);
         }
@@ -76,36 +53,29 @@ export const ResetPasswordScreen = () => {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Cambiar Contraseña</Text>
+            <Text style={styles.title}>Recuperar Contraseña</Text>
             <Text style={styles.subtitle}>
-                Por favor, ingresa tu nueva contraseña
+                Ingresa tu correo electrónico para recibir un código de verificación
             </Text>
 
             <TextInput
                 style={styles.input}
-                placeholder="Nueva contraseña"
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-            />
-
-            <TextInput
-                style={styles.input}
-                placeholder="Confirmar contraseña"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
+                placeholder="Correo electrónico"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
             />
 
             <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleResetPassword}
+                onPress={handleSendCode}
                 disabled={loading}
             >
                 {loading ? (
                     <ActivityIndicator color="white" />
                 ) : (
-                    <Text style={styles.buttonText}>Cambiar Contraseña</Text>
+                    <Text style={styles.buttonText}>Enviar Código</Text>
                 )}
             </TouchableOpacity>
 
@@ -113,7 +83,7 @@ export const ResetPasswordScreen = () => {
                 style={styles.cancelButton}
                 onPress={() => navigation.navigate('Login')}
             >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
+                <Text style={styles.cancelButtonText}>Volver al Login</Text>
             </TouchableOpacity>
         </View>
     );
@@ -172,4 +142,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ResetPasswordScreen; 
+export default ForgotPasswordScreen; 

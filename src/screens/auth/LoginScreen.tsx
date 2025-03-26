@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { setUser, setAuthState, setError } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-type RootStackParamList = {
-  Main: undefined;
-  Login: undefined;
-  Register: undefined;
-};
+import { RootStackParamList } from '../../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -32,30 +27,68 @@ const LoginScreen = () => {
       setLoading(true);
       dispatch(setAuthState('loading'));
       dispatch(setError(null));
-      
-      console.log('Verificando credenciales para:', email);
-      
-      // Primero verificamos si existe el usuario en la tabla users
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email.trim())
-        .eq('password', password.trim())
-        .single();
 
-      if (userError || !userData) {
-        console.error('Error o usuario no encontrado:', userError);
-        dispatch(setError('Email o contraseña incorrectos'));
+      console.log('Iniciando sesión para:', email);
+
+      // Primero verificamos si hay múltiples cuentas asociadas al email
+      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers({
+        filter: { email: email.trim() }
+      });
+
+      if (usersError) {
+        console.error('Error al verificar usuarios:', usersError);
+        // Continuamos con el login normal si hay error al verificar usuarios
+      }
+
+      if (users && users.length > 1) {
+        console.log('Se encontraron múltiples cuentas para:', email);
+        Alert.alert(
+          'Múltiples cuentas',
+          'Se encontraron múltiples cuentas asociadas a este correo. Por favor, verifica que estés usando la contraseña correcta.',
+          [{ text: 'OK' }]
+        );
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
+      });
+
+      if (error) {
+        console.error('Error de autenticación:', error);
+        if (error.message.includes('Invalid login credentials')) {
+          dispatch(setError('Email o contraseña incorrectos. Si tienes múltiples cuentas, asegúrate de usar la contraseña correcta.'));
+        } else {
+          dispatch(setError('Error al iniciar sesión: ' + error.message));
+        }
         dispatch(setAuthState('unauthenticated'));
         return;
       }
 
-      console.log('Usuario encontrado:', userData);
-      
-      // Si encontramos el usuario, lo autenticamos en el estado con su ID
-      dispatch(setUser({ 
-        email: userData.email,
-        id: userData.id 
+      if (!data.user) {
+        dispatch(setError('No se encontró el usuario'));
+        dispatch(setAuthState('unauthenticated'));
+        return;
+      }
+
+      console.log('Login exitoso:', data.user.email);
+
+      // Obtener datos adicionales del usuario
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('username')
+        .eq('id', data.user.id)
+        .single();
+
+      if (userError) {
+        console.error('Error obteniendo datos del usuario:', userError);
+      }
+
+      // Actualizar el estado con los datos del usuario
+      dispatch(setUser({
+        email: data.user.email || '',
+        id: data.user.id,
+        username: userData?.username
       }));
       dispatch(setAuthState('authenticated'));
       navigation.navigate('Main');
@@ -67,6 +100,10 @@ const LoginScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    navigation.navigate('ForgotPassword');
   };
 
   return (
@@ -107,6 +144,14 @@ const LoginScreen = () => {
           ) : (
             <Text style={styles.buttonText}>Iniciar Sesión</Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.forgotPasswordButton}
+          onPress={handleForgotPassword}
+          disabled={loading}
+        >
+          <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')}>
@@ -160,6 +205,15 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  forgotPasswordButton: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  forgotPasswordText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
   link: {
     color: '#4CAF50',

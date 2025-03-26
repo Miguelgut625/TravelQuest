@@ -5,7 +5,7 @@ import { store, persistor } from './src/features/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ActivityIndicator, View, Text } from 'react-native';
 import { supabase } from './src/services/supabase';
-import { setAuthState } from './src/features/authSlice';
+import { setAuthState, setUser, logout } from './src/features/authSlice';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -28,23 +28,31 @@ const App = () => {
     const initializeApp = async () => {
       try {
         console.log('Iniciando la aplicación...');
-        
-        // Verificar conexión con Supabase
-        const { data, error } = await supabase
-          .from('users')
-          .select('count')
-          .limit(1);
 
-        if (error) {
-          console.error('Error conectando con Supabase:', error);
-          throw error;
+        // Verificar sesión actual
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('Error obteniendo sesión:', sessionError);
+          throw sessionError;
         }
 
-        console.log('Conexión con Supabase establecida');
-        store.dispatch(setAuthState('unauthenticated'));
+        if (session?.user) {
+          console.log('Usuario autenticado encontrado:', session.user.email);
+          store.dispatch(setUser({
+            email: session.user.email || '',
+            id: session.user.id,
+            username: session.user.user_metadata?.username
+          }));
+          store.dispatch(setAuthState('authenticated'));
+        } else {
+          console.log('No hay sesión activa');
+          store.dispatch(logout());
+        }
 
       } catch (error) {
         console.error('Error inicializando la app:', error);
+        store.dispatch(logout());
       } finally {
         setIsInitializing(false);
       }

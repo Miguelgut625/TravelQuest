@@ -18,29 +18,42 @@ const RegisterScreen = ({ navigation }: any) => {
 
     try {
       // Crear un nuevo usuario en Supabase
-      const { user, error: signupError } = await supabase.auth.signUp({
+      const { data: authData, error: signupError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            username: username
+          }
+        }
       });
 
       if (signupError) throw signupError;
 
-      // Insertar el usuario en la tabla 'users' incluyendo la contraseña
-      const { data, error: insertError } = await supabase
+      if (!authData.user) {
+        throw new Error('No se pudo crear el usuario');
+      }
+
+      // Insertar el usuario en la tabla 'users' sin la contraseña
+      const { error: insertError } = await supabase
         .from('users')
         .insert([
-          { email, username, password } // Asegúrate de que 'password' sea el nombre correcto de la columna
+          {
+            id: authData.user.id,
+            email,
+            username,
+            created_at: new Date().toISOString()
+          }
         ]);
 
       if (insertError) throw insertError;
 
       // Guardar el usuario en Redux
       dispatch(setUser({
-        id: user?.id, // Usar el ID del usuario creado por Supabase
-        email: user?.email!,
+        id: authData.user.id,
+        email: authData.user.email!,
         username: username,
       }));
-      dispatch(setToken('fake_access_token')); // Puedes establecer un token real si lo tienes
 
       // Redirigir a la pantalla de inicio de sesión
       navigation.replace('Login');
