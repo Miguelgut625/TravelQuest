@@ -8,8 +8,8 @@ import {
   useWindowDimensions,
   ScrollView,
 } from 'react-native';
-import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import generateMission from '../../services/missionGenerator';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 
@@ -22,12 +22,12 @@ const colors = {
   backgroundGradient: ['#005F9E', '#F0F0F0'],
 };
 
-interface Mission {
-  id: number;
-  challenges: {
-    title: string;
-    difficulty: string;
-  };
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  points: number;
 }
 
 const MissionsScreen = () => {
@@ -35,63 +35,37 @@ const MissionsScreen = () => {
   const isSmallScreen = width < 400;
   const dynamicStyles = getDynamicStyles(isSmallScreen);
 
-  const [journeyMissions, setJourneyMissions] = useState<Mission[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useSelector((state: RootState) => state.auth);
-  const [username, setUsername] = useState('');
 
-  const difficultyLevels = ['Fácil', 'Media', 'Difícil', 'Sin clasificar'];
+  const difficultyLevels = ['Fácil', 'Media', 'Difícil'];
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchChallenges = async () => {
       if (!user?.id) return;
-
       setLoading(true);
+
       try {
-        const [{ data: userData, error: userError }, { data: missionsData, error: missionsError }] = await Promise.all([
-          supabase.from('users').select('username').eq('id', user.id).single(),
-          supabase.from('journeys_missions').select('*').eq('userId', user.id),
-        ]);
-
-        if (userError) throw userError;
-        if (missionsError) throw missionsError;
-
-        setUsername(userData?.username || '');
-
-        // ✅ Normalización robusta: acepta claves en inglés o español y mapea claramente
-        const normalized = (missionsData || []).map((m: any) => {
-          const challengeData = m.challenges || {};
-          return {
-            ...m,
-            challenges: {
-              title: challengeData.title || challengeData.Título || 'Sin título',
-              difficulty: challengeData.difficulty || challengeData.Dificultad || 'Sin clasificar',
-            },
-          };
-        });
-
-        setJourneyMissions(normalized);
+        const { challenges: generated } = await generateMission('Alicante', 3, 4, user.id);
+        setChallenges(generated);
       } catch (err: any) {
-        console.error('Error al obtener datos:', err.message);
+        console.error('Error al generar misiones:', err.message);
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchChallenges();
   }, [user]);
 
   const normalize = (text: string) =>
-    text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
   const filterByDifficulty = (level: string) => {
-    return journeyMissions.filter((m) => {
-      const raw = m.challenges?.difficulty;
-      if (!raw) return level === 'Sin clasificar';
-      return normalize(raw) === normalize(level);
-    });
+    return challenges.filter((c) => normalize(c.difficulty) === normalize(level));
   };
 
   if (loading) {
@@ -117,23 +91,23 @@ const MissionsScreen = () => {
           <Image source={Logo} style={dynamicStyles.logo} />
         </View>
         <Text style={dynamicStyles.headerTitle}>Misiones de Viaje</Text>
-        <Text style={dynamicStyles.headerSubtitle}>¡Completa tus desafíos, {username}!</Text>
+        <Text style={dynamicStyles.headerSubtitle}>Desafíos generados para ti</Text>
       </LinearGradient>
 
       <View style={dynamicStyles.tableContainer}>
         {difficultyLevels.map((level) => {
-          const missions = filterByDifficulty(level);
+          const filtered = filterByDifficulty(level);
           return (
             <View key={level} style={dynamicStyles.column}>
               <Text style={dynamicStyles.columnTitle}>{level}</Text>
-              {missions.length === 0 ? (
+              {filtered.length === 0 ? (
                 <Text style={dynamicStyles.emptyText}>No hay misiones</Text>
               ) : (
-                missions.map((mission) => (
+                filtered.map((mission) => (
                   <View key={mission.id} style={dynamicStyles.missionCard}>
-                    <Text style={dynamicStyles.missionTitle}>
-                      {mission.challenges.title}
-                    </Text>
+                    <Text style={dynamicStyles.missionTitle}>{mission.title}</Text>
+                    <Text style={dynamicStyles.missionDescription}>{mission.description}</Text>
+                    <Text style={dynamicStyles.missionInfo}>Puntos: {mission.points}</Text>
                   </View>
                 ))
               )}
@@ -202,6 +176,17 @@ const getDynamicStyles = (isSmallScreen: boolean) =>
     missionTitle: {
       fontSize: isSmallScreen ? 14 : 16,
       color: '#333',
+      fontWeight: 'bold',
+    },
+    missionDescription: {
+      fontSize: 13,
+      color: '#555',
+      marginTop: 4,
+    },
+    missionInfo: {
+      fontSize: 12,
+      color: '#777',
+      marginTop: 2,
     },
   });
 

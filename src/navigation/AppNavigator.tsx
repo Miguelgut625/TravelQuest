@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'; 
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
@@ -6,7 +6,7 @@ import { RootState } from '../features/store';
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
-import SecondaryTabsNavigator, { SecondaryTabsParams } from './SecondaryTabsNavigator';
+import SecondaryTabsNavigator from './SecondaryTabsNavigator';
 
 export type RootStackParams = {
   HomeTabs: undefined;
