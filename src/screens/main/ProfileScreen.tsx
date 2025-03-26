@@ -2,13 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { logout } from '../../features/authSlice';
+import { logout, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/types';
+
+// Definir interfaces para los tipos de datos
+interface Journey {
+  id: string;
+  cityId: string;
+  journeys_missions: JourneyMission[];
+}
+
+interface JourneyMission {
+  completed: boolean;
+  challenges: {
+    points: number;
+  };
+}
+
+type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const ProfileScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
@@ -58,14 +76,14 @@ const ProfileScreen = () => {
         visitedCities: new Set()
       };
 
-      journeys?.forEach(journey => {
+      (journeys as Journey[])?.forEach((journey: Journey) => {
         // Añadir la ciudad a las visitadas
         if (journey.cityId) {
           stats.visitedCities.add(journey.cityId);
         }
 
         // Contar misiones completadas y puntos
-        journey.journeys_missions.forEach(mission => {
+        journey.journeys_missions.forEach((mission: JourneyMission) => {
           if (mission.completed) {
             stats.completedMissions++;
             stats.totalPoints += mission.challenges.points;
@@ -86,8 +104,43 @@ const ProfileScreen = () => {
     }
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
+  const handleLogout = async () => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      console.log('Iniciando proceso de cierre de sesión');
+
+      // Primero cerramos la sesión en Supabase
+      console.log('Cerrando sesión en Supabase');
+      const { error: signOutError } = await supabase.auth.signOut();
+
+      if (signOutError) {
+        console.error('Error al cerrar sesión en Supabase:', signOutError);
+        Alert.alert('Error', 'No se pudo cerrar la sesión en Supabase');
+        return;
+      }
+
+      // Verificar que la sesión se haya cerrado correctamente
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        console.log('Sesión aún activa, intentando cerrar nuevamente');
+        await supabase.auth.signOut();
+      }
+
+      // Una vez que la sesión está cerrada, limpiamos el estado de Redux
+      console.log('Limpiando estado de Redux');
+      dispatch(logout());
+
+      // Forzar la actualización del estado de autenticación
+      dispatch(setAuthState('unauthenticated'));
+
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      Alert.alert('Error', 'Ocurrió un error al cerrar sesión');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -110,11 +163,78 @@ const ProfileScreen = () => {
     setMessage({ type: '', text: '' });
 
     try {
+      // Primero verificamos la sesión actual
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error('Error al obtener la sesión:', sessionError);
+        setMessage({ type: 'error', text: 'Error al verificar tu sesión. Por favor, intenta nuevamente.' });
+        return;
+      }
+
+      if (!session) {
+        // Si no hay sesión, intentamos iniciar sesión con las credenciales actuales
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: user?.email || '',
+          password: currentPassword
+        });
+
+        if (signInError) {
+          console.error('Error al verificar contraseña:', signInError);
+          setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
+          return;
+        }
+
+        if (!signInData.session) {
+          setMessage({ type: 'error', text: 'No se pudo iniciar sesión. Por favor, intenta nuevamente.' });
+          return;
+        }
+
+        // Ahora intentamos actualizar la contraseña
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: newPassword
+        });
+
+        if (updateError) {
+          console.error('Error al actualizar contraseña:', updateError);
+          setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
+          return;
+        }
+
+        // Limpiamos el formulario
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setMessage({ type: 'success', text: 'Tu contraseña ha sido actualizada correctamente' });
+
+        // Cerramos el modal después de 2 segundos
+        setTimeout(() => {
+          setIsChangePasswordVisible(false);
+          setMessage({ type: '', text: '' });
+        }, 2000);
+
+        return;
+      }
+
+      // Si hay sesión activa, verificamos la contraseña actual
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: currentPassword
+      });
+
+      if (signInError) {
+        console.error('Error al verificar contraseña:', signInError);
+        setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
+        return;
+      }
+
+      // Si la contraseña es correcta, actualizamos a la nueva
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (updateError) {
+        console.error('Error al actualizar contraseña:', updateError);
         setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
         return;
       }
@@ -133,7 +253,7 @@ const ProfileScreen = () => {
 
     } catch (error: any) {
       console.error('Error al cambiar contraseña:', error);
-      setMessage({ type: 'error', text: 'Ocurrió un error al intentar cambiar la contraseña' });
+      setMessage({ type: 'error', text: 'Ocurrió un error al intentar cambiar la contraseña. Por favor, intenta nuevamente.' });
     } finally {
       setLoading(false);
     }
@@ -192,8 +312,17 @@ const ProfileScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+      <TouchableOpacity
+        style={[
+          styles.logoutButton,
+          loading && styles.disabledButton
+        ]}
+        onPress={handleLogout}
+        disabled={loading}
+      >
+        <Text style={styles.logoutButtonText}>
+          {loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
+        </Text>
       </TouchableOpacity>
 
       <Modal

@@ -11,6 +11,7 @@ export const linking = {
                     return { token };
                 }
             },
+            EmailSent: 'email-sent',
             Login: 'login',
             Register: 'register',
             Main: {

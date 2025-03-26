@@ -1,17 +1,21 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { persistStore } from 'redux-persist';
+import { persistStore, persistReducer } from 'redux-persist';
 import authReducer from './auth/authSlice';
 import missionReducer from './missionSlice';
 import journalReducer from './journalSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { persistReducer } from 'redux-persist';
 import journeyReducer from './journey/journeySlice';
 
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
   whitelist: ['auth'],
-  debug: true // Habilitar logs de depuración
+  blacklist: ['missions', 'journal', 'journey'],
+  debug: true, // Habilitar logs de depuración
+  timeout: 0, // Evitar timeout en la persistencia
+  writeFailHandler: (err: any) => {
+    console.error('Error al persistir el estado:', err);
+  }
 };
 
 const persistedAuthReducer = persistReducer(persistConfig, authReducer);
@@ -35,7 +39,13 @@ export const persistor = persistStore(store);
 
 // Agregar listener para depuración
 store.subscribe(() => {
-  console.log('Estado actual:', store.getState());
+  const state = store.getState();
+  console.log('Estado actual:', {
+    auth: state.auth,
+    missions: state.missions,
+    journal: state.journal,
+    journey: state.journey
+  });
 });
 
 export type RootState = ReturnType<typeof store.getState>;
