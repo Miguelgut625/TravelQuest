@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { JournalEntry } from '../../features/journalSlice';
+const Logo = require('../../assets/icons/logo.png');
 
 const colors = {
   primary: '#005F9E',
@@ -12,41 +13,50 @@ const colors = {
   backgroundGradient: ['#005F9E', '#F0F0F0'],
 };
 
-const JournalEntryCard = ({ entry }: { entry: JournalEntry }) => (
-  <TouchableOpacity style={styles.card}>
-    <Text style={styles.cardTitle}>{entry.title}</Text>
-    <Text style={styles.cardDate}>{new Date(entry.createdAt).toLocaleDateString()}</Text>
-    <Text style={styles.cardContent} numberOfLines={3}>
-      {entry.content}
-    </Text>
-    {entry.photos.length > 0 && (
-      <View style={styles.photoGrid}>
-        {entry.photos.slice(0, 3).map((photo, index) => (
-          <Image
-            key={index}
-            source={{ uri: photo }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
+const JournalEntryCard = ({ entry, isSmallScreen }: { entry: JournalEntry; isSmallScreen: boolean }) => {
+  const dynamicStyles = getDynamicStyles(isSmallScreen);
+
+  return (
+    <TouchableOpacity style={styles.card}>
+      <Text style={dynamicStyles.cardTitle}>{entry.title}</Text>
+      <Text style={styles.cardDate}>{new Date(entry.createdAt).toLocaleDateString()}</Text>
+      <Text style={styles.cardContent} numberOfLines={3}>
+        {entry.content}
+      </Text>
+      {entry.photos.length > 0 && (
+        <View style={styles.photoGrid}>
+          {entry.photos.slice(0, 3).map((photo, index) => (
+            <Image
+              key={index}
+              source={{ uri: photo }}
+              style={dynamicStyles.thumbnail}
+              resizeMode="cover"
+            />
+          ))}
+          {entry.photos.length > 3 && (
+            <View style={dynamicStyles.morePhotos}>
+              <Text style={dynamicStyles.morePhotosText}>+{entry.photos.length - 3}</Text>
+            </View>
+          )}
+        </View>
+      )}
+      <View style={styles.tags}>
+        {entry.tags.map((tag, index) => (
+          <Text key={index} style={styles.tag}>
+            #{tag}
+          </Text>
         ))}
-        {entry.photos.length > 3 && (
-          <View style={styles.morePhotos}>
-            <Text style={styles.morePhotosText}>+{entry.photos.length - 3}</Text>
-          </View>
-        )}
       </View>
-    )}
-    <View style={styles.tags}>
-      {entry.tags.map((tag, index) => (
-        <Text key={index} style={styles.tag}>
-          #{tag}
-        </Text>
-      ))}
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+};
 
 const JournalScreen = () => {
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 400;
+
+  const dynamicStyles = getDynamicStyles(isSmallScreen);
+
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const entries = useSelector((state: RootState) => state.journal.entries);
   const cities = Object.keys(entries);
@@ -56,7 +66,7 @@ const JournalScreen = () => {
     return (
       <FlatList
         data={entries[selectedCity]}
-        renderItem={({ item }) => <JournalEntryCard entry={item} />}
+        renderItem={({ item }) => <JournalEntryCard entry={item} isSmallScreen={isSmallScreen} />}
         keyExtractor={(item) => item.id}
         style={styles.entriesList}
       />
@@ -66,7 +76,10 @@ const JournalScreen = () => {
   return (
     <View style={styles.container}>
       <LinearGradient colors={colors.backgroundGradient} style={styles.headerGradient}>
-        <Text style={styles.title}>Diario de Viaje</Text>
+        <View style={styles.logoContainer}>
+          <Image source={Logo} style={dynamicStyles.logo} />
+        </View>
+        <Text style={dynamicStyles.title}>Diario de Viaje</Text>
       </LinearGradient>
       <View style={styles.cityTabs}>
         <FlatList
@@ -91,23 +104,59 @@ const JournalScreen = () => {
   );
 };
 
+const getDynamicStyles = (isSmallScreen: boolean) =>
+  StyleSheet.create({
+    logo: {
+      width: isSmallScreen ? 60 : 100,
+      height: isSmallScreen ? 60 : 100,
+      resizeMode: 'contain',
+    },
+    title: {
+      fontSize: isSmallScreen ? 20 : 24,
+      fontWeight: 'bold',
+      color: colors.secondary,
+      textAlign: 'center',
+    },
+    cardTitle: {
+      fontSize: isSmallScreen ? 16 : 18,
+      fontWeight: 'bold',
+      marginBottom: 5,
+      color: colors.primary,
+    },
+    thumbnail: {
+      width: isSmallScreen ? 60 : 80,
+      height: isSmallScreen ? 60 : 80,
+      borderRadius: 5,
+      marginRight: 5,
+    },
+    morePhotos: {
+      width: isSmallScreen ? 60 : 80,
+      height: isSmallScreen ? 60 : 80,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      borderRadius: 5,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    morePhotosText: {
+      color: colors.secondary,
+      fontSize: isSmallScreen ? 14 : 16,
+      fontWeight: 'bold',
+    },
+  });
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.backgroundGradient[1],
   },
   headerGradient: {
-    padding: 20,
-    paddingTop: 40,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
-    marginBottom: 20,
+    padding: 60,
+    paddingTop: 55,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    textAlign: 'center',
+  logoContainer: {
+    position: 'absolute',
+    top: 20,
+    left: 10,
   },
   cityTabs: {
     paddingHorizontal: 20,
@@ -142,12 +191,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     elevation: 5,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: colors.primary,
-  },
   cardDate: {
     color: '#666',
     fontSize: 12,
@@ -160,25 +203,6 @@ const styles = StyleSheet.create({
   photoGrid: {
     flexDirection: 'row',
     marginBottom: 10,
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 5,
-    marginRight: 5,
-  },
-  morePhotos: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  morePhotosText: {
-    color: colors.secondary,
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   tags: {
     flexDirection: 'row',
