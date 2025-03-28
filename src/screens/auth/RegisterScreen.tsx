@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setUser, setToken } from '../../features/authSlice';
-import { supabase } from '../../services/supabase';
+import { supabase } from '../../services/supabase.js';
 
 const RegisterScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');

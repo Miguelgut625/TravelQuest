@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from './supabase.js';
 
 export const getMissionsByCityAndDuration = async (city: string, duration: number) => {
   try {

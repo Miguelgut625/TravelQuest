@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from './supabase.js';
 
 const generateMission = async (city: string, duration: number, missionCount: number) => {
   try {

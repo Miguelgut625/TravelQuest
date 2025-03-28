@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
-import { supabase } from '../../services/supabase';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 
 interface JourneyMission {
-  id: number;
+  id: string;
   created_at: string;
   completed: boolean;
-  journeyId: number;
-  challengeId: number;
-  userId: string;
+  journeyId: string;
+  challengeId: string;
+  userId: string | null;
   journeys: {
     description: string;
   };
@@ -19,68 +18,42 @@ interface JourneyMission {
     title: string;
     description: string;
   };
-  user: {
-    username: string;
-  };
+  user: string | null;
 }
 
-const MissionsScreen = () => {  
-  const [journeyMissions, setJourneyMissions] = useState<JourneyMission[]>([]);
+const MissionsScreen = () => {
+  const [journeyMissions, setJourneyMissions] = useState<Map<string, JourneyMission[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingMission, setUpdatingMission] = useState<number | null>(null);
+  const [updatingMission, setUpdatingMission] = useState<string | null>(null);
   const { user } = useSelector((state: RootState) => state.auth);
-  const [username, setUsername] = useState<string>('');
-
-  useEffect(() => {
-    const fetchUsername = async () => {
-      if (!user?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('username')
-          .eq('id', user.id)
-          .single();
-
-        if (error) throw error;
-        if (data) {
-          setUsername(data.username);
-        }
-      } catch (err: any) {
-        console.error('Error al obtener el username:', err.message);
-      }
-    };
-
-    fetchUsername();
-  }, [user]);
+  const [username, setUsername] = useState<string>(user?.username || '');
+  const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserMissions = async () => {
       if (!user?.id) return;
       
       try {
-        const { data, error } = await supabase
-          .from('journeys_missions')
-          .select(`
-            *,
-            journeys (
-              description
-            ),
-            challenges (
-              title,
-              description
-            ),
-            user:users (
-              username
-            )
-          `)
-          .eq('userId', user.id);
+        const response = await fetch(`http://localhost:5000/api/journeysMissions/user/${user.id}`);
+        const data = await response.json();
 
-        if (error) throw error;
+        if (!response.ok) {
+          throw new Error('Error al obtener las misiones');
+        }
 
         console.log('Misiones del usuario:', data);
-        setJourneyMissions(data || []);
+
+        // Agrupar misiones por journeyId
+        const groupedMissions = data.reduce((acc: Map<string, JourneyMission[]>, mission: JourneyMission) => {
+          if (!acc.has(mission.journeyId)) {
+            acc.set(mission.journeyId, []);
+          }
+          acc.get(mission.journeyId)?.push(mission);
+          return acc;
+        }, new Map<string, JourneyMission[]>());
+
+        setJourneyMissions(groupedMissions);
       } catch (err: any) {
         console.error('Error al obtener las misiones:', err.message);
         setError(err.message);
@@ -92,28 +65,30 @@ const MissionsScreen = () => {
     fetchUserMissions();
   }, [user]);
 
-  const handleCompleteMission = async (missionId: number) => {
+  const handleCompleteMission = async (missionId: string) => {
     try {
       setUpdatingMission(missionId);
-      
-      const { error } = await supabase
-        .from('journeys_missions')
-        .update({ completed: true })
-        .eq('id', missionId);
-
-      if (error) throw error;
-
-      // Actualizar el estado local
-      setJourneyMissions(journeyMissions.map(mission => 
-        mission.id === missionId 
-          ? { ...mission, completed: true }
-          : mission
-      ));
+      // Aquí puedes agregar la lógica para actualizar la misión, por ejemplo, hacer un PUT o PATCH a la API
     } catch (err: any) {
       console.error('Error al completar la misión:', err.message);
     } finally {
       setUpdatingMission(null);
     }
+  };
+
+  const handleSelectJourney = (journeyId: string) => {
+    // Cambiar el journey seleccionado para mostrar sus misiones
+    if (selectedJourneyId === journeyId) {
+      setSelectedJourneyId(null); // Si ya está seleccionado, lo deseleccionamos
+    } else {
+      setSelectedJourneyId(journeyId);
+    }
+  };
+
+  const calculateProgress = (missions: JourneyMission[]) => {
+    const completed = missions.filter((mission) => mission.completed).length;
+    const total = missions.length;
+    return (completed / total) * 100; // Retorna el porcentaje de completado
   };
 
   if (loading) {
@@ -142,60 +117,93 @@ const MissionsScreen = () => {
         <Text style={styles.headerSubtitle}>¡Completa tus desafíos, {username}!</Text>
       </LinearGradient>
 
-      {journeyMissions.map((mission) => (
-        <View key={mission.id} style={styles.missionCard}>
-          <LinearGradient
-            colors={['#ffffff', '#f8f8f8']}
-            style={styles.cardGradient}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.titleContainer}>
-                <Text style={styles.missionTitle}>{mission.challenges?.title || 'Sin título'}</Text>
-                <Text style={[
-                  styles.statusBadge,
-                  mission.completed ? styles.statusCompleted : styles.statusPending
-                ]}>
-                  {mission.completed ? '✓ Completada' : '⏳ Pendiente'}
-                </Text>
-              </View>
-              <Text style={styles.dateText}>
-                {new Date(mission.created_at).toLocaleDateString()}
-              </Text>
-            </View>
+      {Array.from(journeyMissions.keys()).map((journeyId) => {
+        const missions = journeyMissions.get(journeyId) || [];
+        const progress = calculateProgress(missions);
 
-            <View style={styles.detailsContainer}>
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Descripción del Viaje</Text>
-                <Text style={styles.detailValue}>{mission.journeys?.description || 'Sin descripción'}</Text>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Descripción del Desafío</Text>
-                <Text style={styles.detailValue}>{mission.challenges?.description || 'Sin descripción'}</Text>
-              </View>
-
-              <View style={styles.userInfo}>
-                <Text style={styles.userLabel}>Usuario:</Text>
-                <Text style={styles.userValue}>{mission.user?.username || username}</Text>
-              </View>
-            </View>
-
-            {!mission.completed && (
-              <TouchableOpacity 
-                style={styles.completeButton}
-                onPress={() => handleCompleteMission(mission.id)}
-                disabled={updatingMission === mission.id}
+        return (
+          <View key={journeyId} style={styles.journeyCard}>
+            <TouchableOpacity onPress={() => handleSelectJourney(journeyId)}>
+              <LinearGradient
+                colors={['#ffffff', '#f8f8f8']}
+                style={styles.cardGradient}
               >
-                {updatingMission === mission.id ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.completeButtonText}>Completar Misión</Text>
+                <Text style={styles.journeyTitle}>Viaje: {missions[0]?.journeys?.description || 'Sin descripción'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {selectedJourneyId === journeyId && (
+              <FlatList
+                data={missions}
+                renderItem={({ item: mission }) => (
+                  <View style={styles.missionCard}>
+                    <LinearGradient
+                      colors={['#ffffff', '#f8f8f8']}
+                      style={styles.cardGradient}
+                    >
+                      <View style={styles.cardHeader}>
+                        <View style={styles.titleContainer}>
+                          <Text style={styles.missionTitle}>{mission.challenges?.title || 'Sin título'}</Text>
+                          <Text style={[
+                            styles.statusBadge,
+                            mission.completed ? styles.statusCompleted : styles.statusPending
+                          ]}>
+                            {mission.completed ? '✓ Completada' : '⏳ Pendiente'}
+                          </Text>
+                        </View>
+                        <Text style={styles.dateText}>
+                          {new Date(mission.created_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailsContainer}>
+                        <View style={styles.detailSection}>
+                          <Text style={styles.sectionTitle}>Descripción del Viaje</Text>
+                          <Text style={styles.detailValue}>{mission.journeys?.description || 'Sin descripción'}</Text>
+                        </View>
+
+                        <View style={styles.detailSection}>
+                          <Text style={styles.sectionTitle}>Descripción del Desafío</Text>
+                          <Text style={styles.detailValue}>{mission.challenges?.description || 'Sin descripción'}</Text>
+                        </View>
+
+                        <View style={styles.userInfo}>
+                          <Text style={styles.userLabel}>Usuario:</Text>
+                          <Text style={styles.userValue}>{mission.user || username}</Text>
+                        </View>
+                      </View>
+
+                      {!mission.completed && (
+                        <TouchableOpacity 
+                          style={styles.completeButton}
+                          onPress={() => handleCompleteMission(mission.id)}
+                          disabled={updatingMission === mission.id}
+                        >
+                          {updatingMission === mission.id ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={styles.completeButtonText}>Completar Misión</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </LinearGradient>
+                  </View>
                 )}
-              </TouchableOpacity>
+                keyExtractor={(item) => item.id}
+              />
             )}
-          </LinearGradient>
-        </View>
-      ))}
+
+            <View style={styles.progressBarContainer}>
+              <Text style={styles.progressText}>
+                {missions.filter((mission) => mission.completed).length} / {missions.length} misiones completadas
+              </Text>
+              <View style={[styles.progressBar, { width: `${progress}%` }]}>
+                <View style={styles.progressBarFill} />
+              </View>
+            </View>
+          </View>
+        );
+      })}
       <View style={styles.bottomPadding} />
     </ScrollView>
   );
@@ -231,7 +239,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
   },
-  missionCard: {
+  journeyCard: {
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 16,
@@ -245,20 +253,24 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  titleContainer: {
-    flex: 1,
-  },
-  missionTitle: {
-    fontSize: 20,
+  journeyTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2E7D32',
-    marginBottom: 8,
+  },
+  missionCard: {
+    marginBottom: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  missionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
   },
   statusBadge: {
     fontSize: 12,
@@ -334,6 +346,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  progressBarContainer: {
+    marginTop: 12,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+  },
   bottomPadding: {
     height: 20,
   },
@@ -350,4 +383,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MissionsScreen; 
+export default MissionsScreen;
