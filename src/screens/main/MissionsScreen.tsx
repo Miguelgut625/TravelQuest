@@ -68,13 +68,43 @@ const MissionsScreen = () => {
   const handleCompleteMission = async (missionId: string) => {
     try {
       setUpdatingMission(missionId);
-      // Aquí puedes agregar la lógica para actualizar la misión, por ejemplo, hacer un PUT o PATCH a la API
+
+      const response = await fetch(`http://localhost:5000/api/journeysMissions/${missionId}/complete`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al completar la misión');
+      }
+
+      console.log('Misión completada exitosamente');
+
+      // ✅ Actualizar estado localmente sin recargar la app
+      setJourneyMissions((prevMissions) => {
+        const updatedMissions = new Map(prevMissions);
+
+        for (const [journeyId, missions] of updatedMissions.entries()) {
+          updatedMissions.set(
+            journeyId,
+            missions.map((mission) =>
+              mission.id === missionId ? { ...mission, completed: true } : mission
+            )
+          );
+        }
+
+        return updatedMissions;
+      });
+
     } catch (err: any) {
       console.error('Error al completar la misión:', err.message);
     } finally {
       setUpdatingMission(null);
     }
-  };
+};
+
 
   const handleSelectJourney = (journeyId: string) => {
     // Cambiar el journey seleccionado para mostrar sus misiones
