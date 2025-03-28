@@ -47,6 +47,9 @@ const Map: React.FC<MapProps> = ({ initialRegion, markers, onMarkerPress }) => {
               console.log('Marker pressed:', marker);
               onMarkerPress?.(marker);
             }}
+            tracksViewChanges={false}
+            opacity={0.7}
+            zIndex={1}
           />
         );
       })}

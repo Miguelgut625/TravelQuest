@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { Mission } from '../../features/missionSlice';
@@ -10,19 +10,14 @@ import { getMissionsByCityAndDuration } from '../../services/missionService';
 import { useNavigation } from '@react-navigation/native';
 import { MainTabNavigationProp } from '../../types/navigation';
 import generateMission from '../../services/missionGenerator';
-
-interface CityMarker {
-  coordinate: {
-    latitude: number;
-    longitude: number;
-  };
-  title: string;
-  description: string;
-}
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { supabase } from '../../services/supabase';
+import { setCityMissionData } from '../../features/cityMissionSlice';
 
 const { width, height } = Dimensions.get('window');
 
 const MapScreen = () => {
+  const dispatch = useDispatch();
   const navigation = useNavigation<MainTabNavigationProp>();
   const [region, setRegion] = useState({
     latitude: 40.416775,
@@ -35,7 +30,14 @@ const MapScreen = () => {
   const [missionCount, setMissionCount] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [cityMarker, setCityMarker] = useState<CityMarker | null>(null);
+  const cityMarker = useSelector((state: RootState) => state.cityMission.cityMarker);
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const { user } = useSelector((state: RootState) => state.auth);
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const missionsFromRedux = useSelector((state: RootState) => state.missions.missions);
 
@@ -58,14 +60,17 @@ const MapScreen = () => {
   }, []);
 
   const getCityNameFromCoordinates = async (latitude: number, longitude: number) => {
+    setLoading(true);
     try {
       console.log('Obteniendo nombre de ciudad para coordenadas:', latitude, longitude);
       
-      setCityMarker({
-        coordinate: { latitude, longitude },
-        title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
-        description: 'Obteniendo nombre de la ciudad...'
-      });
+      dispatch(setCityMissionData({
+        cityMarker: {
+          coordinate: { latitude, longitude },
+          title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
+          description: 'Obteniendo nombre de la ciudad...'
+        }
+      }));
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -89,7 +94,9 @@ const MapScreen = () => {
         // Verificar si la ubicación está en España
         if (data.address.country_code !== 'es') {
           setErrorMsg('Esta ubicación está fuera de nuestra zona de influencia. Por favor, selecciona una ciudad en España.');
-          setCityMarker(null);
+          dispatch(setCityMissionData({
+            cityMarker: null
+          }));
           setSearchCity('');
           return;
         }
@@ -97,31 +104,55 @@ const MapScreen = () => {
         const cityName = data.address.city || data.address.town || data.address.village || data.address.suburb || 'Ubicación desconocida';
         console.log('Nombre de ciudad encontrado:', cityName);
 
-        setCityMarker({
-          coordinate: { latitude, longitude },
-          title: cityName,
-          description: 'Ciudad seleccionada'
-        });
+        dispatch(setCityMissionData({
+          cityMarker: {
+            coordinate: { latitude, longitude },
+            title: cityName,
+            description: 'Ciudad seleccionada'
+          }
+        }));
         setSearchCity(cityName);
         setErrorMsg(null);
       } else {
         console.log('No se encontraron resultados para las coordenadas');
-        setCityMarker({
-          coordinate: { latitude, longitude },
-          title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
-          description: 'Ubicación seleccionada'
-        });
+        dispatch(setCityMissionData({
+          cityMarker: {
+            coordinate: { latitude, longitude },
+            title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
+            description: 'Ubicación seleccionada'
+          }
+        }));
         setSearchCity(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
       }
     } catch (error) {
       console.error('Error al obtener nombre de la ciudad:', error);
       setErrorMsg('Error al obtener el nombre de la ciudad. Por favor, inténtalo de nuevo.');
-      setCityMarker({
-        coordinate: { latitude, longitude },
-        title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
-        description: 'Ubicación seleccionada'
-      });
+      dispatch(setCityMissionData({
+        cityMarker: {
+          coordinate: { latitude, longitude },
+          title: `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`,
+          description: 'Ubicación seleccionada'
+        }
+      }));
       setSearchCity(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMapPress = (event: any) => {
+    console.log('Map pressed:', event.nativeEvent);
+    const { coordinate } = event.nativeEvent;
+    if (coordinate) {
+      const { latitude, longitude } = coordinate;
+      // Limpiar el marcador anterior
+      dispatch(setCityMissionData({
+        cityMarker: null
+      }));
+      // Aumentar el delay para asegurar que el marcador anterior se limpie
+      setTimeout(() => {
+        getCityNameFromCoordinates(latitude, longitude);
+      }, 300);
     }
   };
 
@@ -150,14 +181,16 @@ const MapScreen = () => {
         const cityName = data[0].address.city || data[0].address.town || data[0].address.village || data[0].display_name.split(',')[0];
         console.log('Nombre de ciudad encontrado:', cityName);
         
-        setCityMarker({
-          coordinate: { 
-            latitude: parseFloat(lat), 
-            longitude: parseFloat(lon) 
-          },
-          title: cityName,
-          description: 'Ciudad seleccionada'
-        });
+        dispatch(setCityMissionData({
+          cityMarker: {
+            coordinate: { 
+              latitude: parseFloat(lat), 
+              longitude: parseFloat(lon) 
+            },
+            title: cityName,
+            description: 'Ciudad seleccionada'
+          }
+        }));
         
         setRegion({
           latitude: parseFloat(lat),
@@ -177,17 +210,28 @@ const MapScreen = () => {
     }
   };
 
-  const handleMapPress = (event: any) => {
-    console.log('Map pressed:', event.nativeEvent);
-    const { coordinate } = event.nativeEvent;
-    if (coordinate) {
-      const { latitude, longitude } = coordinate;
-      // Limpiar el marcador anterior
-      setCityMarker(null);
-      // Aumentar el delay para asegurar que el marcador anterior se limpie
-      setTimeout(() => {
-        getCityNameFromCoordinates(latitude, longitude);
-      }, 300);
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    console.log('Evento DatePicker inicio:', event);
+    console.log('Fecha seleccionada inicio:', selectedDate);
+    if (Platform.OS === 'android') {
+      setShowStartDatePicker(false);
+    }
+    if (selectedDate) {
+      setStartDate(selectedDate);
+      if (selectedDate > endDate) {
+        setEndDate(selectedDate);
+      }
+    }
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    console.log('Evento DatePicker fin:', event);
+    console.log('Fecha seleccionada fin:', selectedDate);
+    if (Platform.OS === 'android') {
+      setShowEndDatePicker(false);
+    }
+    if (selectedDate) {
+      setEndDate(selectedDate);
     }
   };
 
@@ -195,22 +239,85 @@ const MapScreen = () => {
     const durationNum = parseInt(duration);
     const missionCountNum = parseInt(missionCount);
     
-    if (searchCity && durationNum && missionCountNum) {
-      try {
-        await getCityCoordinates(searchCity);
-        //Aqui tengo que crear los viajes
-        await generateMission(searchCity, durationNum, missionCountNum);
-        navigation.navigate('Missions');
-      } catch (error) {
-        console.error('Error:', error);
+    // Validación específica de campos
+    if (!searchCity) {
+      setErrorMsg('Por favor, selecciona una ciudad');
+      return;
+    }
+    if (!missionCountNum) {
+      setErrorMsg('Por favor, ingresa el número de misiones');
+      return;
+    }
+    if (!user?.id) {
+      setErrorMsg('Error: No hay usuario autenticado');
+      return;
+    }
+
+    try {
+      // Primero obtenemos el ID de la ciudad
+      const { data: cityData, error: cityError } = await supabase
+        .from('cities')
+        .select('id')
+        .eq('name', searchCity)
+        .single();
+
+      if (cityError) {
+        throw new Error('Error al obtener el ID de la ciudad');
       }
-    } else {
-      console.log('Por favor, ingresa una ciudad, duración y número de misiones válidos.');
+
+      if (!cityData) {
+        setErrorMsg('No se encontró la ciudad en la base de datos');
+        return;
+      }
+
+      setCityId(cityData.id);
+
+      await getCityCoordinates(searchCity);
+      //ZONA INICIO
+      const startDateString = startDate.toISOString().split('T')[0];
+      const endDateString = endDate.toISOString().split('T')[0];
+
+      // Calcular la duración en días
+      const durationInDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+      if (!Number.isInteger(durationInDays) || durationInDays <= 0) {
+        setErrorMsg('La duración debe ser un número entero positivo.');
+        return;
+      }
+
+      // Generar la descripción
+      const generatedDescription = `Viaje a ${searchCity} por ${durationInDays} días`;
+
+      // Crear el journey con el ID del usuario actual
+      const { error: journeyError } = await supabase
+        .from('journeys')
+        .insert({
+          description: generatedDescription,
+          start_date: startDateString,
+          end_date: endDateString,
+          cityId: cityData.id,
+          userId: user.id
+        });
+
+      if (journeyError) {
+        throw journeyError;
+      }
+
+      //ZONA FIN
+      await generateMission(searchCity, durationNum, missionCountNum);
+      navigation.navigate('Missions');
+    } catch (error) {
+      console.error('Error:', error);
+      setErrorMsg('Error al crear la aventura. Por favor, inténtalo de nuevo.');
     }
   };
 
   return (
     <View style={styles.container}>
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      )}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.input}
@@ -218,13 +325,43 @@ const MapScreen = () => {
           value={searchCity}
           onChangeText={setSearchCity}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Duración (días)"
-          value={duration}
-          onChangeText={setDuration}
-          keyboardType="numeric"
-        />
+        <TouchableOpacity 
+          style={styles.dateButton}
+          onPress={() => {
+            console.log('Abriendo DatePicker inicio');
+            setShowStartDatePicker(true);
+          }}
+        >
+          <Text>Fecha inicio: {startDate.toLocaleDateString()}</Text>
+        </TouchableOpacity>
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={startDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleStartDateChange}
+            minimumDate={new Date()}
+            maximumDate={endDate}
+          />
+        )}
+        <TouchableOpacity 
+          style={styles.dateButton}
+          onPress={() => {
+            console.log('Abriendo DatePicker fin');
+            setShowEndDatePicker(true);
+          }}
+        >
+          <Text>Fecha fin: {endDate.toLocaleDateString()}</Text>
+        </TouchableOpacity>
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={endDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleEndDateChange}
+            minimumDate={startDate}
+          />
+        )}
         <TextInput
           style={styles.input}
           placeholder="Número de misiones"
@@ -324,7 +461,33 @@ const styles = StyleSheet.create({
     color: 'red',
     marginTop: 10,
     textAlign: 'center',
-  }
+  },
+  dateButton: {
+    height: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 5,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+  },
+  descriptionInput: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 10,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    zIndex: 2,
+  },
 });
 
 export default MapScreen; 
