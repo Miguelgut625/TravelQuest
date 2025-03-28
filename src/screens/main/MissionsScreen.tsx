@@ -326,6 +326,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
   };
 
   const handleMissionComplete = (missionId: string) => {
+    handleCompleteMission(missionId);
     dispatch(dispatchCompleteMission(missionId));
   };
 
@@ -398,6 +399,23 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
                 key={mission.id}
                 mission={mission}
                 onComplete={() => handleMissionComplete(mission.id)}
+              />
+            ))}
+          </>
+        )}
+
+        {cityData.expired.length > 0 && (
+          <>
+            <View style={styles.completedDivider}>
+              <View style={styles.dividerLine} />
+              <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
+              <View style={styles.dividerLine} />
+            </View>
+            {cityData.expired.map(mission => (
+              <MissionCard
+                key={mission.id}
+                mission={mission}
+                onComplete={() => {}}
               />
             ))}
           </>
