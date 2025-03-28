@@ -10,19 +10,30 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.travelquest.app"
+      "bundleIdentifier": "com.travelquest.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a tu ubicación para mostrar tu posición en el mapa y encontrar misiones cercanas.",
+        "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceso a tu ubicación para mostrar tu posición en el mapa y encontrar misiones cercanas.",
+        "NSCameraUsageDescription": "Esta aplicación necesita acceso a tu cámara para tomar fotos de las misiones.",
+        "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a tu galería para seleccionar fotos de las misiones."
+      }
     },
     "android": {
       "package": "com.travelquest.app",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET"
       ]
     },
     "scheme": "travelquest",
     "plugins": [
       "expo-location",
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-camera"
     ],
     "extra": {
       "eas": {

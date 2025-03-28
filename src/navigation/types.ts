@@ -8,5 +8,6 @@ export type RootStackParamList = {
     ResetPassword: undefined;
     Profile: undefined;
     Settings: undefined;
+    Leaderboard: undefined;
     // Añade aquí más pantallas según sea necesario
 }; 

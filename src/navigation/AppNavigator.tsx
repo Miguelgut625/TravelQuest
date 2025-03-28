@@ -12,6 +12,7 @@ import MapScreen from '../screens/main/MapScreen';
 import MissionsScreen from '../screens/main/MissionsScreen';
 import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import LeaderboardScreen from '../screens/main/LeaderboardScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
@@ -26,6 +27,7 @@ type TabParamList = {
   };
   Journal: undefined;
   Profile: undefined;
+  Leaderboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -60,6 +62,8 @@ const AppNavigator = () => {
                 iconName = focused ? 'book' : 'book-outline';
               } else if (route.name === 'Profile') {
                 iconName = focused ? 'person' : 'person-outline';
+              } else if (route.name === 'Leaderboard') {
+                iconName = focused ? 'trophy' : 'trophy-outline';
               }
 
               return <Ionicons name={iconName as any} size={size} color={color} />;
@@ -71,6 +75,7 @@ const AppNavigator = () => {
           <Tab.Screen name="Map" component={MapScreen} />
           <Tab.Screen name="Missions" component={MissionsScreen} />
           <Tab.Screen name="Journal" component={JournalScreen} />
+          <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
           <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
       ) : (

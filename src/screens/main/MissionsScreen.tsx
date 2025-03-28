@@ -231,6 +231,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
   };
 
   const handleMissionComplete = (missionId: string) => {
+    handleCompleteMission(missionId);
     dispatch(dispatchCompleteMission(missionId));
   };
 
