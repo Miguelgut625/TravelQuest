@@ -13,4 +13,6 @@ router.use('/cities', cityRoutes);
 router.use('/journeys', journeyRoutes);
 router.use('/users', authRoutes);
 router.use('/journeysMissions', journeyMissionsRoutes);
+router.use('/friends', journeyMissionsRoutes);
+
 export default router;

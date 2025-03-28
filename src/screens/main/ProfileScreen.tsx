@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
+import axios from 'axios';
 import { RootState } from '../../features/store';
 import { logout } from '../../features/authSlice';
 
@@ -14,8 +15,31 @@ const ProfileScreen = () => {
   const totalCities = Object.keys(entries).length;
   const totalEntries = Object.values(entries).flat().length;
 
+  const [friendshipRequests, setFriendshipRequests] = useState([]); // Estado para las solicitudes
+  const [isRequestsVisible, setIsRequestsVisible] = useState(false); // Estado para controlar la visibilidad de las solicitudes
+
+  // Función para obtener las solicitudes de amistad
+  const fetchFriendshipRequests = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/users/requests/${user?.id}`);
+      setFriendshipRequests(response.data); // Guardamos las solicitudes en el estado
+    } catch (error) {
+      console.error('Error al obtener solicitudes:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchFriendshipRequests(); // Llamamos a la función cuando el componente se monta
+    }
+  }, [user]);
+
   const handleLogout = () => {
     dispatch(logout());
+  };
+
+  const toggleRequestsVisibility = () => {
+    setIsRequestsVisible(!isRequestsVisible); // Cambiar el estado de visibilidad
   };
 
   return (
@@ -50,6 +74,36 @@ const ProfileScreen = () => {
           <Text style={styles.journalStat}>Total de entradas: {totalEntries}</Text>
           <Text style={styles.journalStat}>Ciudades visitadas: {totalCities}</Text>
         </View>
+      </View>
+
+      {/* Menú de solicitudes de amistad */}
+      <View style={styles.requestsContainer}>
+        <TouchableOpacity onPress={toggleRequestsVisibility}>
+          <Text style={styles.requestsTitle}>
+            {isRequestsVisible ? 'Ocultar Solicitudes' : 'Ver Solicitudes'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Si el estado de visibilidad es verdadero, mostramos las solicitudes */}
+        {isRequestsVisible && (
+          <FlatList
+            data={friendshipRequests}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.requestItem}>
+                <Text style={styles.requestText}>
+                  {item.senderId} te ha enviado una solicitud.
+                </Text>
+                <TouchableOpacity style={styles.acceptButton}>
+                  <Text style={styles.acceptButtonText}>Aceptar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.rejectButton}>
+                  <Text style={styles.rejectButtonText}>Rechazar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        )}
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -153,6 +207,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  requestsContainer: {
+    marginTop: 20,
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  requestsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+    textAlign: 'center',
+  },
+  requestItem: {
+    marginBottom: 10,
+    padding: 10,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 5,
+  },
+  requestText: {
+    fontSize: 16,
+    color: '#555',
+  },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+  },
+  acceptButtonText: {
+    color: 'white',
+    textAlign: 'center',
+  },
+  rejectButton: {
+    backgroundColor: '#f44336',
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+  },
+  rejectButtonText: {
+    color: 'white',
+    textAlign: 'center',
+  },
 });
 
-export default ProfileScreen; 
+export default ProfileScreen;

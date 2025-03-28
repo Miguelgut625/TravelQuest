@@ -84,10 +84,10 @@ const createJourney = async (req, res) => {
     console.error("Error al crear el viaje:", error.message);
     res.status(500).json({ error: "Error al crear el viaje" });
   }
-};
+};*/
 
 
-// Crear un nuevo viaje****
+//Crear un nuevo viaje****
  const createJourney = async (req,res) => {
   const { name, description } = req.body;
 
@@ -102,7 +102,7 @@ const createJourney = async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
-}; */
+}; 
 
 // Actualizar un viaje****
  const updateJourney = async (req, res) => {
