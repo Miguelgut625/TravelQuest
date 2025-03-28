@@ -8,11 +8,14 @@ export interface Challenge {
 
 export interface JourneyMission {
   id: string;
-  challengeId: string;
   completed: boolean;
-  title: string;
-  description: string;
-  points: number;
   cityName: string;
-  challenge: Challenge;
+  start_date: string;
+  end_date: string;
+  challenge: {
+    title: string;
+    description: string;
+    difficulty: string;
+    points: number;
+  };
 } 

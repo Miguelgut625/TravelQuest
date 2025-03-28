@@ -25,6 +25,7 @@ interface CityMissions {
   [cityName: string]: {
     completed: JourneyMission[];
     pending: JourneyMission[];
+    expired: JourneyMission[];
   };
 }
 
@@ -32,6 +33,8 @@ interface Journey {
   id: string;
   description: string;
   created_at: string;
+  start_date: string;
+  end_date: string;
   cities?: {
     name: string;
   };
@@ -39,6 +42,8 @@ interface Journey {
     id: string;
     completed: boolean;
     challengeId: string;
+    start_date: string;
+    end_date: string;
     challenges: {
       id: string;
       title: string;
@@ -49,47 +54,127 @@ interface Journey {
   }[];
 }
 
-const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onComplete: () => void }) => (
-  <TouchableOpacity
-    style={[styles.card, mission.completed && styles.completedCard]}
-    onPress={() => !mission.completed && onComplete()}
-    disabled={mission.completed}
-  >
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
-      <Text style={[styles.badge, { backgroundColor: mission.completed ? '#4CAF50' : '#FFA000' }]}>
-        {mission.completed ? 'Completada' : 'Pendiente'}
-      </Text>
-    </View>
-    <Text style={styles.cardDescription}>{mission.challenge.description}</Text>
-    <View style={styles.cardFooter}>
-      <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
-      <Text style={styles.points}>{mission.challenge.points} puntos</Text>
-    </View>
-  </TouchableOpacity>
-);
+const getTimeRemaining = (endDate: string) => {
+  const now = new Date();
+  const end = new Date(endDate);
+  const diff = end.getTime() - now.getTime();
+  
+  if (diff <= 0) {
+    return {
+      isExpired: true,
+      text: 'Tiempo expirado'
+    };
+  }
 
-const CityCard = ({ cityName, totalMissions, completedMissions, onPress }: { 
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (days > 0) {
+    return {
+      isExpired: false,
+      text: `${days} días restantes`
+    };
+  } else if (hours > 0) {
+    return {
+      isExpired: false,
+      text: `${hours} horas restantes`
+    };
+  } else {
+    return {
+      isExpired: false,
+      text: `${minutes} minutos restantes`
+    };
+  }
+};
+
+const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onComplete: () => void }) => {
+  const timeRemaining = getTimeRemaining(mission.end_date);
+  const isExpired = timeRemaining.isExpired && !mission.completed;
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.card, 
+        mission.completed && styles.completedCard,
+        isExpired && styles.expiredCard
+      ]}
+      onPress={() => !mission.completed && !isExpired && onComplete()}
+      disabled={mission.completed || isExpired}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
+        <View style={styles.badgeContainer}>
+          <Text style={[
+            styles.badge, 
+            { backgroundColor: mission.completed ? '#4CAF50' : isExpired ? '#f44336' : '#FFA000' }
+          ]}>
+            {mission.completed ? 'Completada' : isExpired ? 'Expirada' : 'Pendiente'}
+          </Text>
+          <Text style={[
+            styles.timeRemaining,
+            isExpired && styles.expiredTime
+          ]}>
+            {timeRemaining.text}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.cardDescription}>{mission.challenge.description}</Text>
+      <View style={styles.cardFooter}>
+        <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
+        <Text style={styles.points}>{mission.challenge.points} puntos</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress }: { 
   cityName: string; 
   totalMissions: number;
   completedMissions: number;
+  expiredMissions: number;
   onPress: () => void;
 }) => (
   <TouchableOpacity style={styles.cityCard} onPress={onPress}>
     <View style={styles.cityCardContent}>
       <View style={styles.cityInfo}>
         <Text style={styles.cityName}>{cityName}</Text>
-        <Text style={styles.missionCount}>
-          {completedMissions}/{totalMissions} misiones completadas
-        </Text>
+        <View style={styles.missionCountContainer}>
+          <Text style={styles.missionCount}>
+            {completedMissions}/{totalMissions} misiones completadas
+          </Text>
+          {expiredMissions > 0 && (
+            <Text style={styles.expiredCount}>
+              {expiredMissions} misiones expiradas
+            </Text>
+          )}
+        </View>
       </View>
       <Ionicons name="chevron-forward" size={24} color="#666" />
     </View>
     <View style={styles.progressBar}>
       <View 
         style={[
-          styles.progressFill, 
+          styles.progressFillCompleted, 
           { width: `${(completedMissions / totalMissions) * 100}%` }
+        ]} 
+      />
+      <View 
+        style={[
+          styles.progressFillExpired, 
+          { 
+            width: `${(expiredMissions / totalMissions) * 100}%`,
+            left: `${(completedMissions / totalMissions) * 100}%`
+          }
+        ]} 
+      />
+      <View 
+        style={[
+          styles.progressFillPending, 
+          { 
+            width: `${((totalMissions - completedMissions - expiredMissions) / totalMissions) * 100}%`,
+            left: `${((completedMissions + expiredMissions) / totalMissions) * 100}%`
+          }
         ]} 
       />
     </View>
@@ -122,6 +207,8 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
           id,
           description,
           created_at,
+          start_date,
+          end_date,
           cities (
             name
           ),
@@ -129,6 +216,8 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
             id,
             completed,
             challengeId,
+            start_date,
+            end_date,
             challenges!inner (
               id,
               title,
@@ -154,6 +243,8 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
           id: jm.id,
           completed: jm.completed,
           cityName: journey.cities?.name || 'Ciudad Desconocida',
+          start_date: jm.start_date || journey.start_date,
+          end_date: jm.end_date || journey.end_date,
           challenge: {
             title: jm.challenges.title,
             description: jm.challenges.description,
@@ -169,11 +260,15 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
         if (!missionsByCity[mission.cityName]) {
           missionsByCity[mission.cityName] = {
             completed: [],
-            pending: []
+            pending: [],
+            expired: []
           };
         }
+        const timeRemaining = getTimeRemaining(mission.end_date);
         if (mission.completed) {
           missionsByCity[mission.cityName].completed.push(mission);
+        } else if (timeRemaining.isExpired) {
+          missionsByCity[mission.cityName].expired.push(mission);
         } else {
           missionsByCity[mission.cityName].pending.push(mission);
         }
@@ -266,8 +361,9 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
             <CityCard
               key={cityName}
               cityName={cityName}
-              totalMissions={missions.completed.length + missions.pending.length}
+              totalMissions={missions.completed.length + missions.pending.length + missions.expired.length}
               completedMissions={missions.completed.length}
+              expiredMissions={missions.expired.length}
               onPress={() => setSelectedCity(cityName)}
             />
           ))}
@@ -418,19 +514,40 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 5,
   },
+  missionCountContainer: {
+    flexDirection: 'column',
+  },
   missionCount: {
     fontSize: 14,
     color: '#666',
+  },
+  expiredCount: {
+    fontSize: 14,
+    color: '#f44336',
+    marginTop: 2,
   },
   progressBar: {
     height: 4,
     backgroundColor: '#E0E0E0',
     borderRadius: 2,
     overflow: 'hidden',
+    position: 'relative',
   },
-  progressFill: {
+  progressFillCompleted: {
     height: '100%',
     backgroundColor: '#4CAF50',
+    position: 'absolute',
+    left: 0,
+  },
+  progressFillExpired: {
+    height: '100%',
+    backgroundColor: '#f44336',
+    position: 'absolute',
+  },
+  progressFillPending: {
+    height: '100%',
+    backgroundColor: '#FFA000',
+    position: 'absolute',
   },
   missionsList: {
     flex: 1,
@@ -485,6 +602,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
   },
+  badgeContainer: {
+    alignItems: 'flex-end',
+  },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -520,6 +640,18 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  expiredCard: {
+    borderColor: '#f44336',
+    borderWidth: 1,
+  },
+  timeRemaining: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  expiredTime: {
+    color: '#f44336',
   },
 });
 

@@ -57,16 +57,16 @@ const getOrCreateUser = async (userId: string) => {
 };
 
 // Función para obtener o crear una ciudad
-const getOrCreateCity = async (cityName: string) => {
+const getOrCreateCity = async (cityName: string, generatedCityName: string) => {
   try {
-    // Primero intentamos encontrar la ciudad
+    // Primero intentamos encontrar la ciudad usando el nombre generado por Gemini
     const { data: existingCity, error: searchError } = await supabase
       .from('cities')
       .select('id')
-      .eq('name', cityName)
+      .eq('name', generatedCityName)
       .single();
 
-    if (searchError && searchError.code !== 'PGRST116') { // PGRST116 es el código para "no se encontraron resultados"
+    if (searchError && searchError.code !== 'PGRST116') {
       throw searchError;
     }
 
@@ -74,10 +74,10 @@ const getOrCreateCity = async (cityName: string) => {
       return existingCity.id;
     }
 
-    // Si no existe la ciudad, la creamos
+    // Si no existe la ciudad, la creamos con el nombre generado por Gemini
     const { data: newCity, error: insertError } = await supabase
       .from('cities')
-      .insert([{ name: cityName }])
+      .insert([{ name: generatedCityName }])
       .select('id')
       .single();
 
@@ -151,16 +151,64 @@ const getExistingChallenges = async (cityId: string, count: number, userId: stri
   }
 };
 
-const generateMission = async (cityName: string, duration: number, missionCount: number, userId: string) => {
+const generateMission = async (
+  cityName: string, 
+  duration: number, 
+  missionCount: number, 
+  userId: string,
+  startDate: Date,
+  endDate: Date
+) => {
   try {
-    console.log('Iniciando generación de misión:', { cityName, duration, missionCount, userId });
+    console.log('Iniciando generación de misión:', { 
+      cityName, 
+      duration, 
+      missionCount, 
+      userId,
+      startDate,
+      endDate 
+    });
 
     // Verificar y crear usuario si no existe
     await getOrCreateUser(userId);
 
-    // Obtener o crear la ciudad
-    const cityId = await getOrCreateCity(cityName);
-    console.log('CityId obtenido/creado:', cityId);
+    // Generar misiones y obtener el nombre correcto de la ciudad
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `Genera ${missionCount} misiones en ${cityName} que se puedan completar en ${duration} días. Devuelve un objeto JSON con la siguiente estructura exacta:
+{
+  "ciudad": "Nombre correcto de la ciudad",
+  "misiones": [
+    {
+      "Título": "Título de la misión",
+      "Descripción": "Descripción detallada de la misión incluyendo qué foto tomar",
+      "Dificultad": "Fácil|Media|Difícil",
+      "Puntos": 25|50|100
+    }
+  ]
+}
+Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No incluyas explicaciones adicionales, solo el JSON.`;
+    
+    console.log('Prompt:', prompt);
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const missionsData = response.text();
+
+    console.log('Respuesta de la API:', missionsData);
+
+    const jsonMatch = missionsData.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No se encontró un objeto JSON válido en la respuesta');
+    }
+
+    const missions = JSON.parse(jsonMatch[0]);
+
+    if (!missions.misiones || !Array.isArray(missions.misiones)) {
+      throw new Error('La respuesta no contiene un array de misiones válido');
+    }
+
+    // Obtener o crear la ciudad usando el nombre corregido por Gemini
+    const cityId = await getOrCreateCity(cityName, missions.ciudad);
 
     // Crear un nuevo journey
     const { data: journey, error: journeyError } = await supabase
@@ -168,8 +216,10 @@ const generateMission = async (cityName: string, duration: number, missionCount:
       .insert([{
         userId,
         cityId,
-        description: `Viaje a ${cityName} por ${duration} días`,
-        created_at: new Date().toISOString()
+        description: `Viaje a ${missions.ciudad} por ${duration} días`,
+        created_at: new Date().toISOString(),
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString()
       }])
       .select('id')
       .single();
@@ -184,7 +234,7 @@ const generateMission = async (cityName: string, duration: number, missionCount:
     // Verificar si hay suficientes desafíos existentes que el usuario no haya solicitado
     const existingChallenges = await getExistingChallenges(cityId, missionCount, userId);
     console.log('Desafíos existentes encontrados:', existingChallenges);
-
+    
     let challenges;
     if (existingChallenges && existingChallenges.length > 0) {
       // Usar desafíos existentes
@@ -193,40 +243,6 @@ const generateMission = async (cityName: string, duration: number, missionCount:
     } else {
       // Solo generar nuevos desafíos si no hay suficientes existentes
       console.log('Generando nuevos desafíos');
-      // Generar nuevos desafíos
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-      const prompt = `Genera ${missionCount} misiones en ${cityName} que se puedan completar en ${duration} días. Devuelve un objeto JSON con la siguiente estructura exacta:
-{
-  "misiones": [
-    {
-      "Título": "Título de la misión",
-      "Descripción": "Descripción detallada de la misión incluyendo qué foto tomar",
-      "Dificultad": "Fácil|Media|Difícil",
-      "Puntos": 25|50|100
-    }
-  ]
-}
-Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No incluyas explicaciones adicionales, solo el JSON.`;
-      
-      console.log('Prompt:', prompt);
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const missionsData = response.text();
-
-      console.log('Respuesta de la API:', missionsData);
-
-      const jsonMatch = missionsData.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No se encontró un objeto JSON válido en la respuesta');
-      }
-
-      const missions = JSON.parse(jsonMatch[0]);
-
-      if (!missions.misiones || !Array.isArray(missions.misiones)) {
-        throw new Error('La respuesta no contiene un array de misiones válido');
-      }
-
       // Crear los desafíos
       const formattedChallenges = missions.misiones.map((mission: any) => ({
         title: mission.Título,
@@ -252,7 +268,9 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
       journeyId: journey.id,
       challengeId: challenge.id,
       completed: false,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString()
     }));
 
     console.log('Vincular misiones al journey:', journeyMissions);

@@ -136,4 +136,20 @@ export const verifyCredentials = async (email: string, password: string) => {
     console.error('Error inesperado en autenticación:', error);
     return { success: false, error };
   }
+};
+
+export const searchCities = async (query: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('cities')
+      .select('*')
+      .ilike('name', `%${query}%`)
+      .limit(10);
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error searching cities:', error);
+    throw error;
+  }
 }; 
