@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setUser, setToken } from '../../features/authSlice';
-import { supabase } from '../../services/supabase.js';
 
 const RegisterScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -17,30 +16,23 @@ const RegisterScreen = ({ navigation }: any) => {
     setError('');
 
     try {
-      // Crear un nuevo usuario en Supabase
-      const { user, error: signupError } = await supabase.auth.signUp({
-        email,
-        password,
+      const response = await fetch('http://localhost:5000/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, username }),
       });
 
-      if (signupError) throw signupError;
+      const data = await response.json();
 
-      // Insertar el usuario en la tabla 'users' incluyendo la contraseña
-      const { data, error: insertError } = await supabase
-        .from('users')
-        .insert([
-          { email, username, password } // Asegúrate de que 'password' sea el nombre correcto de la columna
-        ]);
+      if (!response.ok) throw new Error(data.error || 'Error al registrar usuario');
 
-      if (insertError) throw insertError;
-
-      // Guardar el usuario en Redux
+      // Guardar usuario en Redux
       dispatch(setUser({
-        id: user?.id, // Usar el ID del usuario creado por Supabase
-        email: user?.email!,
-        username: username,
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
       }));
-      dispatch(setToken('fake_access_token')); // Puedes establecer un token real si lo tienes
+      dispatch(setToken('fake_access_token')); // Sustituir por un token real si es necesario
 
       // Redirigir a la pantalla de inicio de sesión
       navigation.replace('Login');
@@ -76,11 +68,7 @@ const RegisterScreen = ({ navigation }: any) => {
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.buttonText}>Registrarse</Text>
-        )}
+        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Registrarse</Text>}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
@@ -138,4 +126,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RegisterScreen; 
+export default RegisterScreen;

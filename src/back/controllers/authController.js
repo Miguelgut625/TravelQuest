@@ -33,18 +33,29 @@ import { supabase } from '../../services/supabase.js';
   }
 };
 
-// Crear un nuevo usuario****
- const createUser = async (req,res) => {
-  const { name, description } = req.body;
+const createUser = async (req, res) => {
+  const { email, password, username } = req.body;
 
   try {
-    const { data, error } = await supabase
-        .from('users')
-      .insert([{ name, description }]);
+    // Crear un nuevo usuario en Supabase
+    const { user, error: signupError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-    if (error) throw error;
+    if (signupError) throw signupError;
 
-    res.status(201).json(data);
+    // Insertar el usuario en la tabla 'users' incluyendo la contraseña
+    const { data, error: insertError } = await supabase
+      .from('users')
+      .insert([{ email, username, password }]);
+
+    if (insertError) throw insertError;
+
+    res.status(201).json({
+      message: 'Usuario creado exitosamente',
+      user: { id: user?.id, email: user?.email, username, password },
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
