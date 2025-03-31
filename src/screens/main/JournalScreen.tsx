@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
 import { Ionicons } from '@expo/vector-icons';
+import { setRefreshJournal } from '../../features/journalSlice';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../../services/supabase';
 
 const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
   <TouchableOpacity style={styles.card}>
@@ -46,16 +49,58 @@ const EmptyState = ({ message }: { message: string }) => (
   </View>
 );
 
-const JournalScreen = () => {
+const JournalScreen = ({ route }) => {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
   const { user } = useSelector((state: RootState) => state.auth);
+  const { shouldRefresh } = useSelector((state: RootState) => state.journal);
+  const dispatch = useDispatch();
+  const navigation = useNavigation();
   
   useEffect(() => {
     fetchJournalEntries();
+    
+    // Suscribirse a cambios en la tabla journal_entries
+    const journalSubscription = supabase
+      .channel('journal_changes')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'journal_entries',
+        filter: `userid=eq.${user?.id}`
+      }, (payload) => {
+        console.log('Nueva entrada de diario detectada:', payload);
+        // Actualizar los datos
+        fetchJournalEntries();
+      })
+      .subscribe();
+      
+    // Limpiar suscripción
+    return () => {
+      supabase.removeChannel(journalSubscription);
+    };
   }, []);
+  
+  useEffect(() => {
+    if (shouldRefresh) {
+      console.log('Actualizando entradas del diario debido a nueva misión completada');
+      fetchJournalEntries();
+      dispatch(setRefreshJournal(false));
+    }
+  }, [shouldRefresh]);
+
+  // Detectar el parámetro refresh
+  useEffect(() => {
+    if (route.params?.refresh) {
+      console.log('Actualizando entradas del diario debido a nueva misión completada');
+      fetchJournalEntries();
+      // Limpiar el parámetro para evitar actualizaciones repetidas
+      navigation.setParams({ refresh: undefined });
+    }
+  }, [route.params?.refresh]);
 
   const fetchJournalEntries = async () => {
     if (!user?.id) {

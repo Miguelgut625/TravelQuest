@@ -2,7 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import authReducer from './auth/authSlice';
 import missionReducer from './missionSlice';
-import journalReducer from './journalSlice';
+import journalReducer from '../features/journalSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import journeyReducer from './journey/journeySlice';
 

@@ -16,15 +16,17 @@ export interface JournalEntry {
 }
 
 interface JournalState {
-  entries: { [cityId: string]: JournalEntry[] };
+  entries: Record<string, any[]>;
   isLoading: boolean;
   error: string | null;
+  shouldRefresh: boolean;
 }
 
 const initialState: JournalState = {
   entries: {},
   isLoading: false,
   error: null,
+  shouldRefresh: false
 };
 
 const journalSlice = createSlice({
@@ -60,6 +62,21 @@ const journalSlice = createSlice({
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
+    setJournalEntries: (state, action: PayloadAction<Record<string, any[]>>) => {
+      state.entries = action.payload;
+      state.isLoading = false;
+      state.error = null;
+    },
+    setJournalLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
+    setJournalError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+      state.isLoading = false;
+    },
+    setRefreshJournal: (state, action: PayloadAction<boolean>) => {
+      state.shouldRefresh = action.payload;
+    }
   },
 });
 
@@ -69,6 +86,10 @@ export const {
   deleteEntry,
   setLoading,
   setError,
+  setJournalEntries,
+  setJournalLoading,
+  setJournalError,
+  setRefreshJournal
 } = journalSlice.actions;
 
 export default journalSlice.reducer; 

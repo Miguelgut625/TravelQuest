@@ -42,75 +42,101 @@ export const addPointsToUser = async (userId: string, points: number) => {
 };
 
 export const completeMission = async (missionId: string, userId: string, imageUrl?: string) => {
+    console.log('Iniciando completeMission con parámetros:', { missionId, userId, imageUrl });
+    
     try {
-        // Primero obtenemos los datos de la misión
+        // Verificar que tenemos los datos necesarios
+        if (!missionId || !userId) {
+            console.error('Parámetros inválidos:', { missionId, userId });
+            throw new Error('Parámetros inválidos para completar misión');
+        }
+        
+        // Obtener datos de la misión para asignar puntos
+        console.log('Obteniendo datos de la misión...');
         const { data: missionData, error: missionError } = await supabase
             .from('journeys_missions')
             .select(`
                 id,
                 journeyId,
-                challenge:challenges (
+                challengeId,
+                completed,
+                challenges (
                     id,
                     title,
-                    description,
                     points
                 )
             `)
             .eq('id', missionId)
             .single();
 
-        if (missionError) throw missionError;
-
-        // Marcar la misión como completada
-        try {
-            // Primero verificar qué columnas están disponibles
-            const { data: columnInfo, error: columnError } = await supabase
-                .rpc('get_table_columns', { table_name: 'journeys_missions' });
-                
-            // Columnas disponibles
-            const hasPhotoUrl = columnInfo?.some(col => col === 'photo_url');
-            const hasPictureUrl = columnInfo?.some(col => col === 'picture_url');
-            
-            let updateData: any = {
-                completed: true,
-                completed_at: new Date().toISOString()
-            };
-            
-            // Añadir la URL de la imagen a la columna correcta si existe
-            if (imageUrl) {
-                if (hasPictureUrl) {
-                    updateData.picture_url = imageUrl;
-                } else if (hasPhotoUrl) {
-                    updateData.photo_url = imageUrl;
-                }
-            }
-            
-            const { error: updateError } = await supabase
-                .from('journeys_missions')
-                .update(updateData)
-                .eq('id', missionId);
-
-            if (updateError) throw updateError;
-            
-        } catch (error: any) {
-            // Si hay un error específico con las columnas, intentamos de nuevo
-            if (error.message && 
-                (error.message.includes('picture_url') || 
-                 error.message.includes('photo_url') ||
-                 error.message.includes('column'))) {
-                console.warn('Error con la columna de imagen pero continuando');
-            } else {
-                throw error;
-            }
+        if (missionError || !missionData) {
+            console.error('Error al obtener datos de la misión:', missionError);
+            throw missionError || new Error('No se encontró la misión');
         }
 
-        // Añadir los puntos al usuario
-        const points = missionData.challenge.points;
-        await addPointsToUser(userId, points);
+        console.log('Datos de misión obtenidos:', missionData);
 
+        // Verificar que la misión no esté ya completada
+        if (missionData.completed) {
+            console.warn('La misión ya está completada');
+            return missionData.challenges.points;
+        }
+
+        // Marcar la misión como completada
+        console.log('Marcando misión como completada...');
+        
+        // Preparar datos para la actualización
+        const updateData: any = {
+            completed: true,
+            completed_at: new Date().toISOString()
+        };
+        
+        // Añadir URL de imagen si existe - CORREGIDO para usar directamente picture_url
+        if (imageUrl) {
+            console.log('Añadiendo URL de imagen a picture_url:', imageUrl);
+            
+            try {
+                // Usar directamente picture_url
+                updateData.picture_url = imageUrl;
+                const { error } = await supabase
+                    .from('journeys_missions')
+                    .update(updateData)
+                    .eq('id', missionId);
+                    
+                if (error) {
+                    console.error('Error al actualizar con picture_url:', error.message);
+                    // Si falla, actualizar sin la imagen
+                    delete updateData.picture_url;
+                    const { error: error2 } = await supabase
+                        .from('journeys_missions')
+                        .update({ completed: true, completed_at: new Date().toISOString() })
+                        .eq('id', missionId);
+                        
+                    if (error2) throw error2;
+                }
+            } catch (error: any) {
+                console.warn('Error con la columna de imagen pero continuando:', error.message);
+            }
+        } else {
+            // Si no hay imagen, solo actualizar el estado completado
+            console.log('Actualizando sin imagen...');
+            const { error } = await supabase
+                .from('journeys_missions')
+                .update({ completed: true, completed_at: new Date().toISOString() })
+                .eq('id', missionId);
+                
+            if (error) throw error;
+        }
+        
+        // Añadir los puntos al usuario
+        const points = missionData.challenges.points;
+        console.log('Añadiendo puntos al usuario:', points);
+        await addPointsToUser(userId, points);
+        
         // Si hay una imagen, intentamos agregar una entrada al diario
         if (imageUrl) {
             try {
+                console.log('Creando entrada en el diario...');
                 // Obtener información de la ciudad
                 const { data: journeyData, error: journeyError } = await supabase
                     .from('journeys')
@@ -126,39 +152,30 @@ export const completeMission = async (missionId: string, userId: string, imageUr
                     console.warn('Error obteniendo datos de journey:', journeyError);
                     return points; // Retornamos puntos y no creamos entrada en el diario
                 }
-
-                // Intentamos crear una entrada en el diario con la imagen
-                try {
-                    // Preparar datos con diferentes convenciones para probar
-                    const entryData = {
-                        userId: userId,
-                        cityId: journeyData.cityId,
-                        missionId: missionId,
-                        title: missionData.challenge.title || 'Misión completada',
-                        content: `Misión completada: ${missionData.challenge.description || ''}`,
-                        photos: [imageUrl],
-                        tags: ['misión', journeyData.cities?.name?.toLowerCase() || 'ciudad']
-                    };
-                    
-                    // Usar nuestra función mejorada de creación de entradas
-                    const success = await createJournalEntry(entryData);
-                    
-                    if (!success) {
-                        console.warn('No se pudo crear la entrada en el diario, pero la misión fue completada');
-                    } else {
-                        console.log('Entrada de diario creada exitosamente');
-                    }
-                } catch (journalErr) {
-                    console.warn('Error al intentar crear entrada en el diario, pero la misión ha sido completada:', journalErr);
-                }
-            } catch (err) {
-                console.warn('Error en el proceso de creación del diario, pero la misión ha sido completada:', err);
+                
+                // Crear entrada en el diario
+                console.log('Datos de journey obtenidos, creando entrada de diario:', journeyData);
+                
+                await createJournalEntry({
+                    userId: userId,
+                    cityId: journeyData.cityId,
+                    missionId: missionId,
+                    title: `Misión completada: ${missionData.challenges.title}`,
+                    content: `He completado esta misión en ${journeyData.cities?.name || 'mi viaje'}.`,
+                    photos: [imageUrl]
+                });
+                
+                console.log('Entrada de diario creada exitosamente');
+            } catch (error) {
+                console.warn('Error creando entrada en el diario, pero la misión se completó:', error);
+                // No lanzamos el error para no interrumpir el flujo
             }
         }
 
+        console.log('Misión completada exitosamente, retornando puntos:', points);
         return points;
     } catch (error) {
-        console.error('Error completando la misión:', error);
+        console.error('Error en completeMission:', error);
         throw error;
     }
 }; 
