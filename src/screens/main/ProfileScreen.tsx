@@ -5,6 +5,13 @@ import axios from 'axios';
 import { RootState } from '../../features/store';
 import { logout } from '../../features/authSlice';
 
+interface FriendshipRequest {
+  id: string; // Asegúrate de que el tipo sea correcto
+  sender: {
+    username: string;
+  };
+}
+
 const ProfileScreen = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
@@ -15,7 +22,7 @@ const ProfileScreen = () => {
   const totalCities = Object.keys(entries).length;
   const totalEntries = Object.values(entries).flat().length;
 
-  const [friendshipRequests, setFriendshipRequests] = useState([]); // Estado para las solicitudes
+  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]); // Definimos el tipo de estado
   const [isRequestsVisible, setIsRequestsVisible] = useState(false); // Estado para controlar la visibilidad de las solicitudes
 
   // Función para obtener las solicitudes de amistad
@@ -27,21 +34,37 @@ const ProfileScreen = () => {
       console.error('Error al obtener solicitudes:', error);
     }
   };
-  const handleAcceptRequest = async (id) => {
+  const handleAcceptRequest = async (id: string) => {
     try {
-      const response = await axios.patch(`http://localhost:5000/api/friends/accept-requests/${id}`);
+      console.log("Esta es la id:" + id);
+      const response = await axios.get(`http://localhost:5000/api/friends/accept-requests/${id}`);
       // Si la solicitud fue aceptada correctamente
       if (response.status === 200) {
         // Actualiza el estado de las solicitudes de amistad, eliminando la aceptada
         setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
         alert('Solicitud aceptada con éxito!');
       }
-    } catch (error) {
-      console.error('Error al aceptar la solicitud:', error);
-      alert('Hubo un error al aceptar la solicitud');
+    } catch (error: any) {
+      console.error('Error al aceptar la solicitud:', error.response ? error.response.data : error.message);
+      alert('Hubo un error al aceptar la solicitud: ' + (error.response ? error.response.data.error : error.message));
     }
   };
   
+  const handleRejectRequest = async (id: string) => {
+    try {
+      console.log("Esta es la id:" + id);
+      const response = await axios.get(`http://localhost:5000/api/friends/reject-requests/${id}`);
+      // Si la solicitud fue rechazada correctamente
+      if (response.status === 200) {
+        // Actualiza el estado de las solicitudes de amistad, eliminando la rechazada
+        setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
+        alert('Solicitud rechazada con éxito!');
+      }
+    } catch (error: any) {
+      console.error('Error al rechazar la solicitud:', error.response ? error.response.data : error.message);
+      alert('Hubo un error al rechazar la solicitud: ' + (error.response ? error.response.data.error : error.message));
+    }
+  };
 
   useEffect(() => {
     if (user?.id) {
@@ -115,7 +138,10 @@ const ProfileScreen = () => {
       >
         <Text style={styles.acceptButtonText}>Aceptar</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.rejectButton}>
+      <TouchableOpacity 
+        style={styles.rejectButton}
+        onPress={() => handleRejectRequest(item.id)} // Pasamos el id de la solicitud
+      >
         <Text style={styles.rejectButtonText}>Rechazar</Text>
       </TouchableOpacity>
     </View>

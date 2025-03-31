@@ -28,57 +28,65 @@ const obtenerSolicitudesPendientes = async (req, res) => {
   }
 };
 
-
 const aceptarSolicitud = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Primero, obtenemos la solicitud de amistad para obtener senderId y receiverId
+    // Obtener la solicitud de amistad
     const { data: invitation, error: invitationError } = await supabase
       .from('friendship_invitations')
       .select('senderId, receiverId')
       .eq('id', id)
-      .single(); // Solo debe haber un registro
+      .single();
 
-    // Si hay un error obteniendo la solicitud de amistad, lanza una excepción
     if (invitationError) throw invitationError;
 
     const { senderId, receiverId } = invitation;
 
-    // Actualiza el campo status a "Accepted" en la tabla 'friendship_invitations'
+    // Actualizar el estado a "Accepted"
     const { data: updatedInvitation, error: updateError } = await supabase
       .from('friendship_invitations')
       .update({ status: 'Accepted' })
       .eq('id', id)
-      .single();  // Solo debe haber un registro actualizado
+      .single();
 
-    // Si hay un error actualizando la solicitud de amistad, lanza una excepción
     if (updateError) throw updateError;
 
-    // Ahora, inserta una nueva fila en la tabla 'friends' con los valores senderId y receiverId
+    // Insertar en la tabla 'friends'
     const { data: newFriendship, error: insertError } = await supabase
       .from('friends')
-      .insert([
-        {
-          user1Id: senderId,
-          user2Id: receiverId
-        }
-      ])
-      .single();  // Solo debe haber un registro insertado
+      .insert([{ user1Id: senderId, user2Id: receiverId }])
+      .single();
 
-    // Si hay un error insertando la relación de amistad, lanza una excepción
     if (insertError) throw insertError;
 
-    // Devuelve los datos actualizados y la nueva amistad
     res.status(200).json({ updatedInvitation, newFriendship });
   } catch (error) {
-    // Maneja el error y responde con el mensaje de error
+    res.status(400).json({ error: error.message });
+  }
+};
+
+const rechazarSolicitud = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Actualizar el estado a "Rejected"
+    const { data: updatedInvitation, error: updateError } = await supabase
+      .from('friendship_invitations')
+      .update({ status: 'Rejected' })
+      .eq('id', id)
+      .single();  
+
+    if (updateError) throw updateError;
+
+    res.status(200).json({ updatedInvitation });
+  } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
 
 
-
-export  {
+export {
   obtenerSolicitudesPendientes,
-  aceptarSolicitud};
+  aceptarSolicitud,
+  rechazarSolicitud
+};
