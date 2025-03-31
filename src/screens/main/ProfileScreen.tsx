@@ -21,7 +21,7 @@ const ProfileScreen = () => {
   // Función para obtener las solicitudes de amistad
   const fetchFriendshipRequests = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/users/requests/${user?.id}`);
+      const response = await axios.get(`http://localhost:5000/api/friends/requests/${user?.id}`);
       setFriendshipRequests(response.data); // Guardamos las solicitudes en el estado
     } catch (error) {
       console.error('Error al obtener solicitudes:', error);
