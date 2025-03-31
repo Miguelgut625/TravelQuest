@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, TextInput, Button } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import axios from 'axios';
 import { RootState } from '../../features/store';
@@ -24,6 +24,7 @@ const ProfileScreen = () => {
 
   const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]); // Definimos el tipo de estado
   const [isRequestsVisible, setIsRequestsVisible] = useState(false); // Estado para controlar la visibilidad de las solicitudes
+  const [username, setUsername] = useState(''); // Estado para el nombre de usuario
 
   // Función para obtener las solicitudes de amistad
   const fetchFriendshipRequests = async () => {
@@ -63,6 +64,22 @@ const ProfileScreen = () => {
     } catch (error: any) {
       console.error('Error al rechazar la solicitud:', error.response ? error.response.data : error.message);
       alert('Hubo un error al rechazar la solicitud: ' + (error.response ? error.response.data.error : error.message));
+    }
+  };
+
+  const handleSendRequest = async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/friends/send-request', {
+        senderId: user?.id,
+        username,
+      });
+
+      if (response.status === 200) {
+        alert('Solicitud enviada con éxito!');
+      }
+    } catch (error: any) {
+      console.error('Error al enviar la solicitud:', error.response ? error.response.data : error.message);
+      alert('Hubo un error al enviar la solicitud: ' + (error.response ? error.response.data.error : error.message));
     }
   };
 
@@ -149,6 +166,16 @@ const ProfileScreen = () => {
 />
 
         )}
+      </View>
+
+      <View style={styles.sendRequestContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Nombre de usuario"
+          value={username}
+          onChangeText={setUsername}
+        />
+        <Button title="Enviar Solicitud" onPress={handleSendRequest} />
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -299,6 +326,23 @@ const styles = StyleSheet.create({
   rejectButtonText: {
     color: 'white',
     textAlign: 'center',
+  },
+  sendRequestContainer: {
+    marginTop: 20,
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
   },
 });
 

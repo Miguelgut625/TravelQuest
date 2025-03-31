@@ -1,6 +1,50 @@
 // friendControlles.js
 import { supabase } from '../../services/supabase.js';
 
+const enviarSolicitud = async (req, res) => {
+  try {
+    const { senderId, username } = req.body;
+
+    // Obtener el receiverId a partir del username
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (userError) throw userError;
+
+    const receiverId = user.id;
+
+    // Verificar si ya son amigos
+    const { data: friends, error: friendsError } = await supabase
+      .from('friends')
+      .select('*')
+      .or(`user1Id.eq.${senderId},user2Id.eq.${senderId}`)
+      .or(`user1Id.eq.${receiverId},user2Id.eq.${receiverId}`)
+      .single();
+
+    if (friends) {
+      return res.status(400).json({ error: 'Ya son amigos' });
+    }
+
+    // Enviar la solicitud de amistad
+    const { data, error } = await supabase
+      .from('friendship_invitations')
+      .insert([{ senderId, receiverId }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};  
+
+
+
 const obtenerSolicitudesPendientes = async (req, res) => {
   try {
     const { id } = req.params;
@@ -88,5 +132,6 @@ const rechazarSolicitud = async (req, res) => {
 export {
   obtenerSolicitudesPendientes,
   aceptarSolicitud,
-  rechazarSolicitud
+  rechazarSolicitud,
+  enviarSolicitud
 };
