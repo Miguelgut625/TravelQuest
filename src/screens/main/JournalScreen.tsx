@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
-import { JournalEntry } from '../../features/journalSlice';
+import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
+import { Ionicons } from '@expo/vector-icons';
 
-const JournalEntryCard = ({ entry }: { entry: JournalEntry }) => (
+const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
   <TouchableOpacity style={styles.card}>
     <Text style={styles.cardTitle}>{entry.title}</Text>
-    <Text style={styles.cardDate}>{new Date(entry.createdAt).toLocaleDateString()}</Text>
+    <Text style={styles.cardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
     <Text style={styles.cardContent} numberOfLines={3}>
       {entry.content}
     </Text>
-    {entry.photos.length > 0 && (
+    {entry.photos && entry.photos.length > 0 && (
       <View style={styles.photoGrid}>
         {entry.photos.slice(0, 3).map((photo, index) => (
           <Image
@@ -29,7 +30,7 @@ const JournalEntryCard = ({ entry }: { entry: JournalEntry }) => (
       </View>
     )}
     <View style={styles.tags}>
-      {entry.tags.map((tag, index) => (
+      {entry.tags && entry.tags.map((tag, index) => (
         <Text key={index} style={styles.tag}>
           #{tag}
         </Text>
@@ -38,22 +39,79 @@ const JournalEntryCard = ({ entry }: { entry: JournalEntry }) => (
   </TouchableOpacity>
 );
 
+const EmptyState = ({ message }: { message: string }) => (
+  <View style={styles.emptyContainer}>
+    <Ionicons name="journal-outline" size={64} color="#ccc" />
+    <Text style={styles.emptyText}>{message}</Text>
+  </View>
+);
+
 const JournalScreen = () => {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
-  const entries = useSelector((state: RootState) => state.journal.entries);
-  const cities = Object.keys(entries);
+  const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useSelector((state: RootState) => state.auth);
+  
+  useEffect(() => {
+    fetchJournalEntries();
+  }, []);
 
-  const renderCityEntries = () => {
-    if (!selectedCity) return null;
-    return (
-      <FlatList
-        data={entries[selectedCity]}
-        renderItem={({ item }) => <JournalEntryCard entry={item} />}
-        keyExtractor={(item) => item.id}
-        style={styles.entriesList}
-      />
-    );
+  const fetchJournalEntries = async () => {
+    if (!user?.id) {
+      setError('Usuario no autenticado');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const entries = await getUserJournalEntries(user.id);
+      setEntriesByCity(entries);
+      
+      // Si hay entradas, seleccionar la primera ciudad por defecto
+      const cities = Object.keys(entries);
+      if (cities.length > 0 && !selectedCity) {
+        setSelectedCity(cities[0]);
+      }
+    } catch (error) {
+      console.error('Error al cargar entradas del diario:', error);
+      setError('No se pudieron cargar las entradas del diario');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Cargando diario de viaje...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchJournalEntries}>
+          <Text style={styles.retryButtonText}>Reintentar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const cities = Object.keys(entriesByCity);
+
+  if (cities.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Diario de Viaje</Text>
+        <EmptyState message="Aún no tienes entradas en tu diario. Completa misiones para añadir fotos a tu diario de viaje." />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -76,7 +134,19 @@ const JournalScreen = () => {
           showsHorizontalScrollIndicator={false}
         />
       </View>
-      {renderCityEntries()}
+      
+      {selectedCity ? (
+        entriesByCity[selectedCity].length > 0 ? (
+          <FlatList
+            data={entriesByCity[selectedCity]}
+            renderItem={({ item }) => <JournalEntryCard entry={item} />}
+            keyExtractor={(item) => item.id}
+            style={styles.entriesList}
+          />
+        ) : (
+          <EmptyState message={`No hay entradas de diario para ${selectedCity}`} />
+        )
+      ) : null}
     </View>
   );
 };
@@ -183,6 +253,48 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     marginRight: 10,
     fontSize: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    padding: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#666',
+    marginTop: 10,
+    textAlign: 'center',
+    fontSize: 16,
   },
 });
 

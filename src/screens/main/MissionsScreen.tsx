@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, ProgressBar, useTheme, Surface } from 'react-native-paper';
 import { JourneyMission } from '../../types/journey';
 import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
+import ImageUploadModal from '../../components/ImageUploadModal';
+import { createJournalEntry } from '../../services/journalService';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -106,6 +108,9 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
   const [userPoints, setUserPoints] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [cityMissions, setCityMissions] = useState<CityMissions>({});
+  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
+  const [completingMission, setCompletingMission] = useState(false);
   const dispatch = useDispatch();
   const theme = useTheme();
 
@@ -196,28 +201,47 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
   }, [journeyId]);
 
   const handleCompleteMission = async (missionId: string) => {
-    if (!user?.id) return;
+    setSelectedMissionId(missionId);
+    setShowImageUploadModal(true);
+  };
+
+  const handleImageUploadSuccess = async (imageUrl: string) => {
+    if (!user?.id || !selectedMissionId) return;
+    setCompletingMission(true);
 
     try {
-      const points = await completeMission(missionId, user.id);
+      // Crear entrada en el diario
+      await createJournalEntry({
+        userId: user.id,
+        missionId: selectedMissionId,
+        photos: [imageUrl],
+        title: 'Misión completada',
+        content: 'Misión completada con éxito',
+        cityId: selectedCity || 'Ciudad Desconocida'
+      });
+
+      // Completar la misión
+      const points = await completeMission(selectedMissionId, user.id, imageUrl);
       setUserPoints(prev => prev + points);
 
       // Actualizar el estado local
       const updatedMissions = missions.map(mission =>
-        mission.id === missionId ? { ...mission, completed: true } : mission
+        mission.id === selectedMissionId ? { ...mission, completed: true } : mission
       );
       setMissions(updatedMissions);
 
       // Actualizar cityMissions
       const newCityMissions = { ...cityMissions };
-      Object.keys(newCityMissions).forEach(cityName => {
-        const mission = newCityMissions[cityName].pending.find(m => m.id === missionId);
+      Object.keys(newCityMissions).forEach(city => {
+        const mission = newCityMissions[city].pending.find(m => m.id === selectedMissionId);
         if (mission) {
-          newCityMissions[cityName].pending = newCityMissions[cityName].pending.filter(m => m.id !== missionId);
-          newCityMissions[cityName].completed.push({ ...mission, completed: true });
+          newCityMissions[city].pending = newCityMissions[city].pending.filter(m => m.id !== selectedMissionId);
+          newCityMissions[city].completed.push({ ...mission, completed: true });
         }
       });
       setCityMissions(newCityMissions);
+
+      dispatch(dispatchCompleteMission(selectedMissionId));
 
       Alert.alert(
         '¡Misión Completada!',
@@ -229,12 +253,11 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
         'Error',
         'No se pudo completar la misión. Por favor, intenta de nuevo.'
       );
+    } finally {
+      setCompletingMission(false);
+      setShowImageUploadModal(false);
+      setSelectedMissionId(null);
     }
-  };
-
-  const handleMissionComplete = (missionId: string) => {
-    handleCompleteMission(missionId);
-    dispatch(dispatchCompleteMission(missionId));
   };
 
   if (loading) {
@@ -304,7 +327,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
               <MissionCard
                 key={mission.id}
                 mission={mission}
-                onComplete={() => handleMissionComplete(mission.id)}
+                onComplete={() => handleCompleteMission(mission.id)}
               />
             ))}
           </>
@@ -344,6 +367,16 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
           </>
         )}
       </ScrollView>
+
+      <ImageUploadModal
+        visible={showImageUploadModal}
+        onClose={() => {
+          setShowImageUploadModal(false);
+          setSelectedMissionId(null);
+        }}
+        onUploadSuccess={handleImageUploadSuccess}
+        loading={completingMission}
+      />
     </View>
   );
 };

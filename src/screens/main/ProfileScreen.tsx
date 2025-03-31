@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState } from '../../features/authSlice';
@@ -8,6 +8,7 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import CloudinaryStatusCard from '../../components/CloudinaryStatusCard';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -260,7 +261,7 @@ const ProfileScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
         {user?.profilePicture ? (
           <Image
@@ -298,13 +299,18 @@ const ProfileScreen = () => {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Configuración</Text>
+        <CloudinaryStatusCard />
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Seguridad</Text>
         <View style={styles.privacyContainer}>
           <TouchableOpacity
             style={styles.privacyButton}
             onPress={() => setIsChangePasswordVisible(true)}
           >
-            <Text style={styles.privacyButtonTitle}>Cambiar Contraseña</Text>
+            <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
           </TouchableOpacity>
           <Text style={styles.privacyDescription}>
             Actualiza tu contraseña para mantener tu cuenta segura
@@ -407,7 +413,7 @@ const ProfileScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -582,7 +588,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  privacyButtonTitle: {
+  privacyButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: 'white',

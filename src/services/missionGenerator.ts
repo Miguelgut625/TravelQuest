@@ -151,9 +151,42 @@ const getExistingChallenges = async (cityId: string, count: number, userId: stri
   }
 };
 
-const generateMission = async (cityName: string, duration: number, missionCount: number, userId: string) => {
+export const generateMission = async (
+  cityName: string, 
+  duration: number, 
+  missionCount: number, 
+  userId: string,
+  startDate: Date | null,
+  endDate: Date | null
+) => {
   try {
-    console.log('Iniciando generación de misión:', { cityName, duration, missionCount, userId });
+    console.log('generateMission recibió fechas:', {
+      startDate,
+      endDate,
+      duration
+    });
+    
+    // Crear fechas por defecto si no se proporcionan
+    const validStartDate = startDate instanceof Date ? startDate : new Date();
+    const validEndDate = endDate instanceof Date ? endDate : new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
+    
+    // Convertir a ISO string para la base de datos
+    const startIsoString = validStartDate.toISOString();
+    const endIsoString = validEndDate.toISOString();
+    
+    console.log('Fechas validadas para misiones:', {
+      startIsoString,
+      endIsoString
+    });
+    
+    console.log('Iniciando generación de misión:', { 
+      cityName, 
+      duration, 
+      missionCount, 
+      userId,
+      startDate,
+      endDate 
+    });
 
     // Verificar y crear usuario si no existe
     await getOrCreateUser(userId);
@@ -169,7 +202,9 @@ const generateMission = async (cityName: string, duration: number, missionCount:
         userId,
         cityId,
         description: `Viaje a ${cityName} por ${duration} días`,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        start_date: startIsoString,
+        end_date: endIsoString
       }])
       .select('id')
       .single();
@@ -252,7 +287,9 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
       journeyId: journey.id,
       challengeId: challenge.id,
       completed: false,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      start_date: startIsoString,
+      end_date: endIsoString
     }));
 
     console.log('Vincular misiones al journey:', journeyMissions);
@@ -299,7 +336,7 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
       challenges: createdMissions
     };
   } catch (error) {
-    console.error('Error generando desafíos:', error);
+    console.error('Error generando misiones:', error);
     throw error;
   }
 };

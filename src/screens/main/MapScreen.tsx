@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
-import Map, { MapMarker } from '../../components/maps';
+import Map from '../../components/maps';
 import * as Location from 'expo-location';
 import { getMissionsByCityAndDuration } from '../../services/missionService';
 import { useNavigation } from '@react-navigation/native';
@@ -49,76 +49,6 @@ const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep:
   </Modal>
 );
 
-const DateRangePickerWeb: React.FC = () => {
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleDatesChange = (dates: [Date | null, Date | null]) => {
-    const [start, end] = dates;
-    setStartDate(start);
-    setEndDate(end);
-  };
-
-  const calculateDuration = (start: Date | null, end: Date | null): number => {
-    if (!start || !end) return 0;
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const formatDateRange = (): string => {
-    if (!startDate && !endDate) {
-      return 'Selecciona fechas';
-    }
-    
-    const formatDate = (date: Date | null): string => {
-      if (!date) return '';
-      return format(date, 'dd MMM');
-    };
-
-    const duration = calculateDuration(startDate, endDate);
-    const startStr = formatDate(startDate);
-    const endStr = formatDate(endDate);
-
-    if (startStr && endStr) {
-      return `${startStr} - ${endStr} · ${duration} noches`;
-    } else if (startStr) {
-      return `${startStr} - Selecciona fecha final`;
-    } else {
-      return 'Selecciona fechas';
-    }
-  };
-
-  return (
-    <View style={styles.datePickerContainer}>
-      <TouchableOpacity
-        style={styles.datePickerButton}
-        onPress={() => setIsOpen(!isOpen)}
-      >
-        <View style={styles.datePickerContent}>
-          <Text style={styles.datePickerText}>{formatDateRange()}</Text>
-          <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={24} color="white" />
-        </View>
-      </TouchableOpacity>
-      {isOpen && (
-        <View style={styles.calendarDropdown}>
-          <DatePicker
-            selected={startDate}
-            onChange={handleDatesChange}
-            startDate={startDate}
-            endDate={endDate}
-            selectsRange
-            inline
-            monthsShown={2}
-            calendarClassName="booking-calendar"
-            placeholderText="Selecciona fechas"
-          />
-        </View>
-      )}
-    </View>
-  );
-};
-
 const MapScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useDispatch();
@@ -130,7 +60,6 @@ const MapScreen = () => {
     longitudeDelta: 0.0421,
   });
   const [searchCity, setSearchCity] = useState('');
-  const [duration, setDuration] = useState('');
   const [missionCount, setMissionCount] = useState('');
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -141,23 +70,48 @@ const MapScreen = () => {
   const [filteredCities, setFilteredCities] = useState<City[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentStep, setCurrentStep] = useState('');
+  const [duration, setDuration] = useState<number>(0);
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  useEffect(() => {
-    (async () => {
+  const getLocation = async () => {
+    try {
+      setIsLoadingLocation(true);
+      console.log('Solicitando permisos de ubicación...');
       let { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('Estado de los permisos:', status);
+      setHasLocationPermission(status === 'granted');
+
       if (status !== 'granted') {
+        console.log('Permisos denegados');
         setErrorMsg('Se requiere permiso para acceder a la ubicación');
         return;
       }
 
       let location = await Location.getCurrentPositionAsync({});
-      setRegion({
+      const newRegion = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         latitudeDelta: 0.0922,
         longitudeDelta: 0.0421,
+      };
+
+      setRegion(newRegion);
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
       });
-    })();
+    } catch (error) {
+      console.error('Error obteniendo la ubicación:', error);
+      setErrorMsg('Error al obtener la ubicación. Por favor, verifica que el GPS esté activado.');
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  useEffect(() => {
+    getLocation();
   }, []);
 
   const calculateDuration = (start: Date | null, end: Date | null) => {
@@ -186,7 +140,7 @@ const MapScreen = () => {
     }
   };
 
-  const handleCitySelect = (city: any) => {
+  const handleCitySelect = (city: City) => {
     setSearchCity(city.name.toUpperCase());
     setShowSuggestions(false);
     setRegion({
@@ -203,20 +157,48 @@ const MapScreen = () => {
       return;
     }
 
-    const durationNum = parseInt(duration);
     const missionCountNum = parseInt(missionCount);
+    const calculatedDuration = calculateDuration(startDate, endDate);
+    setDuration(calculatedDuration);
 
-    if (!searchCity || !durationNum || !missionCountNum) {
+    if (!searchCity || calculatedDuration <= 0 || !missionCountNum) {
       setErrorMsg('Por favor, completa todos los campos');
       return;
     }
 
+    if (!startDate || !endDate) {
+      setErrorMsg('Selecciona fechas de inicio y fin');
+      return;
+    }
+
     try {
+      const validStartDate = new Date(startDate.getTime());
+      const validEndDate = new Date(endDate.getTime());
+
+      if (validEndDate < validStartDate) {
+        setErrorMsg('La fecha de fin no puede ser anterior a la fecha de inicio');
+        return;
+      }
+
       setIsLoading(true);
       setErrorMsg(null);
 
-      const result = await generateMission(searchCity, durationNum, missionCountNum, user.id);
-      
+      setCurrentStep('Preparando tu viaje a ' + searchCity.toUpperCase() + '...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setCurrentStep('Buscando lugares interesantes...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      setCurrentStep('Creando misiones emocionantes...');
+      const result = await generateMission(
+        searchCity.toUpperCase(),
+        calculatedDuration,
+        missionCountNum,
+        user.id,
+        validStartDate,
+        validEndDate
+      );
+
       if (!result.journeyId) {
         throw new Error('No se recibió el ID del journey');
       }
@@ -234,12 +216,6 @@ const MapScreen = () => {
     }
   };
 
-  const handleDatesChange = (dates: [Date | null, Date | null]) => {
-    const [start, end] = dates;
-    setStartDate(start);
-    setEndDate(end);
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
@@ -247,15 +223,21 @@ const MapScreen = () => {
           style={styles.input}
           placeholder="Buscar ciudad"
           value={searchCity}
-          onChangeText={setSearchCity}
+          onChangeText={handleCitySearch}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Duración (días)"
-          value={duration}
-          onChangeText={setDuration}
-          keyboardType="numeric"
-        />
+        {showSuggestions && filteredCities.length > 0 && (
+          <View style={styles.suggestionsList}>
+            {filteredCities.map((city) => (
+              <TouchableOpacity
+                key={city.id}
+                style={styles.suggestionItem}
+                onPress={() => handleCitySelect(city)}
+              >
+                <Text style={styles.suggestionText}>{city.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
         <TextInput
           style={styles.input}
           placeholder="Número de misiones"
@@ -265,7 +247,27 @@ const MapScreen = () => {
         />
         
         {Platform.OS === 'web' ? (
-          <DateRangePickerWeb />
+          <View style={styles.dateRangeContainer}>
+            <DatePicker
+              selected={startDate}
+              onChange={(dates) => {
+                const [start, end] = dates;
+                setStartDate(start);
+                setEndDate(end);
+                if (start && end) {
+                  setDuration(calculateDuration(start, end));
+                }
+              }}
+              startDate={startDate}
+              endDate={endDate}
+              selectsRange
+              inline
+              monthsShown={2}
+              minDate={new Date()}
+              placeholderText="Selecciona fechas"
+              className="booking-calendar"
+            />
+          </View>
         ) : (
           <View style={styles.datePickersRow}>
             <TouchableOpacity
@@ -273,7 +275,7 @@ const MapScreen = () => {
               onPress={() => setShowStartDatePicker(true)}
             >
               <Text style={styles.dateButtonText}>
-                Inicio: {startDate?.toLocaleDateString() || ''}
+                Inicio: {startDate?.toLocaleDateString() || 'Seleccionar'}
               </Text>
             </TouchableOpacity>
 
@@ -282,35 +284,10 @@ const MapScreen = () => {
               onPress={() => setShowEndDatePicker(true)}
             >
               <Text style={styles.dateButtonText}>
-                Fin: {endDate?.toLocaleDateString() || ''}
+                Fin: {endDate?.toLocaleDateString() || 'Seleccionar'}
               </Text>
             </TouchableOpacity>
           </View>
-        )}
-
-        {(showStartDatePicker || showEndDatePicker) && (
-          <DatePicker
-            selected={showStartDatePicker ? startDate : endDate}
-            onChange={(date) => {
-              if (Platform.OS === 'android') {
-                setShowStartDatePicker(false);
-                setShowEndDatePicker(false);
-              }
-              if (date) {
-                if (showStartDatePicker) {
-                  setStartDate(date);
-                } else {
-                  setEndDate(date);
-                }
-              }
-            }}
-            minDate={new Date()}
-            maxDate={new Date()}
-            showTimeSelect={false}
-            dateFormat="dd/MM/yyyy"
-            className="booking-calendar"
-            calendarClassName="booking-calendar"
-          />
         )}
 
         <Text style={styles.durationText}>
@@ -326,17 +303,41 @@ const MapScreen = () => {
             {isLoading ? 'Generando...' : 'Buscar Aventuras'}
           </Text>
         </TouchableOpacity>
+
         {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
       </View>
 
       <View style={styles.mapContainer}>
-        <Map
-          region={region}
-          style={styles.map}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
-        />
+        {isLoadingLocation ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.loadingText}>Obteniendo ubicación...</Text>
+            {errorMsg ? (
+              <TouchableOpacity style={styles.retryButton} onPress={getLocation}>
+                <Text style={styles.retryButtonText}>Reintentar</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : (
+          <Map
+            region={region}
+            style={styles.map}
+            showsUserLocation={hasLocationPermission}
+            showsMyLocationButton={hasLocationPermission}
+            userLocation={userLocation}
+            onRegionChangeComplete={(newRegion) => {
+              setRegion(newRegion);
+            }}
+          />
+        )}
+        {errorMsg ? (
+          <View style={styles.errorOverlay}>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        ) : null}
       </View>
+
+      <LoadingModal visible={isLoading} currentStep={currentStep} />
     </View>
   );
 };
@@ -361,7 +362,6 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 9999,
     position: 'relative',
-    overflow: 'visible'
   },
   mapContainer: {
     flex: 1,
@@ -436,58 +436,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 2,
-  },
-  datePickerContainer: {
-    position: 'relative',
-    zIndex: 9999,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 16,
-    overflow: 'visible',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      },
-      default: {
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4
-      }
-    })
-  },
-  dateInputContainer: {
-    width: '100%',
-  },
-  datePickerTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 10,
-  },
-  dateInput: {
-    width: '100%',
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    backgroundColor: 'white',
-    fontSize: 16,
-    cursor: 'pointer',
   },
   dateButton: {
     backgroundColor: '#f0f0f0',
@@ -502,42 +450,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
     color: '#666',
-    fontSize: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-    fontSize: 16,
-  },
-  errorOverlay: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    right: 10,
-    backgroundColor: 'rgba(244, 67, 54, 0.9)',
-    padding: 10,
-    borderRadius: 5,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  retryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  searchInputContainer: {
-    position: 'relative',
-    zIndex: 1,
+  dateRangeContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 2,
   },
   suggestionsList: {
     position: 'absolute',
@@ -566,64 +492,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  dateRangeContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 2,
-  },
-  datePickerWrapper: {
-    width: '100%',
-  },
-  datePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 4,
-    backgroundColor: '#005F9E',
-    borderWidth: 1,
-    borderColor: '#005F9E'
-  },
-  datePickerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  loadingContainer: {
     flex: 1,
-  },
-  datePickerText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: 'white',
-  },
-  calendarDropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    zIndex: 9999,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    borderRadius: 8,
-    marginTop: 4,
+    justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      web: {
-        width: 620,
-        marginLeft: 'auto',
-        marginRight: 'auto'
-      }
-    })
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  retryButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  errorOverlay: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    backgroundColor: 'rgba(244, 67, 54, 0.9)',
+    padding: 10,
+    borderRadius: 5,
   },
 });
 
