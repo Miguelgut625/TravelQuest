@@ -25,6 +25,7 @@ interface CityMissions {
   [cityName: string]: {
     completed: JourneyMission[];
     pending: JourneyMission[];
+    expired: JourneyMission[];
   };
 }
 
@@ -169,7 +170,8 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
         if (!missionsByCity[mission.cityName]) {
           missionsByCity[mission.cityName] = {
             completed: [],
-            pending: []
+            pending: [],
+            expired: []
           };
         }
         if (mission.completed) {
