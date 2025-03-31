@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, TextInput, Button } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, TextInput, Button, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import axios from 'axios';
 import { RootState } from '../../features/store';
@@ -98,7 +98,7 @@ const ProfileScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Image
           source={user?.profilePicture ? { uri: user.profilePicture } : require('../../assets/icons/avatar.png')}
@@ -142,29 +142,28 @@ const ProfileScreen = () => {
         {/* Si el estado de visibilidad es verdadero, mostramos las solicitudes */}
         {isRequestsVisible && (
           <FlatList
-  data={friendshipRequests}
-  keyExtractor={(item) => item.id} // Asegúrate de que id sea una cadena
-  renderItem={({ item }) => (
-    <View style={styles.requestItem}>
-      <Text style={styles.requestText}>
-        {item.sender.username} te ha enviado una solicitud.
-      </Text>
-      <TouchableOpacity 
-        style={styles.acceptButton} 
-        onPress={() => handleAcceptRequest(item.id)} // Pasamos el id de la solicitud
-      >
-        <Text style={styles.acceptButtonText}>Aceptar</Text>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={styles.rejectButton}
-        onPress={() => handleRejectRequest(item.id)} // Pasamos el id de la solicitud
-      >
-        <Text style={styles.rejectButtonText}>Rechazar</Text>
-      </TouchableOpacity>
-    </View>
-  )}
-/>
-
+            data={friendshipRequests}
+            keyExtractor={(item) => item.id} // Asegúrate de que id sea una cadena
+            renderItem={({ item }) => (
+              <View style={styles.requestItem}>
+                <Text style={styles.requestText}>
+                  {item.sender.username} te ha enviado una solicitud.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.acceptButton} 
+                  onPress={() => handleAcceptRequest(item.id)} // Pasamos el id de la solicitud
+                >
+                  <Text style={styles.acceptButtonText}>Aceptar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.rejectButton}
+                  onPress={() => handleRejectRequest(item.id)} // Pasamos el id de la solicitud
+                >
+                  <Text style={styles.rejectButtonText}>Rechazar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
         )}
       </View>
 
@@ -181,7 +180,7 @@ const ProfileScreen = () => {
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 };
 
