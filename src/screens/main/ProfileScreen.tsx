@@ -27,6 +27,21 @@ const ProfileScreen = () => {
       console.error('Error al obtener solicitudes:', error);
     }
   };
+  const handleAcceptRequest = async (id) => {
+    try {
+      const response = await axios.patch(`http://localhost:5000/api/friends/accept-requests/${id}`);
+      // Si la solicitud fue aceptada correctamente
+      if (response.status === 200) {
+        // Actualiza el estado de las solicitudes de amistad, eliminando la aceptada
+        setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
+        alert('Solicitud aceptada con éxito!');
+      }
+    } catch (error) {
+      console.error('Error al aceptar la solicitud:', error);
+      alert('Hubo un error al aceptar la solicitud');
+    }
+  };
+  
 
   useEffect(() => {
     if (user?.id) {
@@ -87,22 +102,26 @@ const ProfileScreen = () => {
         {/* Si el estado de visibilidad es verdadero, mostramos las solicitudes */}
         {isRequestsVisible && (
           <FlatList
-            data={friendshipRequests}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.requestItem}>
-                <Text style={styles.requestText}>
-                  {item.senderId} te ha enviado una solicitud.
-                </Text>
-                <TouchableOpacity style={styles.acceptButton}>
-                  <Text style={styles.acceptButtonText}>Aceptar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.rejectButton}>
-                  <Text style={styles.rejectButtonText}>Rechazar</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          />
+  data={friendshipRequests}
+  keyExtractor={(item) => item.id} // Asegúrate de que id sea una cadena
+  renderItem={({ item }) => (
+    <View style={styles.requestItem}>
+      <Text style={styles.requestText}>
+        {item.sender.username} te ha enviado una solicitud.
+      </Text>
+      <TouchableOpacity 
+        style={styles.acceptButton} 
+        onPress={() => handleAcceptRequest(item.id)} // Pasamos el id de la solicitud
+      >
+        <Text style={styles.acceptButtonText}>Aceptar</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.rejectButton}>
+        <Text style={styles.rejectButtonText}>Rechazar</Text>
+      </TouchableOpacity>
+    </View>
+  )}
+/>
+
         )}
       </View>
 

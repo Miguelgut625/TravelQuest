@@ -8,8 +8,6 @@ import { getUsers,
      obtenerSolicitudesPendientes} from '../controllers/authController.js';
 
 const router = Router();
-// Primero definimos la ruta que no tiene parámetros de ID
-router.get('/requests/:id', obtenerSolicitudesPendientes); // Obtener todas las invitaciones de amistad
 
 // Luego definimos las rutas que aceptan parámetros de ID
 router.get('/', getUsers); // Obtener todos los usuarios
