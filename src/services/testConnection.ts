@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 export const testSupabaseConnection = async () => {
   try {
     const { data, error } = await supabase
-      .from('missions') // Cambia 'missions' por cualquier tabla que tengas
+      .from('challenges') // Cambia 'missions' por cualquier tabla que tengas
       .select('*')
       .limit(1); // Limitar a 1 para una prueba rápida
 

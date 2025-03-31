@@ -11,6 +11,10 @@ import { JourneyMission } from '../../types/journey';
 import { completeMission as dispatchCompleteMission } from '../../features/journeySlice';
 import { FlatList } from 'react-native';
 import { useWindowDimensions } from 'react-native';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { SecondaryTabsParams } from '../../navigation/SecondaryTabsNavigator';
+
+type MissionsScreenProps = BottomTabScreenProps<SecondaryTabsParams, 'Missions'>;
 
 const Logo = require('../../assets/icons/logo.png');
 
@@ -20,17 +24,6 @@ const colors = {
   danger: '#D32F2F',
   backgroundGradient: ['#005F9E', '#F0F0F0'],
 };
-
-type MissionsScreenRouteProp = RouteProp<{
-  Missions: {
-    journeyId: string;
-    challenges: JourneyMission[];
-  };
-}, 'Missions'>;
-
-interface MissionsScreenProps {
-  route: MissionsScreenRouteProp;
-}
 
 interface CityMissions {
   [cityName: string]: {
@@ -193,8 +186,10 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
 );
 
 const MissionsScreen = ({ route }: MissionsScreenProps) => {
-  const { journeyId } = route.params || {};
-  const { user } = useSelector((state: RootState) => state.auth);
+  const { user } = useSelector((state: RootState) => state.auth); useEffect(() => {
+  if (user?.id) {
+    fetchMissions(user.id, setCityMissions, setMissions, setError, setLoading);
+  }}, [user?.id]);
   const [missions, setMissions] = useState<JourneyMission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -235,6 +230,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
           journeys_missions (
             id,
             completed,
+            userId,
             challengeId,
             start_date,
             end_date,
@@ -258,20 +254,24 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
       }
   
       const allMissions: JourneyMissionWithCity[] = journeys.flatMap((journey: Journey) =>
-        journey.journeys_missions.map((jm): JourneyMissionWithCity => ({
-          id: jm.id,
-          completed: jm.completed,
-          cityName: journey.cities?.name || 'Ciudad Desconocida',
-          start_date: jm.start_date || journey.start_date,
-          end_date: jm.end_date || journey.end_date,
-          challenge: {
-            title: jm.challenges.title,
-            description: jm.challenges.description,
-            difficulty: jm.challenges.difficulty,
-            points: jm.challenges.points,
-          },
-        }))
-      );
+        journey.journeys_missions
+          .filter((jm: any) => jm.userId === userId)
+          .map((jm: any): JourneyMissionWithCity => ({
+            id: jm.id,
+            completed: jm.completed,
+            userId: jm.userId,
+            cityName: journey.cities?.name || 'Ciudad Desconocida',
+            start_date: jm.start_date || journey.start_date,
+            end_date: jm.end_date || journey.end_date,
+            challenge: {
+              id: jm.challenges.id,
+              title: jm.challenges.title,
+              description: jm.challenges.description,
+              difficulty: jm.challenges.difficulty,
+              points: jm.challenges.points,
+            },            
+          }))
+      );           
   
       const missionsByCity: CityMissions = {};
       allMissions.forEach((mission) => {
@@ -299,7 +299,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
     if (user?.id) {
       fetchMissions(user.id, setCityMissions, setMissions, setError, setLoading);
     }
-  }, [journeyId, user?.id]);
+  }, [user?.id]);
   
 
   const handleCompleteMission = async (missionId: string) => {

@@ -7,6 +7,7 @@ import { RootState } from '../features/store';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import SecondaryTabsNavigator from './SecondaryTabsNavigator';
+import HomeScreen from '../screens/main/HomeScreen';
 
 export type RootStackParams = {
   HomeTabs: undefined;
@@ -35,6 +36,7 @@ const AppNavigator = () => {
               component={RegisterScreen}
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
+
           </>
         )}
       </Stack.Navigator>

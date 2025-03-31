@@ -25,14 +25,14 @@ export const uploadImage = async (filePath: string, bucket: string) => {
 export const getMissionsByCity = async (cityId: string) => {
   try {
     const { data, error } = await supabase
-      .from('missions')
+      .from('challenges')
       .select('*')
       .eq('cityId', cityId);
 
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error fetching missions:', error);
+    console.error('Error fetching challenges:', error);
     throw error;
   }
 };

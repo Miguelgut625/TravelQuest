@@ -41,7 +41,7 @@ const LoginScreen = ({ navigation }: any) => {
         }));
         dispatch(setToken('fake_access_token'));
 
-        navigation.replace('DeafultScreen');
+        navigation.replace("HomeTabs");
       } else {
         setError('Credenciales incorrectas');
       }
