@@ -7,9 +7,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { setRefreshJournal } from '../../features/journalSlice';
 import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
+import { TabParamList } from '../../navigation/AppNavigator';
 
 interface JournalScreenProps {
-  route: RouteProp<{ Journal: { refresh?: boolean } }, 'Journal'>;
+  route: RouteProp<TabParamList, 'Journal'>;
 }
 
 const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (

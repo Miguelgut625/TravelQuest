@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -11,6 +11,8 @@ import { completeMission as dispatchCompleteMission } from '../../features/journ
 import ImageUploadModal from '../../components/ImageUploadModal';
 import { setRefreshJournal } from '../../features/journalSlice';
 import { createJournalEntry } from '../../services/journalService';
+import MissionCompletedModal from '../../components/MissionCompletedModal';
+import CompletingMissionModal from '../../components/CompletingMissionModal';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -201,13 +203,19 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   </TouchableOpacity>
 );
 
-const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
+const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => {
   const { journeyId } = route.params || {};
   const { user } = useSelector((state: RootState) => state.auth);
   const [missions, setMissions] = useState<CityMissions>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completingMission, setCompletingMission] = useState(false);
+  const [missionCompleted, setMissionCompleted] = useState(false);
+  const [completedMissionInfo, setCompletedMissionInfo] = useState<{
+    title: string;
+    points: number;
+    cityName: string;
+  } | null>(null);
   const [userPoints, setUserPoints] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const dispatch = useDispatch();
@@ -303,114 +311,105 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     try {
       setCompletingMission(true);
-
-      console.log('Completando misión:', { missionId, imageUrl });
-
-      if (!user?.id) {
-        throw new Error('Usuario no autenticado');
+      
+      // Encontrar la misión en el estado local
+      let foundMissionTitle = '';
+      let foundMissionPoints = 0;
+      let foundCityName = '';
+      
+      Object.keys(missions).forEach((cityName) => {
+        const pending = missions[cityName].pending;
+        const foundMission = pending.find((m) => m.id === missionId);
+        if (foundMission) {
+          foundMissionTitle = foundMission.challenge.title;
+          foundMissionPoints = foundMission.challenge.points;
+          foundCityName = cityName;
+        }
+      });
+      
+      if (!foundMissionTitle || !foundCityName) {
+        throw new Error('Misión no encontrada');
       }
-
-      // Crear entrada en el diario
-      await createJournalEntry({
-        userId: user.id,
-        missionId: missionId,
-        photos: [imageUrl || ''],
-        title: 'Misión completada',
-        content: 'Misión completada con éxito',
-        cityId: selectedCity || 'Ciudad Desconocida'
+      
+      // Guardar información de la misión antes de completarla
+      setCompletedMissionInfo({
+        title: foundMissionTitle,
+        points: foundMissionPoints,
+        cityName: foundCityName
       });
 
-      // Completar la misión
-      const points = await completeMission(missionId, user.id, imageUrl);
-
-      console.log('Misión completada, puntos:', points);
-
-      // Actualizar la lista de misiones localmente
-      const updatedMissions = { ...missions };
-
-      // Buscar la misión en todas las ciudades
-      let missionFound = false;
-
-      for (const city in updatedMissions) {
-        // Verificar que updatedMissions[city] existe y tiene la estructura esperada
-        if (!updatedMissions[city]) {
-          console.warn(`Ciudad ${city} no tiene estructura de misiones`);
-          continue;
-        }
-
-        // Buscar en misiones pendientes
-        if (updatedMissions[city].pending) {
-          const pendingIndex = updatedMissions[city].pending.findIndex(m => m.id === missionId);
-          if (pendingIndex !== -1) {
-            // Encontramos la misión en pendientes, moverla a completadas
-            const mission = { ...updatedMissions[city].pending[pendingIndex], completed: true };
-            updatedMissions[city].pending.splice(pendingIndex, 1);
-            updatedMissions[city].completed.push(mission);
-            missionFound = true;
-            break;
-          }
-        }
-
-        // Buscar en misiones expiradas (por si acaso)
-        if (!missionFound && updatedMissions[city].expired) {
-          const expiredIndex = updatedMissions[city].expired.findIndex(m => m.id === missionId);
-          if (expiredIndex !== -1) {
-            // Encontramos la misión en expiradas, moverla a completadas
-            const mission = { ...updatedMissions[city].expired[expiredIndex], completed: true };
-            updatedMissions[city].expired.splice(expiredIndex, 1);
-            updatedMissions[city].completed.push(mission);
-            missionFound = true;
-            break;
-          }
-        }
-
-        // No es necesario buscar en completadas, pero por si acaso
-        if (!missionFound && updatedMissions[city].completed) {
-          const completedIndex = updatedMissions[city].completed.findIndex(m => m.id === missionId);
-          if (completedIndex !== -1) {
-            console.log('La misión ya estaba completada');
-            missionFound = true;
-            break;
-          }
-        }
-      }
-
-      if (!missionFound) {
-        console.warn('No se encontró la misión con ID:', missionId);
-      }
-
-      setMissions(updatedMissions);
-      dispatch(dispatchCompleteMission(missionId));
-
-      // Alerta de éxito con puntos
-      Alert.alert(
-        'Misión Completada',
-        `¡Felicidades! Has completado la misión y has ganado ${points} puntos.\n\n¿Quieres ver tu entrada en el diario de viaje?`,
-        [
-          {
-            text: 'Ver Diario',
-            onPress: () => {
-              // Para Redux
-              if (typeof dispatch === 'function') {
-                dispatch(setRefreshJournal(true));
-              }
-              navigation.navigate('Journal', { refresh: true });
-            }
-          },
-          {
-            text: 'Continuar',
-            style: 'cancel'
-          }
-        ]
+      // Completar misión en la base de datos
+      await completeMission(
+        missionId, 
+        user?.id || '', 
+        imageUrl
       );
 
+      // Crear entrada en el diario para esta misión completada
+      if (imageUrl) {
+        await createJournalEntry({
+          userId: user?.id || '',
+          cityId: foundCityName || '',
+          missionId: missionId,
+          title: `Misión completada: ${foundMissionTitle}`,
+          content: `He completado la misión "${foundMissionTitle}" en ${foundCityName}. ¡Conseguí ${foundMissionPoints} puntos!`,
+          photos: [imageUrl],
+          tags: [foundCityName || '', 'Misión completada']
+        });
+      }
+
+      // Actualizar el estado local
+      setMissions((prev) => {
+        const updatedMissions = { ...prev };
+        const city = updatedMissions[foundCityName];
+        
+        // Encontrar el índice de la misión en las pendientes
+        const index = city.pending.findIndex((m) => m.id === missionId);
+        
+        if (index !== -1) {
+          // Obtener la misión y marcarla como completada
+          const mission = { ...city.pending[index], completed: true };
+          
+          // Eliminar la misión de pendientes
+          city.pending.splice(index, 1);
+          
+          // Añadir la misión a completadas
+          city.completed.push(mission);
+        }
+        
+        return updatedMissions;
+      });
+
+      // Actualizar la UI de puntos
+      setUserPoints((prev) => prev + foundMissionPoints);
+      
+      // Actualizar el estado global
+      dispatch(dispatchCompleteMission(missionId));
+      dispatch(setRefreshJournal(true));
+
+      // Mostrar el modal de misión completada
+      setMissionCompleted(true);
+
     } catch (error) {
-      console.error('Error completando misión:', error);
-      Alert.alert('Error', 'No se pudo completar la misión');
+      console.error('Error al completar la misión:', error);
+      Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
+      setMissionCompleted(false);
     } finally {
       setCompletingMission(false);
     }
   };
+
+  useEffect(() => {
+    if (missionCompleted) {
+      // Si la misión se completó, programar la navegación al diario
+      const timer = setTimeout(() => {
+        setMissionCompleted(false);
+        navigation.navigate('Journal', { refresh: true });
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [missionCompleted, navigation]);
 
   if (loading) {
     return (
@@ -520,6 +519,21 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
           </>
         )}
       </ScrollView>
+
+      {/* Modal de misión completada */}
+      <MissionCompletedModal
+        visible={missionCompleted}
+        missionInfo={completedMissionInfo}
+        onFinished={() => {
+          setMissionCompleted(false);
+          navigation.navigate('Journal', { refresh: true });
+        }}
+      />
+      
+      {/* Modal de carga durante el proceso */}
+      <CompletingMissionModal
+        visible={completingMission && !missionCompleted}
+      />
     </View>
   );
 };
@@ -745,5 +759,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 });
+
+const MissionsScreen = (props: any) => {
+  return <MissionsScreenComponent {...props} />;
+};
 
 export default MissionsScreen; 

@@ -19,13 +19,16 @@ import { useTheme } from 'react-native-paper';
 import { RootStackParamList } from './types';
 import { View, ActivityIndicator } from 'react-native';
 
-type TabParamList = {
+// Define los parámetros para las pestañas principales
+export type TabParamList = {
   Map: undefined;
   Missions: {
-    journeyId: string;
-    challenges: any[];
+    journeyId?: string;
+    challenges?: any[];
   };
-  Journal: undefined;
+  Journal: {
+    refresh?: boolean;
+  };
   Profile: undefined;
 };
 
@@ -71,7 +74,7 @@ const AppNavigator = () => {
         >
           <Tab.Screen name="Map" component={MapScreen} />
           <Tab.Screen name="Missions" component={MissionsScreen} />
-          <Tab.Screen name="Journal" component={JournalScreen} />
+          <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} />
           <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
       ) : (

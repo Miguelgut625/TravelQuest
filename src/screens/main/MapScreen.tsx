@@ -42,6 +42,18 @@ const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep:
         <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={styles.loadingTitle}>Generando tu aventura</Text>
         <Text style={styles.loadingStep}>{currentStep}</Text>
+        
+        {/* Indicador de progreso visual */}
+        <View style={styles.progressBar}>
+          <View style={[
+            styles.progressFill, 
+            { 
+              width: currentStep.includes('Preparando') ? '30%' : 
+                    currentStep.includes('Buscando') ? '60%' : 
+                    currentStep.includes('Creando') ? '90%' : '10%' 
+            }
+          ]} />
+        </View>
       </View>
     </View>
   </Modal>
@@ -527,39 +539,104 @@ const MapScreen = () => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-  const getLocation = async () => {
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-        
-        console.log('Estado de permisos de ubicación:', status);
-      
-      if (status !== 'granted') {
-          console.warn('Permiso de ubicación denegado');
-          setErrorLocationMsg('Permiso de ubicación denegado');
-          setIsLoadingLocation(false);
-        return;
-      }
-
-      console.log('Obteniendo ubicación actual...');
-      let location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      
-      console.log('Ubicación obtenida:', location);
-      
-      setUserLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-        
-        setIsLoadingLocation(false);
+    const getLocation = async () => {
+      try {
+        setIsLoadingLocation(true);
         setErrorLocationMsg(null);
-    } catch (error) {
+        
+        console.log('Solicitando permisos de ubicación...');
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('Estado de permisos de ubicación:', status);
+        
+        if (status !== 'granted') {
+          console.warn('Permiso de ubicación denegado');
+          setErrorLocationMsg('Permiso de ubicación denegado. La aplicación necesita acceso a tu ubicación para funcionar correctamente.');
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        console.log('Permisos concedidos, obteniendo ubicación actual...');
+        
+        // Configurar opciones para obtener la ubicación para Android
+        const options = Platform.OS === 'android' ? {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 10000,  // 10 segundos entre actualizaciones
+          distanceInterval: 10, // 10 metros mínimo entre actualizaciones
+          mayShowUserSettingsDialog: true, // Mostrar diálogo de configuración si es necesario
+        } : {
+          accuracy: Location.Accuracy.Balanced
+        };
+        
+        console.log('Usando opciones de ubicación:', JSON.stringify(options));
+        
+        try {
+          console.log('Intentando obtener ubicación...');
+          let location = await Location.getCurrentPositionAsync(options);
+          console.log('Ubicación obtenida:', JSON.stringify(location.coords));
+          
+          // Actualizar estado con la ubicación obtenida
+          setUserLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          
+          // Actualizar el estado de la región del mapa
+          setRegion({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          });
+            
+          setIsLoadingLocation(false);
+        } catch (locationError: any) {
+          console.error('Error específico al obtener ubicación:', locationError);
+          
+          // Intentar con el método getLastKnownPositionAsync como fallback
+          console.log('Intentando obtener última ubicación conocida...');
+          try {
+            const lastLocation = await Location.getLastKnownPositionAsync();
+            if (lastLocation) {
+              console.log('Última ubicación conocida:', JSON.stringify(lastLocation.coords));
+              setUserLocation({
+                latitude: lastLocation.coords.latitude,
+                longitude: lastLocation.coords.longitude,
+              });
+              
+              setRegion({
+                latitude: lastLocation.coords.latitude,
+                longitude: lastLocation.coords.longitude,
+                latitudeDelta: 0.0922,
+                longitudeDelta: 0.0421,
+              });
+              
+              setIsLoadingLocation(false);
+              return;
+            }
+          } catch (lastLocError) {
+            console.error('Error al obtener última ubicación conocida:', lastLocError);
+          }
+          
+          throw locationError; // Propagar el error original si no pudimos recuperar
+        }
+      } catch (error: any) {
         console.error('Error al obtener la ubicación:', error);
-        setErrorLocationMsg('Error al obtener la ubicación');
-      setIsLoadingLocation(false);
-    }
-  };
+        setErrorLocationMsg(`Error al obtener la ubicación: ${error.message}. Usando ubicación por defecto.`);
+        setIsLoadingLocation(false);
+        
+        // Usar una ubicación por defecto en caso de error
+        setUserLocation({
+          latitude: 40.416775,
+          longitude: -3.703790,
+        });
+        setRegion({
+          latitude: 40.416775,
+          longitude: -3.703790,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        });
+      }
+    };
 
     getLocation();
   }, []);
@@ -607,7 +684,7 @@ const MapScreen = () => {
       return;
     }
 
-    const missionCountNum = parseInt(missionCount);
+    const missionCountNum = parseInt(missionCount) || 3; // Usar 3 como valor por defecto si no hay número
 
     if (!duration || duration <= 0) {
       setErrorMsg('Por favor, selecciona fechas válidas para crear un viaje');
@@ -616,6 +693,11 @@ const MapScreen = () => {
 
     if (!startDate || !endDate) {
       setErrorMsg('Selecciona fechas de inicio y fin');
+      return;
+    }
+
+    if (!searchCity) {
+      setErrorMsg('Por favor, ingresa una ciudad de destino');
       return;
     }
 
@@ -628,16 +710,22 @@ const MapScreen = () => {
         return;
       }
 
+      // Iniciar el proceso de generación
       setIsLoading(true);
       setErrorMsg(null);
 
-      setCurrentStep('Preparando tu viaje a ' + searchCity.toUpperCase() + '...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setCurrentStep('Buscando lugares interesantes...');
+      // Paso 1: Preparando el viaje
+      setCurrentStep(`Preparando tu viaje a ${searchCity.toUpperCase()}...`);
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      setCurrentStep('Creando misiones emocionantes...');
+      // Paso 2: Buscando lugares
+      setCurrentStep(`Buscando lugares interesantes en ${searchCity.toUpperCase()}...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Paso 3: Creando misiones
+      setCurrentStep(`Creando ${missionCountNum} misiones emocionantes...`);
+      
+      // Llamar a la API para generar las misiones
       const result = await generateMission(
         searchCity.toUpperCase(),
         duration,
@@ -651,6 +739,11 @@ const MapScreen = () => {
         throw new Error('No se recibió el ID del journey');
       }
 
+      // Paso final: Completado
+      setCurrentStep('¡Aventura generada con éxito!');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Navegar a la pantalla de misiones
       navigation.navigate('Missions', {
         journeyId: result.journeyId,
         challenges: result.challenges || []
@@ -744,46 +837,100 @@ const MapScreen = () => {
             <ActivityIndicator size="large" color="#4CAF50" />
             <Text style={styles.loadingText}>Obteniendo ubicación...</Text>
             {errorLocationMsg && (
-              <TouchableOpacity 
-                style={styles.retryButton} 
-                onPress={() => {
-                  setIsLoadingLocation(true);
-                  setErrorLocationMsg(null);
-                  (async () => {
-                    try {
-                      const location = await Location.getCurrentPositionAsync({
-                        accuracy: Location.Accuracy.Balanced,
-                      });
-                      setUserLocation({
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                      });
-                      setIsLoadingLocation(false);
-                    } catch (error) {
-                      console.error('Error al reintentar obtener ubicación:', error);
-                      setErrorLocationMsg('Error al obtener la ubicación');
-                      setIsLoadingLocation(false);
-                    }
-                  })();
-                }}
-              >
-                <Text style={styles.retryButtonText}>Reintentar</Text>
-              </TouchableOpacity>
+              <Text style={styles.errorText}>{errorLocationMsg}</Text>
             )}
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={() => {
+                console.log('Reintentando obtener ubicación...');
+                setIsLoadingLocation(true);
+                setErrorLocationMsg(null);
+                (async () => {
+                  try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status !== 'granted') {
+                      throw new Error('Permiso de ubicación denegado');
+                    }
+                    
+                    const location = await Location.getCurrentPositionAsync({
+                      accuracy: Location.Accuracy.Balanced,
+                    });
+                    
+                    console.log('Nueva ubicación obtenida:', JSON.stringify(location.coords));
+                    
+                    setUserLocation({
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude,
+                    });
+                    
+                    setRegion({
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude,
+                      latitudeDelta: 0.0922,
+                      longitudeDelta: 0.0421,
+                    });
+                    
+                    setIsLoadingLocation(false);
+                  } catch (error: any) {
+                    console.error('Error al reintentar obtener ubicación:', error);
+                    setErrorLocationMsg(`Error: ${error.message}`);
+                    setIsLoadingLocation(false);
+                    
+                    // Usar ubicación por defecto
+                    setUserLocation({
+                      latitude: 40.416775,
+                      longitude: -3.703790,
+                    });
+                  }
+                })();
+              }}
+            >
+              <Text style={styles.retryButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.retryButton, { marginTop: 10, backgroundColor: '#FFA000' }]} 
+              onPress={() => {
+                console.log('Usando ubicación por defecto...');
+                setUserLocation({
+                  latitude: 40.416775, // Madrid
+                  longitude: -3.703790,
+                });
+                setRegion({
+                  latitude: 40.416775,
+                  longitude: -3.703790,
+                  latitudeDelta: 0.0922,
+                  longitudeDelta: 0.0421,
+                });
+                setIsLoadingLocation(false);
+              }}
+            >
+              <Text style={styles.retryButtonText}>Usar ubicación por defecto</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <Map
-            region={{
-              latitude: userLocation?.latitude || 40.416775,
-              longitude: userLocation?.longitude || -3.703790,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
-            }}
-            style={styles.map}
-            showsUserLocation={true}
-          />
+          <View style={{ flex: 1, width: '100%' }}>
+            {errorLocationMsg && (
+              <View style={styles.errorOverlay}>
+                <Text style={styles.errorText}>{errorLocationMsg}</Text>
+              </View>
+            )}
+            <Map
+              region={region}
+              style={styles.map}
+              showsUserLocation={true}
+              onRegionChangeComplete={(newRegion) => {
+                console.log('Región del mapa cambiada:', newRegion);
+              }}
+              onMapReady={() => {
+                console.log('Mapa listo');
+              }}
+            />
+          </View>
         )}
       </View>
+
+      <LoadingModal visible={isLoading} currentStep={currentStep} />
     </View>
   );
 };
@@ -1014,6 +1161,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(244, 67, 54, 0.9)',
     padding: 10,
     borderRadius: 5,
+  },
+  progressBar: {
+    height: 8,
+    width: '100%',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
   },
 });
 

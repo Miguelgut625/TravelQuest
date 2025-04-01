@@ -495,8 +495,14 @@ export const createJournalEntry = async (data: {
         cityName = contentCityMatch[1].trim();
         console.log('Nombre de ciudad extraído del contenido:', cityName);
       } else {
-        cityName = 'Ciudad Desconocida';
-        console.warn('Usando nombre de ciudad por defecto');
+        // Si cityId parece ser un nombre de ciudad, usarlo directamente
+        if (typeof data.cityId === 'string' && data.cityId.length > 2 && !/^[0-9a-f-]+$/.test(data.cityId)) {
+          cityName = data.cityId;
+          console.log('Usando cityId como nombre:', cityName);
+        } else {
+          cityName = 'Ciudad Desconocida';
+          console.warn('Usando nombre de ciudad por defecto');
+        }
       }
     }
     
@@ -506,66 +512,175 @@ export const createJournalEntry = async (data: {
       updatedTags.push(cityName);
     }
     
-    // Preparar diferentes versiones de datos para la inserción con nombres de columnas alternativos
-    const insertDataOptions = [
-      // Versión 1: snake_case (formato tradicional PostgreSQL)
-      {
-        user_id: data.userId,
-        city_id: data.cityId,
-        mission_id: data.missionId,
-        title: data.title,
-        content: data.content,
-        photos: data.photos,
-        city_name: cityName,
-        created_at: new Date().toISOString(),
-        tags: updatedTags
-      },
-      // Versión 2: camelCase
-      {
-        userId: data.userId,
-        cityId: data.cityId,
-        missionId: data.missionId,
-        title: data.title,
-        content: data.content,
-        photos: data.photos,
-        cityName: cityName,
-        created_at: new Date().toISOString(),
-        tags: updatedTags
-      },
-      // Versión 3: lowercase
-      {
-        userid: data.userId,
-        cityid: data.cityId,
-        missionid: data.missionId,
-        title: data.title,
-        content: data.content,
-        photos: data.photos,
-        cityname: cityName,
-        created_at: new Date().toISOString(),
-        tags: updatedTags
-      }
-    ];
-    
-    // Intentar cada formato de nombres de columnas
-    for (const insertData of insertDataOptions) {
-      try {
-        console.log('Intentando insertar con formato:', insertData);
-        const { error } = await supabase.from('journal_entries').insert(insertData);
-        
-        if (!error) {
-          console.log('Entrada creada exitosamente con formato:', insertData);
-          return true;
+    // NUEVO: Primero, obtener estructura de la tabla para conocer las columnas reales
+    try {
+      const { data: tableInfo, error: tableError } = await supabase
+        .from('journal_entries')
+        .select('*')
+        .limit(1);
+      
+      let columnStructure: Record<string, boolean> = {};
+      if (!tableError && tableInfo) {
+        // Si pudimos obtener datos, analizamos el primer registro para ver las columnas
+        if (tableInfo.length > 0) {
+          // Usamos un enfoque tipado más seguro
+          const firstRow = tableInfo[0];
+          if (firstRow && typeof firstRow === 'object') {
+            // Iterar sobre las propiedades del objeto de manera segura
+            Object.keys(firstRow).forEach(key => {
+              columnStructure[key] = true;
+            });
+            console.log("Estructura de columnas detectada:", Object.keys(columnStructure));
+          }
         }
-        
-        console.warn('Error al insertar con este formato:', error);
-      } catch (e) {
-        console.warn('Excepción al insertar con este formato:', e);
       }
+      
+      // Preparamos una estructura básica de datos para la inserción
+      const baseData: Record<string, any> = {
+        title: data.title,
+        content: data.content,
+        photos: data.photos,
+        created_at: new Date().toISOString(),
+        tags: updatedTags
+      };
+      
+      // Añadimos los campos de IDs según las columnas detectadas
+      const insertData: Record<string, any> = { ...baseData };
+      
+      // Usuario
+      if ('user_id' in columnStructure) insertData.user_id = data.userId;
+      else if ('userid' in columnStructure) insertData.userid = data.userId;
+      else if ('userId' in columnStructure) insertData.userId = data.userId;
+      else insertData.userid = data.userId; // Por defecto
+      
+      // Ciudad
+      if ('city_id' in columnStructure) insertData.city_id = data.cityId;
+      else if ('cityid' in columnStructure) insertData.cityid = data.cityId;
+      else if ('cityId' in columnStructure) insertData.cityId = data.cityId;
+      
+      // Nombre de ciudad (si existe columna)
+      if ('city_name' in columnStructure) insertData.city_name = cityName;
+      else if ('cityname' in columnStructure) insertData.cityname = cityName;
+      else if ('cityName' in columnStructure) insertData.cityName = cityName;
+      
+      // Misión
+      if ('mission_id' in columnStructure) insertData.mission_id = data.missionId;
+      else if ('missionid' in columnStructure) insertData.missionid = data.missionId;
+      else if ('missionId' in columnStructure) insertData.missionId = data.missionId;
+      
+      console.log('Intentando insertar con datos adaptados:', insertData);
+      const { error } = await supabase.from('journal_entries').insert(insertData);
+      
+      if (!error) {
+        console.log('Entrada creada exitosamente');
+        return true;
+      }
+      
+      console.warn('Error al insertar con datos adaptados:', error);
+      
+      // Si falló, intentamos con las tres versiones anteriores
+      const insertDataOptions = [
+        // Versión 1: snake_case (formato tradicional PostgreSQL)
+        {
+          user_id: data.userId,
+          city_id: data.cityId,
+          mission_id: data.missionId,
+          title: data.title,
+          content: data.content,
+          photos: data.photos,
+          city_name: cityName,
+          created_at: new Date().toISOString(),
+          tags: updatedTags
+        },
+        // Versión 2: camelCase
+        {
+          userId: data.userId,
+          cityId: data.cityId,
+          missionId: data.missionId,
+          title: data.title,
+          content: data.content,
+          photos: data.photos,
+          cityName: cityName,
+          created_at: new Date().toISOString(),
+          tags: updatedTags
+        },
+        // Versión 3: lowercase
+        {
+          userid: data.userId,
+          cityid: data.cityId,
+          missionid: data.missionId,
+          title: data.title,
+          content: data.content,
+          photos: data.photos,
+          cityname: cityName,
+          created_at: new Date().toISOString(),
+          tags: updatedTags
+        },
+        // Versión 4: solo campos obligatorios mínimos
+        {
+          userid: data.userId,
+          title: data.title,
+          content: data.content,
+          photos: data.photos,
+          created_at: new Date().toISOString(),
+          tags: updatedTags
+        }
+      ];
+      
+      // Intentar cada formato de nombres de columnas
+      for (const insertOption of insertDataOptions) {
+        try {
+          console.log('Intentando insertar con formato alternativo:', insertOption);
+          const { error } = await supabase.from('journal_entries').insert(insertOption);
+          
+          if (!error) {
+            console.log('Entrada creada exitosamente con formato alternativo');
+            return true;
+          }
+          
+          console.warn('Error al insertar con este formato:', error);
+        } catch (e) {
+          console.warn('Excepción al insertar con este formato:', e);
+        }
+      }
+      
+      // Último intento: usar la tabla journey_diary si está disponible
+      try {
+        const { data: checkData, error: checkError } = await supabase
+          .from('journey_diary')
+          .select('id')
+          .limit(1);
+        
+        if (!checkError) {
+          // La tabla journey_diary existe, intentamos insertar ahí
+          console.log('Intentando insertar en journey_diary como alternativa');
+          const { error: diaryError } = await supabase.from('journey_diary').insert({
+            userid: data.userId,
+            title: data.title,
+            content: data.content,
+            photos: data.photos,
+            created_at: new Date().toISOString(),
+            tags: updatedTags
+          });
+          
+          if (!diaryError) {
+            console.log('Entrada creada exitosamente en journey_diary');
+            return true;
+          }
+          
+          console.warn('Error al insertar en journey_diary:', diaryError);
+        }
+      } catch (e) {
+        console.warn('Error comprobando journey_diary:', e);
+      }
+      
+      // Si llegamos aquí, ninguno de los formatos funcionó
+      console.error('No se pudo crear entrada en el diario con ningún formato');
+      return false;
+    } catch (tableErr) {
+      console.error('Error al obtener estructura de tabla:', tableErr);
+      return false;
     }
-    
-    // Si llegamos aquí, ninguno de los formatos funcionó
-    console.error('No se pudo crear entrada en el diario con ningún formato');
-    return false;
   } catch (error) {
     console.error('Error inesperado al crear entrada en el diario:', error);
     return false;
