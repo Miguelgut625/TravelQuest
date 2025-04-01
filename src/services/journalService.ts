@@ -185,23 +185,42 @@ const organizeCityEntries = (
   }
   
   data.forEach((entry: any) => {
+    // Intentar todas las posibles formas del nombre de la ciudad
     let cityName = 'Ciudad Desconocida';
     
-    // Intentamos obtener el nombre de la ciudad de varias formas posibles
+    // Orden de prioridad para obtener el nombre de la ciudad
     if (!missingCityRelation && entry.cities?.name) {
       cityName = entry.cities.name;
-    } else if (entry.cityName) {
-      cityName = entry.cityName;
     } else if (entry.city_name) {
       cityName = entry.city_name;
+    } else if (entry.cityName) {
+      cityName = entry.cityName;
+    } else if (entry.cityname) {
+      cityName = entry.cityname;
+    } else if (entry.cities && entry.cities.name) {
+      cityName = entry.cities.name;
+    } else if (entry.city?.name) {
+      cityName = entry.city.name;
     } else {
-      // Buscar el cityId en las etiquetas y usar la primera que parece ser un nombre de ciudad
+      // Buscar en las etiquetas cualquier nombre que parezca ser de ciudad
       if (entry.tags && Array.isArray(entry.tags)) {
-        const cityTag = entry.tags.find((tag: string) => 
-          tag !== 'misión' && tag !== 'mission' && tag !== 'viaje' && tag !== 'travel'
+        // Filtrar tags comunes que no son ciudades
+        const commonTags = ['misión', 'mission', 'viaje', 'travel', 'foto', 'photo'];
+        const possibleCityTag = entry.tags.find((tag: string) => 
+          !commonTags.includes(tag.toLowerCase()) && 
+          tag.charAt(0).toUpperCase() === tag.charAt(0) // Primera letra mayúscula
         );
-        if (cityTag) {
-          cityName = cityTag.charAt(0).toUpperCase() + cityTag.slice(1); // Capitalizar
+        
+        if (possibleCityTag) {
+          cityName = possibleCityTag;
+        }
+      }
+      
+      // Buscar en el contenido de la entrada
+      if (cityName === 'Ciudad Desconocida' && entry.content) {
+        const contentMatch = entry.content.match(/(?:en|in) ([A-Za-z\s]+)\.$/);
+        if (contentMatch && contentMatch[1]) {
+          cityName = contentMatch[1].trim();
         }
       }
     }
@@ -213,9 +232,9 @@ const organizeCityEntries = (
     // Nos aseguramos de que todos los campos necesarios existan
     const processedEntry: CityJournalEntry = {
       id: entry.id || `generated-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      userId: entry.userId || '',
-      cityId: entry.cityId || '',
-      missionId: entry.missionId || undefined,
+      userId: entry.userId || entry.user_id || entry.userid || '',
+      cityId: entry.cityId || entry.city_id || entry.cityid || '',
+      missionId: entry.missionId || entry.mission_id || entry.missionid || undefined,
       title: entry.title || 'Entrada sin título',
       content: entry.content || '',
       photos: Array.isArray(entry.photos) ? entry.photos : 
@@ -399,64 +418,156 @@ export const createJournalEntry = async (data: {
   tags?: string[];
 }) => {
   try {
-    // Preparar versiones de datos con diferentes convenciones de nombres
-    const snakeCaseData = {
-      user_id: data.userId,
-      city_id: data.cityId,
-      mission_id: data.missionId,
-      title: data.title,
-      content: data.content,
-      photos: data.photos,
-      created_at: new Date().toISOString(),
-      tags: data.tags || []
-    };
+    console.log('Intentando crear entrada de diario con datos:', data);
     
-    const lowerCamelData = {
-      userid: data.userId,
-      cityid: data.cityId,
-      missionid: data.missionId,
-      title: data.title,
-      content: data.content,
-      photos: data.photos,
-      created_at: new Date().toISOString(),
-      tags: data.tags || []
-    };
-
-    // Intentar primero con journal_entries
+    // Primero, obtener el nombre de la ciudad usando cityId
+    let cityName = null;
     try {
-      // Probar las diferentes convenciones de nombres
-      for (const entryData of [data, snakeCaseData, lowerCamelData]) {
-        try {
-          const { error } = await supabase.from('journal_entries').insert(entryData);
-          if (!error) {
-            console.log('Entrada creada exitosamente en journal_entries');
-            return true;
-          }
-        } catch {}
-      }
+      // Consulta directa a la tabla cities
+      const { data: cityData, error: cityError } = await supabase
+        .from('cities')
+        .select('name')
+        .eq('id', data.cityId)
+        .single();
       
-      // Si llegamos aquí, ninguna convención funcionó, intentar con journey_diary
-      console.log('No se pudo crear entrada en journal_entries, intentando con journey_diary');
+      if (!cityError && cityData && cityData.name) {
+        cityName = cityData.name;
+        console.log('Nombre de ciudad encontrado:', cityName);
+      } else {
+        console.warn('No se pudo obtener el nombre de la ciudad (1):', cityError);
+        
+        // Intento alternativo: buscar en journeys
+        const { data: journeyData, error: journeyError } = await supabase
+          .from('journeys')
+          .select(`
+            cities (
+              name
+            )
+          `)
+          .eq('cityId', data.cityId)
+          .single();
+        
+        if (!journeyError && journeyData && journeyData.cities && journeyData.cities.name) {
+          cityName = journeyData.cities.name;
+          console.log('Nombre de ciudad encontrado en journeys:', cityName);
+        } else {
+          console.warn('No se pudo obtener el nombre de la ciudad (2):', journeyError);
+        }
+      }
     } catch (e) {
-      console.warn('Error con journal_entries, intentando con journey_diary:', e);
+      console.warn('Error al buscar el nombre de la ciudad:', e);
     }
     
-    // Intentar con journey_diary
-    for (const entryData of [data, snakeCaseData, lowerCamelData]) {
+    // Si no pudimos obtener el nombre de la ciudad, vamos a intentar con datos de la misión
+    if (!cityName) {
       try {
-        const { error } = await supabase.from('journey_diary').insert(entryData);
+        // Buscar en la tabla journeys_missions
+        const { data: missionData, error: missionError } = await supabase
+          .from('journeys_missions')
+          .select(`
+            journeyId,
+            journey:journeyId (
+              cityId,
+              cities:cityId (
+                name
+              )
+            )
+          `)
+          .eq('id', data.missionId)
+          .single();
+        
+        if (!missionError && missionData?.journey?.cities?.name) {
+          cityName = missionData.journey.cities.name;
+          console.log('Nombre de ciudad encontrado a través de la misión:', cityName);
+        } else {
+          console.warn('No se pudo obtener el nombre a través de la misión:', missionError);
+        }
+      } catch (e) {
+        console.warn('Error buscando ciudad a través de misión:', e);
+      }
+    }
+    
+    // Si todavía no tenemos nombre, usar algún valor por defecto
+    if (!cityName) {
+      // Último intento: verificar si hay texto en el contenido que indique la ciudad
+      const contentCityMatch = data.content.match(/(?:en|in) ([A-Za-z\s]+)\.$/);
+      if (contentCityMatch && contentCityMatch[1]) {
+        cityName = contentCityMatch[1].trim();
+        console.log('Nombre de ciudad extraído del contenido:', cityName);
+      } else {
+        cityName = 'Ciudad Desconocida';
+        console.warn('Usando nombre de ciudad por defecto');
+      }
+    }
+    
+    // Añadir el nombre de la ciudad a las etiquetas
+    const updatedTags = [...(data.tags || [])];
+    if (cityName && !updatedTags.includes(cityName)) {
+      updatedTags.push(cityName);
+    }
+    
+    // Preparar diferentes versiones de datos para la inserción con nombres de columnas alternativos
+    const insertDataOptions = [
+      // Versión 1: snake_case (formato tradicional PostgreSQL)
+      {
+        user_id: data.userId,
+        city_id: data.cityId,
+        mission_id: data.missionId,
+        title: data.title,
+        content: data.content,
+        photos: data.photos,
+        city_name: cityName,
+        created_at: new Date().toISOString(),
+        tags: updatedTags
+      },
+      // Versión 2: camelCase
+      {
+        userId: data.userId,
+        cityId: data.cityId,
+        missionId: data.missionId,
+        title: data.title,
+        content: data.content,
+        photos: data.photos,
+        cityName: cityName,
+        created_at: new Date().toISOString(),
+        tags: updatedTags
+      },
+      // Versión 3: lowercase
+      {
+        userid: data.userId,
+        cityid: data.cityId,
+        missionid: data.missionId,
+        title: data.title,
+        content: data.content,
+        photos: data.photos,
+        cityname: cityName,
+        created_at: new Date().toISOString(),
+        tags: updatedTags
+      }
+    ];
+    
+    // Intentar cada formato de nombres de columnas
+    for (const insertData of insertDataOptions) {
+      try {
+        console.log('Intentando insertar con formato:', insertData);
+        const { error } = await supabase.from('journal_entries').insert(insertData);
+        
         if (!error) {
-          console.log('Entrada creada exitosamente en journey_diary');
+          console.log('Entrada creada exitosamente con formato:', insertData);
           return true;
         }
-      } catch {}
+        
+        console.warn('Error al insertar con este formato:', error);
+      } catch (e) {
+        console.warn('Excepción al insertar con este formato:', e);
+      }
     }
     
-    // Si llegamos aquí, ninguna tabla funcionó
-    console.error('No se pudo crear entrada en ninguna tabla de diario');
+    // Si llegamos aquí, ninguno de los formatos funcionó
+    console.error('No se pudo crear entrada en el diario con ningún formato');
     return false;
   } catch (error) {
-    console.error('Error creando entrada en el diario:', error);
+    console.error('Error inesperado al crear entrada en el diario:', error);
     return false;
   }
 }; 
