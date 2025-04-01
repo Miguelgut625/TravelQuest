@@ -299,6 +299,28 @@ const ProfileScreen = () => {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Social</Text>
+        <View style={styles.socialContainer}>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('Friends')}
+          >
+            <Ionicons name="people" size={24} color="white" />
+            <Text style={styles.socialButtonText}>Amigos</Text>
+          </TouchableOpacity>
+          <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('Leaderboard')}
+          >
+            <Ionicons name="trophy" size={24} color="white" />
+            <Text style={styles.socialButtonText}>Leaderboard</Text>
+          </TouchableOpacity>
+          <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Configuración</Text>
         <CloudinaryStatusCard />
       </View>
@@ -319,10 +341,7 @@ const ProfileScreen = () => {
       </View>
 
       <TouchableOpacity
-        style={[
-          styles.logoutButton,
-          loading && styles.disabledButton
-        ]}
+        style={[styles.logoutButton, loading && styles.disabledButton]}
         onPress={handleLogout}
         disabled={loading}
       >
@@ -341,10 +360,7 @@ const ProfileScreen = () => {
             <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
 
             {message.text ? (
-              <Text style={[
-                styles.messageText,
-                message.type === 'error' ? styles.errorMessage : styles.successMessage
-              ]}>
+              <Text style={[styles.messageText, message.type === 'error' ? styles.errorMessage : styles.successMessage]}>
                 {message.text}
               </Text>
             ) : null}
@@ -397,11 +413,7 @@ const ProfileScreen = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  styles.saveButton,
-                  loading && styles.disabledButton
-                ]}
+                style={[styles.modalButton, styles.saveButton, loading && styles.disabledButton]}
                 onPress={handleChangePassword}
                 disabled={loading}
               >
@@ -483,12 +495,48 @@ const styles = StyleSheet.create({
   },
   section: {
     margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
     color: '#333',
+  },
+  socialContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  socialButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    marginBottom: 10,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  socialButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  socialDescription: {
+    fontSize: 12,
+    color: 'black',
+    textAlign: 'center',
   },
   logoutButton: {
     margin: 20,

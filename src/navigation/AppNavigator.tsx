@@ -13,10 +13,11 @@ import MapScreen from '../screens/main/MapScreen';
 import MissionsScreen from '../screens/main/MissionsScreen';
 import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import LeaderboardScreen from '../screens/main/LeaderboardScreen';
+import FriendsScreen from '../screens/main/FriendsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
-import { RootStackParamList } from './types';
 import { View, ActivityIndicator } from 'react-native';
 
 // Define los parámetros para las pestañas principales
@@ -30,9 +31,11 @@ export type TabParamList = {
     refresh?: boolean;
   };
   Profile: undefined;
+  Leaderboard: undefined;
+  Friends: undefined;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator<TabParamList>();
 
 const AppNavigator = () => {
@@ -62,9 +65,14 @@ const AppNavigator = () => {
                 iconName = focused ? 'list' : 'list-outline';
               } else if (route.name === 'Journal') {
                 iconName = focused ? 'book' : 'book-outline';
+              } else if (route.name === 'Friends') {
+                iconName = focused ? 'people' : 'people-outline';
+              } else if (route.name === 'Leaderboard') {
+                iconName = focused ? 'trophy' : 'trophy-outline';
               } else if (route.name === 'Profile') {
                 iconName = focused ? 'person' : 'person-outline';
               }
+              
 
               return <Ionicons name={iconName as any} size={size} color={color} />;
             },
@@ -75,7 +83,10 @@ const AppNavigator = () => {
           <Tab.Screen name="Map" component={MapScreen} />
           <Tab.Screen name="Missions" component={MissionsScreen} />
           <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} />
+          <Tab.Screen name="Friends" component={FriendsScreen} />
+          <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
           <Tab.Screen name="Profile" component={ProfileScreen} />
+          
         </Tab.Navigator>
       ) : (
         <Stack.Navigator

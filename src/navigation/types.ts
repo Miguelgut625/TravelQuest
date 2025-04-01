@@ -16,5 +16,7 @@ export type RootStackParamList = {
     Journal: {
         refresh?: boolean;
     };
+    Friends: undefined;
+    Leaderboard: undefined;
     // Añade aquí más pantallas según sea necesario
 }; 
