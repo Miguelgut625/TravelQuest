@@ -16,7 +16,7 @@ const RegisterScreen = ({ navigation }: any) => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/users', {
+      const response = await fetch('http://192.168.56.1:5000/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, username }),

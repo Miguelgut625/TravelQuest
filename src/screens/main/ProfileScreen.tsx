@@ -29,7 +29,7 @@ const ProfileScreen = () => {
   // Función para obtener las solicitudes de amistad
   const fetchFriendshipRequests = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/friends/requests/${user?.id}`);
+      const response = await axios.get(`http://192.168.56.1:5000/api/friends/requests/${user?.id}`);
       setFriendshipRequests(response.data); // Guardamos las solicitudes en el estado
     } catch (error) {
       console.error('Error al obtener solicitudes:', error);
@@ -38,7 +38,7 @@ const ProfileScreen = () => {
   const handleAcceptRequest = async (id: string) => {
     try {
       console.log("Esta es la id:" + id);
-      const response = await axios.get(`http://localhost:5000/api/friends/accept-requests/${id}`);
+      const response = await axios.get(`http://192.168.56.1:5000/api/friends/accept-requests/${id}`);
       // Si la solicitud fue aceptada correctamente
       if (response.status === 200) {
         // Actualiza el estado de las solicitudes de amistad, eliminando la aceptada
@@ -54,7 +54,7 @@ const ProfileScreen = () => {
   const handleRejectRequest = async (id: string) => {
     try {
       console.log("Esta es la id:" + id);
-      const response = await axios.get(`http://localhost:5000/api/friends/reject-requests/${id}`);
+      const response = await axios.get(`http://192.168.56.1:5000/api/friends/reject-requests/${id}`);
       // Si la solicitud fue rechazada correctamente
       if (response.status === 200) {
         // Actualiza el estado de las solicitudes de amistad, eliminando la rechazada
@@ -69,7 +69,7 @@ const ProfileScreen = () => {
 
   const handleSendRequest = async () => {
     try {
-      const response = await axios.post('http://localhost:5000/api/friends/send-request', {
+      const response = await axios.post('http://192.168.56.1:5000/api/friends/send-request', {
         senderId: user?.id,
         username,
       });

@@ -35,7 +35,7 @@ const MissionsScreen = () => {
       if (!user?.id) return;
       
       try {
-        const response = await fetch(`http://localhost:5000/api/journeysMissions/user/${user.id}`);
+        const response = await fetch(`http://192.168.56.1:5000/api/journeysMissions/user/${user.id}`);
         const data = await response.json();
 
         if (!response.ok) {
@@ -69,7 +69,7 @@ const MissionsScreen = () => {
     try {
       setUpdatingMission(missionId);
 
-      const response = await fetch(`http://localhost:5000/api/journeysMissions/${missionId}/complete`, {
+      const response = await fetch(`http://192.168.56.1:5000/api/journeysMissions/${missionId}/complete`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +82,7 @@ const MissionsScreen = () => {
 
       console.log('Misión completada exitosamente');
 
-      // ✅ Actualizar estado localmente sin recargar la app
+      //  Actualizar estado localmente sin recargar la app
       setJourneyMissions((prevMissions) => {
         const updatedMissions = new Map(prevMissions);
 

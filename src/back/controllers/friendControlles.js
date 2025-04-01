@@ -16,16 +16,32 @@ const enviarSolicitud = async (req, res) => {
 
     const receiverId = user.id;
 
-    // Verificar si ya son amigos
+    // Verificar que no se está enviando una solicitud a sí mismo
+    if (senderId === receiverId) {
+      return res.status(400).json({ error: 'No puedes enviarte una solicitud a ti mismo' });
+    }
+
+    // Verificar si ya son amigos (comprobando ambas direcciones)
     const { data: friends, error: friendsError } = await supabase
       .from('friends')
       .select('*')
-      .or(`user1Id.eq.${senderId},user2Id.eq.${senderId}`)
-      .or(`user1Id.eq.${receiverId},user2Id.eq.${receiverId}`)
+      .or(`and(user1Id.eq.${senderId},user2Id.eq.${receiverId}),and(user1Id.eq.${receiverId},user2Id.eq.${senderId})`)
       .single();
 
     if (friends) {
       return res.status(400).json({ error: 'Ya son amigos' });
+    }
+
+    // Verificar si ya existe una solicitud pendiente en cualquier dirección
+    const { data: existingRequest, error: requestError } = await supabase
+      .from('friendship_invitations')
+      .select('*')
+      .or(`and(senderId.eq.${senderId},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${senderId})`)
+      .eq('status', 'Pending')
+      .single();
+
+    if (existingRequest) {
+      return res.status(400).json({ error: 'Ya existe una solicitud pendiente entre estos usuarios' });
     }
 
     // Enviar la solicitud de amistad
