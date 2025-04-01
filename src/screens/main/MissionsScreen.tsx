@@ -7,7 +7,6 @@ import { completeMission } from '../../services/pointsService';
 import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, ProgressBar, useTheme, Surface } from 'react-native-paper';
-import { JourneyMission } from '../../types/journey';
 import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
 import ImageUploadModal from '../../components/ImageUploadModal';
 import { setRefreshJournal } from '../../features/journalSlice';
@@ -33,6 +32,19 @@ interface CityMissions {
   };
 }
 
+interface JourneyMission {
+  id: string;
+  completed: boolean;
+  cityName: string;
+  end_date: string;
+  challenge: {
+    title: string;
+    description: string;
+    difficulty: string;
+    points: number;
+  };
+}
+
 interface Journey {
   id: string;
   description: string;
@@ -44,6 +56,7 @@ interface Journey {
     id: string;
     completed: boolean;
     challengeId: string;
+    end_date: string;
     challenges: {
       id: string;
       title: string;
@@ -221,6 +234,7 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
             id,
             completed,
             challengeId,
+            end_date,
             challenges!inner (
               id,
               title,
@@ -246,6 +260,7 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
           id: jm.id,
           completed: jm.completed,
           cityName: journey.cities?.name || 'Ciudad Desconocida',
+          end_date: jm.end_date,
           challenge: {
             title: jm.challenges.title,
             description: jm.challenges.description,
@@ -290,6 +305,10 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
       setCompletingMission(true);
 
       console.log('Completando misión:', { missionId, imageUrl });
+
+      if (!user?.id) {
+        throw new Error('Usuario no autenticado');
+      }
 
       // Crear entrada en el diario
       await createJournalEntry({
@@ -461,7 +480,7 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
               <MissionCard
                 key={mission.id}
                 mission={mission}
-                onComplete={() => handleCompleteMission(mission.id)}
+                onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
               />
             ))}
           </>
@@ -501,16 +520,6 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
           </>
         )}
       </ScrollView>
-
-      <ImageUploadModal
-        visible={showImageUploadModal}
-        onClose={() => {
-          setShowImageUploadModal(false);
-          setSelectedMissionId(null);
-        }}
-        onUploadSuccess={handleImageUploadSuccess}
-        loading={completingMission}
-      />
     </View>
   );
 };
@@ -680,6 +689,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  badgeContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+  },
   cardDescription: {
     color: '#666',
     marginBottom: 10,
@@ -730,11 +743,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
-  },
-  loadingText: {
-    color: '#FFFFFF',
-    marginTop: 10,
-    fontWeight: 'bold',
   },
 });
 

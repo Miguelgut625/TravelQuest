@@ -5,8 +5,12 @@ import { RootState } from '../../features/store';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
 import { Ionicons } from '@expo/vector-icons';
 import { setRefreshJournal } from '../../features/journalSlice';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
+
+interface JournalScreenProps {
+  route: RouteProp<{ Journal: { refresh?: boolean } }, 'Journal'>;
+}
 
 const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
   <TouchableOpacity style={styles.card}>
@@ -49,7 +53,7 @@ const EmptyState = ({ message }: { message: string }) => (
   </View>
 );
 
-const JournalScreen = ({ route }) => {
+const JournalScreen = ({ route }: JournalScreenProps) => {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
   const [loading, setLoading] = useState(true);
@@ -58,7 +62,7 @@ const JournalScreen = ({ route }) => {
   const { user } = useSelector((state: RootState) => state.auth);
   const { shouldRefresh } = useSelector((state: RootState) => state.journal);
   const dispatch = useDispatch();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   
   useEffect(() => {
     fetchJournalEntries();
@@ -71,7 +75,7 @@ const JournalScreen = ({ route }) => {
         schema: 'public', 
         table: 'journal_entries',
         filter: `userid=eq.${user?.id}`
-      }, (payload) => {
+      }, (payload: any) => {
         console.log('Nueva entrada de diario detectada:', payload);
         // Actualizar los datos
         fetchJournalEntries();
@@ -98,7 +102,9 @@ const JournalScreen = ({ route }) => {
       console.log('Actualizando entradas del diario debido a nueva misión completada');
       fetchJournalEntries();
       // Limpiar el parámetro para evitar actualizaciones repetidas
-      navigation.setParams({ refresh: undefined });
+      if (navigation.setParams) {
+        navigation.setParams({ refresh: undefined });
+      }
     }
   }, [route.params?.refresh]);
 

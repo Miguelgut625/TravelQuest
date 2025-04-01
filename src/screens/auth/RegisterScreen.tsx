@@ -34,7 +34,7 @@ const RegisterScreen = ({ navigation }: any) => {
         throw new Error('No se pudo crear el usuario');
       }
 
-      // Insertar el usuario en la tabla 'users' sin la contraseña
+      // Insertar el usuario en la tabla 'users' con la contraseña
       const { error: insertError } = await supabase
         .from('users')
         .insert([
@@ -42,6 +42,7 @@ const RegisterScreen = ({ navigation }: any) => {
             id: authData.user.id,
             email,
             username,
+            password,
             created_at: new Date().toISOString()
           }
         ]);
@@ -55,8 +56,8 @@ const RegisterScreen = ({ navigation }: any) => {
         username: username,
       }));
 
-      // Redirigir a la pantalla de inicio de sesión
-      navigation.replace('Login');
+      // Redirigir a la pantalla de verificación de email
+      navigation.replace('VerifyEmail', { email });
     } catch (error: any) {
       setError(error.message);
     } finally {

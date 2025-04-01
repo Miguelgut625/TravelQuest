@@ -8,6 +8,7 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import VerifyCodeScreen from '../screens/auth/VerifyCodeScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
+import VerifyEmailScreen from '../screens/auth/VerifyEmailScreen';
 import MapScreen from '../screens/main/MapScreen';
 import MissionsScreen from '../screens/main/MissionsScreen';
 import JournalScreen from '../screens/main/JournalScreen';
@@ -83,6 +84,7 @@ const AppNavigator = () => {
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         </Stack.Navigator>
       )}

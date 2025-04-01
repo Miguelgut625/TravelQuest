@@ -30,25 +30,7 @@ const LoginScreen = () => {
 
       console.log('Iniciando sesión para:', email);
 
-      // Primero verificamos si hay múltiples cuentas asociadas al email
-      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers({
-        filter: { email: email.trim() }
-      });
-
-      if (usersError) {
-        console.error('Error al verificar usuarios:', usersError);
-        // Continuamos con el login normal si hay error al verificar usuarios
-      }
-
-      if (users && users.length > 1) {
-        console.log('Se encontraron múltiples cuentas para:', email);
-        Alert.alert(
-          'Múltiples cuentas',
-          'Se encontraron múltiples cuentas asociadas a este correo. Por favor, verifica que estés usando la contraseña correcta.',
-          [{ text: 'OK' }]
-        );
-      }
-
+      // Intentar iniciar sesión directamente
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim()
@@ -57,7 +39,12 @@ const LoginScreen = () => {
       if (error) {
         console.error('Error de autenticación:', error);
         if (error.message.includes('Invalid login credentials')) {
-          dispatch(setError('Email o contraseña incorrectos. Si tienes múltiples cuentas, asegúrate de usar la contraseña correcta.'));
+          dispatch(setError('Email o contraseña incorrectos.'));
+        } else if (error.message.includes('User not allowed') || error.message.includes('Email not confirmed')) {
+          dispatch(setError('Necesitas verificar tu correo electrónico antes de iniciar sesión'));
+          // Redirigir a la pantalla de verificación
+          navigation.navigate('VerifyEmail', { email: email.trim() });
+          return;
         } else {
           dispatch(setError('Error al iniciar sesión: ' + error.message));
         }

@@ -47,8 +47,6 @@ const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep:
   </Modal>
 );
 
-<<<<<<< HEAD
-=======
 const DateRangePickerMobile: React.FC<{
   startDateProp: Date | null;
   endDateProp: Date | null;
@@ -253,8 +251,8 @@ const DateRangePickerWeb: React.FC<{
       const isStartDate = startDate && currentDate.getTime() === new Date(startDate).setHours(0,0,0,0);
       const isEndDate = endDate && currentDate.getTime() === new Date(endDate).setHours(0,0,0,0);
       const isInRange = startDate && endDate && 
-                        currentDate > new Date(startDate).setHours(0,0,0,0) && 
-                        currentDate < new Date(endDate).setHours(0,0,0,0);
+                        currentDate.getTime() > new Date(startDate).setHours(0,0,0,0) && 
+                        currentDate.getTime() < new Date(endDate).setHours(0,0,0,0);
       
       days.push({
         date: currentDate,
@@ -501,7 +499,6 @@ const DateRangePickerWeb: React.FC<{
   );
 };
 
->>>>>>> 3d2dca72 (diario y subida de imagenes)
 const MapScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useDispatch();
@@ -520,34 +517,22 @@ const MapScreen = () => {
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-<<<<<<< HEAD
-=======
   const [currentStep, setCurrentStep] = useState('');
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [errorLocationMsg, setErrorLocationMsg] = useState<string | null>(null);
->>>>>>> 3d2dca72 (diario y subida de imagenes)
   const [filteredCities, setFilteredCities] = useState<City[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [currentStep, setCurrentStep] = useState('');
   const [duration, setDuration] = useState<number>(0);
-  const [hasLocationPermission, setHasLocationPermission] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
   const getLocation = async () => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
-<<<<<<< HEAD
-      console.log('Estado de los permisos:', status);
-      setHasLocationPermission(status === 'granted');
-
-=======
         
         console.log('Estado de permisos de ubicación:', status);
       
->>>>>>> 3d2dca72 (diario y subida de imagenes)
       if (status !== 'granted') {
           console.warn('Permiso de ubicación denegado');
           setErrorLocationMsg('Permiso de ubicación denegado');
@@ -555,17 +540,6 @@ const MapScreen = () => {
         return;
       }
 
-<<<<<<< HEAD
-      let location = await Location.getCurrentPositionAsync({});
-      const newRegion = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      };
-
-      setRegion(newRegion);
-=======
       console.log('Obteniendo ubicación actual...');
       let location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -573,7 +547,6 @@ const MapScreen = () => {
       
       console.log('Ubicación obtenida:', location);
       
->>>>>>> 3d2dca72 (diario y subida de imagenes)
       setUserLocation({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -635,17 +608,9 @@ const MapScreen = () => {
     }
 
     const missionCountNum = parseInt(missionCount);
-<<<<<<< HEAD
-    const calculatedDuration = calculateDuration(startDate, endDate);
-    setDuration(calculatedDuration);
-
-    if (!searchCity || calculatedDuration <= 0 || !missionCountNum) {
-      setErrorMsg('Por favor, completa todos los campos');
-=======
 
     if (!duration || duration <= 0) {
       setErrorMsg('Por favor, selecciona fechas válidas para crear un viaje');
->>>>>>> 3d2dca72 (diario y subida de imagenes)
       return;
     }
 
@@ -675,13 +640,13 @@ const MapScreen = () => {
       setCurrentStep('Creando misiones emocionantes...');
       const result = await generateMission(
         searchCity.toUpperCase(),
-        calculatedDuration,
+        duration,
         missionCountNum,
         user.id,
         validStartDate,
         validEndDate
       );
-
+      
       if (!result.journeyId) {
         throw new Error('No se recibió el ID del journey');
       }
@@ -699,8 +664,6 @@ const MapScreen = () => {
     }
   };
 
-<<<<<<< HEAD
-=======
   const onDatesChange = (dates: [Date | null, Date | null]) => {
     const [start, end] = dates;
     
@@ -722,28 +685,27 @@ const MapScreen = () => {
   // Elegir el componente correcto según la plataforma
   const DateRangePicker = Platform.OS === 'web' ? DateRangePickerWeb : DateRangePickerMobile;
 
->>>>>>> 3d2dca72 (diario y subida de imagenes)
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Buscar ciudad"
-          value={searchCity}
-          onChangeText={handleCitySearch}
-        />
-        {showSuggestions && filteredCities.length > 0 && (
+          <TextInput
+            style={styles.input}
+            placeholder="Buscar ciudad"
+            value={searchCity}
+            onChangeText={handleCitySearch}
+          />
+          {showSuggestions && filteredCities.length > 0 && (
           <View style={styles.suggestionsList}>
             {filteredCities.map((city) => (
-              <TouchableOpacity
+                <TouchableOpacity
                 key={city.id}
-                style={styles.suggestionItem}
+                  style={styles.suggestionItem}
                 onPress={() => handleCitySelect(city)}
-              >
+                >
                 <Text style={styles.suggestionText}>{city.name}</Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
             ))}
-          </View>
+        </View>
         )}
         <TextInput
           style={styles.input}
@@ -753,57 +715,11 @@ const MapScreen = () => {
           keyboardType="numeric"
         />
         
-<<<<<<< HEAD
-        {Platform.OS === 'web' ? (
-          <View style={styles.dateRangeContainer}>
-            <DatePicker
-              selected={startDate}
-              onChange={(dates) => {
-                const [start, end] = dates;
-                setStartDate(start);
-                setEndDate(end);
-                if (start && end) {
-                  setDuration(calculateDuration(start, end));
-                }
-              }}
-              startDate={startDate}
-              endDate={endDate}
-              selectsRange
-              inline
-              monthsShown={2}
-              minDate={new Date()}
-              placeholderText="Selecciona fechas"
-              className="booking-calendar"
-            />
-          </View>
-        ) : (
-          <View style={styles.datePickersRow}>
-            <TouchableOpacity
-              style={[styles.dateButton, { flex: 1, marginRight: 5 }]}
-              onPress={() => setShowStartDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                Inicio: {startDate?.toLocaleDateString() || 'Seleccionar'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.dateButton, { flex: 1, marginLeft: 5 }]}
-              onPress={() => setShowEndDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                Fin: {endDate?.toLocaleDateString() || 'Seleccionar'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-=======
         <DateRangePicker
           startDateProp={startDate}
           endDateProp={endDate}
           onDatesChange={onDatesChange}
         />
->>>>>>> 3d2dca72 (diario y subida de imagenes)
 
         <Text style={styles.durationText}>
           Duración del viaje: {calculateDuration(startDate, endDate)} días
@@ -865,15 +781,9 @@ const MapScreen = () => {
             }}
             style={styles.map}
             showsUserLocation={true}
-            userLocation={userLocation}
           />
         )}
       </View>
-<<<<<<< HEAD
-
-      <LoadingModal visible={isLoading} currentStep={currentStep} />
-=======
->>>>>>> 3d2dca72 (diario y subida de imagenes)
     </View>
   );
 };
@@ -972,8 +882,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
-<<<<<<< HEAD
-=======
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 15,
@@ -1000,42 +908,37 @@ const styles = StyleSheet.create({
       },
       default: {
         elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4
       }
     })
   },
-  dateInputContainer: {
-    width: '100%',
+  datePickerButton: {
+    backgroundColor: '#005F9E',
+    borderRadius: 8,
+    padding: 12,
   },
-  datePickerTitle: {
+  datePickerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  datePickerText: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 10,
   },
-  dateInput: {
-    width: '100%',
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
+  calendarDropdown: {
     backgroundColor: 'white',
-    fontSize: 16,
-    cursor: 'pointer',
->>>>>>> 3d2dca72 (diario y subida de imagenes)
-  },
-  dateButton: {
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 5,
-  },
-  dateButtonText: {
-    color: '#333',
-    textAlign: 'center',
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
   durationText: {
     textAlign: 'center',
