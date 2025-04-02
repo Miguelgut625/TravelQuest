@@ -352,7 +352,7 @@ const modalStyles = StyleSheet.create({
   }
 });
 
-// Componente principal (renombrado para combinar ambas ramas)
+// Componente principal siguiendo la estructura de main
 const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => {
   const { journeyId } = route.params || {};
   const { user } = useSelector((state: RootState) => state.auth);
@@ -379,7 +379,6 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       setLoading(false);
       return;
     }
-
     try {
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
@@ -415,7 +414,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         return;
       }
 
-      const allMissions = journeys.flatMap((journey: Journey) => 
+      const allMissions = journeys.flatMap((journey: Journey) =>
         journey.journeys_missions.map((jm) => ({
           id: jm.id,
           completed: jm.completed,
@@ -462,12 +461,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     try {
       setCompletingMission(true);
-      
-      // Buscar la misión en el estado local para obtener sus detalles
+      // Buscar la misión en el estado local para obtener detalles
       let foundMissionTitle = '';
       let foundMissionPoints = 0;
       let foundCityName = '';
-      
       Object.keys(missions).forEach((cityName) => {
         const pending = missions[cityName].pending;
         const foundMission = pending.find((m) => m.id === missionId);
@@ -477,34 +474,29 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           foundCityName = cityName;
         }
       });
-      
       if (!foundMissionTitle || !foundCityName) {
         throw new Error('Misión no encontrada');
       }
-      
-      // Guardar la información de la misión completada
+      // Guardar información de la misión completada
       setCompletedMissionInfo({
         title: foundMissionTitle,
         points: foundMissionPoints,
         cityName: foundCityName
       });
-      
       // Completar la misión en la base de datos
       await completeMission(missionId, user?.id || '', imageUrl);
-      
       // Crear entrada en el diario si hay imagen
       if (imageUrl) {
         await createJournalEntry({
           userId: user?.id || '',
-          cityId: foundCityName || '',
+          cityId: foundCityName,
           missionId: missionId,
           title: `Misión completada: ${foundMissionTitle}`,
           content: `He completado la misión "${foundMissionTitle}" en ${foundCityName}. ¡Conseguí ${foundMissionPoints} puntos!`,
           photos: [imageUrl],
-          tags: [foundCityName || '', 'Misión completada']
+          tags: [foundCityName, 'Misión completada']
         });
       }
-      
       // Actualizar el estado local: mover la misión de pendientes a completadas
       setMissions((prev) => {
         const updatedMissions = { ...prev };
@@ -517,15 +509,12 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         }
         return updatedMissions;
       });
-
       // Actualizar puntos y estado global
       setUserPoints((prev) => prev + foundMissionPoints);
       dispatch(dispatchCompleteMission(missionId));
       dispatch(setRefreshJournal(true));
-      
-      // Mostrar modal de misión completada
+      // Mostrar modal de misión completada (la navegación se realizará desde allí)
       setMissionCompleted(true);
-
     } catch (error) {
       console.error('Error al completar la misión:', error);
       Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
@@ -554,6 +543,17 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       setShowShareModal(false);
     }
   };
+
+  useEffect(() => {
+    if (missionCompleted) {
+      // Si la misión se completó, programar la navegación al diario
+      const timer = setTimeout(() => {
+        setMissionCompleted(false);
+        navigation.navigate('Journal', { refresh: true });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [missionCompleted, navigation]);
 
   if (loading) {
     return (
@@ -612,9 +612,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         </TouchableOpacity>
         <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
       </View>
-      
       <Text style={styles.cityTitle}>{selectedCity}</Text>
-      
       <ScrollView style={styles.missionsList}>
         {cityData.pending.length > 0 && (
           <>
@@ -629,7 +627,6 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             ))}
           </>
         )}
-
         {cityData.expired.length > 0 && (
           <>
             <View style={styles.completedDivider}>
@@ -647,7 +644,6 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             ))}
           </>
         )}
-
         {cityData.completed.length > 0 && (
           <>
             <View style={styles.completedDivider}>
@@ -737,10 +733,7 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
@@ -811,10 +804,7 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
