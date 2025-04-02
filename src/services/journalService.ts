@@ -582,12 +582,12 @@ export const createJournalEntry = async (data: {
       const insertDataOptions = [
         // Versión 1: snake_case (formato tradicional PostgreSQL)
         {
-          user_id: data.userId,
-          city_id: data.cityId,
-          mission_id: data.missionId,
-          title: data.title,
-          content: data.content,
-          photos: data.photos,
+      user_id: data.userId,
+      city_id: data.cityId,
+      mission_id: data.missionId,
+      title: data.title,
+      content: data.content,
+      photos: data.photos,
           city_name: cityName,
           created_at: new Date().toISOString(),
           tags: updatedTags
@@ -601,14 +601,14 @@ export const createJournalEntry = async (data: {
           content: data.content,
           photos: data.photos,
           cityName: cityName,
-          created_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
           tags: updatedTags
         },
         // Versión 3: lowercase
         {
-          userid: data.userId,
-          cityid: data.cityId,
-          missionid: data.missionId,
+      userid: data.userId,
+      cityid: data.cityId,
+      missionid: data.missionId,
           title: data.title,
           content: data.content,
           photos: data.photos,
@@ -619,10 +619,10 @@ export const createJournalEntry = async (data: {
         // Versión 4: solo campos obligatorios mínimos
         {
           userid: data.userId,
-          title: data.title,
-          content: data.content,
-          photos: data.photos,
-          created_at: new Date().toISOString(),
+      title: data.title,
+      content: data.content,
+      photos: data.photos,
+      created_at: new Date().toISOString(),
           tags: updatedTags
         }
       ];
@@ -664,8 +664,8 @@ export const createJournalEntry = async (data: {
           });
           
           if (!diaryError) {
-            console.log('Entrada creada exitosamente en journey_diary');
-            return true;
+          console.log('Entrada creada exitosamente en journey_diary');
+          return true;
           }
           
           console.warn('Error al insertar en journey_diary:', diaryError);
@@ -679,7 +679,7 @@ export const createJournalEntry = async (data: {
       return false;
     } catch (tableErr) {
       console.error('Error al obtener estructura de tabla:', tableErr);
-      return false;
+    return false;
     }
   } catch (error) {
     console.error('Error inesperado al crear entrada en el diario:', error);

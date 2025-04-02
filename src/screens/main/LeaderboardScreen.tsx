@@ -22,7 +22,7 @@ const LeaderboardScreen = () => {
       try {
         const { data, error } = await supabase
           .from('users') 
-          .select('username, points') 
+          .select('id, username, points') // Asegúrate de incluir el campo id
           .order('points', { ascending: false }); 
 
         if (error) throw error;
@@ -52,23 +52,32 @@ const LeaderboardScreen = () => {
   );
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#0000ff" />;
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
   }
 
   if (error) {
-    return <Text style={styles.errorText}>Error: {error}</Text>;
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Error: {error}</Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color="#007bff" /> {/* Icono de flecha */}
+        <Ionicons name="arrow-back" size={24} color="#007bff" />
+        <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Leaderboard</Text>
+      <Text style={styles.title}>Tabla de clasificación</Text>
       <FlatList
         data={leaderboardData}
         renderItem={renderItem}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id.toString()}
       />
     </View>
   );
@@ -81,11 +90,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa', // Color de fondo
   },
   backButton: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    padding: 8,
-    zIndex: 1, // Asegúrate de que esté por encima de otros elementos
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  backButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#007bff',
   },
   title: {
     fontSize: 24,

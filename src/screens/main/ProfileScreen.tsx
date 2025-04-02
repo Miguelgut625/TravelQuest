@@ -8,7 +8,6 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
-import CloudinaryStatusCard from '../../components/CloudinaryStatusCard';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -318,11 +317,6 @@ const ProfileScreen = () => {
           </TouchableOpacity>
           <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Configuración</Text>
-        <CloudinaryStatusCard />
       </View>
 
       <View style={styles.section}>
