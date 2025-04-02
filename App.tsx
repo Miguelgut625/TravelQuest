@@ -5,6 +5,8 @@ import { store } from './src/features/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AppRegistry } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AntDesign } from '@expo/vector-icons';
+
 
 const App = () => {
   return (

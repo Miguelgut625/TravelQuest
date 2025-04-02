@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSelector } from 'react-redux';
 import { RootState } from '../features/store';
+
 import { Ionicons } from '@expo/vector-icons';
 
 // Importar pantallas (las crearemos después)

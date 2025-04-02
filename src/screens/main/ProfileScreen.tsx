@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, TextInput, Button, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import axios from 'axios';
 import { RootState } from '../../features/store';
 import { logout } from '../../features/authSlice';
+// Importamos supabase directamente
+import { supabase } from '../../services/supabase';
 
 interface FriendshipRequest {
-  id: string; // Asegúrate de que el tipo sea correcto
+  id: string;
   sender: {
     username: string;
   };
@@ -22,70 +23,148 @@ const ProfileScreen = () => {
   const totalCities = Object.keys(entries).length;
   const totalEntries = Object.values(entries).flat().length;
 
-  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]); // Definimos el tipo de estado
-  const [isRequestsVisible, setIsRequestsVisible] = useState(false); // Estado para controlar la visibilidad de las solicitudes
-  const [username, setUsername] = useState(''); // Estado para el nombre de usuario
+  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
+  const [isRequestsVisible, setIsRequestsVisible] = useState(false);
+  const [username, setUsername] = useState('');
 
-  // Función para obtener las solicitudes de amistad
+  // Función para obtener las solicitudes de amistad directamente de Supabase
   const fetchFriendshipRequests = async () => {
     try {
-      const response = await axios.get(`http://192.168.56.1:5000/api/friends/requests/${user?.id}`);
-      setFriendshipRequests(response.data); // Guardamos las solicitudes en el estado
+      const { data, error } = await supabase
+        .from('friendship_invitations')
+        .select(`
+          id,
+          created_at,
+          senderId,
+          receiverId,
+          status,
+          sender:senderId (username)`)
+        .eq('receiverId', user?.id)
+        .eq('status', 'Pending');
+
+      if (error) throw error;
+      
+      setFriendshipRequests(data || []);
     } catch (error) {
       console.error('Error al obtener solicitudes:', error);
     }
   };
+
   const handleAcceptRequest = async (id: string) => {
     try {
-      console.log("Esta es la id:" + id);
-      const response = await axios.get(`http://192.168.56.1:5000/api/friends/accept-requests/${id}`);
-      // Si la solicitud fue aceptada correctamente
-      if (response.status === 200) {
-        // Actualiza el estado de las solicitudes de amistad, eliminando la aceptada
-        setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-        alert('Solicitud aceptada con éxito!');
-      }
+      // Obtener la solicitud de amistad
+      const { data: invitation, error: invitationError } = await supabase
+        .from('friendship_invitations')
+        .select('senderId, receiverId')
+        .eq('id', id)
+        .single();
+
+      if (invitationError) throw invitationError;
+
+      const { senderId, receiverId } = invitation;
+
+      // Actualizar el estado a "Accepted"
+      const { error: updateError } = await supabase
+        .from('friendship_invitations')
+        .update({ status: 'Accepted' })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      // Insertar en la tabla 'friends'
+      const { error: insertError } = await supabase
+        .from('friends')
+        .insert([{ user1Id: senderId, user2Id: receiverId }]);
+
+      if (insertError) throw insertError;
+
+      // Actualiza el estado de las solicitudes de amistad, eliminando la aceptada
+      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
+      alert('Solicitud aceptada con éxito!');
     } catch (error: any) {
-      console.error('Error al aceptar la solicitud:', error.response ? error.response.data : error.message);
-      alert('Hubo un error al aceptar la solicitud: ' + (error.response ? error.response.data.error : error.message));
+      console.error('Error al aceptar la solicitud:', error.message);
+      alert('Hubo un error al aceptar la solicitud: ' + error.message);
     }
   };
   
   const handleRejectRequest = async (id: string) => {
     try {
-      console.log("Esta es la id:" + id);
-      const response = await axios.get(`http://192.168.56.1:5000/api/friends/reject-requests/${id}`);
-      // Si la solicitud fue rechazada correctamente
-      if (response.status === 200) {
-        // Actualiza el estado de las solicitudes de amistad, eliminando la rechazada
-        setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-        alert('Solicitud rechazada con éxito!');
-      }
+      // Actualizar el estado a "Rejected"
+      const { error: updateError } = await supabase
+        .from('friendship_invitations')
+        .update({ status: 'Rejected' })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      // Actualiza el estado de las solicitudes de amistad, eliminando la rechazada
+      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
+      alert('Solicitud rechazada con éxito!');
     } catch (error: any) {
-      console.error('Error al rechazar la solicitud:', error.response ? error.response.data : error.message);
-      alert('Hubo un error al rechazar la solicitud: ' + (error.response ? error.response.data.error : error.message));
+      console.error('Error al rechazar la solicitud:', error.message);
+      alert('Hubo un error al rechazar la solicitud: ' + error.message);
     }
   };
 
   const handleSendRequest = async () => {
     try {
-      const response = await axios.post('http://192.168.56.1:5000/api/friends/send-request', {
-        senderId: user?.id,
-        username,
-      });
+      // Obtener el receiverId a partir del username
+      const { data: user2, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
 
-      if (response.status === 200) {
-        alert('Solicitud enviada con éxito!');
+      if (userError) throw userError;
+
+      const receiverId = user2.id;
+
+      // Verificar que no se está enviando una solicitud a sí mismo
+      if (user?.id === receiverId) {
+        return alert('No puedes enviarte una solicitud a ti mismo');
       }
+
+      // Verificar si ya son amigos (comprobando ambas direcciones)
+      const { data: friends, error: friendsError } = await supabase
+        .from('friends')
+        .select('*')
+        .or(`and(user1Id.eq.${user?.id},user2Id.eq.${receiverId}),and(user1Id.eq.${receiverId},user2Id.eq.${user?.id})`)
+        .single();
+
+      if (friends) {
+        return alert('Ya son amigos');
+      }
+
+      // Verificar si ya existe una solicitud pendiente en cualquier dirección
+      const { data: existingRequest, error: requestError } = await supabase
+        .from('friendship_invitations')
+        .select('*')
+        .or(`and(senderId.eq.${user?.id},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${user?.id})`)
+        .eq('status', 'Pending')
+        .single();
+
+      if (existingRequest) {
+        return alert('Ya existe una solicitud pendiente entre estos usuarios');
+      }
+
+      // Enviar la solicitud de amistad
+      const { error } = await supabase
+        .from('friendship_invitations')
+        .insert([{ senderId: user?.id, receiverId }]);
+
+      if (error) throw error;
+
+      alert('Solicitud enviada con éxito!');
+      setUsername(''); // Limpiar el campo después de enviar
     } catch (error: any) {
-      console.error('Error al enviar la solicitud:', error.response ? error.response.data : error.message);
-      alert('Hubo un error al enviar la solicitud: ' + (error.response ? error.response.data.error : error.message));
+      console.error('Error al enviar la solicitud:', error.message);
+      alert('Hubo un error al enviar la solicitud: ' + error.message);
     }
   };
 
   useEffect(() => {
     if (user?.id) {
-      fetchFriendshipRequests(); // Llamamos a la función cuando el componente se monta
+      fetchFriendshipRequests();
     }
   }, [user]);
 
@@ -94,7 +173,7 @@ const ProfileScreen = () => {
   };
 
   const toggleRequestsVisibility = () => {
-    setIsRequestsVisible(!isRequestsVisible); // Cambiar el estado de visibilidad
+    setIsRequestsVisible(!isRequestsVisible);
   };
 
   return (
