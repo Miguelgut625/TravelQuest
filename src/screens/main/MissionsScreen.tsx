@@ -1,5 +1,6 @@
+// MissionsScreen.jsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -67,6 +68,12 @@ interface Journey {
   }[];
 }
 
+interface Friend {
+  user2Id: string;
+  username: string;
+  points: number;
+}
+
 const getTimeRemaining = (endDate: string) => {
   const now = new Date();
   const end = new Date(endDate);
@@ -101,7 +108,12 @@ const getTimeRemaining = (endDate: string) => {
   }
 };
 
-const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onComplete: (imageUrl?: string) => void }) => {
+// Modificamos MissionCard para incluir el botón de compartir
+const MissionCard = ({ mission, onComplete, onShare }: { 
+  mission: JourneyMission; 
+  onComplete: (imageUrl?: string) => void;
+  onShare: () => void;
+}) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const timeRemaining = getTimeRemaining(mission.end_date);
   const isExpired = timeRemaining.isExpired && !mission.completed;
@@ -114,9 +126,7 @@ const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onCompl
   };
 
   const handleUploadSuccess = (imageUrl: string) => {
-    // Cerrar el modal
     setShowUploadModal(false);
-    // Llamar a la función onComplete que manejará el proceso de completar la misión
     onComplete(imageUrl);
   };
 
@@ -152,6 +162,12 @@ const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onCompl
         <View style={styles.cardFooter}>
           <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
           <Text style={styles.points}>{mission.challenge.points} puntos</Text>
+          {/* Botón para compartir: solo si la misión no está completada y no expiró */}
+          {(!mission.completed && !timeRemaining.isExpired) && (
+            <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
+              <Ionicons name="share-social" size={20} color="#4CAF50" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {completingMission && (
@@ -201,6 +217,130 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   </TouchableOpacity>
 );
 
+// Modal para seleccionar un amigo (se usa igual que antes)
+const FriendSelectionModal = ({ visible, onClose, onSelect }: { 
+  visible: boolean; 
+  onClose: () => void; 
+  onSelect: (friend: Friend) => void;
+}) => {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState(true);
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  useEffect(() => {
+    if (visible) {
+      const fetchFriends = async () => {
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+        try {
+          setLoading(true);
+          const { data: friendData, error } = await supabase
+            .from('friends')
+            .select('user2Id')
+            .eq('user1Id', user.id);
+          if (error) throw error;
+  
+          const friendDetails = await Promise.all(
+            friendData.map(async (friend: { user2Id: string }) => {
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('username, points')
+                .eq('id', friend.user2Id)
+                .single();
+              if (userError) return null;
+              return {
+                user2Id: friend.user2Id,
+                username: userData.username,
+                points: userData.points,
+              };
+            })
+          );
+  
+          setFriends(friendDetails.filter((f) => f !== null) as Friend[]);
+        } catch (error) {
+          console.error('Error fetching friends:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchFriends();
+    }
+  }, [visible, user]);
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
+      <View style={modalStyles.modalOverlay}>
+        <View style={modalStyles.modalContent}>
+          <Text style={modalStyles.modalTitle}>Selecciona un amigo</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color="#4CAF50" />
+          ) : (
+            <FlatList
+              data={friends}
+              keyExtractor={(item) => item.user2Id}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={modalStyles.friendItem} onPress={() => onSelect(item)}>
+                  <Text style={modalStyles.friendName}>{item.username}</Text>
+                  <Text style={modalStyles.friendPoints}>Puntos: {item.points}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+          <TouchableOpacity style={modalStyles.cancelButton} onPress={onClose}>
+            <Text style={modalStyles.cancelButtonText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const modalStyles = StyleSheet.create({
+  modalOverlay: {
+    flex:1,
+    backgroundColor:'rgba(0,0,0,0.5)',
+    justifyContent:'center',
+    alignItems:'center'
+  },
+  modalContent: {
+    width:'80%',
+    backgroundColor:'white',
+    borderRadius:10,
+    padding:20,
+    maxHeight:'80%'
+  },
+  modalTitle: {
+    fontSize:20,
+    fontWeight:'bold',
+    marginBottom:10
+  },
+  friendItem: {
+    padding:10,
+    borderBottomWidth:1,
+    borderBottomColor:'#ccc'
+  },
+  friendName: {
+    fontSize:16
+  },
+  friendPoints: {
+    fontSize:14,
+    color:'#666'
+  },
+  cancelButton: {
+    marginTop:10,
+    backgroundColor:'#f44336',
+    padding:10,
+    borderRadius:5,
+    alignItems:'center'
+  },
+  cancelButtonText: {
+    color:'white',
+    fontWeight:'bold'
+  }
+});
+
 const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
   const { journeyId } = route.params || {};
   const { user } = useSelector((state: RootState) => state.auth);
@@ -210,6 +350,8 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
   const [completingMission, setCompletingMission] = useState(false);
   const [userPoints, setUserPoints] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  // Estado para mostrar modal de compartir
+  const [showShareModal, setShowShareModal] = useState(false);
   const dispatch = useDispatch();
   const theme = useTheme();
 
@@ -304,13 +446,10 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
     try {
       setCompletingMission(true);
 
-      console.log('Completando misión:', { missionId, imageUrl });
-
       if (!user?.id) {
         throw new Error('Usuario no autenticado');
       }
 
-      // Crear entrada en el diario
       await createJournalEntry({
         userId: user.id,
         missionId: missionId,
@@ -320,29 +459,16 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
         cityId: selectedCity || 'Ciudad Desconocida'
       });
 
-      // Completar la misión
       const points = await completeMission(missionId, user.id, imageUrl);
-
-      console.log('Misión completada, puntos:', points);
 
       // Actualizar la lista de misiones localmente
       const updatedMissions = { ...missions };
-
-      // Buscar la misión en todas las ciudades
       let missionFound = false;
 
       for (const city in updatedMissions) {
-        // Verificar que updatedMissions[city] existe y tiene la estructura esperada
-        if (!updatedMissions[city]) {
-          console.warn(`Ciudad ${city} no tiene estructura de misiones`);
-          continue;
-        }
-
-        // Buscar en misiones pendientes
         if (updatedMissions[city].pending) {
           const pendingIndex = updatedMissions[city].pending.findIndex(m => m.id === missionId);
           if (pendingIndex !== -1) {
-            // Encontramos la misión en pendientes, moverla a completadas
             const mission = { ...updatedMissions[city].pending[pendingIndex], completed: true };
             updatedMissions[city].pending.splice(pendingIndex, 1);
             updatedMissions[city].completed.push(mission);
@@ -350,25 +476,12 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
             break;
           }
         }
-
-        // Buscar en misiones expiradas (por si acaso)
         if (!missionFound && updatedMissions[city].expired) {
           const expiredIndex = updatedMissions[city].expired.findIndex(m => m.id === missionId);
           if (expiredIndex !== -1) {
-            // Encontramos la misión en expiradas, moverla a completadas
             const mission = { ...updatedMissions[city].expired[expiredIndex], completed: true };
             updatedMissions[city].expired.splice(expiredIndex, 1);
             updatedMissions[city].completed.push(mission);
-            missionFound = true;
-            break;
-          }
-        }
-
-        // No es necesario buscar en completadas, pero por si acaso
-        if (!missionFound && updatedMissions[city].completed) {
-          const completedIndex = updatedMissions[city].completed.findIndex(m => m.id === missionId);
-          if (completedIndex !== -1) {
-            console.log('La misión ya estaba completada');
             missionFound = true;
             break;
           }
@@ -382,7 +495,6 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
       setMissions(updatedMissions);
       dispatch(dispatchCompleteMission(missionId));
 
-      // Alerta de éxito con puntos
       Alert.alert(
         'Misión Completada',
         `¡Felicidades! Has completado la misión y has ganado ${points} puntos.\n\n¿Quieres ver tu entrada en el diario de viaje?`,
@@ -390,10 +502,7 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
           {
             text: 'Ver Diario',
             onPress: () => {
-              // Para Redux
-              if (typeof dispatch === 'function') {
-                dispatch(setRefreshJournal(true));
-              }
+              dispatch(setRefreshJournal(true));
               navigation.navigate('Journal', { refresh: true });
             }
           },
@@ -409,6 +518,26 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
       Alert.alert('Error', 'No se pudo completar la misión');
     } finally {
       setCompletingMission(false);
+    }
+  };
+
+  // Función para compartir el journey (desde una misión)
+  const handleShareJourney = async (friend: Friend) => {
+    try {
+      const { error } = await supabase
+        .from('journeys_shared')
+        .insert({
+          journeyId: journeyId,
+          ownerId: user.id,
+          sharedWithUserId: friend.user2Id
+        });
+      if (error) throw error;
+      Alert.alert('Éxito', `Journey compartido con ${friend.username}`);
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'No se pudo compartir el journey');
+    } finally {
+      setShowShareModal(false);
     }
   };
 
@@ -481,6 +610,7 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
                 key={mission.id}
                 mission={mission}
                 onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
+                onShare={() => setShowShareModal(true)}
               />
             ))}
           </>
@@ -498,6 +628,7 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
                 key={mission.id}
                 mission={mission}
                 onComplete={() => {}}
+                onShare={() => {}}
               />
             ))}
           </>
@@ -515,11 +646,17 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
                 key={mission.id}
                 mission={mission}
                 onComplete={() => {}}
+                onShare={() => {}}
               />
             ))}
           </>
         )}
       </ScrollView>
+      <FriendSelectionModal 
+        visible={showShareModal} 
+        onClose={() => setShowShareModal(false)}
+        onSelect={handleShareJourney}
+      />
     </View>
   );
 };
@@ -532,9 +669,9 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    flexWrap: 'wrap'
   },
   backButton: {
     flexDirection: 'row',
@@ -545,42 +682,17 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     color: '#333',
   },
-  cityTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
-    padding: 20,
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
   },
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#4CAF50',
+    marginRight: 10
   },
   citiesList: {
     flex: 1,
@@ -631,6 +743,12 @@ const styles = StyleSheet.create({
   missionsList: {
     flex: 1,
   },
+  cityTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -669,6 +787,10 @@ const styles = StyleSheet.create({
   },
   completedCard: {
     opacity: 0.8,
+  },
+  expiredCard: {
+    borderColor: '#f44336',
+    borderWidth: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -710,6 +832,30 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: 'bold',
   },
+  shareIcon: {
+    marginLeft: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    padding: 20,
+  },
   retryButton: {
     backgroundColor: '#4CAF50',
     padding: 10,
@@ -721,29 +867,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: 'bold',
   },
-  expiredCard: {
-    borderColor: '#f44336',
-    borderWidth: 1,
-  },
-  timeRemaining: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  expiredTime: {
-    color: '#f44336',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-  },
 });
 
-export default MissionsScreen; 
+export default MissionsScreen;
