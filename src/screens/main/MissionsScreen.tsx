@@ -1,6 +1,16 @@
 // MissionsScreen.jsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Alert, 
+  ScrollView, 
+  Modal, 
+  FlatList 
+} from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -12,6 +22,8 @@ import { completeMission as dispatchCompleteMission } from '../../features/journ
 import ImageUploadModal from '../../components/ImageUploadModal';
 import { setRefreshJournal } from '../../features/journalSlice';
 import { createJournalEntry } from '../../services/journalService';
+import MissionCompletedModal from '../../components/MissionCompletedModal';
+import CompletingMissionModal from '../../components/CompletingMissionModal';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -108,7 +120,7 @@ const getTimeRemaining = (endDate: string) => {
   }
 };
 
-// Modificamos MissionCard para incluir el botón de compartir
+// Componente MissionCard con botón para compartir (solo si la misión está disponible)
 const MissionCard = ({ mission, onComplete, onShare }: { 
   mission: JourneyMission; 
   onComplete: (imageUrl?: string) => void;
@@ -162,7 +174,6 @@ const MissionCard = ({ mission, onComplete, onShare }: {
         <View style={styles.cardFooter}>
           <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
           <Text style={styles.points}>{mission.challenge.points} puntos</Text>
-          {/* Botón para compartir: solo si la misión no está completada y no expiró */}
           {(!mission.completed && !timeRemaining.isExpired) && (
             <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
               <Ionicons name="share-social" size={20} color="#4CAF50" />
@@ -217,7 +228,7 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   </TouchableOpacity>
 );
 
-// Modal para seleccionar un amigo (se usa igual que antes)
+// Modal para seleccionar un amigo
 const FriendSelectionModal = ({ visible, onClose, onSelect }: { 
   visible: boolean; 
   onClose: () => void; 
@@ -341,13 +352,20 @@ const modalStyles = StyleSheet.create({
   }
 });
 
-const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
+// Componente principal (renombrado para combinar ambas ramas)
+const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => {
   const { journeyId } = route.params || {};
   const { user } = useSelector((state: RootState) => state.auth);
   const [missions, setMissions] = useState<CityMissions>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completingMission, setCompletingMission] = useState(false);
+  const [missionCompleted, setMissionCompleted] = useState(false);
+  const [completedMissionInfo, setCompletedMissionInfo] = useState<{
+    title: string;
+    points: number;
+    cityName: string;
+  } | null>(null);
   const [userPoints, setUserPoints] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   // Estado para mostrar modal de compartir
@@ -412,7 +430,6 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
         }))
       );
 
-      // Organizar misiones por ciudad
       const missionsByCity: CityMissions = {};
       allMissions.forEach((mission: JourneyMission) => {
         if (!missionsByCity[mission.cityName]) {
@@ -445,90 +462,87 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     try {
       setCompletingMission(true);
-
-      if (!user?.id) {
-        throw new Error('Usuario no autenticado');
+      
+      // Buscar la misión en el estado local para obtener sus detalles
+      let foundMissionTitle = '';
+      let foundMissionPoints = 0;
+      let foundCityName = '';
+      
+      Object.keys(missions).forEach((cityName) => {
+        const pending = missions[cityName].pending;
+        const foundMission = pending.find((m) => m.id === missionId);
+        if (foundMission) {
+          foundMissionTitle = foundMission.challenge.title;
+          foundMissionPoints = foundMission.challenge.points;
+          foundCityName = cityName;
+        }
+      });
+      
+      if (!foundMissionTitle || !foundCityName) {
+        throw new Error('Misión no encontrada');
       }
-
-      await createJournalEntry({
-        userId: user.id,
-        missionId: missionId,
-        photos: [imageUrl || ''],
-        title: 'Misión completada',
-        content: 'Misión completada con éxito',
-        cityId: selectedCity || 'Ciudad Desconocida'
+      
+      // Guardar la información de la misión completada
+      setCompletedMissionInfo({
+        title: foundMissionTitle,
+        points: foundMissionPoints,
+        cityName: foundCityName
+      });
+      
+      // Completar la misión en la base de datos
+      await completeMission(missionId, user?.id || '', imageUrl);
+      
+      // Crear entrada en el diario si hay imagen
+      if (imageUrl) {
+        await createJournalEntry({
+          userId: user?.id || '',
+          cityId: foundCityName || '',
+          missionId: missionId,
+          title: `Misión completada: ${foundMissionTitle}`,
+          content: `He completado la misión "${foundMissionTitle}" en ${foundCityName}. ¡Conseguí ${foundMissionPoints} puntos!`,
+          photos: [imageUrl],
+          tags: [foundCityName || '', 'Misión completada']
+        });
+      }
+      
+      // Actualizar el estado local: mover la misión de pendientes a completadas
+      setMissions((prev) => {
+        const updatedMissions = { ...prev };
+        const city = updatedMissions[foundCityName];
+        const index = city.pending.findIndex((m) => m.id === missionId);
+        if (index !== -1) {
+          const mission = { ...city.pending[index], completed: true };
+          city.pending.splice(index, 1);
+          city.completed.push(mission);
+        }
+        return updatedMissions;
       });
 
-      const points = await completeMission(missionId, user.id, imageUrl);
-
-      // Actualizar la lista de misiones localmente
-      const updatedMissions = { ...missions };
-      let missionFound = false;
-
-      for (const city in updatedMissions) {
-        if (updatedMissions[city].pending) {
-          const pendingIndex = updatedMissions[city].pending.findIndex(m => m.id === missionId);
-          if (pendingIndex !== -1) {
-            const mission = { ...updatedMissions[city].pending[pendingIndex], completed: true };
-            updatedMissions[city].pending.splice(pendingIndex, 1);
-            updatedMissions[city].completed.push(mission);
-            missionFound = true;
-            break;
-          }
-        }
-        if (!missionFound && updatedMissions[city].expired) {
-          const expiredIndex = updatedMissions[city].expired.findIndex(m => m.id === missionId);
-          if (expiredIndex !== -1) {
-            const mission = { ...updatedMissions[city].expired[expiredIndex], completed: true };
-            updatedMissions[city].expired.splice(expiredIndex, 1);
-            updatedMissions[city].completed.push(mission);
-            missionFound = true;
-            break;
-          }
-        }
-      }
-
-      if (!missionFound) {
-        console.warn('No se encontró la misión con ID:', missionId);
-      }
-
-      setMissions(updatedMissions);
+      // Actualizar puntos y estado global
+      setUserPoints((prev) => prev + foundMissionPoints);
       dispatch(dispatchCompleteMission(missionId));
-
-      Alert.alert(
-        'Misión Completada',
-        `¡Felicidades! Has completado la misión y has ganado ${points} puntos.\n\n¿Quieres ver tu entrada en el diario de viaje?`,
-        [
-          {
-            text: 'Ver Diario',
-            onPress: () => {
-              dispatch(setRefreshJournal(true));
-              navigation.navigate('Journal', { refresh: true });
-            }
-          },
-          {
-            text: 'Continuar',
-            style: 'cancel'
-          }
-        ]
-      );
+      dispatch(setRefreshJournal(true));
+      
+      // Mostrar modal de misión completada
+      setMissionCompleted(true);
 
     } catch (error) {
-      console.error('Error completando misión:', error);
-      Alert.alert('Error', 'No se pudo completar la misión');
+      console.error('Error al completar la misión:', error);
+      Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
+      setMissionCompleted(false);
     } finally {
       setCompletingMission(false);
     }
   };
 
-  // Función para compartir el journey (desde una misión)
+  // Función para compartir el journey desde una misión
   const handleShareJourney = async (friend: Friend) => {
     try {
       const { error } = await supabase
         .from('journeys_shared')
         .insert({
           journeyId: journeyId,
-          ownerId: user.id,
+          ownerId: user?.id,
           sharedWithUserId: friend.user2Id
         });
       if (error) throw error;
@@ -652,14 +666,34 @@ const MissionsScreen = ({ route, navigation }: MissionsScreenProps) => {
           </>
         )}
       </ScrollView>
+      {/* Modal para compartir journey */}
       <FriendSelectionModal 
         visible={showShareModal} 
         onClose={() => setShowShareModal(false)}
         onSelect={handleShareJourney}
       />
+      {/* Modal de misión completada */}
+      <MissionCompletedModal
+        visible={missionCompleted}
+        missionInfo={completedMissionInfo}
+        onFinished={() => {
+          setMissionCompleted(false);
+          navigation.navigate('Journal', { refresh: true });
+        }}
+      />
+      {/* Modal de carga durante el proceso */}
+      <CompletingMissionModal
+        visible={completingMission && !missionCompleted}
+      />
     </View>
   );
 };
+
+const MissionsScreen = (props: any) => {
+  return <MissionsScreenComponent {...props} />;
+};
+
+export default MissionsScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -868,5 +902,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-export default MissionsScreen;
