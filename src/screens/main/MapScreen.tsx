@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { format } from 'date-fns';
 import { searchCities } from '../../services/supabase';
+import GlobeView from '../../components/GlobeView';
 
 interface City {
   id: string;
@@ -915,17 +916,7 @@ const MapScreen = () => {
                 <Text style={styles.errorText}>{errorLocationMsg}</Text>
               </View>
             )}
-            <Map
-              region={region}
-              style={styles.map}
-              showsUserLocation={true}
-              onRegionChangeComplete={(newRegion) => {
-                console.log('Región del mapa cambiada:', newRegion);
-              }}
-              onMapReady={() => {
-                console.log('Mapa listo');
-              }}
-            />
+            <GlobeView style={styles.map} />
           </View>
         )}
       </View>
