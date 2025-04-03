@@ -431,15 +431,17 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     fetchMissions();
   }, [journeyId]);
 
+  
+
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     try {
       setCompletingMission(true);
-      
+  
       // Encontrar la misión en el estado local
       let foundMissionTitle = '';
       let foundMissionPoints = 0;
       let foundCityName = '';
-      
+  
       Object.keys(missions).forEach((cityName) => {
         const pending = missions[cityName].pending;
         const foundMission = pending.find((m) => m.id === missionId);
@@ -449,25 +451,25 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           foundCityName = cityName;
         }
       });
-      
+  
       if (!foundMissionTitle || !foundCityName) {
         throw new Error('Misión no encontrada');
       }
-      
+  
       // Guardar información de la misión antes de completarla
       setCompletedMissionInfo({
         title: foundMissionTitle,
         points: foundMissionPoints,
         cityName: foundCityName
       });
-
+  
       // Completar misión en la base de datos
       await completeMission(
-        missionId, 
-        user?.id || '', 
+        missionId,
+        user?.id || '',
         imageUrl
       );
-
+  
       // Crear entrada en el diario para esta misión completada
       if (imageUrl) {
         await createJournalEntry({
@@ -480,39 +482,85 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           tags: [foundCityName || '', 'Misión completada']
         });
       }
-
+  
       // Actualizar el estado local
       setMissions((prev) => {
         const updatedMissions = { ...prev };
         const city = updatedMissions[foundCityName];
-        
+  
         // Encontrar el índice de la misión en las pendientes
         const index = city.pending.findIndex((m) => m.id === missionId);
-        
+  
         if (index !== -1) {
           // Obtener la misión y marcarla como completada
           const mission = { ...city.pending[index], completed: true };
-          
+  
           // Eliminar la misión de pendientes
           city.pending.splice(index, 1);
-          
+  
           // Añadir la misión a completadas
           city.completed.push(mission);
         }
-        
+  
         return updatedMissions;
       });
-
+  
       // Actualizar la UI de puntos
       setUserPoints((prev) => prev + foundMissionPoints);
-      
+  
       // Actualizar el estado global
       dispatch(dispatchCompleteMission(missionId));
       dispatch(setRefreshJournal(true));
-
+  
+      // Lógica para actualizar XP y nivel
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('xp, level, xp_next')
+        .eq('id', '61f24556-c0d1-4ca1-a41c-0ab33d7f5ebe')
+        .single();
+  
+      if (userError) throw userError;
+  
+      if (userData) {
+        // Calcular los puntos de XP a añadir (mitad de los puntos de la misión)
+        const xpToAdd = Math.floor(foundMissionPoints / 2);
+  
+        // Actualizar XP
+        const newXp = userData.xp + xpToAdd;
+  
+        // Verificar si ha superado el xp_next y si debe subir de nivel
+        let newLvl = userData.level;
+        let newNextXp = userData.xp_next;
+  
+        if (newXp >= userData.xp_next) {
+          // Sube de nivel
+          newLvl += 1;
+  
+          // Aumentar el xp_next en un 10%
+          newNextXp = Math.floor(newNextXp * 1.1);
+        }
+  
+        // Actualizar usuario en Supabase
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            xp: newXp,
+            level: newLvl,
+            xp_next: newNextXp
+          })
+          .eq('id', '61f24556-c0d1-4ca1-a41c-0ab33d7f5ebe');
+  
+        if (updateError) {
+          throw updateError;
+        }
+  
+        // Actualizar los puntos del usuario local
+        setUserPoints(newXp);
+      }
+  
       // Mostrar el modal de misión completada
       setMissionCompleted(true);
-
+  
     } catch (error) {
       console.error('Error al completar la misión:', error);
       Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
@@ -521,6 +569,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       setCompletingMission(false);
     }
   };
+  
 
   useEffect(() => {
     if (missionCompleted) {
