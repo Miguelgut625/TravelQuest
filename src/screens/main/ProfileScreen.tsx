@@ -408,9 +408,14 @@ const ProfileScreen = () => {
 
   // Llamar a esta función cuando se haga clic en el botón correspondiente
   const handleFetchPendingRequests = async () => {
-    const pendingRequests = await fetchPendingRequests();
-    setFriendshipRequests(pendingRequests);
+    // Alternar el estado de isRequestsVisible
     setIsRequestsVisible(!isRequestsVisible);
+
+    // Solo buscar solicitudes pendientes si se van a mostrar
+    if (!isRequestsVisible) {
+      const requests = await fetchPendingRequests();
+      setFriendshipRequests(requests);
+    }
   };
 
   return (
@@ -495,26 +500,28 @@ const ProfileScreen = () => {
           </Text>
         </TouchableOpacity>
 
-        {isRequestsVisible && friendshipRequests.length === 0 ? (
-          <Text style={styles.noRequestsText}>No hay solicitudes pendientes</Text>
-        ) : (
-          <FlatList
-            data={friendshipRequests}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.requestItem}>
-                <Text style={styles.requestText}>
-                  {item.username || 'Usuario desconocido'} te ha enviado una solicitud.
-                </Text>
-                <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
-                  <Text style={styles.acceptButtonText}>Aceptar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
-                  <Text style={styles.rejectButtonText}>Rechazar</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          />
+        {isRequestsVisible && (
+          friendshipRequests.length === 0 ? (
+            <Text style={styles.noRequestsText}>No hay solicitudes pendientes</Text>
+          ) : (
+            <FlatList
+              data={friendshipRequests}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.requestItem}>
+                  <Text style={styles.requestText}>
+                    {item.users.username || 'Usuario desconocido'} te ha enviado una solicitud.
+                  </Text>
+                  <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
+                    <Text style={styles.acceptButtonText}>Aceptar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
+                    <Text style={styles.rejectButtonText}>Rechazar</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          )
         )}
       </View>
 
