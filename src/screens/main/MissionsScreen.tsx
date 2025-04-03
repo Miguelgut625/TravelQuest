@@ -526,30 +526,38 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         const xpToAdd = Math.floor(foundMissionPoints / 2);
   
         // Actualizar XP
-        const newXp = userData.xp + xpToAdd;
+        var newXp = userData.xp + xpToAdd;
   
-        // Verificar si ha superado el xp_next y si debe subir de nivel
-        let newLvl = userData.level;
-        let newNextXp = userData.xp_next;
-  
-        if (newXp >= userData.xp_next) {
-          // Sube de nivel
-          newLvl += 1;
-  
-          // Aumentar el xp_next en un 10%
-          newNextXp = Math.floor(newNextXp * 1.1);
-        }
-  
-        // Actualizar usuario en Supabase
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            xp: newXp,
-            level: newLvl,
-            xp_next: newNextXp
-          })
-          .eq('id', '61f24556-c0d1-4ca1-a41c-0ab33d7f5ebe');
-  
+// Verificar si ha superado el xp_next y si debe subir de nivel
+let newLvl = userData.level;
+let newNextXp = userData.xp_next;
+
+if (newXp >= userData.xp_next) {
+  // Sube de nivel
+  newLvl += 1;
+
+  // Calcular la experiencia sobrante
+  const excessXp = newXp - userData.xp_next;
+
+  // Reiniciar xp a 0
+  newXp = 0;
+
+  // Aumentar el xp_next en un 10%
+  newNextXp = Math.floor(userData.xp_next * 1.1);
+
+  // Sumar la experiencia sobrante al nuevo xp, asegurando que no sea negativo
+  newXp += Math.max(excessXp, 0); // Asegurarse de que no sea negativo
+}
+
+// Actualizar usuario en Supabase
+const { error: updateError } = await supabase
+  .from('users')
+  .update({
+    xp: newXp, // Esto será 0 o la experiencia sobrante
+    level: newLvl,
+    xp_next: newNextXp
+  })
+  .eq('id', '61f24556-c0d1-4ca1-a41c-0ab33d7f5ebe');
         if (updateError) {
           throw updateError;
         }
