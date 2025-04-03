@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { CompositeScreenProps, useNavigation } from '@react-navigation/native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { CompositeScreenProps } from '@react-navigation/native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParams } from '../../navigation/AppNavigator';
+import { RootStackParamList } from '../../navigation/types'
 import { SecondaryTabsParams } from '../../navigation/SecondaryTabsNavigator';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
+import styles from './styles';
 
 const colors = {
   primary: '#005F9E',
@@ -17,25 +18,29 @@ const colors = {
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<SecondaryTabsParams, 'Home'>,
-  NativeStackScreenProps<RootStackParams>
+  NativeStackScreenProps<RootStackParamList>
 >;
 
 export default function HomeScreen({ navigation }: Props) {
-  const { token } = useSelector((state: RootState) => state.auth);
+  const { user, authState } = useSelector((state: RootState) => state.auth);
+  const isAuthenticated = authState === 'authenticated';
 
   const handleNavigation = (screen: keyof SecondaryTabsParams) => {
-    if (!token) {
-      navigation.navigate('Login');
+    if (!isAuthenticated) {
+      navigation.getParent()?.navigate('Login');
       return;
     }
-    navigation.navigate(screen);
+    navigation.navigate(screen as any);
   };
 
   useEffect(() => {
-    if (!token) {
-      navigation.navigate('Login');
+    if (!isAuthenticated && !user) {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('Login');
+      }
     }
-  }, [token, navigation]);
+  }, [isAuthenticated, user, navigation]);
 
   return (
     <View style={styles.container}>
@@ -57,41 +62,14 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.cardText}>Ir al Perfil</Text>
       </TouchableOpacity>
 
-      {!token && (
-        <TouchableOpacity style={[styles.card, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('Login')}>
+      {!isAuthenticated && (
+        <TouchableOpacity 
+          style={[styles.card, { backgroundColor: colors.primary }]} 
+          onPress={() => navigation.getParent()?.navigate('Login')}
+        >
           <Text style={[styles.cardText, { color: colors.secondary }]}>Iniciar Sesión</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.backgroundGradient[1],
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 30,
-  },
-  card: {
-    backgroundColor: colors.secondary,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    width: '100%',
-    alignItems: 'center',
-    elevation: 5,
-  },
-  cardText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-});

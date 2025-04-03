@@ -1,24 +1,23 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface User {
-  id: string;
   email: string;
-  username: string;
-  profilePicture?: string;
+  id: string;
+  username?: string;
 }
 
 interface AuthState {
   user: User | null;
   token: string | null;
-  isLoading: boolean;
+  authState: 'idle' | 'loading' | 'authenticated' | 'unauthenticated' | 'password_recovery';
   error: string | null;
 }
 
 const initialState: AuthState = {
   user: null,
   token: null,
-  isLoading: false,
-  error: null,
+  authState: 'unauthenticated',
+  error: null
 };
 
 const authSlice = createSlice({
@@ -27,23 +26,29 @@ const authSlice = createSlice({
   reducers: {
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
+      state.authState = 'authenticated';
+      state.error = null;
     },
     setToken: (state, action: PayloadAction<string>) => {
       state.token = action.payload;
     },
-    setLoading: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = action.payload;
+    setAuthState: (state, action: PayloadAction<AuthState['authState']>) => {
+      state.authState = action.payload;
     },
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
     logout: (state) => {
+      console.log('Ejecutando logout en authSlice');
       state.user = null;
       state.token = null;
+      state.authState = 'unauthenticated';
       state.error = null;
+      console.log('Estado después del logout:', state);
+      return state;
     },
   },
 });
 
-export const { setUser, setToken, setLoading, setError, logout } = authSlice.actions;
-export default authSlice.reducer; 
+export const { setUser, setToken, logout, setAuthState, setError } = authSlice.actions;
+export default authSlice.reducer;

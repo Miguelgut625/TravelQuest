@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -7,23 +7,24 @@ import { completeMission } from '../../services/pointsService';
 import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, ProgressBar, useTheme, Surface } from 'react-native-paper';
-import { JourneyMission } from '../../types/journey';
-import { completeMission as dispatchCompleteMission } from '../../features/journeySlice';
-import { FlatList } from 'react-native';
-import { useWindowDimensions } from 'react-native';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { SecondaryTabsParams } from '../../navigation/SecondaryTabsNavigator';
+import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
+import ImageUploadModal from '../../components/ImageUploadModal';
+import { setRefreshJournal } from '../../features/journalSlice';
+import { createJournalEntry } from '../../services/journalService';
+import MissionCompletedModal from '../../components/MissionCompletedModal';
+import CompletingMissionModal from '../../components/CompletingMissionModal';
 
-type MissionsScreenProps = BottomTabScreenProps<SecondaryTabsParams, 'Missions'>;
+type MissionsScreenRouteProp = RouteProp<{
+  Missions: {
+    journeyId: string;
+    challenges: JourneyMission[];
+  };
+}, 'Missions'>;
 
-const Logo = require('../../assets/icons/logo.png');
-
-const colors = {
-  primary: '#005F9E',
-  secondary: '#FFFFFF',
-  danger: '#D32F2F',
-  backgroundGradient: ['#005F9E', '#F0F0F0'],
-};
+interface MissionsScreenProps {
+  route: MissionsScreenRouteProp;
+  navigation: any;
+}
 
 interface CityMissions {
   [cityName: string]: {
@@ -33,12 +34,23 @@ interface CityMissions {
   };
 }
 
+interface JourneyMission {
+  id: string;
+  completed: boolean;
+  cityName: string;
+  end_date: string;
+  challenge: {
+    title: string;
+    description: string;
+    difficulty: string;
+    points: number;
+  };
+}
+
 interface Journey {
   id: string;
   description: string;
   created_at: string;
-  start_date: string;
-  end_date: string;
   cities?: {
     name: string;
   };
@@ -46,7 +58,6 @@ interface Journey {
     id: string;
     completed: boolean;
     challengeId: string;
-    start_date: string;
     end_date: string;
     challenges: {
       id: string;
@@ -92,43 +103,75 @@ const getTimeRemaining = (endDate: string) => {
   }
 };
 
-const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onComplete: () => void }) => {
+const MissionCard = ({ mission, onComplete }: { mission: JourneyMission; onComplete: (imageUrl?: string) => void }) => {
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const timeRemaining = getTimeRemaining(mission.end_date);
   const isExpired = timeRemaining.isExpired && !mission.completed;
+  const [completingMission, setCompletingMission] = useState(false);
+
+  const handleMissionPress = () => {
+    if (!mission.completed && !isExpired) {
+      setShowUploadModal(true);
+    }
+  };
+
+  const handleUploadSuccess = (imageUrl: string) => {
+    // Cerrar el modal
+    setShowUploadModal(false);
+    // Llamar a la función onComplete que manejará el proceso de completar la misión
+    onComplete(imageUrl);
+  };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.card, 
-        mission.completed && styles.completedCard,
-        isExpired && styles.expiredCard
-      ]}
-      onPress={() => !mission.completed && !isExpired && onComplete()}
-      disabled={mission.completed || isExpired}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
-        <View style={styles.badgeContainer}>
-          <Text style={[
-            styles.badge, 
-            { backgroundColor: mission.completed ? '#4CAF50' : isExpired ? '#f44336' : '#FFA000' }
-          ]}>
-            {mission.completed ? 'Completada' : isExpired ? 'Expirada' : 'Pendiente'}
-          </Text>
-          <Text style={[
-            styles.timeRemaining,
-            isExpired && styles.expiredTime
-          ]}>
-            {timeRemaining.text}
-          </Text>
+    <>
+      <TouchableOpacity
+        style={[
+          styles.card,
+          mission.completed && styles.completedCard,
+          isExpired && styles.expiredCard
+        ]}
+        onPress={handleMissionPress}
+        disabled={mission.completed || isExpired || completingMission}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
+          <View style={styles.badgeContainer}>
+            <Text style={[
+              styles.badge,
+              { backgroundColor: mission.completed ? '#4CAF50' : isExpired ? '#f44336' : '#FFA000' }
+            ]}>
+              {mission.completed ? 'Completada' : isExpired ? 'Expirada' : 'Pendiente'}
+            </Text>
+            <Text style={[
+              styles.timeRemaining,
+              isExpired && styles.expiredTime
+            ]}>
+              {timeRemaining.text}
+            </Text>
+          </View>
         </View>
-      </View>
-      <Text style={styles.cardDescription}>{mission.challenge.description}</Text>
-      <View style={styles.cardFooter}>
-        <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
-        <Text style={styles.points}>{mission.challenge.points} puntos</Text>
-      </View>
-    </TouchableOpacity>
+        <Text style={styles.cardDescription}>{mission.challenge.description}</Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
+          <Text style={styles.points}>{mission.challenge.points} puntos</Text>
+        </View>
+
+        {completingMission && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingText}>Completando misión...</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <ImageUploadModal
+        visible={showUploadModal}
+        missionId={mission.id}
+        missionTitle={mission.challenge.title}
+        onClose={() => setShowUploadModal(false)}
+        onSuccess={handleUploadSuccess}
+      />
+    </>
   );
 };
 
@@ -136,86 +179,55 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   cityName: string; 
   totalMissions: number;
   completedMissions: number;
-  expiredMissions: number;
+  expiredMissions?: number;
   onPress: () => void;
 }) => (
   <TouchableOpacity style={styles.cityCard} onPress={onPress}>
     <View style={styles.cityCardContent}>
       <View style={styles.cityInfo}>
         <Text style={styles.cityName}>{cityName}</Text>
-        <View style={styles.missionCountContainer}>
-          <Text style={styles.missionCount}>
-            {completedMissions}/{totalMissions} misiones completadas
-          </Text>
-          {expiredMissions > 0 && (
-            <Text style={styles.expiredCount}>
-              {expiredMissions} misiones expiradas
-            </Text>
-          )}
-        </View>
+        <Text style={styles.missionCount}>
+          {completedMissions}/{totalMissions} misiones completadas
+        </Text>
       </View>
       <Ionicons name="chevron-forward" size={24} color="#666" />
     </View>
     <View style={styles.progressBar}>
       <View 
         style={[
-          styles.progressFillCompleted, 
+          styles.progressFill, 
           { width: `${(completedMissions / totalMissions) * 100}%` }
-        ]} 
-      />
-      <View 
-        style={[
-          styles.progressFillExpired, 
-          { 
-            width: `${(expiredMissions / totalMissions) * 100}%`,
-            left: `${(completedMissions / totalMissions) * 100}%`
-          }
-        ]} 
-      />
-      <View 
-        style={[
-          styles.progressFillPending, 
-          { 
-            width: `${((totalMissions - completedMissions - expiredMissions) / totalMissions) * 100}%`,
-            left: `${((completedMissions + expiredMissions) / totalMissions) * 100}%`
-          }
         ]} 
       />
     </View>
   </TouchableOpacity>
 );
 
-const MissionsScreen = ({ route }: MissionsScreenProps) => {
-  const { user } = useSelector((state: RootState) => state.auth); useEffect(() => {
-  if (user?.id) {
-    fetchMissions(user.id, setCityMissions, setMissions, setError, setLoading);
-  }}, [user?.id]);
-  const [missions, setMissions] = useState<JourneyMission[]>([]);
+const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => {
+  const { journeyId } = route.params || {};
+  const { user } = useSelector((state: RootState) => state.auth);
+  const [missions, setMissions] = useState<CityMissions>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [completingMission, setCompletingMission] = useState(false);
+  const [missionCompleted, setMissionCompleted] = useState(false);
+  const [completedMissionInfo, setCompletedMissionInfo] = useState<{
+    title: string;
+    points: number;
+    cityName: string;
+  } | null>(null);
   const [userPoints, setUserPoints] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
-  const [cityMissions, setCityMissions] = useState<CityMissions>({});
   const dispatch = useDispatch();
   const theme = useTheme();
 
-  const { width } = useWindowDimensions();
-  const cardWidth = width * 0.17;
-  const cardMargin = width * 0.02;
-  const numColumns = Math.floor(width / (cardWidth + cardMargin * 2)) || 1;
+  const fetchMissions = async () => {
+    if (!user?.id) {
+      setError('Usuario no autenticado');
+      setLoading(false);
+      return;
+    }
 
-
-  interface JourneyMissionWithCity extends JourneyMission {
-    cityName: string;
-  }
-  
-  const fetchMissions = async (
-    userId: string,
-    setCityMissions: React.Dispatch<React.SetStateAction<CityMissions>>,
-    setMissions: React.Dispatch<React.SetStateAction<JourneyMissionWithCity[]>>,
-    setError: React.Dispatch<React.SetStateAction<string | null>>,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
     try {
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
@@ -223,18 +235,15 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
           id,
           description,
           created_at,
-          start_date,
-          end_date,
-          userId,
-          cities ( name ),
-          journeys_missions (
+          cities (
+            name
+          ),
+          journeys_missions!inner (
             id,
             completed,
-            userId,
             challengeId,
-            start_date,
             end_date,
-            challenges (
+            challenges!inner (
               id,
               title,
               description,
@@ -243,49 +252,50 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
             )
           )
         `)
-        .eq('userId', userId)
+        .eq('userId', user.id)
         .order('created_at', { ascending: false });
-  
+
       if (journeysError) throw journeysError;
+
       if (!journeys || journeys.length === 0) {
         setError('No hay viajes disponibles');
         setLoading(false);
         return;
       }
-  
-      const allMissions: JourneyMissionWithCity[] = journeys.flatMap((journey: Journey) =>
-        journey.journeys_missions
-          .filter((jm: any) => jm.userId === userId)
-          .map((jm: any): JourneyMissionWithCity => ({
-            id: jm.id,
-            completed: jm.completed,
-            userId: jm.userId,
-            cityName: journey.cities?.name || 'Ciudad Desconocida',
-            start_date: jm.start_date || journey.start_date,
-            end_date: jm.end_date || journey.end_date,
-            challenge: {
-              id: jm.challenges.id,
-              title: jm.challenges.title,
-              description: jm.challenges.description,
-              difficulty: jm.challenges.difficulty,
-              points: jm.challenges.points,
-            },            
-          }))
-      );           
-  
+
+      const allMissions = journeys.flatMap((journey: Journey) => 
+        journey.journeys_missions.map((jm) => ({
+          id: jm.id,
+          completed: jm.completed,
+          cityName: journey.cities?.name || 'Ciudad Desconocida',
+          end_date: jm.end_date,
+          challenge: {
+            title: jm.challenges.title,
+            description: jm.challenges.description,
+            difficulty: jm.challenges.difficulty,
+            points: jm.challenges.points
+          }
+        }))
+      );
+
+      // Organizar misiones por ciudad
       const missionsByCity: CityMissions = {};
-      allMissions.forEach((mission) => {
+      allMissions.forEach((mission: JourneyMission) => {
         if (!missionsByCity[mission.cityName]) {
-          missionsByCity[mission.cityName] = { completed: [], pending: [], expired: [] };
+          missionsByCity[mission.cityName] = {
+            completed: [],
+            pending: [],
+            expired: []
+          };
         }
-        const timeRemaining = getTimeRemaining(mission.end_date);
-        if (mission.completed) missionsByCity[mission.cityName].completed.push(mission);
-        else if (timeRemaining.isExpired) missionsByCity[mission.cityName].expired.push(mission);
-        else missionsByCity[mission.cityName].pending.push(mission);
+        if (mission.completed) {
+          missionsByCity[mission.cityName].completed.push(mission);
+        } else {
+          missionsByCity[mission.cityName].pending.push(mission);
+        }
       });
-  
-      setCityMissions(missionsByCity);
-      setMissions(allMissions);
+
+      setMissions(missionsByCity);
     } catch (error) {
       console.error('Error fetching missions:', error);
       setError('Error al cargar las misiones');
@@ -293,56 +303,113 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
       setLoading(false);
     }
   };
-  
 
   useEffect(() => {
-    if (user?.id) {
-      fetchMissions(user.id, setCityMissions, setMissions, setError, setLoading);
-    }
-  }, [user?.id]);
-  
+    fetchMissions();
+  }, [journeyId]);
 
-  const handleCompleteMission = async (missionId: string) => {
-    if (!user?.id) return;
-
+  const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     try {
-      const points = await completeMission(missionId, user.id);
-      setUserPoints(prev => prev + points);
-
-      // Actualizar el estado local
-      const updatedMissions = missions.map(mission =>
-        mission.id === missionId ? { ...mission, completed: true } : mission
-      );
-      setMissions(updatedMissions);
-
-      // Actualizar cityMissions
-      const newCityMissions = { ...cityMissions };
-      Object.keys(newCityMissions).forEach(cityName => {
-        const mission = newCityMissions[cityName].pending.find(m => m.id === missionId);
-        if (mission) {
-          newCityMissions[cityName].pending = newCityMissions[cityName].pending.filter(m => m.id !== missionId);
-          newCityMissions[cityName].completed.push({ ...mission, completed: true });
+      setCompletingMission(true);
+      
+      // Encontrar la misión en el estado local
+      let foundMissionTitle = '';
+      let foundMissionPoints = 0;
+      let foundCityName = '';
+      
+      Object.keys(missions).forEach((cityName) => {
+        const pending = missions[cityName].pending;
+        const foundMission = pending.find((m) => m.id === missionId);
+        if (foundMission) {
+          foundMissionTitle = foundMission.challenge.title;
+          foundMissionPoints = foundMission.challenge.points;
+          foundCityName = cityName;
         }
       });
-      setCityMissions(newCityMissions);
+      
+      if (!foundMissionTitle || !foundCityName) {
+        throw new Error('Misión no encontrada');
+      }
+      
+      // Guardar información de la misión antes de completarla
+      setCompletedMissionInfo({
+        title: foundMissionTitle,
+        points: foundMissionPoints,
+        cityName: foundCityName
+      });
 
-      Alert.alert(
-        '¡Misión Completada!',
-        `Has ganado ${points} puntos por completar esta misión.`
+      // Completar misión en la base de datos
+      await completeMission(
+        missionId, 
+        user?.id || '', 
+        imageUrl
       );
+
+      // Crear entrada en el diario para esta misión completada
+      if (imageUrl) {
+        await createJournalEntry({
+          userId: user?.id || '',
+          cityId: foundCityName || '',
+          missionId: missionId,
+          title: `Misión completada: ${foundMissionTitle}`,
+          content: `He completado la misión "${foundMissionTitle}" en ${foundCityName}. ¡Conseguí ${foundMissionPoints} puntos!`,
+          photos: [imageUrl],
+          tags: [foundCityName || '', 'Misión completada']
+        });
+      }
+
+      // Actualizar el estado local
+      setMissions((prev) => {
+        const updatedMissions = { ...prev };
+        const city = updatedMissions[foundCityName];
+        
+        // Encontrar el índice de la misión en las pendientes
+        const index = city.pending.findIndex((m) => m.id === missionId);
+        
+        if (index !== -1) {
+          // Obtener la misión y marcarla como completada
+          const mission = { ...city.pending[index], completed: true };
+          
+          // Eliminar la misión de pendientes
+          city.pending.splice(index, 1);
+          
+          // Añadir la misión a completadas
+          city.completed.push(mission);
+        }
+        
+        return updatedMissions;
+      });
+
+      // Actualizar la UI de puntos
+      setUserPoints((prev) => prev + foundMissionPoints);
+      
+      // Actualizar el estado global
+      dispatch(dispatchCompleteMission(missionId));
+      dispatch(setRefreshJournal(true));
+
+      // Mostrar el modal de misión completada
+      setMissionCompleted(true);
+
     } catch (error) {
-      console.error('Error completing mission:', error);
-      Alert.alert(
-        'Error',
-        'No se pudo completar la misión. Por favor, intenta de nuevo.'
-      );
+      console.error('Error al completar la misión:', error);
+      Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
+      setMissionCompleted(false);
+    } finally {
+      setCompletingMission(false);
     }
   };
 
-  const handleMissionComplete = (missionId: string) => {
-    handleCompleteMission(missionId);
-    dispatch(dispatchCompleteMission(missionId));
-  };
+  useEffect(() => {
+    if (missionCompleted) {
+      // Si la misión se completó, programar la navegación al diario
+      const timer = setTimeout(() => {
+        setMissionCompleted(false);
+        navigation.navigate('Journal', { refresh: true });
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [missionCompleted, navigation]);
 
   if (loading) {
     return (
@@ -357,17 +424,9 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-        style={styles.retryButton}
-        onPress={() => {
-          if (user?.id) {
-            fetchMissions(user.id, setCityMissions, setMissions, setError, setLoading);
-          }
-        }}
-      >
-        <Text style={styles.retryButtonText}>Reintentar</Text>
-      </TouchableOpacity>
-
+        <TouchableOpacity style={styles.retryButton} onPress={fetchMissions}>
+          <Text style={styles.retryButtonText}>Reintentar</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -379,32 +438,23 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
           <Text style={styles.title}>Tus Ciudades</Text>
           <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
         </View>
-        <FlatList
-          data={Object.entries(cityMissions)}
-          keyExtractor={([cityName]) => cityName}
-          numColumns={numColumns}
-          columnWrapperStyle={{ justifyContent: 'flex-start' }}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          renderItem={({ item }) => {
-            const [cityName, missions] = item;
-            return (
-              <View style={{ width: cardWidth, margin: cardMargin }}>
-                <CityCard
-                  cityName={cityName}
-                  totalMissions={missions.completed.length + missions.pending.length + missions.expired.length}
-                  completedMissions={missions.completed.length}
-                  expiredMissions={missions.expired.length}
-                  onPress={() => setSelectedCity(cityName)}
-                />
-              </View>
-            );
-          }}
-        />
+        <ScrollView style={styles.citiesList}>
+          {Object.entries(missions).map(([cityName, missions]) => (
+            <CityCard
+              key={cityName}
+              cityName={cityName}
+              totalMissions={missions.completed.length + missions.pending.length}
+              completedMissions={missions.completed.length}
+              expiredMissions={missions.expired.length}
+              onPress={() => setSelectedCity(cityName)}
+            />
+          ))}
+        </ScrollView>
       </View>
     );
   }
 
-  const cityData = cityMissions[selectedCity];
+  const cityData = missions[selectedCity];
 
   return (
     <View style={styles.container}>
@@ -429,7 +479,7 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
               <MissionCard
                 key={mission.id}
                 mission={mission}
-                onComplete={() => handleMissionComplete(mission.id)}
+                onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
               />
             ))}
           </>
@@ -469,6 +519,21 @@ const MissionsScreen = ({ route }: MissionsScreenProps) => {
           </>
         )}
       </ScrollView>
+
+      {/* Modal de misión completada */}
+      <MissionCompletedModal
+        visible={missionCompleted}
+        missionInfo={completedMissionInfo}
+        onFinished={() => {
+          setMissionCompleted(false);
+          navigation.navigate('Journal', { refresh: true });
+        }}
+      />
+      
+      {/* Modal de carga durante el proceso */}
+      <CompletingMissionModal
+        visible={completingMission && !missionCompleted}
+      />
     </View>
   );
 };
@@ -477,19 +542,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: colors.backgroundGradient[1],
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 45,
-    paddingHorizontal: 20,
-  },
-  logoContainer: {
-    position: 'absolute',
-    top: 20,
-    left: 10,
+    marginBottom: 20,
   },
   backButton: {
     flexDirection: 'row',
@@ -510,7 +569,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.backgroundGradient[1],
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 10,
@@ -520,12 +579,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.backgroundGradient[1],
+    backgroundColor: '#f5f5f5',
   },
   errorText: {
-    color: colors.danger,
+    color: 'red',
     textAlign: 'center',
-    padding: 16,
+    padding: 20,
   },
   title: {
     fontSize: 24,
@@ -539,6 +598,20 @@ const styles = StyleSheet.create({
   },
   citiesList: {
     flex: 1,
+  },
+  cityCard: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   cityCardContent: {
     flexDirection: 'row',
@@ -555,40 +628,19 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 5,
   },
-  missionCountContainer: {
-    flexDirection: 'column',
-  },
   missionCount: {
     fontSize: 14,
     color: '#666',
-  },
-  expiredCount: {
-    fontSize: 14,
-    color: '#f44336',
-    marginTop: 2,
   },
   progressBar: {
     height: 4,
     backgroundColor: '#E0E0E0',
     borderRadius: 2,
     overflow: 'hidden',
-    position: 'relative',
   },
-  progressFillCompleted: {
+  progressFill: {
     height: '100%',
     backgroundColor: '#4CAF50',
-    position: 'absolute',
-    left: 0,
-  },
-  progressFillExpired: {
-    height: '100%',
-    backgroundColor: '#f44336',
-    position: 'absolute',
-  },
-  progressFillPending: {
-    height: '100%',
-    backgroundColor: '#FFA000',
-    position: 'absolute',
   },
   missionsList: {
     flex: 1,
@@ -643,9 +695,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
   },
-  badgeContainer: {
-    alignItems: 'flex-end',
-  },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -653,6 +702,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  badgeContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
   },
   cardDescription: {
     color: '#666',
@@ -694,37 +747,21 @@ const styles = StyleSheet.create({
   expiredTime: {
     color: '#f44336',
   },
-  cityGridContainer: {
-    paddingBottom: 20,
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
   },
-  cityGridRow: {
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  cityGridItem: {
-    flex: 1,
-    marginHorizontal: 5,
-    minWidth: 160,
-    maxWidth: 240,
-  },
-  cityCard: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
-    height: 150, // por ejemplo
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  
 });
 
+const MissionsScreen = (props: any) => {
+  return <MissionsScreenComponent {...props} />;
+};
 
 export default MissionsScreen; 

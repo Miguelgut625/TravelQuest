@@ -8,10 +8,11 @@ export interface Challenge {
 
 export interface JourneyMission {
   id: string;
+  challengeId: string;
   completed: boolean;
-  userId: string; // ✅ Añadido
+  title: string;
+  description: string;
+  points: number;
   cityName: string;
-  start_date: string;
-  end_date: string;
-  challenge: Challenge; // ✅ Usar el tipo ya definido
-}
+  challenge: Challenge;
+} 

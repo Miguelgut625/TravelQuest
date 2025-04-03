@@ -17,6 +17,45 @@ interface Journey {
   id: string;
 }
 
+// Función para verificar y crear usuario si no existe
+const getOrCreateUser = async (userId: string) => {
+  try {
+    // Verificar si el usuario existe
+    const { data: existingUser, error: searchError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (searchError && searchError.code !== 'PGRST116') {
+      throw searchError;
+    }
+
+    if (existingUser) {
+      return existingUser.id;
+    }
+
+    // Si no existe, crear el usuario
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert([{
+        id: userId,
+        email: `${userId}@temp.com`, // Email temporal
+        username: `user_${userId.slice(0, 8)}`, // Username temporal
+        password: 'temp_password' // Contraseña temporal
+      }])
+      .select('id')
+      .single();
+
+    if (insertError) throw insertError;
+
+    return newUser.id;
+  } catch (error) {
+    console.error('Error al obtener/crear el usuario:', error);
+    throw error;
+  }
+};
+
 // Función para obtener o crear una ciudad
 const getOrCreateCity = async (cityName: string) => {
   try {
@@ -43,7 +82,7 @@ const getOrCreateCity = async (cityName: string) => {
       .single();
 
     if (insertError) throw insertError;
-    
+
     return newCity.id;
   } catch (error) {
     console.error('Error al obtener/crear la ciudad:', error);
@@ -112,10 +151,49 @@ const getExistingChallenges = async (cityId: string, count: number, userId: stri
   }
 };
 
-const generateMission = async (cityName: string, duration: number, missionCount: number, userId: string) => {
+export const generateMission = async (
+  cityName: string, 
+  duration: number, 
+  missionCount: number, 
+  userId: string,
+  startDate: Date | null,
+  endDate: Date | null
+) => {
   try {
+    console.log('generateMission recibió fechas:', {
+      startDate,
+      endDate,
+      duration
+    });
+    
+    // Crear fechas por defecto si no se proporcionan
+    const validStartDate = startDate instanceof Date ? startDate : new Date();
+    const validEndDate = endDate instanceof Date ? endDate : new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
+    
+    // Convertir a ISO string para la base de datos
+    const startIsoString = validStartDate.toISOString();
+    const endIsoString = validEndDate.toISOString();
+    
+    console.log('Fechas validadas para misiones:', {
+      startIsoString,
+      endIsoString
+    });
+    
+    console.log('Iniciando generación de misión:', { 
+      cityName, 
+      duration, 
+      missionCount, 
+      userId,
+      startDate,
+      endDate 
+    });
+
+    // Verificar y crear usuario si no existe
+    await getOrCreateUser(userId);
+
     // Obtener o crear la ciudad
     const cityId = await getOrCreateCity(cityName);
+    console.log('CityId obtenido/creado:', cityId);
 
     // Crear un nuevo journey
     const { data: journey, error: journeyError } = await supabase
@@ -123,15 +201,24 @@ const generateMission = async (cityName: string, duration: number, missionCount:
       .insert([{
         userId,
         cityId,
-        description: `Viaje a ${cityName} por ${duration} días`
+        description: `Viaje a ${cityName} por ${duration} días`,
+        created_at: new Date().toISOString(),
+        start_date: startIsoString,
+        end_date: endIsoString
       }])
       .select('id')
       .single();
 
-    if (journeyError) throw journeyError;
+    if (journeyError) {
+      console.error('Error creando journey:', journeyError);
+      throw journeyError;
+    }
+
+    console.log('Journey creado:', journey);
 
     // Verificar si hay suficientes desafíos existentes que el usuario no haya solicitado
     const existingChallenges = await getExistingChallenges(cityId, missionCount, userId);
+    console.log('Desafíos existentes encontrados:', existingChallenges);
 
     let challenges;
     if (existingChallenges && existingChallenges.length > 0) {
@@ -156,7 +243,8 @@ const generateMission = async (cityName: string, duration: number, missionCount:
   ]
 }
 Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No incluyas explicaciones adicionales, solo el JSON.`;
-
+      
+      console.log('Prompt:', prompt);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const missionsData = response.text();
@@ -190,7 +278,7 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
         .select('id');
 
       if (challengesError) throw challengesError;
-      
+
       challenges = newChallenges;
     }
 
@@ -198,19 +286,57 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
     const journeyMissions = challenges.map((challenge: { id: string }) => ({
       journeyId: journey.id,
       challengeId: challenge.id,
-      completed: false
+      completed: false,
+      created_at: new Date().toISOString(),
+      start_date: startIsoString,
+      end_date: endIsoString
     }));
+
+    console.log('Vincular misiones al journey:', journeyMissions);
 
     const { error: linkError } = await supabase
       .from('journeys_missions')
       .insert(journeyMissions);
 
-    if (linkError) throw linkError;
+    if (linkError) {
+      console.error('Error vinculando misiones:', linkError);
+      throw linkError;
+    }
 
-    console.log('Journey y desafíos creados exitosamente');
-    return { journeyId: journey.id, challenges };
+    // Verificar que las misiones se hayan creado correctamente
+    const { data: createdMissions, error: verifyError } = await supabase
+      .from('journeys_missions')
+      .select(`
+        id,
+        challengeId,
+        completed,
+        challenge:challenges (
+        title,
+        description,
+        difficulty,
+          points
+        )
+      `)
+      .eq('journeyId', journey.id)
+      .order('created_at', { ascending: true });
+
+    if (verifyError) {
+      console.error('Error verificando misiones creadas:', verifyError);
+      throw verifyError;
+    }
+
+    if (!createdMissions || createdMissions.length === 0) {
+      throw new Error('No se pudieron crear las misiones');
+    }
+
+    console.log('Misiones creadas verificadas:', createdMissions);
+
+    return {
+      journeyId: journey.id,
+      challenges: createdMissions
+    };
   } catch (error) {
-    console.error('Error generando desafíos:', error);
+    console.error('Error generando misiones:', error);
     throw error;
   }
 };
