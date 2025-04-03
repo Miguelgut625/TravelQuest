@@ -51,6 +51,9 @@ const ProfileScreen = () => {
   const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
   const [isRequestsVisible, setIsRequestsVisible] = useState(false);
   const [username, setUsername] = useState('');
+  const [level, setLevel] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [xpNext, setXpNext] = useState(0);
 
   useEffect(() => {
     fetchUserStats();
@@ -100,6 +103,19 @@ const ProfileScreen = () => {
           }
         });
       });
+
+      // Aquí deberías obtener el nivel, xp y xp_next del usuario
+      const userStats = await supabase
+        .from('users')
+        .select('level, xp, xp_next')
+        .eq('id', user.id)
+        .single();
+
+      if (userStats.error) throw userStats.error;
+
+      setLevel(userStats.data.level);
+      setXp(userStats.data.xp);
+      setXpNext(userStats.data.xp_next);
 
       setStats({
         totalPoints: stats.totalPoints,
@@ -454,6 +470,15 @@ const ProfileScreen = () => {
             </View>
           </>
         )}
+      </View>
+
+      {/* Nueva sección para el nivel y la XP */}
+      <View style={styles.levelContainer}>
+        <Text style={styles.levelTitle}>Nivel: {level}</Text>
+        <Text style={styles.xpTitle}>XP: {xp} / {xpNext}</Text>
+        <View style={styles.progressBar}>
+          <View style={{ width: `${(xp / xpNext) * 100}%`, backgroundColor: '#4CAF50', height: '100%' }} />
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -910,6 +935,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#666',
     marginBottom: 10,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#ddd',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginTop: 5,
+    width: '100%',
+  },
+  levelContainer: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+    alignItems: 'center',
+  },
+  levelTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  xpTitle: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 
