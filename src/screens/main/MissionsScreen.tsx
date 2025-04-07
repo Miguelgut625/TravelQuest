@@ -69,6 +69,11 @@ interface Journey {
   }[];
 }
 
+interface SharedJourney {
+  journeyId: string;
+  journeys: Journey;
+}
+
 const getTimeRemaining = (endDate: string) => {
   const now = new Date();
   const end = new Date(endDate);
@@ -222,7 +227,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     }
 
     try {
-      const { data: journeys, error: journeysError } = await supabase
+      // Primero obtenemos los journeys propios del usuario
+      const { data: ownJourneys, error: ownJourneysError } = await supabase
         .from('journeys')
         .select(`
           id,
@@ -245,18 +251,54 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             )
           )
         `)
-        .eq('userId', user.id)
-        .order('created_at', { ascending: false });
+        .eq('userId', user.id);
 
-      if (journeysError) throw journeysError;
+      if (ownJourneysError) throw ownJourneysError;
 
-      if (!journeys || journeys.length === 0) {
+      // Luego obtenemos los journeys compartidos con el usuario
+      const { data: sharedJourneys, error: sharedJourneysError } = await supabase
+        .from('journeys_shared')
+        .select(`
+          journeyId,
+          journeys:journeyId (
+            id,
+            description,
+            created_at,
+            cities (
+              name
+            ),
+            journeys_missions!inner (
+              id,
+              completed,
+              challengeId,
+              end_date,
+              challenges!inner (
+                id,
+                title,
+                description,
+                difficulty,
+                points
+              )
+            )
+          )
+        `)
+        .eq('sharedWithUserId', user.id);
+
+      if (sharedJourneysError) throw sharedJourneysError;
+
+      // Combinamos los journeys propios y compartidos
+      const allJourneys = [
+        ...(ownJourneys || []),
+        ...(sharedJourneys?.map((sj: SharedJourney) => sj.journeys) || [])
+      ];
+
+      if (!allJourneys || allJourneys.length === 0) {
         setError('No hay viajes disponibles');
         setLoading(false);
         return;
       }
 
-      const allMissions = journeys.flatMap((journey: Journey) =>
+      const allMissions = allJourneys.flatMap((journey: Journey) =>
         journey.journeys_missions.map((jm) => ({
           id: jm.id,
           completed: jm.completed,
@@ -284,7 +326,12 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         if (mission.completed) {
           missionsByCity[mission.cityName].completed.push(mission);
         } else {
-          missionsByCity[mission.cityName].pending.push(mission);
+          const timeRemaining = getTimeRemaining(mission.end_date);
+          if (timeRemaining.isExpired) {
+            missionsByCity[mission.cityName].expired.push(mission);
+          } else {
+            missionsByCity[mission.cityName].pending.push(mission);
+          }
         }
       });
 
@@ -330,18 +377,20 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       let foundMissionTitle = '';
       let foundMissionPoints = 0;
       let foundCityName = '';
+      let foundMission: JourneyMission | null = null;
 
       Object.keys(missions).forEach((cityName) => {
         const pending = missions[cityName].pending;
-        const foundMission = pending.find((m) => m.id === missionId);
-        if (foundMission) {
-          foundMissionTitle = foundMission.challenge.title;
-          foundMissionPoints = foundMission.challenge.points;
+        const mission = pending.find((m) => m.id === missionId);
+        if (mission) {
+          foundMissionTitle = mission.challenge.title;
+          foundMissionPoints = mission.challenge.points;
           foundCityName = cityName;
+          foundMission = mission;
         }
       });
 
-      if (!foundMissionTitle || !foundCityName) {
+      if (!foundMissionTitle || !foundCityName || !foundMission) {
         throw new Error('Misión no encontrada');
       }
 
@@ -381,18 +430,15 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         const updatedMissions = { ...prev };
         const city = updatedMissions[foundCityName];
 
-        // Encontrar el índice de la misión en las pendientes
-        const index = city.pending.findIndex((m) => m.id === missionId);
-
-        if (index !== -1) {
-          // Obtener la misión y marcarla como completada
-          const mission = { ...city.pending[index], completed: true };
-
-          // Eliminar la misión de pendientes
-          city.pending.splice(index, 1);
-
-          // Añadir la misión a completadas
-          city.completed.push(mission);
+        // Encontrar y eliminar la misión de pendientes
+        const pendingIndex = city.pending.findIndex((m) => m.id === missionId);
+        if (pendingIndex !== -1) {
+          const completedMission = {
+            ...city.pending[pendingIndex],
+            completed: true
+          };
+          city.pending.splice(pendingIndex, 1);
+          city.completed.push(completedMission);
         }
 
         return updatedMissions;
@@ -407,6 +453,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       // Mostrar el modal de misión completada
       setMissionCompleted(true);
+
+      // Recargar las misiones para asegurar que el estado está actualizado
+      await fetchMissions();
 
     } catch (error) {
       console.error('Error al completar la misión:', error);
