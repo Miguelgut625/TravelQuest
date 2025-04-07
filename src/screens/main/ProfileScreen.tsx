@@ -62,6 +62,15 @@ const ProfileScreen = () => {
     try {
       setLoadingStats(true);
 
+      // Obtener los puntos del usuario
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('points')
+        .eq('id', user.id)
+        .single();
+
+      if (userError) throw userError;
+
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
@@ -81,22 +90,21 @@ const ProfileScreen = () => {
 
       // Calcular estadísticas
       const stats = {
-        totalPoints: 0,
+        totalPoints: userData?.points || 0,
         completedMissions: 0,
-        visitedCities: 0
+        visitedCities: new Set<string>()
       };
 
       (journeys as Journey[])?.forEach((journey: Journey) => {
-        // Añadir la ciudad a las visitadas
+        // Añadir la ciudad al Set de ciudades visitadas
         if (journey.cityId) {
-          stats.visitedCities++;
+          stats.visitedCities.add(journey.cityId);
         }
 
-        // Contar misiones completadas y puntos
+        // Contar misiones completadas
         journey.journeys_missions.forEach((mission: JourneyMission) => {
           if (mission.completed) {
             stats.completedMissions++;
-            stats.totalPoints += mission.challenges.points;
           }
         });
       });
@@ -104,7 +112,7 @@ const ProfileScreen = () => {
       setStats({
         totalPoints: stats.totalPoints,
         completedMissions: stats.completedMissions,
-        visitedCities: stats.visitedCities
+        visitedCities: stats.visitedCities.size
       });
 
     } catch (error) {
@@ -387,13 +395,13 @@ const ProfileScreen = () => {
   const fetchPendingRequests = async () => {
     try {
       const { data, error } = await supabase
-      .from('friendship_invitations')
-      .select(`
+        .from('friendship_invitations')
+        .select(`
         id, senderId, created_at, receiverId, status,
         users:senderId (username)
       `)
-      .eq('receiverId', user?.id)
-      .eq('status', 'Pending');
+        .eq('receiverId', user?.id)
+        .eq('status', 'Pending');
 
       if (error) throw error;
       console.log('Solicitudes pendientes obtenidas:', user?.id);
