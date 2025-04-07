@@ -25,7 +25,7 @@ interface JourneyMission {
 
 interface FriendshipRequest {
   id: string;
-  sender: {
+  users: {
     username: string;
   };
 }
@@ -57,7 +57,78 @@ const ProfileScreen = () => {
 
   useEffect(() => {
     fetchUserStats();
-  }, [user?.id]);
+    
+    // Suscripción a cambios en journeys del usuario
+    const journeysSubscription = supabase
+      .channel('journeys-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'journeys',
+          filter: `userId=eq.${user?.id}`
+        },
+        () => fetchUserStats()
+      )
+      .subscribe();
+      
+    // Suscripción a cambios en las misiones del usuario
+    const missionsSubscription = supabase
+      .channel('journeys-missions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'journeys_missions'
+        },
+        () => fetchUserStats()
+      )
+      .subscribe();
+      
+    // Suscripción a cambios en el usuario (nivel, xp)
+    const userStatsSubscription = supabase
+      .channel('user-stats-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${user?.id}`
+        },
+        () => fetchUserStats()
+      )
+      .subscribe();
+      
+    // Suscripción a cambios en solicitudes de amistad
+    const friendshipSubscription = supabase
+      .channel('friendship-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendship_invitations',
+          filter: `receiverId=eq.${user?.id}`
+        },
+        () => {
+          if (isRequestsVisible) {
+            fetchPendingRequests().then(requests => setFriendshipRequests(requests));
+          }
+        }
+      )
+      .subscribe();
+    
+    // Limpieza de suscripciones
+    return () => {
+      journeysSubscription.unsubscribe();
+      missionsSubscription.unsubscribe();
+      userStatsSubscription.unsubscribe();
+      friendshipSubscription.unsubscribe();
+    };
+  }, [user?.id, isRequestsVisible]);
 
   const fetchUserStats = async () => {
     if (!user?.id) return;
@@ -68,16 +139,7 @@ const ProfileScreen = () => {
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
-        .select(`
-          id,
-          cityId,
-          journeys_missions!inner (
-            completed,
-            challenges!inner (
-              points
-            )
-          )
-        `)
+        .select(`id, cityId, journeys_missions!inner (completed, challenges!inner (points))`)
         .eq('userId', user.id);
 
       if (journeysError) throw journeysError;
@@ -90,12 +152,10 @@ const ProfileScreen = () => {
       };
 
       (journeys as Journey[])?.forEach((journey: Journey) => {
-        // Añadir la ciudad a las visitadas
         if (journey.cityId) {
           stats.visitedCities++;
         }
 
-        // Contar misiones completadas y puntos
         journey.journeys_missions.forEach((mission: JourneyMission) => {
           if (mission.completed) {
             stats.completedMissions++;
@@ -104,7 +164,7 @@ const ProfileScreen = () => {
         });
       });
 
-      // Aquí deberías obtener el nivel, xp y xp_next del usuario
+      // Obtener el nivel, xp y xp_next del usuario
       const userStats = await supabase
         .from('users')
         .select('level, xp, xp_next')
