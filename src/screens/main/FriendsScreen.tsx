@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
-import { supabase } from '../../services/supabase'; // Asegúrate de que la ruta sea correcta
+import { supabase } from '../../services/supabase'; 
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 
 interface Friend {
-  user2Id: string; // ID del amigo
-  username: string; // Nombre del amigo
-  points: number; // Puntos del amigo
+  user2Id: string; 
+  username: string; 
+  points: number; 
 }
 
 const FriendsScreen = () => {
@@ -37,7 +37,7 @@ const FriendsScreen = () => {
             const { data: userData, error: userError } = await supabase
               .from('users')
               .select('username, points')
-              .eq('id', friend.user2Id) // Asegúrate de que el ID sea correcto
+              .eq('id', friend.user2Id) 
               .single();
 
             if (userError) {
@@ -78,7 +78,7 @@ const FriendsScreen = () => {
       <Text style={styles.title}>Lista de Amigos</Text>
       <FlatList
         data={friends}
-        keyExtractor={(item) => item.user2Id.toString()} // Asegúrate de que user2Id sea único
+        keyExtractor={(item) => item.user2Id.toString()} 
         renderItem={({ item }) => (
           <View style={styles.friendItem}>
             <Text style={styles.friendName}>{item.username}</Text>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f9f9f9', // Color de fondo
+    backgroundColor: '#f9f9f9', 
   },
   title: {
     fontSize: 24,
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     padding: 15,
     marginVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#ffffff', // Color de fondo de cada amigo
+    backgroundColor: '#ffffff', 
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
-    elevation: 2, // Sombra para Android
+    elevation: 2, 
   },
   friendName: {
     fontSize: 18,
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   friendPoints: {
     fontSize: 16,
-    color: '#666', // Color gris para los puntos
+    color: '#666', 
   },
 });
 
