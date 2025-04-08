@@ -207,6 +207,15 @@ const ProfileScreen = () => {
       setLoadingStats(true);
       console.log('Obteniendo estadísticas actualizadas...');
 
+      // Obtener los puntos del usuario
+      const { data: userPointsData, error: userPointsError } = await supabase
+        .from('users')
+        .select('points')
+        .eq('id', user.id)
+        .single();
+
+      if (userPointsError) throw userPointsError;
+
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
@@ -222,15 +231,16 @@ const ProfileScreen = () => {
 
       // Calcular estadísticas
       const stats = {
-        totalPoints: 0,
+        totalPoints: userPointsData?.points || 0,
         completedMissions: 0,
-        visitedCities: 0
+        visitedCities: new Set<string>()
       };
 
       if (journeys && journeys.length > 0) {
         (journeys as Journey[]).forEach((journey: Journey) => {
+          // Añadir la ciudad al Set de ciudades visitadas
           if (journey.cityId) {
-            stats.visitedCities++;
+            stats.visitedCities.add(journey.cityId);
           }
 
           if (journey.journeys_missions && journey.journeys_missions.length > 0) {
@@ -267,7 +277,7 @@ const ProfileScreen = () => {
       setStats({
         totalPoints: stats.totalPoints,
         completedMissions: stats.completedMissions,
-        visitedCities: stats.visitedCities
+        visitedCities: stats.visitedCities.size
       });
 
       console.log('Estadísticas actualizadas correctamente');
@@ -555,13 +565,13 @@ const ProfileScreen = () => {
   const fetchPendingRequests = async () => {
     try {
       const { data, error } = await supabase
-      .from('friendship_invitations')
-      .select(`
+        .from('friendship_invitations')
+        .select(`
         id, senderId, created_at, receiverId, status,
         users:senderId (username)
       `)
-      .eq('receiverId', user?.id)
-      .eq('status', 'Pending');
+        .eq('receiverId', user?.id)
+        .eq('status', 'Pending');
 
       if (error) throw error;
       console.log('Solicitudes pendientes obtenidas:', user?.id);
