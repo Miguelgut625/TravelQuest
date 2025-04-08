@@ -25,7 +25,7 @@ interface JourneyMission {
 
 interface FriendshipRequest {
   id: string;
-  sender: {
+  users: {
     username: string;
   };
 }
@@ -51,33 +51,133 @@ const ProfileScreen = () => {
   const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
   const [isRequestsVisible, setIsRequestsVisible] = useState(false);
   const [username, setUsername] = useState('');
+  const [level, setLevel] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [xpNext, setXpNext] = useState(0);
 
   useEffect(() => {
     fetchUserStats();
-  }, [user?.id]);
+    
+    // Suscripción a cambios en journeys del usuario
+    const journeysSubscription = supabase
+      .channel('journeys-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'journeys',
+          filter: `userId=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('Cambio detectado en journeys:', payload);
+          fetchUserStats();
+        }
+      )
+      .subscribe();
+      
+    // Suscripción a cambios en las misiones del usuario
+    const missionsSubscription = supabase
+      .channel('journeys-missions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'journeys_missions'
+        },
+        (payload) => {
+          console.log('Cambio detectado en misiones:', payload);
+          fetchUserStats();
+        }
+      )
+      .subscribe();
+      
+    // Suscripción a cambios en challenges
+    const challengesSubscription = supabase
+      .channel('challenges-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'challenges'
+        },
+        (payload) => {
+          console.log('Cambio detectado en challenges:', payload);
+          fetchUserStats();
+        }
+      )
+      .subscribe();
+      
+    // Suscripción a cambios en el usuario (nivel, xp)
+    const userStatsSubscription = supabase
+      .channel('user-stats-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('Cambio detectado en stats de usuario:', payload);
+          fetchUserStats();
+        }
+      )
+      .subscribe();
+      
+    // Suscripción a cambios en solicitudes de amistad
+    const friendshipSubscription = supabase
+      .channel('friendship-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friendship_invitations',
+          filter: `receiverId=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('Cambio detectado en solicitudes de amistad:', payload);
+          if (isRequestsVisible) {
+            fetchPendingRequests().then(requests => setFriendshipRequests(requests));
+          }
+        }
+      )
+      .subscribe();
+    
+    // Limpieza de suscripciones
+    return () => {
+      console.log('Limpiando suscripciones de tiempo real');
+      journeysSubscription.unsubscribe();
+      missionsSubscription.unsubscribe();
+      challengesSubscription.unsubscribe();
+      userStatsSubscription.unsubscribe();
+      friendshipSubscription.unsubscribe();
+    };
+  }, [user?.id, isRequestsVisible]);
 
   const fetchUserStats = async () => {
     if (!user?.id) return;
 
     try {
       setLoadingStats(true);
+      console.log('Obteniendo estadísticas actualizadas...');
 
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
-        .select(`
-          id,
-          cityId,
-          journeys_missions!inner (
-            completed,
-            challenges!inner (
-              points
-            )
-          )
-        `)
+        .select(`id, cityId, journeys_missions!inner (completed, challenges!inner (points))`)
         .eq('userId', user.id);
 
-      if (journeysError) throw journeysError;
+      if (journeysError) {
+        console.error('Error al obtener journeys:', journeysError);
+        throw journeysError;
+      }
+
+      console.log('Journeys obtenidos:', journeys);
 
       // Calcular estadísticas
       const stats = {
@@ -86,26 +186,50 @@ const ProfileScreen = () => {
         visitedCities: 0
       };
 
-      (journeys as Journey[])?.forEach((journey: Journey) => {
-        // Añadir la ciudad a las visitadas
-        if (journey.cityId) {
-          stats.visitedCities++;
-        }
+      if (journeys && journeys.length > 0) {
+        (journeys as Journey[]).forEach((journey: Journey) => {
+          if (journey.cityId) {
+            stats.visitedCities++;
+          }
 
-        // Contar misiones completadas y puntos
-        journey.journeys_missions.forEach((mission: JourneyMission) => {
-          if (mission.completed) {
-            stats.completedMissions++;
-            stats.totalPoints += mission.challenges.points;
+          if (journey.journeys_missions && journey.journeys_missions.length > 0) {
+            journey.journeys_missions.forEach((mission: JourneyMission) => {
+              if (mission.completed) {
+                stats.completedMissions++;
+                stats.totalPoints += mission.challenges.points || 0;
+              }
+            });
           }
         });
-      });
+      }
+
+      console.log('Estadísticas calculadas:', stats);
+
+      // Obtener el nivel, xp y xp_next del usuario
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('level, xp, xp_next')
+        .eq('id', user.id)
+        .single();
+
+      if (userError) {
+        console.error('Error al obtener datos del usuario:', userError);
+        throw userError;
+      }
+
+      console.log('Datos de usuario obtenidos:', userData);
+
+      setLevel(userData.level || 0);
+      setXp(userData.xp || 0);
+      setXpNext(userData.xp_next || 100);
 
       setStats({
         totalPoints: stats.totalPoints,
         completedMissions: stats.completedMissions,
         visitedCities: stats.visitedCities
       });
+
+      console.log('Estadísticas actualizadas correctamente');
 
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
@@ -221,7 +345,7 @@ const ProfileScreen = () => {
         setTimeout(() => {
           setIsChangePasswordVisible(false);
           setMessage({ type: '', text: '' });
-        }, 2000);
+        }, 2000)
 
         return;
       }
@@ -338,7 +462,10 @@ const ProfileScreen = () => {
         .eq('username', username)
         .single();
 
-      if (userError) throw userError;
+      if (userError) {
+        alert('No se encontró el usuario');
+        return;
+      }
 
       const receiverId = receiver.id;
 
@@ -454,6 +581,15 @@ const ProfileScreen = () => {
             </View>
           </>
         )}
+      </View>
+
+      {/* Nueva sección para el nivel y la XP */}
+      <View style={styles.levelContainer}>
+        <Text style={styles.levelTitle}>Nivel: {level}</Text>
+        <Text style={styles.xpTitle}>XP: {xp} / {xpNext}</Text>
+        <View style={styles.progressBar}>
+          <View style={{ width: `${(xp / xpNext) * 100}%`, backgroundColor: '#4CAF50', height: '100%' }} />
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -910,6 +1046,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#666',
     marginBottom: 10,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#ddd',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginTop: 5,
+    width: '100%',
+  },
+  levelContainer: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+    alignItems: 'center',
+  },
+  levelTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  xpTitle: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 
