@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Aler
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState } from '../../features/authSlice';
-import { supabase } from '../../services/supabase';
+import { supabase, ensureValidSession } from '../../services/supabase';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -58,111 +58,152 @@ const ProfileScreen = () => {
   useEffect(() => {
     fetchUserStats();
     
-    // Suscripción a cambios en journeys del usuario
-    const journeysSubscription = supabase
-      .channel('journeys-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'journeys',
-          filter: `userId=eq.${user?.id}`
-        },
-        (payload) => {
-          console.log('Cambio detectado en journeys:', payload);
-          fetchUserStats();
+    // Verificar sesión válida para las suscripciones
+    const setupRealtime = async () => {
+      try {
+        const { valid, session, error } = await ensureValidSession();
+        if (!valid) {
+          console.error('Sesión inválida para suscripciones en tiempo real:', error);
+          Alert.alert('Error de sesión', 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+          dispatch(logout());
+          return;
         }
-      )
-      .subscribe();
-      
-    // Suscripción a cambios en las misiones del usuario
-    const missionsSubscription = supabase
-      .channel('journeys-missions-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'journeys_missions'
-        },
-        (payload) => {
-          console.log('Cambio detectado en misiones:', payload);
-          fetchUserStats();
-        }
-      )
-      .subscribe();
-      
-    // Suscripción a cambios en challenges
-    const challengesSubscription = supabase
-      .channel('challenges-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'challenges'
-        },
-        (payload) => {
-          console.log('Cambio detectado en challenges:', payload);
-          fetchUserStats();
-        }
-      )
-      .subscribe();
-      
-    // Suscripción a cambios en el usuario (nivel, xp)
-    const userStatsSubscription = supabase
-      .channel('user-stats-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'users',
-          filter: `id=eq.${user?.id}`
-        },
-        (payload) => {
-          console.log('Cambio detectado en stats de usuario:', payload);
-          fetchUserStats();
-        }
-      )
-      .subscribe();
-      
-    // Suscripción a cambios en solicitudes de amistad
-    const friendshipSubscription = supabase
-      .channel('friendship-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friendship_invitations',
-          filter: `receiverId=eq.${user?.id}`
-        },
-        (payload) => {
-          console.log('Cambio detectado en solicitudes de amistad:', payload);
-          if (isRequestsVisible) {
-            fetchPendingRequests().then(requests => setFriendshipRequests(requests));
-          }
-        }
-      )
-      .subscribe();
-    
-    // Limpieza de suscripciones
-    return () => {
-      console.log('Limpiando suscripciones de tiempo real');
-      journeysSubscription.unsubscribe();
-      missionsSubscription.unsubscribe();
-      challengesSubscription.unsubscribe();
-      userStatsSubscription.unsubscribe();
-      friendshipSubscription.unsubscribe();
+        
+        // Suscripción a cambios en journeys del usuario
+        const journeysSubscription = supabase
+          .channel('journeys-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'journeys',
+              filter: `userId=eq.${user?.id}`
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en journeys:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en las misiones del usuario
+        const missionsSubscription = supabase
+          .channel('journeys-missions-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'journeys_missions'
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en misiones:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en challenges
+        const challengesSubscription = supabase
+          .channel('challenges-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'challenges'
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en challenges:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en el usuario (nivel, xp)
+        const userStatsSubscription = supabase
+          .channel('user-stats-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'users',
+              filter: `id=eq.${user?.id}`
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en stats de usuario:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en solicitudes de amistad
+        const friendshipSubscription = supabase
+          .channel('friendship-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'friendship_invitations',
+              filter: `receiverId=eq.${user?.id}`
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en solicitudes de amistad:', payload);
+              if (isRequestsVisible) {
+                fetchPendingRequests().then(requests => setFriendshipRequests(requests));
+              }
+            }
+          )
+          .subscribe();
+        
+        // Limpieza de suscripciones
+        return () => {
+          console.log('Limpiando suscripciones de tiempo real');
+          journeysSubscription.unsubscribe();
+          missionsSubscription.unsubscribe();
+          challengesSubscription.unsubscribe();
+          userStatsSubscription.unsubscribe();
+          friendshipSubscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Error configurando suscripciones en tiempo real:', error);
+      }
     };
-  }, [user?.id, isRequestsVisible]);
+    
+    const cleanupFn = setupRealtime();
+    
+    return () => {
+      if (cleanupFn && typeof cleanupFn.then === 'function') {
+        cleanupFn.then(cleanup => {
+          if (cleanup && typeof cleanup === 'function') {
+            cleanup();
+          }
+        });
+      }
+    };
+  }, [user?.id, isRequestsVisible, dispatch]);
 
   const fetchUserStats = async () => {
     if (!user?.id) return;
 
     try {
+      // Verificar sesión válida antes de obtener estadísticas
+      const { valid, error: sessionError } = await ensureValidSession();
+      if (!valid) {
+        console.error('Sesión inválida para obtener estadísticas:', sessionError);
+        Alert.alert('Error de sesión', 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        dispatch(logout());
+        return;
+      }
+      
       setLoadingStats(true);
       console.log('Obteniendo estadísticas actualizadas...');
 
