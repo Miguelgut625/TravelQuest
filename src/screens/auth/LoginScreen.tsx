@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#005F9E',
   },
   formContainer: {
     flex: 1,
@@ -182,11 +182,11 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 20,
   },
   buttonText: {
     color: 'white',
@@ -198,16 +198,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   forgotPasswordText: {
-    color: '#4CAF50',
+    color: '#005F9E',
     fontSize: 14,
     textDecorationLine: 'underline',
   },
   link: {
-    color: '#4CAF50',
-    fontSize: 14,
     marginTop: 20,
-    textAlign: 'center',
-    textDecorationLine: 'underline',
+    color: '#005F9E',
+    textAlign: 'center'
   },
   errorText: {
     color: '#f44336',

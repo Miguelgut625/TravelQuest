@@ -6,13 +6,15 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getRecentConversations } from '../../services/messageService';
+import { supabase } from '../../services/supabase';
 
 interface Conversation {
   conversation_user_id: string;
@@ -23,11 +25,53 @@ interface Conversation {
 }
 
 const ConversationsScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
+
+  useEffect(() => {
+    checkUserAuth();
+  }, []);
+
+  const checkUserAuth = async () => {
+    // Verificar si el usuario está autenticado
+    if (!user) {
+      Alert.alert(
+        "No autenticado",
+        "Por favor inicia sesión para acceder a los mensajes",
+        [
+          { text: "OK", onPress: () => navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }]
+          })}
+        ]
+      );
+      return;
+    }
+
+    // Verificar si el correo electrónico está verificado
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('Error obteniendo información del usuario:', error);
+      return;
+    }
+
+    if (data && data.user && !data.user.email_confirmed_at) {
+      Alert.alert(
+        "Correo no verificado",
+        "Por favor verifica tu correo electrónico para acceder a los mensajes. Revisa tu bandeja de entrada.",
+        [
+          { text: "OK", onPress: () => navigation.navigate('VerifyEmail', { email: data.user?.email }) }
+        ]
+      );
+      return;
+    }
+
+    // Si todo está bien, cargamos las conversaciones
+    fetchConversations();
+  };
 
   const fetchConversations = async () => {
     if (!user) {
@@ -48,7 +92,9 @@ const ConversationsScreen = () => {
   };
 
   useEffect(() => {
-    fetchConversations();
+    if (user) {
+      fetchConversations();
+    }
   }, [user]);
 
   const handleRefresh = () => {

@@ -78,10 +78,39 @@ export const markMessagesAsRead = async (receiverId: string, senderId: string): 
 // Función para suscribirse a nuevos mensajes
 export const subscribeToMessages = (
   userId: string,
-  onNewMessage: (message: Message) => void
+  onNewMessage: (message: Message) => void,
+  friendId?: string
 ) => {
-  const subscription = supabase
-    .channel('messages-channel')
+  // Si tenemos un friendId, nos suscribimos a mensajes entre dos usuarios específicos
+  if (friendId) {
+    return supabase
+      .channel(`messages-channel-${userId}-${friendId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `and(or(sender_id.eq.${userId},sender_id.eq.${friendId}),or(receiver_id.eq.${userId},receiver_id.eq.${friendId}))`,
+        },
+        (payload: { new: Message }) => {
+          // Verificar que el mensaje es parte de la conversación entre estos dos usuarios
+          const newMsg = payload.new;
+          if (
+            (newMsg.sender_id === userId && newMsg.receiver_id === friendId) ||
+            (newMsg.sender_id === friendId && newMsg.receiver_id === userId)
+          ) {
+            console.log('Nuevo mensaje en conversación específica:', newMsg);
+            onNewMessage(newMsg);
+          }
+        }
+      )
+      .subscribe();
+  }
+
+  // Suscripción general a todos los mensajes donde el usuario es receptor
+  return supabase
+    .channel(`messages-channel-${userId}`)
     .on(
       'postgres_changes',
       {
@@ -91,12 +120,11 @@ export const subscribeToMessages = (
         filter: `receiver_id=eq.${userId}`,
       },
       (payload: { new: Message }) => {
+        console.log('Nuevo mensaje recibido:', payload.new);
         onNewMessage(payload.new);
       }
     )
     .subscribe();
-
-  return subscription;
 };
 
 // Función para obtener las conversaciones recientes

@@ -14,8 +14,13 @@ const theme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: '#4CAF50',
-    accent: '#03A9F4',
+    primary: '#005F9E',
+    accent: '#FFB74D',
+    background: '#F5F7FA',
+    text: '#333333',
+    placeholder: '#78909C',
+    surface: '#FFFFFF',
+    error: '#D32F2F',
   },
 };
 
@@ -71,7 +76,7 @@ const App = () => {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#005F9E" />
         <Text style={{ marginTop: 10 }}>Cargando...</Text>
       </View>
     );

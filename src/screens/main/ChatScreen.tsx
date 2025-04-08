@@ -8,7 +8,8 @@ import {
   FlatList,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -31,6 +32,82 @@ const ChatScreen = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const flatListRef = useRef<FlatList>(null);
 
+  useEffect(() => {
+    checkUserAuth();
+    
+    // Configurar el título de la pantalla con el nombre del amigo
+    navigation.setOptions({
+      title: friendName || 'Chat',
+    });
+  }, []);
+
+  // Manejador para nuevos mensajes recibidos
+  const handleNewMessage = (newMessage: Message) => {
+    if (newMessage.sender_id === friendId) {
+      setMessages((prevMessages) => [...prevMessages, newMessage]);
+      // Marcar como leído inmediatamente
+      markMessagesAsRead(user?.id || '', friendId);
+    }
+  };
+
+  const checkUserAuth = async () => {
+    // Verificar si el usuario está autenticado
+    if (!user) {
+      Alert.alert(
+        "No autenticado",
+        "Por favor inicia sesión para acceder al chat",
+        [
+          { 
+            text: "OK", 
+            onPress: () => navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }] as never[]
+            })
+          }
+        ]
+      );
+      return;
+    }
+
+    // Verificar si el correo electrónico está verificado
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('Error obteniendo información del usuario:', error);
+      return;
+    }
+
+    if (data && data.user && !data.user.email_confirmed_at) {
+      Alert.alert(
+        "Correo no verificado",
+        "Por favor verifica tu correo electrónico para acceder al chat. Revisa tu bandeja de entrada.",
+        [
+          { 
+            text: "OK", 
+            onPress: () => {
+              // @ts-ignore - Para solucionar problemas de tipado con la navegación
+              navigation.navigate('VerifyEmail', { email: data.user?.email });
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    // Si todo está bien, cargamos los mensajes y configuramos la suscripción
+    loadMessages();
+    
+    // Configurar suscripción a mensajes en tiempo real
+    // Pasamos friendId para suscribirnos específicamente a esta conversación
+    const subscription = subscribeToMessages(user.id, handleNewMessage, friendId);
+    
+    // Limpiar suscripción al desmontar
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  };
+
   // Función para cargar los mensajes
   const loadMessages = async () => {
     if (!user?.id) return;
@@ -42,29 +119,6 @@ const ChatScreen = () => {
     // Marcar mensajes como leídos
     await markMessagesAsRead(user.id, friendId);
   };
-
-  // Efecto para cargar mensajes y configurar la suscripción
-  useEffect(() => {
-    loadMessages();
-    
-    // Configurar título con el nombre del amigo
-    navigation.setOptions({
-      title: friendName,
-    });
-
-    // Suscribirse a nuevos mensajes
-    const subscription = subscribeToMessages(user?.id || '', (newMessage) => {
-      if (newMessage.sender_id === friendId) {
-        setMessages((prevMessages) => [...prevMessages, newMessage]);
-        // Marcar como leído inmediatamente
-        markMessagesAsRead(user?.id || '', friendId);
-      }
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [user?.id, friendId]);
 
   // Desplazarse al último mensaje
   useEffect(() => {
@@ -94,7 +148,7 @@ const ChatScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#005F9E" />
       </View>
     );
   }
@@ -173,58 +227,53 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     maxWidth: '80%',
-    padding: 12,
-    borderRadius: 20,
+    padding: 10,
     marginVertical: 5,
+    borderRadius: 10,
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#DCF8C6',
-    borderBottomRightRadius: 0,
+    backgroundColor: '#005F9E',
   },
   friendMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: 'white',
-    borderBottomLeftRadius: 0,
+    backgroundColor: '#000000',
   },
   messageText: {
     fontSize: 16,
+    color: 'white',
   },
   messageTime: {
     fontSize: 12,
-    color: '#888',
-    alignSelf: 'flex-end',
-    marginTop: 4,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 5,
+    textAlign: 'right',
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 10,
-    backgroundColor: 'white',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
+    backgroundColor: 'white',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    padding: 10,
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
     maxHeight: 100,
-    backgroundColor: '#f9f9f9',
   },
   sendButton: {
-    width: 45,
-    height: 45,
-    borderRadius: 25,
-    backgroundColor: '#4CAF50',
+    marginLeft: 10,
+    backgroundColor: '#005F9E',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
   },
   sendButtonDisabled: {
-    backgroundColor: '#A5D6A7',
+    backgroundColor: '#ccc',
   },
 });
 

@@ -46,7 +46,7 @@ const MissionCompletedModal = ({ visible, missionInfo, onFinished }: MissionComp
     >
       <View style={styles.modalContainer}>
         <View style={styles.successCard}>
-          <Ionicons name="checkmark-circle" size={70} color="#4CAF50" />
+          <Ionicons name="checkmark-circle" size={70} color="#005F9E" />
           <Text style={styles.successTitle}>¡Misión completada!</Text>
           {missionInfo && (
             <>
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#005F9E',
     marginTop: 10,
     marginBottom: 15,
   },
@@ -114,12 +114,12 @@ const styles = StyleSheet.create({
   pointsLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#005F9E',
   },
   pointsValue: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFA000',
+    color: '#FFB74D',
   },
   successHint: {
     color: '#666',
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   },
   progressAnimation: {
     height: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
   },
 });

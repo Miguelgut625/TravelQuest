@@ -157,7 +157,8 @@ export const generateMission = async (
   missionCount: number, 
   userId: string,
   startDate: Date | null,
-  endDate: Date | null
+  endDate: Date | null,
+  tags: string[] = []
 ) => {
   try {
     console.log('generateMission recibió fechas:', {
@@ -165,6 +166,8 @@ export const generateMission = async (
       endDate,
       duration
     });
+    
+    console.log('Tags seleccionados:', tags);
     
     // Crear fechas por defecto si no se proporcionan
     const validStartDate = startDate instanceof Date ? startDate : new Date();
@@ -185,14 +188,29 @@ export const generateMission = async (
       missionCount, 
       userId,
       startDate,
-      endDate 
+      endDate,
+      tags
     });
 
     // Verificar y crear usuario si no existe
     await getOrCreateUser(userId);
 
-    // Obtener o crear la ciudad
-    const cityId = await getOrCreateCity(cityName);
+    // Primero, usar Gemini para corregir el nombre de la ciudad
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const cityCorrectionPrompt = `Corrige el nombre de la ciudad "${cityName}" al nombre oficial y correcto. 
+    Devuelve SOLO el nombre corregido, sin explicaciones ni formato adicional. 
+    Por ejemplo, si el usuario escribe "akilante", debes devolver "Alicante".`;
+    
+    console.log('Prompt de corrección de ciudad:', cityCorrectionPrompt);
+    const cityCorrectionResult = await model.generateContent(cityCorrectionPrompt);
+    const cityCorrectionResponse = await cityCorrectionResult.response;
+    const correctedCityName = cityCorrectionResponse.text().trim();
+    
+    console.log('Nombre de ciudad corregido:', correctedCityName);
+
+    // Obtener o crear la ciudad con el nombre corregido
+    const cityId = await getOrCreateCity(correctedCityName);
     console.log('CityId obtenido/creado:', cityId);
 
     // Crear un nuevo journey
@@ -201,7 +219,7 @@ export const generateMission = async (
       .insert([{
         userId,
         cityId,
-        description: `Viaje a ${cityName} por ${duration} días`,
+        description: `Viaje a ${correctedCityName} por ${duration} días`,
         created_at: new Date().toISOString(),
         start_date: startIsoString,
         end_date: endIsoString
@@ -228,10 +246,17 @@ export const generateMission = async (
     } else {
       // Solo generar nuevos desafíos si no hay suficientes existentes
       console.log('Generando nuevos desafíos');
+      
+      // Preparar la parte de preferencias para el prompt
+      let preferencesText = '';
+      if (tags && tags.length > 0) {
+        preferencesText = `Las misiones deben basarse en las siguientes preferencias del usuario: ${tags.join(', ')}.`;
+      }
+      
       // Generar nuevos desafíos
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-      const prompt = `Genera ${missionCount} misiones en ${cityName} que se puedan completar en ${duration} días. Devuelve un objeto JSON con la siguiente estructura exacta:
+      const missionPrompt = `Genera ${missionCount} misiones en ${correctedCityName} que se puedan completar en ${duration} días. ${preferencesText}
+      
+Devuelve un objeto JSON con la siguiente estructura exacta:
 {
   "misiones": [
     {
@@ -244,8 +269,8 @@ export const generateMission = async (
 }
 Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No incluyas explicaciones adicionales, solo el JSON.`;
       
-      console.log('Prompt:', prompt);
-      const result = await model.generateContent(prompt);
+      console.log('Prompt de misiones:', missionPrompt);
+      const result = await model.generateContent(missionPrompt);
       const response = await result.response;
       const missionsData = response.text();
 

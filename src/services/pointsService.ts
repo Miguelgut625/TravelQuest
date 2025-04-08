@@ -41,6 +41,34 @@ export const addPointsToUser = async (userId: string, points: number) => {
     }
 };
 
+export const deductPointsFromUser = async (userId: string, points: number) => {
+    try {
+        // Primero obtenemos los puntos actuales
+        const currentPoints = await getUserPoints(userId);
+        
+        // Verificamos que el usuario tenga suficientes puntos
+        if (currentPoints < points) {
+            throw new Error('No hay suficientes puntos para realizar esta acción');
+        }
+
+        // Actualizamos los puntos
+        const { error } = await supabase
+            .from('users')
+            .update({
+                points: currentPoints - points,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        return currentPoints - points;
+    } catch (error) {
+        console.error('Error descontando puntos del usuario:', error);
+        throw error;
+    }
+};
+
 export const completeMission = async (missionId: string, userId: string, imageUrl?: string) => {
     console.log('Iniciando completeMission con parámetros:', { missionId, userId, imageUrl });
     

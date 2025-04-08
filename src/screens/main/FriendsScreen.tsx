@@ -14,9 +14,10 @@ import { supabase } from '../../services/supabase';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { countUnreadMessages } from '../../services/messageService';
+import { getFriends } from '../../services/friendService';
 
 interface Friend {
-  user2Id: string;
+  user2_id: string;
   username: string;
   points: number;
   unreadMessages?: number;
@@ -37,41 +38,21 @@ const FriendsScreen = () => {
     }
 
     try {
-      const { data: friendData, error: friendError } = await supabase
-        .from('friends')
-        .select('user2Id')
-        .eq('user1Id', user.id);
-
-      if (friendError) throw friendError;
-
-      // Obtener detalles de cada amigo
-      const friendsDetails = await Promise.all(
-        friendData.map(async (friend: { user2Id: string }) => {
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('username, points')
-            .eq('id', friend.user2Id)
-            .single();
-
-          if (userError) {
-            console.error('Error fetching user data:', userError);
-            return null;
-          }
-
-          // Contar mensajes no leídos
+      // Usar el servicio de amigos para obtener la lista
+      const friendsList = await getFriends(user.id);
+      
+      // Añadir conteo de mensajes no leídos para cada amigo
+      const friendsWithUnread = await Promise.all(
+        friendsList.map(async (friend) => {
           const unreadCount = await countUnreadMessages(user.id);
-
           return {
-            user2Id: friend.user2Id,
-            username: userData.username,
-            points: userData.points,
+            ...friend,
             unreadMessages: unreadCount || 0
           };
         })
       );
 
-      // Filtrar los amigos que no se pudieron obtener
-      setFriends(friendsDetails.filter((friend) => friend !== null));
+      setFriends(friendsWithUnread);
     } catch (error) {
       console.error('Error fetching friends:', error);
     } finally {
@@ -99,7 +80,7 @@ const FriendsScreen = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#005F9E" />
       </View>
     );
   }
@@ -108,7 +89,7 @@ const FriendsScreen = () => {
   const renderFriendItem = ({ item }: { item: Friend }) => (
     <TouchableOpacity 
       style={styles.friendItem}
-      onPress={() => openChat(item.user2Id, item.username)}
+      onPress={() => openChat(item.user2_id, item.username)}
     >
       <View style={styles.friendInfo}>
         <Text style={styles.friendName}>{item.username}</Text>
@@ -120,7 +101,7 @@ const FriendsScreen = () => {
             <Text style={styles.badgeText}>{item.unreadMessages}</Text>
           </View>
         )}
-        <Ionicons name="chatbubble-outline" size={24} color="#4CAF50" />
+        <Ionicons name="chatbubble-outline" size={24} color="#005F9E" />
       </View>
     </TouchableOpacity>
   );
@@ -137,13 +118,13 @@ const FriendsScreen = () => {
       ) : (
         <FlatList
           data={friends}
-          keyExtractor={(item) => item.user2Id.toString()}
+          keyExtractor={(item) => item.user2_id.toString()}
           renderItem={renderFriendItem}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#4CAF50']}
+              colors={['#005F9E']}
             />
           }
         />
@@ -163,6 +144,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#005F9E',
   },
   friendItem: {
     padding: 15,

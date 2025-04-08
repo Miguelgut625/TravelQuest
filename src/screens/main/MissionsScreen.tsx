@@ -47,6 +47,12 @@ interface JourneyMission {
   };
 }
 
+interface Friend {
+  user2Id: string;
+  username: string;
+  points: number;
+}
+
 interface Journey {
   id: string;
   description: string;
@@ -139,7 +145,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
           <View style={styles.badgeContainer}>
             <Text style={[
               styles.badge,
-              { backgroundColor: mission.completed ? '#4CAF50' : isExpired ? '#f44336' : '#FFA000' }
+              { backgroundColor: mission.completed ? '#005F9E' : isExpired ? '#D32F2F' : '#FFB74D' }
             ]}>
               {mission.completed ? 'Completada' : isExpired ? 'Expirada' : 'Pendiente'}
             </Text>
@@ -157,7 +163,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
           <Text style={styles.points}>{mission.challenge.points} puntos</Text>
           {(!mission.completed && !timeRemaining.isExpired) && (
             <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
-              <Ionicons name="share-social" size={20} color="#4CAF50" />
+              <Ionicons name="share-social" size={20} color="#005F9E" />
             </TouchableOpacity>
           )}
         </View>
@@ -545,7 +551,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         .from('journeys_shared')
         .insert({
           journeyId: journeyId,
-          ownerId: user.id,
+          ownerId: user?.id || '',
           sharedWithUserId: friend.user2Id
         });
       if (error) throw error;
@@ -561,7 +567,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#005F9E" />
         <Text style={styles.loadingText}>Cargando misiones...</Text>
       </View>
     );
@@ -645,6 +651,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 key={mission.id}
                 mission={mission}
                 onComplete={() => {}}
+                onShare={() => setShowShareModal(true)}
               />
             ))}
           </>
@@ -662,6 +669,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 key={mission.id}
                 mission={mission}
                 onComplete={() => {}}
+                onShare={() => setShowShareModal(true)}
               />
             ))}
           </>
@@ -748,7 +756,7 @@ const styles = StyleSheet.create({
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#005F9E',
   },
   citiesList: {
     flex: 1,
@@ -794,7 +802,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
   },
   missionsList: {
     flex: 1,
@@ -813,10 +821,10 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
   },
   completedText: {
-    color: '#4CAF50',
+    color: '#005F9E',
     fontWeight: 'bold',
     marginHorizontal: 10,
     fontSize: 16,
@@ -875,11 +883,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   points: {
-    color: '#4CAF50',
+    color: '#005F9E',
     fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
@@ -947,7 +955,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginTop: 10,
-    backgroundColor: '#f44336',
+    backgroundColor: '#D32F2F',
     padding: 10,
     borderRadius: 5,
     alignItems: 'center'

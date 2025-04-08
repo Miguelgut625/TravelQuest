@@ -63,4 +63,56 @@ BEGIN
   LEFT JOIN unread_counts uc ON uc.partner_id = cp.partner_id
   ORDER BY lm.created_at DESC;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER; 
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Actualizar políticas de seguridad para la tabla friends existente
+-- Si la tabla friends ya existe, sólo actualizamos las políticas
+
+-- Habilitar RLS en la tabla friends si no está habilitado
+ALTER TABLE friends ENABLE ROW LEVEL SECURITY;
+
+-- Los usuarios sólo pueden ver sus propias amistades
+DROP POLICY IF EXISTS "Users can view their own friends" ON friends;
+CREATE POLICY "Users can view their own friends" ON friends
+  FOR SELECT
+  USING ("user1Id" = auth.uid());
+
+-- Los usuarios sólo pueden crear amistades donde ellos son el primer usuario
+DROP POLICY IF EXISTS "Users can create friendships" ON friends;
+CREATE POLICY "Users can create friendships" ON friends
+  FOR INSERT
+  WITH CHECK ("user1Id" = auth.uid());
+
+-- Tabla de solicitudes de amistad
+CREATE TABLE IF NOT EXISTS friend_requests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  sender_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  receiver_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT different_users CHECK (sender_id != receiver_id),
+  CONSTRAINT unique_request UNIQUE (sender_id, receiver_id)
+);
+
+-- Políticas de seguridad para solicitudes de amistad
+ALTER TABLE friend_requests ENABLE ROW LEVEL SECURITY;
+
+-- Los usuarios pueden ver solicitudes que han enviado o recibido
+CREATE POLICY "Users can view their own requests" ON friend_requests
+  FOR SELECT
+  USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+-- Los usuarios sólo pueden crear solicitudes donde ellos son el remitente
+CREATE POLICY "Users can create friend requests" ON friend_requests
+  FOR INSERT
+  WITH CHECK (auth.uid() = sender_id);
+
+-- Los usuarios sólo pueden actualizar solicitudes que han recibido
+CREATE POLICY "Users can update received requests" ON friend_requests
+  FOR UPDATE
+  USING (auth.uid() = receiver_id);
+
+-- Los usuarios pueden eliminar solicitudes que han enviado
+CREATE POLICY "Users can delete sent requests" ON friend_requests
+  FOR DELETE
+  USING (auth.uid() = sender_id); 

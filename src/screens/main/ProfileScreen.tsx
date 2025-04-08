@@ -8,6 +8,7 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { getUserPoints } from '../../services/pointsService';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -26,6 +27,9 @@ interface JourneyMission {
 interface FriendshipRequest {
   id: string;
   sender: {
+    username: string;
+  };
+  users: {
     username: string;
   };
 }
@@ -62,6 +66,9 @@ const ProfileScreen = () => {
     try {
       setLoadingStats(true);
 
+      // Obtener los puntos actuales del usuario desde el servicio
+      const userPoints = await getUserPoints(user.id);
+
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
@@ -81,7 +88,6 @@ const ProfileScreen = () => {
 
       // Calcular estadísticas
       const stats = {
-        totalPoints: 0,
         completedMissions: 0,
         visitedCities: 0
       };
@@ -92,17 +98,16 @@ const ProfileScreen = () => {
           stats.visitedCities++;
         }
 
-        // Contar misiones completadas y puntos
+        // Contar misiones completadas
         journey.journeys_missions.forEach((mission: JourneyMission) => {
           if (mission.completed) {
             stats.completedMissions++;
-            stats.totalPoints += mission.challenges.points;
           }
         });
       });
 
       setStats({
-        totalPoints: stats.totalPoints,
+        totalPoints: userPoints, // Usamos los puntos obtenidos del servicio
         completedMissions: stats.completedMissions,
         visitedCities: stats.visitedCities
       });
@@ -420,36 +425,40 @@ const ProfileScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        {user?.profilePicture ? (
-          <Image
-            source={{ uri: user.profilePicture }}
-            style={styles.avatar}
-          />
-        ) : (
-          <View style={styles.avatarContainer}>
-            <Ionicons name="person-circle" size={100} color="white" />
+      <View style={styles.headerBackground}>
+        <View style={styles.header}>
+          {user?.profilePicture ? (
+            <Image
+              source={{ uri: user.profilePicture }}
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
+            </View>
+          )}
+          <View style={styles.userInfo}>
+            <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
+            <Text style={styles.email}>{user?.email}</Text>
           </View>
-        )}
-        <Text style={styles.username}>{user?.username || user?.email}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
+        </View>
       </View>
 
-      <View style={styles.statsContainer}>
+      <View style={styles.stats}>
         {loadingStats ? (
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color="#005F9E" />
         ) : (
           <>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.totalPoints}</Text>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.totalPoints}</Text>
               <Text style={styles.statLabel}>Puntos</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.completedMissions}</Text>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.completedMissions}</Text>
               <Text style={styles.statLabel}>Misiones Completadas</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.visitedCities}</Text>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.visitedCities}</Text>
               <Text style={styles.statLabel}>Ciudades</Text>
             </View>
           </>
@@ -458,85 +467,94 @@ const ProfileScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Social</Text>
-        <View style={styles.socialContainer}>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => navigation.navigate('Friends')}
-          >
-            <Ionicons name="people" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Amigos</Text>
-          </TouchableOpacity>
-          <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => navigation.navigate('Leaderboard')}
-          >
-            <Ionicons name="trophy" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Leaderboard</Text>
-          </TouchableOpacity>
-          <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.settingsOption}
+          onPress={() => navigation.navigate('Friends')}
+        >
+          <Ionicons name="people" size={24} color="#005F9E" />
+          <Text style={styles.settingsText}>Amigos</Text>
+          <Ionicons name="chevron-forward" size={24} color="#78909C" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.settingsOption}
+          onPress={() => navigation.navigate('Leaderboard')}
+        >
+          <Ionicons name="trophy" size={24} color="#005F9E" />
+          <Text style={styles.settingsText}>Leaderboard</Text>
+          <Ionicons name="chevron-forward" size={24} color="#78909C" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Seguridad</Text>
-        <View style={styles.privacyContainer}>
-          <TouchableOpacity
-            style={styles.privacyButton}
-            onPress={() => setIsChangePasswordVisible(true)}
-          >
-            <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
-          </TouchableOpacity>
-          <Text style={styles.privacyDescription}>
-            Actualiza tu contraseña para mantener tu cuenta segura
-          </Text>
-        </View>
+        <TouchableOpacity
+          style={styles.settingsOption}
+          onPress={() => setIsChangePasswordVisible(true)}
+        >
+          <Ionicons name="lock-closed" size={24} color="#005F9E" />
+          <Text style={styles.settingsText}>Cambiar Contraseña</Text>
+          <Ionicons name="chevron-forward" size={24} color="#78909C" />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.requestsContainer}>
-        <TouchableOpacity onPress={handleFetchPendingRequests}>
-          <Text style={styles.requestsTitle}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Solicitudes de amistad</Text>
+        <TouchableOpacity
+          style={styles.settingsOption}
+          onPress={handleFetchPendingRequests}
+        >
+          <Ionicons name="person-add" size={24} color="#005F9E" />
+          <Text style={styles.settingsText}>
             {isRequestsVisible ? 'Ocultar Solicitudes' : 'Ver Solicitudes'}
           </Text>
+          <Ionicons name={isRequestsVisible ? "chevron-up" : "chevron-down"} size={24} color="#78909C" />
         </TouchableOpacity>
 
         {isRequestsVisible && (
-          friendshipRequests.length === 0 ? (
-            <Text style={styles.noRequestsText}>No hay solicitudes pendientes</Text>
-          ) : (
-            <FlatList
-              data={friendshipRequests}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.requestItem}>
-                  <Text style={styles.requestText}>
-                    {item.users.username || 'Usuario desconocido'} te ha enviado una solicitud.
-                  </Text>
-                  <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
-                    <Text style={styles.acceptButtonText}>Aceptar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
-                    <Text style={styles.rejectButtonText}>Rechazar</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            />
-          )
+          <View style={styles.friendsListContainer}>
+            {friendshipRequests.length === 0 ? (
+              <Text style={styles.emptyText}>No hay solicitudes pendientes</Text>
+            ) : (
+              <FlatList
+                data={friendshipRequests}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <View style={styles.friendRequestItem}>
+                    <Text style={styles.friendRequestName}>
+                      {item.users.username || 'Usuario desconocido'}
+                    </Text>
+                    <View style={styles.friendRequestButtons}>
+                      <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
+                        <Text style={styles.buttonText}>Aceptar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
+                        <Text style={styles.buttonText}>Rechazar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              />
+            )}
+          </View>
         )}
-      </View>
-
-      <View style={styles.sendRequestContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre de usuario"
-          value={username}
-          onChangeText={setUsername}
-        />
-        <Button title="Enviar Solicitud" onPress={handleSendRequest} />
+        
+        <View style={styles.sendRequestContainer}>
+          <TextInput
+            style={styles.emailInput}
+            placeholder="Nombre de usuario"
+            value={username}
+            onChangeText={setUsername}
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={handleSendRequest}>
+            <Text style={styles.buttonText}>Enviar</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity
-        style={[styles.logoutButton, loading && styles.disabledButton]}
+        style={styles.logoutButton}
         onPress={handleLogout}
         disabled={loading}
       >
@@ -550,12 +568,12 @@ const ProfileScreen = () => {
         transparent={true}
         animationType="slide"
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
             <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
 
             {message.text ? (
-              <Text style={[styles.messageText, message.type === 'error' ? styles.errorMessage : styles.successMessage]}>
+              <Text style={[styles.messageText, message.type === 'error' ? styles.errorText : styles.successText]}>
                 {message.text}
               </Text>
             ) : null}
@@ -593,30 +611,28 @@ const ProfileScreen = () => {
               }}
             />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setIsChangePasswordVisible(false);
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                  setMessage({ type: '', text: '' });
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton, loading && styles.disabledButton]}
-                onPress={handleChangePassword}
-                disabled={loading}
-              >
-                <Text style={styles.modalButtonText}>
-                  {loading ? 'Guardando...' : 'Guardar'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleChangePassword}
+              disabled={loading}
+            >
+              <Text style={styles.modalButtonText}>
+                {loading ? 'Guardando...' : 'Guardar cambios'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => {
+                setIsChangePasswordVisible(false);
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                setMessage({ type: '', text: '' });
+              }}
+            >
+              <Text style={styles.modalButtonText}>Cancelar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -629,288 +645,245 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    backgroundColor: '#4CAF50',
+  headerBackground: {
+    backgroundColor: '#005F9E',
     padding: 20,
+    paddingBottom: 70,
+  },
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 10,
-  },
-  avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 10,
-    backgroundColor: '#4CAF50',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#FFB74D',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 15,
   },
-  username: {
-    fontSize: 24,
+  avatarText: {
+    color: 'white',
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 22,
     fontWeight: 'bold',
     color: 'white',
     marginBottom: 5,
   },
   email: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
+    marginBottom: 5,
   },
-  statsContainer: {
+  stats: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 20,
-    backgroundColor: 'white',
-    marginTop: -20,
+    justifyContent: 'space-between',
+    marginTop: -40,
     marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: 'white',
     borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#005F9E',
+    marginBottom: 5,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center'
+  },
+  section: {
+    marginBottom: 25,
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#005F9E',
+  },
+  settingsOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  settingsText: {
+    marginLeft: 10,
+    flex: 1,
+    fontSize: 16,
+  },
+  logoutButton: {
+    backgroundColor: '#D32F2F',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalView: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 25,
+    width: '90%',
+    maxWidth: 400,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowRadius: 4,
     elevation: 5,
-  },
-  statCard: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  section: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  socialContainer: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  socialButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginBottom: 10,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  socialButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  socialDescription: {
-    fontSize: 12,
-    color: 'black',
-    textAlign: 'center',
-  },
-  logoutButton: {
-    margin: 20,
-    backgroundColor: '#f44336',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  logoutButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    width: '90%',
-    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#005F9E',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: '#f0f0f0',
+    padding: 12,
     borderRadius: 5,
-    padding: 10,
     marginBottom: 15,
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  modalButton: {
+    backgroundColor: '#005F9E',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
     marginTop: 10,
   },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
   cancelButton: {
-    backgroundColor: '#f44336',
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#78909C',
   },
   modalButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#D32F2F',
+    marginBottom: 10,
+  },
+  successText: {
+    color: '#005F9E',
+    marginBottom: 10,
+  },
+  friendsListContainer: {
+    marginTop: 5,
+    marginBottom: 15,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  friendRequestItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  friendRequestName: {
+    fontSize: 16,
+    flex: 1,
+  },
+  friendRequestButtons: {
+    flexDirection: 'row',
+  },
+  acceptButton: {
+    backgroundColor: '#005F9E',
+    padding: 8,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  rejectButton: {
+    backgroundColor: '#D32F2F',
+    padding: 8,
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  sendRequestContainer: {
+    marginTop: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  emailInput: {
+    backgroundColor: 'white',
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+    marginRight: 10,
+  },
+  sendButton: {
+    backgroundColor: '#005F9E',
+    padding: 10,
+    borderRadius: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   messageText: {
     textAlign: 'center',
     marginBottom: 15,
     padding: 10,
     borderRadius: 5,
-  },
-  errorMessage: {
-    backgroundColor: '#ffebee',
-    color: '#c62828',
-  },
-  successMessage: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  privacyContainer: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-    padding: 15,
-  },
-  privacyButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  privacyButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  privacyDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  requestsContainer: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  requestsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  requestItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  requestText: {
-    flex: 1,
-    color: '#333',
-  },
-  acceptButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
-    padding: 5,
-    marginLeft: 10,
-  },
-  acceptButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  rejectButton: {
-    backgroundColor: '#f44336',
-    borderRadius: 5,
-    padding: 5,
-    marginLeft: 10,
-  },
-  rejectButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  sendRequestContainer: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  noRequestsText: {
-    textAlign: 'center',
-    color: '#666',
-    marginBottom: 10,
-  },
+  }
 });
 
 export default ProfileScreen; 
