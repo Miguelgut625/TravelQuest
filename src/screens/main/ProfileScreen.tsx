@@ -247,7 +247,6 @@ const ProfileScreen = () => {
             journey.journeys_missions.forEach((mission: JourneyMission) => {
               if (mission.completed) {
                 stats.completedMissions++;
-                stats.totalPoints += mission.challenges.points || 0;
               }
             });
           }
