@@ -90,6 +90,7 @@ export const completeMission = async (missionId: string, userId: string, imageUr
             completed: true,
             completed_at: new Date().toISOString()
         };
+
         
         // Añadir URL de imagen si existe - CORREGIDO para usar directamente picture_url
         if (imageUrl) {

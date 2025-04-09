@@ -408,7 +408,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         imageUrl
       );
 
-      if (!result.success) {
+      console.log('Resultado de completar la misión:', result);
+      if (typeof result !== 'number') {
         throw new Error('Error al completar la misión');
       }
 
