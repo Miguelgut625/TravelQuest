@@ -321,11 +321,6 @@ const ProfileScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Configuración</Text>
-        <CloudinaryStatusCard />
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Seguridad</Text>
         <View style={styles.privacyContainer}>
           <TouchableOpacity

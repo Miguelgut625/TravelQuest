@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions, Animated } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
@@ -8,6 +8,7 @@ import { setRefreshJournal } from '../../features/journalSlice';
 import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
+import { styles } from './styles';
 
 interface JournalScreenProps {
   route: RouteProp<TabParamList, 'Journal'>;
@@ -28,32 +29,38 @@ interface JournalEntryFromDB {
 }
 
 const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
-  <TouchableOpacity style={styles.card}>
-    <Text style={styles.cardTitle}>{entry.title}</Text>
-    <Text style={styles.cardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
-    <Text style={styles.cardContent} numberOfLines={3}>
+  <TouchableOpacity style={styles.journalCard}>
+    <Text style={styles.journalCardTitle}>{entry.title}</Text>
+    <Text style={styles.journalCardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+    {entry.missionId && (
+      <View style={styles.journalMissionBadge}>
+        <Ionicons name="trophy" size={16} color="#4CAF50" />
+        <Text style={styles.journalMissionBadgeText}>Misión Completada</Text>
+      </View>
+    )}
+    <Text style={styles.journalCardContent} numberOfLines={3}>
       {entry.content}
     </Text>
     {entry.photos && entry.photos.length > 0 && (
-      <View style={styles.photoGrid}>
+      <View style={styles.journalPhotoGrid}>
         {entry.photos.slice(0, 3).map((photo, index) => (
           <Image
             key={index}
             source={{ uri: photo }}
-            style={styles.thumbnail}
+            style={styles.journalThumbnail}
             resizeMode="cover"
           />
         ))}
         {entry.photos.length > 3 && (
-          <View style={styles.morePhotos}>
-            <Text style={styles.morePhotosText}>+{entry.photos.length - 3}</Text>
+          <View style={styles.journalMorePhotos}>
+            <Text style={styles.journalMorePhotosText}>+{entry.photos.length - 3}</Text>
           </View>
         )}
       </View>
     )}
-    <View style={styles.tags}>
+    <View style={styles.journalTags}>
       {entry.tags && entry.tags.map((tag, index) => (
-        <Text key={index} style={styles.tag}>
+        <Text key={index} style={styles.journalTag}>
           #{tag}
         </Text>
       ))}
@@ -62,14 +69,16 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
 );
 
 const EmptyState = ({ message }: { message: string }) => (
-  <View style={styles.emptyContainer}>
+  <View style={styles.journalEmptyContainer}>
     <Ionicons name="journal-outline" size={64} color="#ccc" />
-    <Text style={styles.emptyText}>{message}</Text>
+    <Text style={styles.journalEmptyText}>{message}</Text>
   </View>
 );
 
 const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJournalEntry[]; onPress: () => void }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [nextImageIndex, setNextImageIndex] = useState(1);
+  const slideAnim = useRef(new Animated.Value(0)).current;
   
   // Recopilar todas las fotos de las entradas de la ciudad
   const allPhotos = entries.reduce<string[]>((photos, entry) => {
@@ -79,36 +88,86 @@ const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJourn
     return photos;
   }, []);
 
+  // Función para animar el deslizamiento
+  const animateSlide = () => {
+    // Reset la animación
+    slideAnim.setValue(0);
+    
+    // Animar hacia la izquierda
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentImageIndex(nextImageIndex);
+      setNextImageIndex((nextImageIndex + 1) % allPhotos.length);
+      slideAnim.setValue(0);
+    });
+  };
+
   // Efecto para el carrusel automático
   useEffect(() => {
     if (allPhotos.length <= 1) return;
 
     const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => 
-        prevIndex === allPhotos.length - 1 ? 0 : prevIndex + 1
-      );
-    }, 3000); // Cambiar imagen cada 3 segundos
+      animateSlide();
+    }, 4000);
 
     return () => clearInterval(interval);
-  }, [allPhotos.length]);
+  }, [allPhotos.length, nextImageIndex]);
 
   return (
-    <TouchableOpacity style={styles.cityCard} onPress={onPress}>
+    <TouchableOpacity style={styles.journalCityCard} onPress={onPress}>
       {allPhotos.length > 0 ? (
         <>
-          <Image
-            source={{ uri: allPhotos[currentImageIndex] }}
-            style={styles.cityCardBackground}
-            resizeMode="cover"
-          />
+          <View style={styles.journalCarouselContainer}>
+            <Animated.View
+              style={[
+                styles.journalImageContainer,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -Dimensions.get('window').width]
+                    })
+                  }]
+                }
+              ]}
+            >
+              <Image
+                source={{ uri: allPhotos[currentImageIndex] }}
+                style={styles.journalCityCardBackground}
+                resizeMode="cover"
+              />
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.journalImageContainer,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [Dimensions.get('window').width, 0]
+                    })
+                  }]
+                }
+              ]}
+            >
+              <Image
+                source={{ uri: allPhotos[nextImageIndex] }}
+                style={styles.journalCityCardBackground}
+                resizeMode="cover"
+              />
+            </Animated.View>
+          </View>
           {allPhotos.length > 1 && (
-            <View style={styles.carouselDots}>
+            <View style={styles.journalCarouselDots}>
               {allPhotos.map((_, index) => (
                 <View
                   key={index}
                   style={[
-                    styles.dot,
-                    index === currentImageIndex && styles.activeDot
+                    styles.journalDot,
+                    index === currentImageIndex && styles.journalActiveDot
                   ]}
                 />
               ))}
@@ -116,15 +175,17 @@ const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJourn
           )}
         </>
       ) : (
-        <View style={styles.noImageBackground}>
+        <View style={styles.journalNoImageBackground}>
           <Ionicons name="image-outline" size={32} color="#666" />
         </View>
       )}
-      <View style={styles.cityCardOverlay} />
-      <View style={styles.cityCardContent}>
-        <Ionicons name="location" size={32} color="#fff" />
-        <Text style={styles.cityName}>{city}</Text>
-        <Text style={styles.viewMissionsText}>Ver misiones ({entries.length})</Text>
+      <View style={styles.journalCityCardOverlay} />
+      <View style={styles.journalCityCardContent}>
+        <View style={styles.journalTextContainer}>
+          <Ionicons name="location" size={32} color="#fff" />
+          <Text style={styles.journalCityName}>{city}</Text>
+          <Text style={styles.journalViewMissionsText}>Ver misiones ({entries.length})</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -175,13 +236,12 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
     const journalSubscription = supabase
       .channel('journal_changes')
       .on('postgres_changes', { 
-        event: 'INSERT', 
+        event: '*', // Escuchar todos los eventos (INSERT, UPDATE, DELETE)
         schema: 'public', 
         table: 'journal_entries',
         filter: `userid=eq.${user?.id}`
       }, (payload: any) => {
-        console.log('Nueva entrada de diario detectada:', payload);
-        // Actualizar los datos
+        console.log('Cambio detectado en el diario:', payload);
         fetchJournalEntries();
       })
       .subscribe();
@@ -337,19 +397,19 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   const renderContent = () => {
     if (loading) {
       return (
-        <View style={styles.loadingContainer}>
+        <View style={styles.journalLoadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Cargando diario...</Text>
+          <Text style={styles.journalLoadingText}>Cargando diario...</Text>
         </View>
       );
     }
 
     if (error) {
       return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchJournalEntries}>
-            <Text style={styles.retryButtonText}>Reintentar</Text>
+        <View style={styles.journalErrorContainer}>
+          <Text style={styles.journalErrorText}>{error}</Text>
+          <TouchableOpacity style={styles.journalRetryButton} onPress={fetchJournalEntries}>
+            <Text style={styles.journalRetryButtonText}>Reintentar</Text>
           </TouchableOpacity>
         </View>
       );
@@ -359,12 +419,12 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 
     if (viewMode === 'entries' && selectedCity) {
       return (
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+        <View style={styles.journalContainer}>
+          <View style={styles.journalHeader}>
+            <TouchableOpacity onPress={handleBackPress} style={styles.journalBackButton}>
               <Ionicons name="arrow-back" size={24} color="#333" />
             </TouchableOpacity>
-            <Text style={styles.title}>{selectedCity}</Text>
+            <Text style={styles.journalTitle}>{selectedCity}</Text>
           </View>
           
           {entriesByCity[selectedCity].length === 0 ? (
@@ -375,7 +435,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
               data={entriesByCity[selectedCity]}
               renderItem={({ item }) => <JournalEntryCard entry={item} />}
               keyExtractor={(item) => item.id}
-              style={styles.entriesList}
+              style={styles.journalEntriesList}
             />
           )}
         </View>
@@ -383,12 +443,12 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
     }
 
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Ciudades Disponibles</Text>
+      <View style={styles.journalContainer}>
+        <Text style={styles.journalTitle}>Ciudades Disponibles</Text>
         {cities.length === 0 ? (
-          <View style={styles.emptyContainer}>
+          <View style={styles.journalEmptyContainer}>
             <Ionicons name="map-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>
+            <Text style={styles.journalEmptyText}>
               No hay ciudades disponibles todavía.
             </Text>
           </View>
@@ -405,7 +465,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
             )}
             keyExtractor={(item) => item}
             numColumns={4}
-            columnWrapperStyle={styles.cityGrid}
+            columnWrapperStyle={styles.journalCityGrid}
           />
         )}
       </View>
@@ -414,260 +474,5 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 
   return renderContent();
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-  },
-  cityTabs: {
-    marginBottom: 20,
-  },
-  cityTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginRight: 10,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  selectedCityTab: {
-    backgroundColor: '#4CAF50',
-  },
-  cityTabText: {
-    color: '#666',
-    fontWeight: 'bold',
-  },
-  selectedCityTabText: {
-    color: 'white',
-  },
-  entriesList: {
-    flex: 1,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  cardDate: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 10,
-  },
-  cardContent: {
-    color: '#333',
-    marginBottom: 10,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 5,
-    marginRight: 5,
-  },
-  morePhotos: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  morePhotosText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  tag: {
-    color: '#4CAF50',
-    marginRight: 10,
-    fontSize: 12,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#666',
-    marginTop: 10,
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  cityCard: {
-    width: '20%',
-    aspectRatio: 1,
-    backgroundColor: '#333',
-    borderRadius: 15,
-    margin: '2.5%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  cityCardBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-  cityCardOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 1,
-  },
-  cityCardContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '5%',
-  },
-  cityName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 4,
-    textAlign: 'center',
-    color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  viewMissionsText: {
-    color: '#fff',
-    marginTop: 4,
-    fontSize: 12,
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  cityGrid: {
-    justifyContent: 'flex-start',
-    flexWrap: 'wrap',
-    flexDirection: 'row',
-    paddingHorizontal: '2.5%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 10,
-  },
-  backButton: {
-    padding: 10,
-    marginRight: 10,
-  },
-  carouselDots: {
-    position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    marginHorizontal: 2,
-  },
-  activeDot: {
-    backgroundColor: '#fff',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  noImageBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default JournalScreen; 

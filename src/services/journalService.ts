@@ -420,6 +420,33 @@ export const createJournalEntry = async (data: {
   try {
     console.log('Intentando crear entrada de diario con datos:', data);
     
+    // Obtener información adicional de la misión
+    let missionInfo = null;
+    try {
+      const { data: missionData, error: missionError } = await supabase
+        .from('journeys_missions')
+        .select(`
+          id,
+          completed,
+          end_date,
+          challenges (
+            title,
+            description,
+            difficulty,
+            points
+          )
+        `)
+        .eq('id', data.missionId)
+        .single();
+      
+      if (!missionError && missionData) {
+        missionInfo = missionData;
+        console.log('Información de misión encontrada:', missionInfo);
+      }
+    } catch (e) {
+      console.warn('Error al obtener información de la misión:', e);
+    }
+    
     // Primero, obtener el nombre de la ciudad usando cityId
     let cityName = null;
     try {
@@ -506,10 +533,27 @@ export const createJournalEntry = async (data: {
       }
     }
     
-    // Añadir el nombre de la ciudad a las etiquetas
+    // Añadir el nombre de la ciudad y etiquetas relacionadas con la misión
     const updatedTags = [...(data.tags || [])];
     if (cityName && !updatedTags.includes(cityName)) {
       updatedTags.push(cityName);
+    }
+    
+    // Añadir etiquetas relacionadas con la misión
+    if (missionInfo?.challenges) {
+      const difficultyTag = `dificultad-${missionInfo.challenges.difficulty.toLowerCase()}`;
+      if (!updatedTags.includes(difficultyTag)) {
+        updatedTags.push(difficultyTag);
+      }
+      if (!updatedTags.includes('misión')) {
+        updatedTags.push('misión');
+      }
+    }
+    
+    // Preparar el contenido enriquecido
+    let enrichedContent = data.content;
+    if (missionInfo?.challenges) {
+      enrichedContent = `Misión: ${missionInfo.challenges.title}\n\n${data.content}`;
     }
     
     // NUEVO: Primero, obtener estructura de la tabla para conocer las columnas reales
@@ -538,7 +582,7 @@ export const createJournalEntry = async (data: {
       // Preparamos una estructura básica de datos para la inserción
       const baseData: Record<string, any> = {
         title: data.title,
-        content: data.content,
+        content: enrichedContent,
         photos: data.photos,
         created_at: new Date().toISOString(),
         tags: updatedTags
