@@ -465,22 +465,27 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       if (userError) throw userError;
 
       if (userData) {
-        // Calcular los puntos de XP a añadir (mitad de los puntos de la misión)
         const xpToAdd = Math.floor(foundMissionPoints / 2);
 
-        // Actualizar XP
-        const newXp = userData.xp + xpToAdd;
-
-        // Verificar si ha superado el xp_next y si debe subir de nivel
+        // Calcular nueva XP temporal
+        let tempXp = userData.xp + xpToAdd;
+        
         let newLvl = userData.level;
         let newNextXp = userData.xp_next;
-
-        if (newXp >= userData.xp_next) {
-          // Sube de nivel
+        let newXp = tempXp;
+        
+        if (tempXp >= userData.xp_next) {
+          // Subir de nivel
           newLvl += 1;
-
+        
+          // Calcular el exceso de XP
+          const leftoverXp = tempXp - userData.xp_next;
+        
+          // XP actual se reinicia, se suma el excedente
+          newXp = leftoverXp;
+        
           // Aumentar el xp_next en un 10%
-          newNextXp = Math.floor(newNextXp * 1.1);
+          newNextXp = Math.floor(userData.xp_next * 1.1);
         }
 
         // Actualizar usuario en Supabase
