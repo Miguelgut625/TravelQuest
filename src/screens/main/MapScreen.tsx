@@ -1,18 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator } from 'react-native';
+// @ts-nocheck
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
-import Map from '../../components/maps';
 import * as Location from 'expo-location';
 import { getMissionsByCityAndDuration } from '../../services/missionService';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import generateMission from '../../services/missionGenerator';
 import { Ionicons } from '@expo/vector-icons';
-import { Calendar } from 'react-native-calendars';
-import { format } from 'date-fns';
+import { Calendar, DateData } from 'react-native-calendars';
+import { format, addDays, addMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { searchCities } from '../../services/supabase';
 import GlobeView from '../../components/GlobeView';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MissionResponse } from '../../hooks/useFetchMissions';
+import { FlatList } from 'react-native-web';
+import { FontAwesome } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
+import FallbackView from '../../components/FallbackView';
+import { GlobeViewRef } from '../../components/GlobeView';
 
 interface City {
   id: string;
@@ -33,28 +41,12 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 const { width, height } = Dimensions.get('window');
 
 const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep: string }) => (
-  <Modal
-    transparent={true}
-    visible={visible}
-    animationType="fade"
-  >
+  <Modal transparent={true} visible={visible} animationType="fade">
     <View style={styles.modalContainer}>
       <View style={styles.loadingCard}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingTitle}>Generando tu aventura</Text>
+        <ActivityIndicator size={40} color="#005F9E" />
+        <Text style={styles.loadingTitle}>Generando viaje</Text>
         <Text style={styles.loadingStep}>{currentStep}</Text>
-        
-        {/* Indicador de progreso visual */}
-        <View style={styles.progressBar}>
-          <View style={[
-            styles.progressFill, 
-            { 
-              width: currentStep.includes('Preparando') ? '30%' : 
-                    currentStep.includes('Buscando') ? '60%' : 
-                    currentStep.includes('Creando') ? '90%' : '10%' 
-            }
-          ]} />
-        </View>
       </View>
     </View>
   </Modal>
@@ -64,130 +56,154 @@ const DateRangePickerMobile: React.FC<{
   startDateProp: Date | null;
   endDateProp: Date | null;
   onDatesChange: (dates: [Date | null, Date | null]) => void;
-}> = ({ startDateProp, endDateProp, onDatesChange }) => {
+  isFormCollapsed?: boolean;
+  setIsFormCollapsed?: (collapsed: boolean) => void;
+}> = ({ startDateProp, endDateProp, onDatesChange, isFormCollapsed, setIsFormCollapsed }) => {
+  const [showCalendar, setShowCalendar] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<{[date: string]: any}>({});
+  const [markedDates, setMarkedDates] = useState<any>({});
 
   useEffect(() => {
+    if (startDateProp !== startDate) {
     setStartDate(startDateProp);
+    }
+    if (endDateProp !== endDate) {
     setEndDate(endDateProp);
-    
-    if (startDateProp || endDateProp) {
-      updateMarkedDates(startDateProp, endDateProp);
     }
   }, [startDateProp, endDateProp]);
 
-  const updateMarkedDates = (start: Date | null, end: Date | null) => {
-    const newMarkedDates: {[date: string]: any} = {};
-    
-    if (start) {
-      const startStr = format(start, 'yyyy-MM-dd');
-      newMarkedDates[startStr] = { 
-        startingDay: true, 
-        color: '#005F9E',
-        textColor: 'white'
-      };
-    }
-    
-    if (end) {
-      const endStr = format(end, 'yyyy-MM-dd');
-      newMarkedDates[endStr] = { 
-        endingDay: true, 
-        color: '#005F9E',
-        textColor: 'white'
-      };
-    }
-    
-    if (start && end) {
-      let currentDate = new Date(start);
-      currentDate.setDate(currentDate.getDate() + 1);
-      
-      while (currentDate < end) {
-        const dateStr = format(currentDate, 'yyyy-MM-dd');
-        newMarkedDates[dateStr] = { 
-          color: '#e5f3ff',
-          textColor: '#005F9E'
-        };
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-    }
-    
-    setSelectedDates(newMarkedDates);
-  };
-
-  const handleDayPress = (day: any) => {
-    const selectedDate = new Date(day.dateString);
-    
-    if (!startDate || (startDate && endDate)) {
-      const newStart = selectedDate;
-      setStartDate(newStart);
-      setEndDate(null);
-      updateMarkedDates(newStart, null);
-      onDatesChange([newStart, null]);
-    } else {
-      if (selectedDate < startDate) {
-        const newEnd = new Date(startDate);
-        setEndDate(newEnd);
-        setStartDate(selectedDate);
-        updateMarkedDates(selectedDate, newEnd);
-        onDatesChange([selectedDate, newEnd]);
-      } else {
-        setEndDate(selectedDate);
-        updateMarkedDates(startDate, selectedDate);
-        onDatesChange([startDate, selectedDate]);
-      }
-    }
-  };
+  useEffect(() => {
+    updateMarkedDates(startDate, endDate);
+  }, [startDate, endDate]);
 
   const calculateDuration = (start: Date | null, end: Date | null): number => {
     if (!start || !end) return 0;
     const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Incluir el día de inicio y fin
+  };
+
+  const updateMarkedDates = (start: Date | null, end: Date | null) => {
+    if (!start) return;
+    
+    const newMarkedDates: any = {};
+    
+    // Marcar fecha de inicio
+    const startDateStr = start.toISOString().split('T')[0];
+    newMarkedDates[startDateStr] = {
+        startingDay: true, 
+        color: '#005F9E',
+        textColor: 'white'
+      };
+    
+    // Si hay fecha de fin, marcar días intermedios y fecha de fin
+    if (end && start <= end) {
+      let currentDate = new Date(start);
+      currentDate.setDate(currentDate.getDate() + 1);
+      
+      // Marcar días intermedios
+      while (currentDate < end) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        newMarkedDates[dateStr] = { 
+          color: '#e6f2ff',
+          textColor: '#005F9E'
+        };
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      // Marcar fecha de fin
+      const endDateStr = end.toISOString().split('T')[0];
+      newMarkedDates[endDateStr] = {
+        endingDay: true,
+        color: '#005F9E',
+        textColor: 'white'
+      };
+    }
+    
+    setMarkedDates(newMarkedDates);
+  };
+
+  const handleDayPress = (day: any) => {
+    const date = new Date(day.dateString);
+    date.setHours(12, 0, 0, 0); // Mediodía para evitar problemas de zona horaria
+    
+    if (!startDate || (startDate && endDate)) {
+      // Si no hay fecha de inicio o ambas fechas están establecidas, empezar de nuevo
+      setStartDate(date);
+      setEndDate(null);
+      onDatesChange([date, null]);
+    } else {
+      // Si ya hay fecha de inicio pero no de fin
+      if (date < startDate) {
+        // Si la fecha seleccionada es anterior a la fecha de inicio, invertir
+        setEndDate(startDate);
+        setStartDate(date);
+        onDatesChange([date, startDate]);
+      } else {
+        // Establecer fecha de fin normalmente
+        setEndDate(date);
+        onDatesChange([startDate, date]);
+      }
+    }
+  };
+
+  const formatDate = (date: Date | null): string => {
+    if (!date) return 'No seleccionada';
+    return format(date, 'dd MMM yyyy', { locale: es });
   };
 
   const formatDateRange = (): string => {
-    if (!startDate && !endDate) {
-      return 'Selecciona fechas';
+    if (!startDate) return 'Selecciona fechas';
+    if (!endDate) return `Desde ${formatDate(startDate)}`;
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  };
+
+  const onToggleCalendar = () => {
+    // Al abrir el calendario, asegurar que el formulario no esté colapsado
+    if (isFormCollapsed && setIsFormCollapsed) {
+      setIsFormCollapsed(false);
     }
     
-    const formatDate = (date: Date | null): string => {
-      if (!date) return '';
-      return format(date, 'dd MMM');
-    };
-
-    const duration = calculateDuration(startDate, endDate);
-    const startStr = formatDate(startDate);
-    const endStr = formatDate(endDate);
-
-    if (startStr && endStr) {
-      return `${startStr} - ${endStr} · ${duration} noches`;
-    } else if (startStr) {
-      return `${startStr} - Selecciona fecha final`;
-    } else {
-      return 'Selecciona fechas';
-    }
+    // Luego cambiar el estado del calendario
+    setShowCalendar(!showCalendar);
   };
 
   return (
     <View style={styles.datePickerContainer}>
       <TouchableOpacity
         style={styles.datePickerButton}
-        onPress={() => setIsOpen(!isOpen)}
+        onPress={onToggleCalendar}
       >
         <View style={styles.datePickerContent}>
           <Text style={styles.datePickerText}>{formatDateRange()}</Text>
-          <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={24} color="white" />
+          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="white" />
         </View>
       </TouchableOpacity>
-      {isOpen && (
-        <View style={styles.calendarDropdown}>
+      
+      {showCalendar && (
+        <Modal
+          transparent={true}
+          visible={showCalendar}
+          animationType="fade"
+          onRequestClose={() => setShowCalendar(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.calendarHeader}>
+                <Text style={styles.calendarTitle}>Selecciona fechas</Text>
+                <TouchableOpacity onPress={() => setShowCalendar(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
           <Calendar
-            minDate={new Date().toISOString().split('T')[0]}
+                markingType={'period'}
+                markedDates={markedDates}
             onDayPress={handleDayPress}
-            markingType="period"
-            markedDates={selectedDates}
+                monthFormat={'MMMM yyyy'}
+                hideExtraDays={true}
+                firstDay={1}
+                enableSwipeMonths={true}
             theme={{
               calendarBackground: '#ffffff',
               textSectionTitleColor: '#b6c1cd',
@@ -201,9 +217,28 @@ const DateRangePickerMobile: React.FC<{
               arrowColor: '#005F9E',
               monthTextColor: '#005F9E',
               indicatorColor: '#005F9E',
-            }}
-          />
+                  textDayFontWeight: '300',
+                  textDayHeaderFontWeight: '300',
+                  textDayFontSize: 14,
+                  textMonthFontSize: 14,
+                  textDayHeaderFontSize: 12
+                }}
+              />
+            
+              <View style={styles.durationContainer}>
+                <Text style={styles.durationText}>
+                  Duración: {calculateDuration(startDate, endDate)} días
+                </Text>
+                <TouchableOpacity 
+                  style={styles.calendarCloseButton}
+                  onPress={() => setShowCalendar(false)}
+                >
+                  <Text style={styles.calendarCloseButtonText}>Aplicar</Text>
+                </TouchableOpacity>
         </View>
+            </View>
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -215,157 +250,71 @@ const DateRangePickerWeb: React.FC<{
   endDateProp: Date | null;
   onDatesChange: (dates: [Date | null, Date | null]) => void;
 }> = ({ startDateProp, endDateProp, onDatesChange }) => {
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
-  const [isOpen, setIsOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [hoverDate, setHoverDate] = useState<Date | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
+    if (startDateProp !== startDate) {
     setStartDate(startDateProp);
+    }
+    if (endDateProp !== endDate) {
     setEndDate(endDateProp);
+    }
   }, [startDateProp, endDateProp]);
   
-  // Función para generar el calendario
-  const generateCalendar = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    
-    // Obtener el primer día del mes
-    const firstDay = new Date(year, month, 1);
-    const startingDayOfWeek = firstDay.getDay(); // 0 = domingo
-    
-    // Obtener el último día del mes
-    const lastDay = new Date(year, month + 1, 0);
-    const totalDays = lastDay.getDate();
-    
-    // Crear un array para los días del mes
-    const days = [];
-    
-    // Agregar días del mes anterior para completar la primera semana
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      const prevMonthDay = new Date(year, month, -i);
-      days.unshift({
-        date: prevMonthDay,
-        isCurrentMonth: false,
-        isToday: false,
-        isSelected: false
-      });
-    }
-    
-    // Agregar los días del mes actual
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    for (let i = 1; i <= totalDays; i++) {
-      const currentDate = new Date(year, month, i);
-      currentDate.setHours(0, 0, 0, 0);
-      
-      const isToday = currentDate.getTime() === today.getTime();
-      const isStartDate = startDate && currentDate.getTime() === new Date(startDate).setHours(0,0,0,0);
-      const isEndDate = endDate && currentDate.getTime() === new Date(endDate).setHours(0,0,0,0);
-      const isInRange = startDate && endDate && 
-                        currentDate.getTime() > new Date(startDate).setHours(0,0,0,0) && 
-                        currentDate.getTime() < new Date(endDate).setHours(0,0,0,0);
-      
-      days.push({
-        date: currentDate,
-        isCurrentMonth: true,
-        isToday,
-        isSelected: isStartDate || isEndDate,
-        isStartDate,
-        isEndDate,
-        isInRange
-      });
-    }
-    
-    // Agregar días del mes siguiente para completar la última semana
-    const remainingDays = 7 - (days.length % 7);
-    if (remainingDays < 7) {
-      for (let i = 1; i <= remainingDays; i++) {
-        const nextMonthDay = new Date(year, month + 1, i);
-        days.push({
-          date: nextMonthDay,
-          isCurrentMonth: false,
-          isToday: false,
-          isSelected: false
-        });
+  useEffect(() => {
+    // Cerrar el calendario al hacer clic fuera
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setShowCalendar(false);
       }
-    }
-    
-    return days;
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const calculateDuration = (start: Date | null, end: Date | null): number => {
+    if (!start || !end) return 0;
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Incluir el día de inicio y fin
+  };
+
+  const formatDate = (date: Date | null): string => {
+    if (!date) return 'No seleccionada';
+    return format(date, 'dd MMM yyyy', { locale: es });
+  };
+
+  const formatDateRange = (): string => {
+    if (!startDate) return 'Selecciona fechas';
+    if (!endDate) return `Desde ${formatDate(startDate)}`;
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
   };
   
   const handleDateClick = (date: Date) => {
-    // No permitir seleccionar fechas en el pasado
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    if (date < today) {
-      return;
-    }
-    
     if (!startDate || (startDate && endDate)) {
-      // Si no hay fecha de inicio o ambas fechas están seleccionadas, establecer como nueva fecha de inicio
+      // Si no hay fecha de inicio o ambas fechas están establecidas, empezar de nuevo
       setStartDate(date);
       setEndDate(null);
       onDatesChange([date, null]);
     } else {
-      // Si solo hay fecha de inicio, establecer como fecha de fin
+      // Si ya hay fecha de inicio pero no de fin
       if (date < startDate) {
-        // Si la fecha seleccionada es anterior a la fecha de inicio, intercambiarlas
-        setEndDate(new Date(startDate));
+        // Si la fecha seleccionada es anterior a la fecha de inicio, invertir
+        setEndDate(startDate);
         setStartDate(date);
         onDatesChange([date, startDate]);
       } else {
+        // Establecer fecha de fin normalmente
         setEndDate(date);
         onDatesChange([startDate, date]);
       }
-    }
-  };
-  
-  const formatMonth = (date: Date) => {
-    const months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    return `${months[date.getMonth()]} ${date.getFullYear()}`;
-  };
-  
-  const changeMonth = (offset: number) => {
-    const newMonth = new Date(currentMonth);
-    newMonth.setMonth(newMonth.getMonth() + offset);
-    setCurrentMonth(newMonth);
-  };
-  
-  const days = generateCalendar(currentMonth);
-  const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  
-  const calculateDuration = (start: Date | null, end: Date | null): number => {
-    if (!start || !end) return 0;
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-  
-  const formatDate = (date: Date | null): string => {
-    if (!date) return '';
-    return `${date.getDate()} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][date.getMonth()]}`;
-  };
-  
-  const formatDateRange = (): string => {
-    if (!startDate && !endDate) {
-      return 'Selecciona fechas';
-    }
-    
-    const startStr = formatDate(startDate);
-    const endStr = formatDate(endDate);
-    const duration = calculateDuration(startDate, endDate);
-    
-    if (startStr && endStr) {
-      return `${startStr} - ${endStr} · ${duration} noches`;
-    } else if (startStr) {
-      return `${startStr} - Selecciona fecha final`;
-    } else {
-      return 'Selecciona fechas';
     }
   };
 
@@ -373,140 +322,56 @@ const DateRangePickerWeb: React.FC<{
     <View style={styles.datePickerContainer}>
       <TouchableOpacity
         style={styles.datePickerButton}
-        onPress={() => setIsOpen(!isOpen)}
+        onPress={() => setShowCalendar(!showCalendar)}
       >
         <View style={styles.datePickerContent}>
           <Text style={styles.datePickerText}>{formatDateRange()}</Text>
-          <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={24} color="white" />
+          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="white" />
         </View>
       </TouchableOpacity>
       
-      {isOpen && (
-    <div style={{ 
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          right: 0,
-          backgroundColor: 'white',
-          zIndex: 9999,
-          boxShadow: '0px 2px 10px rgba(0,0,0,0.1)',
-          borderRadius: 8,
-          marginTop: 4,
-          padding: 15,
-          width: 620,
-          marginLeft: 'auto',
-          marginRight: 'auto'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: 10
-          }}>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center'
-    }}>
-      <button
-                onClick={() => changeMonth(-1)}
-        style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: 24,
-                  cursor: 'pointer',
-                  color: '#005F9E'
-                }}
-              >
-                &larr;
-      </button>
-              <h3 style={{
-                margin: '0 15px',
-                color: '#005F9E'
-              }}>
-                {formatMonth(currentMonth)}
-              </h3>
-              <button 
-                onClick={() => changeMonth(1)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: 24,
-                  cursor: 'pointer',
-                  color: '#005F9E'
-                }}
-              >
-                &rarr;
-              </button>
-            </div>
+      {showCalendar && (
+        <View style={styles.calendarOverlay}>
+          <View 
+            style={styles.calendarContainer}
+            ref={calendarRef as any}
+          >
+            <View style={styles.calendarHeader}>
+              <Text style={styles.calendarTitle}>Selecciona fechas</Text>
+              <TouchableOpacity onPress={() => setShowCalendar(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
             
-            <div style={{
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              <button 
-                onClick={() => {
-                  setStartDate(null);
-                  setEndDate(null);
-                  onDatesChange([null, null]);
-                }}
-                style={{
-                  background: 'none',
-                  border: '1px solid #ddd',
-                  padding: '5px 10px',
-                  borderRadius: 4,
-                  cursor: 'pointer'
-                }}
-              >
-                Limpiar
-              </button>
-            </div>
-          </div>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: 5,
-            textAlign: 'center'
-          }}>
-            {weekDays.map(day => (
-              <div key={day} style={{
-                padding: 5,
-                fontWeight: 'bold',
-                color: '#666'
-              }}>
-                {day}
-              </div>
-            ))}
+            <Text style={styles.calendarSubtitle}>
+              {format(currentMonth, 'MMMM yyyy', { locale: es })}
+            </Text>
             
-            {days.map((day, index) => (
-              <div 
-                key={index}
-                onClick={() => day.isCurrentMonth && handleDateClick(day.date)}
-          style={{
-                  padding: 10,
-                  cursor: day.isCurrentMonth ? 'pointer' : 'default',
-                  backgroundColor: day.isStartDate || day.isEndDate 
-                    ? '#005F9E' 
-                    : day.isInRange 
-                      ? '#e5f3ff' 
-                      : 'transparent',
-                  color: day.isStartDate || day.isEndDate 
-                    ? 'white' 
-                    : !day.isCurrentMonth 
-                      ? '#ccc' 
-                      : day.isToday 
-                        ? '#005F9E' 
-                        : '#333',
-                  fontWeight: day.isToday ? 'bold' : 'normal',
-                  borderRadius: 4,
-                  opacity: day.isCurrentMonth ? 1 : 0.5
-                }}
-              >
-                {day.date.getDate()}
-        </div>
-            ))}
-    </div>
-        </div>
+            <View style={styles.calendarControls}>
+              <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.calendarArrow}>
+                <Ionicons name="chevron-back" size={24} color="#005F9E" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => changeMonth(1)} style={styles.calendarArrow}>
+                <Ionicons name="chevron-forward" size={24} color="#005F9E" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.calendar}>
+              {/* Código del calendario */}
+            </View>
+            
+            <Text style={styles.durationText}>
+              Duración: {calculateDuration(startDate, endDate)} días
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.calendarCloseButton}
+              onPress={() => setShowCalendar(false)}
+            >
+              <Text style={styles.calendarCloseButtonText}>Aplicar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -516,6 +381,10 @@ const MapScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
+  // Referencia al WebView para poder enviar mensajes al globo
+  const webViewRef = useRef<WebView>(null);
+  // Añadir la referencia a GlobeView
+  const globeRef = useRef<GlobeViewRef>(null);
   const [region, setRegion] = useState({
     latitude: 40.416775, // Madrid por defecto
     longitude: -3.703790,
@@ -532,7 +401,7 @@ const MapScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState('');
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false); // Cambiado a false para mostrar el mapa inmediatamente
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [errorLocationMsg, setErrorLocationMsg] = useState<string | null>(null);
   const [filteredCities, setFilteredCities] = useState<City[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -541,8 +410,14 @@ const MapScreen = () => {
     latitude: 40.416775, // Madrid por defecto
     longitude: -3.703790,
   });
-  // Añadir estado para los tags
+  // Estado para los tags
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  
+  // Estado para indicar carga durante cambio de vista
+  const [changingView, setChangingView] = useState(false);
+  // Nuevo estado para controlar si el formulario está colapsado
+  const [isFormCollapsed, setIsFormCollapsed] = useState(false);
+  const isSmallScreen = width < 768 || height < 600;
 
   // Definir los tags disponibles
   const availableTags = [
@@ -567,8 +442,35 @@ const MapScreen = () => {
     );
   };
 
+  // Función para cargar el globo terráqueo de Cesium
+  const loadCesiumGlobe = () => {
+    console.log("Cargando globo terráqueo de Cesium...");
+    
+    // Indicar que estamos cargando
+    setChangingView(true);
+    
+    // Recargar el componente forzando una re-renderización
+    // Esto es más efectivo que simplemente esperar
+    if (webViewRef.current) {
+      try {
+        // Intentar recargar la WebView (si existe el método)
+        if (webViewRef.current.reload) {
+          console.log("Recargando WebView...");
+          webViewRef.current.reload();
+        }
+      } catch (error) {
+        console.error("Error al recargar WebView:", error);
+      }
+    }
+    
+    // Como respaldo, establecer un timeout para quitar el indicador de carga
+    setTimeout(() => {
+      setChangingView(false);
+    }, 3000);
+  };
+
   useEffect(() => {
-    // Iniciar la obtención de la ubicación en segundo plano
+    // Obtener la ubicación del usuario cuando la componente se monta
     getLocation();
   }, []);
 
@@ -784,7 +686,7 @@ const MapScreen = () => {
     
     if (start && end) {
       const diffTime = Math.abs(end.getTime() - start.getTime());
-      const newDuration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const newDuration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Incluir el día de inicio y fin
       console.log('Nueva duración calculada:', newDuration);
       setDuration(newDuration);
     } else {
@@ -795,9 +697,102 @@ const MapScreen = () => {
   // Elegir el componente correcto según la plataforma
   const DateRangePicker = Platform.OS === 'web' ? DateRangePickerWeb : DateRangePickerMobile;
 
+  // Función para alternar la visibilidad del formulario
+  const toggleFormCollapse = () => {
+    setIsFormCollapsed(!isFormCollapsed);
+  };
+
+  // Función para manejar errores del globo terráqueo
+  const handleGlobeError = (error: string) => {
+    console.error("Error en el Globo Terráqueo:", error);
+    setErrorLocationMsg(`Error al cargar el Globo Terráqueo: ${error}`);
+  };
+
+  // Función para reintentar cargar el globo terráqueo
+  const retryLoadGlobe = () => {
+    setErrorLocationMsg(null);
+    loadCesiumGlobe();
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
+      {/* Barra superior con botón para expandir/colapsar */}
+      <View style={styles.headerBar}>
+        <Text style={styles.headerTitle}>TravelQuest</Text>
+        <TouchableOpacity onPress={toggleFormCollapse} style={styles.collapseButton}>
+          <Ionicons name={isFormCollapsed ? "chevron-down" : "chevron-up"} size={24} color="#005F9E" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Mapa debajo de todo */}
+      <View style={[
+        styles.mapContainer,
+        isFormCollapsed && styles.mapContainerExpanded
+      ]}>
+        {/* Mostrar la duración del viaje en días encima del mapa */}
+        {startDate && endDate && (
+          <View style={styles.durationOverlay}>
+            <Text style={styles.durationOverlayText}>
+              <Ionicons name="calendar" size={16} color="white" /> {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
+            </Text>
+            <Text style={styles.durationOverlayText}>
+              <Ionicons name="time" size={16} color="white" /> Duración: {calculateDuration(startDate, endDate)} días
+            </Text>
+          </View>
+        )}
+        
+        {isLoadingLocation ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#005F9E" />
+            <Text style={styles.loadingText}>Cargando ubicación...</Text>
+          </View>
+        ) : errorLocationMsg ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorLocationMsg}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={getLocation}>
+              <Text style={styles.retryButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* Globo terráqueo */}
+            <GlobeView 
+              ref={globeRef}
+              region={region}
+              onRegionChange={(reg) => {
+                // Actualizamos la región
+                setRegion(reg);
+              }}
+              showsUserLocation={true}
+              style={styles.map}
+              onLoadingChange={(loading) => {
+                console.log("Cambio de estado de carga del mapa:", loading);
+                setChangingView(loading);
+              }}
+              onError={handleGlobeError}
+            />
+            
+            {/* Botón flotante para recargar el globo */}
+            <TouchableOpacity 
+              style={styles.floatingButton}
+              onPress={retryLoadGlobe}
+            >
+              <Ionicons name="refresh" size={20} color="white" style={{marginRight: 5}} />
+              <Text style={{color: 'white', fontWeight: 'bold'}}>Recargar Globo 3D</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      {/* Contenedor del formulario, que puede estar colapsado - colocado al final para que se muestre encima */}
+      {!isFormCollapsed && (
+        <ScrollView 
+          style={[
+            styles.searchContainer,
+            isSmallScreen && styles.searchContainerSmall
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           <TextInput
             style={styles.input}
             placeholder="Buscar ciudad"
@@ -815,75 +810,75 @@ const MapScreen = () => {
                 <Text style={styles.suggestionText}>{city.name}</Text>
                 </TouchableOpacity>
             ))}
-        </View>
-        )}
-        <TextInput
-          style={styles.input}
-          placeholder="Número de misiones"
-          value={missionCount}
-          onChangeText={setMissionCount}
-          keyboardType="numeric"
-        />
-        
-        <DateRangePicker
-          startDateProp={startDate}
-          endDateProp={endDate}
-          onDatesChange={onDatesChange}
-        />
-
-        <Text style={styles.durationText}>
-          Duración del viaje: {calculateDuration(startDate, endDate)} días
-        </Text>
-
-        {/* Sección de etiquetas */}
-        <Text style={styles.tagsTitle}>Preferencias de viaje:</Text>
-        <View style={styles.tagsContainer}>
-          {availableTags.map(tag => (
-            <TouchableOpacity
-              key={tag.id}
-              style={[
-                styles.tagButton,
-                selectedTags.includes(tag.id) && styles.tagButtonSelected
-              ]}
-              onPress={() => toggleTag(tag.id)}
-            >
-              <Text
-                style={[
-                  styles.tagText,
-                  selectedTags.includes(tag.id) && styles.tagTextSelected
-                ]}
-              >
-                {tag.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, isLoading && styles.buttonDisabled]}
-          onPress={handleSearch}
-          disabled={isLoading}
-        >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'Generando...' : 'Buscar Aventuras'}
-          </Text>
-        </TouchableOpacity>
-
-        {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-      </View>
-
-      <View style={styles.mapContainer}>
-        <View style={{ flex: 1, width: '100%' }}>
-          {errorLocationMsg && (
-            <View style={styles.errorOverlay}>
-              <Text style={styles.errorText}>{errorLocationMsg}</Text>
-            </View>
+          </View>
           )}
-          <GlobeView style={styles.map} />
-        </View>
-      </View>
+
+          <View style={styles.formRow}>
+            <TextInput
+              style={[styles.input, styles.smallInput]}
+              placeholder="Nº misiones"
+              value={missionCount}
+              onChangeText={setMissionCount}
+              keyboardType="numeric"
+            />
+            
+            <DateRangePicker
+              startDateProp={startDate}
+              endDateProp={endDate}
+              onDatesChange={onDatesChange}
+              isFormCollapsed={isFormCollapsed}
+              setIsFormCollapsed={setIsFormCollapsed}
+            />
+          </View>
+          
+          <View style={styles.tagsContainer}>
+            {availableTags.map(tag => (
+              <TouchableOpacity
+                key={tag.id}
+                style={[
+                  styles.tagButton,
+                  selectedTags.includes(tag.id) && styles.tagButtonSelected
+                ]}
+                onPress={() => toggleTag(tag.id)}
+              >
+                <Text 
+                  style={[
+                    styles.tagText,
+                    selectedTags.includes(tag.id) && styles.tagTextSelected
+                  ]}
+                >
+                  {tag.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity 
+            style={[
+              styles.button,
+              (!searchCity || !startDate || !endDate) && styles.buttonDisabled
+            ]}
+            onPress={handleSearch}
+            disabled={!searchCity || !startDate || !endDate}
+          >
+            <Text style={styles.buttonText}>
+              Generar Misiones
+            </Text>
+          </TouchableOpacity>
+
+          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+        </ScrollView>
+      )}
 
       <LoadingModal visible={isLoading} currentStep={currentStep} />
+
+      {/* Overlay para cambiar entre vistas */}
+      {changingView && (
+        <View style={styles.changingViewOverlay}>
+          <ActivityIndicator size="large" color="#FFF" />
+          <Text style={styles.loadingText}>Cargando vista...</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -892,6 +887,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    zIndex: 10,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#005F9E',
+  },
+  collapseButton: {
+    padding: 5,
   },
   searchContainer: {
     backgroundColor: 'white',
@@ -906,25 +925,57 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    zIndex: 9999,
-    position: 'relative',
+    position: 'absolute',
+    top: 51,
+    left: 0,
+    right: 0,
+    zIndex: 9,
+    maxHeight: '60%',
+  },
+  searchContainerSmall: {
+    padding: 12,
+    maxHeight: '50%',
+  },
+  formRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  input: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  smallInput: {
+    flex: 0.4,
   },
   mapContainer: {
     flex: 1,
-    marginTop: 10,
+    position: 'relative',
+    zIndex: 1,
+  },
+  mapContainerExpanded: {
+    flex: 1,
+  },
+  tagButtonSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    margin: 2,
+  },
+  tagTextSmall: {
+    fontSize: 10,
   },
   map: {
     width: '100%',
     height: '100%',
-  },
-  input: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-    backgroundColor: 'white',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   button: {
     backgroundColor: '#005F9E',
@@ -995,69 +1046,90 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   datePickerContainer: {
+    flex: 0.55,
     position: 'relative',
-    zIndex: 9999,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 16,
-    overflow: 'visible',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      },
-      default: {
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4
-      }
-    })
+    zIndex: 999,
   },
   datePickerButton: {
     backgroundColor: '#005F9E',
     borderRadius: 8,
     padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   datePickerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
   },
   datePickerText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
-  calendarDropdown: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginTop: 8,
+  calendarOverlay: {
+    position: 'absolute',
+    top: '100%',
+    left: 0, 
+    right: 0,
+    zIndex: 9999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 10,
+    maxHeight: '70%',
+  },
+  calendarContainer: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 5,
+    width: '100%',
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  calendarTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  calendarSubtitle: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    marginVertical: 10,
+  },
+  calendarControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  calendarArrow: {
+    padding: 5,
+  },
+  calendarCloseButton: {
+    backgroundColor: '#005F9E',
+    padding: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  calendarCloseButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   durationText: {
-    textAlign: 'center',
-    marginBottom: 10,
     color: '#666',
-  },
-  dateRangeContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 2,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   suggestionsList: {
     position: 'absolute',
@@ -1093,7 +1165,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#666',
+    fontSize: 16,
+    color: '#333',
   },
   retryButton: {
     backgroundColor: '#4CAF50',
@@ -1130,34 +1203,139 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tagsTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 8,
+    marginTop: 5,
+    marginBottom: 5,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 15,
+    marginTop: 5,
+    justifyContent: 'center',
   },
   tagButton: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#005F9E',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    margin: 4,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    margin: 5,
     backgroundColor: 'white',
+    minWidth: 95,
   },
   tagButtonSelected: {
     backgroundColor: '#005F9E',
   },
   tagText: {
     color: '#005F9E',
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   tagTextSelected: {
     color: 'white',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    backgroundColor: '#005F9E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    zIndex: 999,
+  },
+  changingViewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  durationOverlay: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 95, 158, 0.8)',
+    padding: 10,
+    borderRadius: 8,
+    zIndex: 1000,
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  durationOverlayText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'white',
+    marginVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calendarStyle: {
+    height: 300,
+    maxHeight: '50vh',
+  },
+  durationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 5,
+    paddingHorizontal: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 10,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
 

@@ -137,7 +137,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#005F9E" />
+        <ActivityIndicator size={40} color="#005F9E" />
         <Text style={styles.loadingText}>Cargando diario de viaje...</Text>
       </View>
     );

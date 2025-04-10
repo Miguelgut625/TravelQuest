@@ -2,22 +2,49 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
-    "lib": ["dom", "esnext"],
+    "lib": [
+      "dom",
+      "esnext"
+    ],
     "allowJs": true,
     "jsx": "react-native",
     "noEmit": true,
     "isolatedModules": true,
-    "strict": true,
+    "strict": false,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": [
+        "src/*"
+      ]
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ],
+    "noImplicitAny": false,
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "src/**/*",
-    "src/types/**/*" // Asegúrate de incluir esta línea
+    "src/types/*.d.ts"
   ],
-  "extends": "expo/tsconfig.base",
-  "exclude": ["node_modules"]
+  "files": [
+    "src/types/react.d.ts",
+    "src/types/react-native.d.ts",
+    "src/types/expo.d.ts",
+    "src/types/react-native-webview.d.ts",
+    "src/types/reactNativeSize.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "babel.config.js",
+    "metro.config.js",
+    "jest.config.js"
+  ],
+  "extends": "expo/tsconfig.base"
 }

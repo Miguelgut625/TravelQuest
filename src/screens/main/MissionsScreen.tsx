@@ -265,7 +265,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
         <View style={modalStyles.modalContent}>
           <Text style={modalStyles.modalTitle}>Selecciona un amigo</Text>
           {loading ? (
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size={40} color="#4CAF50" />
           ) : (
             <FlatList
               data={friends}
@@ -567,7 +567,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#005F9E" />
+        <ActivityIndicator size={40} color="#4CAF50" />
         <Text style={styles.loadingText}>Cargando misiones...</Text>
       </View>
     );

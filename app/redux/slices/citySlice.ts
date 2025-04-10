@@ -3,6 +3,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 interface City {
   id: string;
   name: string;
+  correctedName: string;
   country: string;
   description: string;
   coordinates: {
@@ -44,6 +45,15 @@ const citySlice = createSlice({
         city.completedMissions += action.payload.completed ? 1 : -1;
       }
     },
+    setCorrectedName: (state, action: PayloadAction<{ cityId: string; correctedName: string }>) => {
+      const city = state.cities.find(c => c.id === action.payload.cityId);
+      if (city) {
+        city.correctedName = action.payload.correctedName;
+      }
+      if (state.selectedCity && state.selectedCity.id === action.payload.cityId) {
+        state.selectedCity.correctedName = action.payload.correctedName;
+      }
+    },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
     },
@@ -57,6 +67,7 @@ export const {
   setCities,
   setSelectedCity,
   updateCityProgress,
+  setCorrectedName,
   setLoading,
   setError,
 } = citySlice.actions;

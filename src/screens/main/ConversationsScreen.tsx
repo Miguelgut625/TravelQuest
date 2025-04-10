@@ -110,7 +110,7 @@ const ConversationsScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size={40} color="#4CAF50" />
       </View>
     );
   }

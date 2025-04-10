@@ -14,5 +14,6 @@ export interface JourneyMission {
   description: string;
   points: number;
   cityName: string;
+  correctedCityName?: string;
   challenge: Challenge;
 } 

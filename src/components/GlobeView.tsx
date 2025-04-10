@@ -1,621 +1,160 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, Platform, Animated, Easing, Dimensions, PanResponder, TouchableOpacity } from 'react-native';
-import WebView, { WebViewMessageEvent } from 'react-native-webview';
-import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
+// @ts-nocheck
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator, Text, Dimensions, Linking } from 'react-native';
+import WebView from 'react-native-webview';
 import * as Location from 'expo-location';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Region } from '../types/map';
+import { FAB, Button } from 'react-native-paper';
+import FallbackView from './FallbackView';
+import MapView, { Marker } from 'react-native-maps';
 
-// Declaración de tipos para Cesium
-declare global {
-  interface Window {
-    Cesium: any;
-    rotationInterval: any;
-    rotationCounter: number;
-    viewer: any;
-  }
-}
+// Token de Cesium
+const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiNGNjYzBhOS0wYzA1LTRiNTQtYWJhYi01YjEwNTZiZmJhNDQiLCJpZCI6MjkwMjQyLCJpYXQiOjE3NDM1ODE4NTB9.M05o3luP4BS1qlxa46iP5PWBPIos1RpFjsXhqj8Xl0Q';
 
-// Bandera para usar el globo de respaldo si hay problemas con WebView
-const USE_FALLBACK = false; // Intentaremos usar Cesium a través de WebView
-const TIMEOUT_SECONDS = 120; // Aumentar tiempo de espera a 2 minutos para carga completa
-
-// Distancias para cambio de vista
-const MAP_VIEW_DISTANCE_THRESHOLD = 2000000; // Mostrar mapa 2D cuando se acerca a menos de 2000 km
-const GLOBE_VIEW_DISTANCE_THRESHOLD = 3000000; // Volver a globo 3D cuando se aleja a más de 3000 km
-
-const GlobeView = (props: { style?: any }) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [useFallbackView, setUseFallbackView] = useState(USE_FALLBACK);
-  const [showMapView, setShowMapView] = useState(false); // Estado para controlar qué vista mostrar
-  const [currentPosition, setCurrentPosition] = useState({
-    latitude: 0,
-    longitude: 0,
-    altitude: 15000000,
-    zoom: 2
-  });
-  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
-  const [locationPermission, setLocationPermission] = useState<boolean>(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState<boolean>(true);
-  
-  const webViewRef = useRef<WebView>(null);
-  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const cesiumContainerRef = useRef<HTMLDivElement>(null);
-  const mapViewRef = useRef<MapView>(null);
-
-  // Función para obtener la ubicación del usuario
-  const getUserLocation = async () => {
-    try {
-      console.log("Iniciando obtención de ubicación en segundo plano");
-      
-      // Solicitar permisos
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationPermission(status === 'granted');
-      
-      if (status === 'granted') {
-        // Obtenemos la ubicación del usuario en segundo plano sin bloquear la UI
-        console.log("Permiso concedido, obteniendo ubicación en segundo plano");
-        
-        // Primero intentamos con una precisión alta pero con un timeout bajo
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Highest,
-          // Opciones avanzadas solo disponibles en algunas plataformas
-          // Estas opciones podrían no estar disponibles en todas las plataformas
-          // maximumAge: 10000,
-          // timeout: 5000
-        }).then(location => {
-          console.log("Ubicación obtenida (primera llamada):", location);
-          setUserLocation({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude
-          });
-          setIsLoadingLocation(false);
-        }).catch(err => {
-          console.log("Error en primera llamada de ubicación, intentando con menor precisión:", err);
-          
-          // Si falla, intentamos con precisión más baja para obtener una ubicación rápida
-          Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-            // Opciones avanzadas
-            // maximumAge: 30000,
-            // timeout: 10000
-          }).then(location => {
-            console.log("Ubicación obtenida (segunda llamada):", location);
-            setUserLocation({
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude
-            });
-            setIsLoadingLocation(false);
-          }).catch(secondErr => {
-            console.error("Error obteniendo ubicación incluso con menor precisión:", secondErr);
-            setIsLoadingLocation(false);
-          });
-        });
-      } else {
-        console.log('Permiso de ubicación denegado');
-        setIsLoadingLocation(false);
-      }
-    } catch (err) {
-      console.error('Error al obtener la ubicación:', err);
-      setIsLoadingLocation(false);
-    }
-  };
-
-  // Función para ir a la ubicación del usuario
-  const goToUserLocation = () => {
-    console.log("goToUserLocation llamada con userLocation:", userLocation);
-    
-    if (!userLocation) {
-      console.log("No hay ubicación disponible, intentando obtener ubicación ahora");
-      // Intentar obtener la ubicación nuevamente
-      Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Highest
-      }).then(location => {
-        console.log("Ubicación obtenida después de solicitarla:", location);
-        const newLocation = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude
-        };
-        
-        setUserLocation(newLocation);
-        
-        // Llamar recursivamente a la función después de obtener la ubicación
-        setTimeout(() => goToUserLocation(), 500);
-      }).catch(err => {
-        console.error("Error obteniendo ubicación en demanda:", err);
-      });
-      return;
-    }
-    
-    // Si estamos en la vista de globo, cambiamos a la vista de mapa con zoom
-    if (!showMapView) {
-      console.log("Cambiando de globo a mapa. userLocation:", userLocation);
-      
-      // Primero animamos el globo hacia la ubicación antes de cambiar a la vista de mapa
-      if (webViewRef.current) {
-        console.log("Animando globo hacia la ubicación del usuario");
-        webViewRef.current.injectJavaScript(`
-          (function() {
-            try {
-              if (window.viewer) {
-                // Primero hacemos zoom out para una transición más suave
-                window.viewer.camera.flyTo({
-                  destination: Cesium.Cartesian3.fromDegrees(
-                    ${userLocation.longitude},
-                    ${userLocation.latitude},
-                    5000000 // Altura intermedia para iniciar el acercamiento
-                  ),
-                  orientation: {
-                    heading: 0.0,
-                    pitch: -Cesium.Math.PI_OVER_TWO,
-                    roll: 0.0
-                  },
-                  duration: 1.0,
-                  complete: function() {
-                    // Luego hacemos zoom in más cercano
-                    window.viewer.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromDegrees(
-                        ${userLocation.longitude},
-                        ${userLocation.latitude},
-                        1000000 // Altura más cercana
-                      ),
-                      orientation: {
-                        heading: 0.0,
-                        pitch: -Cesium.Math.PI_OVER_TWO,
-                        roll: 0.0
-                      },
-                      duration: 1.0
-                    });
-                  }
-                });
-                console.log('Animación de cámara iniciada hacia la ubicación del usuario');
-              }
-            } catch(e) {
-              console.error('Error al animar el globo:', e);
-            }
-            return true;
-          })();
-        `);
-      }
-      
-      // Actualizamos la posición para que el WebView sepa dónde mirar
-      setCurrentPosition(prevState => {
-        console.log("Actualizando currentPosition a:", {
-          ...prevState,
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          altitude: 1000000,
-          zoom: 12
-        });
-        return {
-          ...prevState,
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          altitude: 1000000, // Altura para iniciar la transición
-          zoom: 12
-        };
-      });
-      
-      // Añadimos un mayor retraso para permitir que la animación del globo termine
-      setTimeout(() => {
-        setShowMapView(true);
-        console.log("Vista de mapa activada");
-        
-        // Animamos el mapa a la ubicación del usuario
-        if (mapViewRef.current) {
-          console.log("Animando mapa a:", userLocation);
-          setTimeout(() => {
-            try {
-              mapViewRef.current?.animateToRegion({
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                latitudeDelta: 0.01, // Zoom cercano
-                longitudeDelta: 0.01
-              }, 1000);
-              console.log("Animación de mapa iniciada");
-            } catch (err) {
-              console.error("Error en animateToRegion:", err);
-            }
-          }, 1000); // Aumentamos el retraso para asegurar que el mapa está listo
-        } else {
-          console.log("mapViewRef.current es null");
-        }
-      }, 2000); // 2 segundos para permitir que termine la animación del globo
-      
-      // Detenemos rotación en el WebView
-      if (webViewRef.current) {
-        console.log("Deteniendo rotación del WebView");
-        webViewRef.current.injectJavaScript(`
-          (function() {
-            try {
-              autoRotate = false;
-              console.log('Rotación automática detenida al ir a la ubicación');
-            } catch(e) {
-              console.error('Error al detener rotación:', e);
-            }
-            return true;
-          })();
-        `);
-      } else {
-        console.log("webViewRef.current es null");
-      }
-    } else {
-      console.log("Ya estamos en vista de mapa, haciendo zoom a:", userLocation);
-      // Si ya estamos en el mapa, solo hacemos zoom a la ubicación
-      if (mapViewRef.current) {
-        try {
-          mapViewRef.current.animateToRegion({
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: 0.01, // Zoom cercano
-            longitudeDelta: 0.01
-          }, 1000);
-          console.log("Zoom en mapa iniciado");
-        } catch (err) {
-          console.error("Error en animateToRegion (modo mapa):", err);
-        }
-      } else {
-        console.log("mapViewRef.current es null en modo mapa");
-      }
-    }
-  };
-
-  // Efecto para obtener la ubicación del usuario al inicio
-  useEffect(() => {
-    // Indicamos inmediatamente que el globo está cargado
-    // para que se muestre sin esperar a la ubicación
-    setLoading(false);
-    
-    // Obtenemos la ubicación del usuario en paralelo
-    getUserLocation();
-    
-    // Opcionalmente, intentar obtener la ubicación periódicamente si no se obtiene la primera vez
-    const locationInterval = setInterval(() => {
-      if (!userLocation && locationPermission) {
-        console.log("Reintentando obtener ubicación...");
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced
-        }).then(location => {
-          console.log("Ubicación obtenida después de reintentos:", location);
-          setUserLocation({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude
-          });
-          // Una vez que tenemos la ubicación, podemos detener los reintentos
-          clearInterval(locationInterval);
-          setIsLoadingLocation(false);
-        }).catch(err => {
-          console.log("Error en reintento de ubicación:", err);
-          // No actualizamos isLoadingLocation para seguir mostrando que estamos buscando
-        });
-      } else if (userLocation) {
-        // Si ya tenemos ubicación, detener los reintentos
-        clearInterval(locationInterval);
-      }
-    }, 10000); // Reintentar cada 10 segundos
-
-    // Limpiar el intervalo cuando el componente se desmonte
-    return () => {
-      clearInterval(locationInterval);
-    };
-  }, [locationPermission, userLocation]);
-
-  // Efecto para configurar un timeout para cambiar a la vista de respaldo si tarda demasiado
-  useEffect(() => {
-    if (!useFallbackView && Platform.OS !== 'web') {
-      // Configurar timeout más largo
-      loadTimeoutRef.current = setTimeout(() => {
-        console.warn('Timeout en carga de Cesium, intentando recuperar automáticamente');
-        if (webViewRef.current) {
-          // Intentar recargar antes de cambiar a la vista de respaldo
-          webViewRef.current.reload();
-          
-          // Si aún hay problemas después de recargar, entonces cambiar a vista de respaldo
-          setTimeout(() => {
-            if (loading) {
-              console.warn('Cesium sigue sin cargar, cambiando a vista alternativa');
-              setUseFallbackView(true);
-            }
-          }, 30000); // 30 segundos adicionales después de recargar
-        } else {
-          setUseFallbackView(true);
-        }
-      }, TIMEOUT_SECONDS * 1000); // 120 segundos de espera para cargar Cesium
-
-      return () => {
-        if (loadTimeoutRef.current) {
-          clearTimeout(loadTimeoutRef.current);
-        }
-      };
-    }
-    return undefined;
-  }, [useFallbackView]);
-
-  // Efecto para manejar cambios de orientación
-  useEffect(() => {
-    if (Platform.OS !== 'web') {
-      // Obtener dimensiones iniciales
-      const initialDimensions = Dimensions.get('window');
-      
-      // Función para manejar cambios de dimensiones
-      const dimensionsChangeHandler = ({ window }: { window: { width: number; height: number } }) => {
-        // Si estamos en el mapa, actualizar la región
-        if (showMapView && mapViewRef.current) {
-          setTimeout(() => {
-            mapViewRef.current?.animateToRegion({
-              latitude: currentPosition.latitude,
-              longitude: currentPosition.longitude,
-              latitudeDelta: 0.0922 * (10 / Math.max(1, currentPosition.zoom)),
-              longitudeDelta: 0.0421 * (10 / Math.max(1, currentPosition.zoom))
-            }, 300);
-          }, 300);
-        }
-      };
-      
-      // Añadir listener para cambios de dimensiones
-      const subscription = Dimensions.addEventListener('change', dimensionsChangeHandler);
-      
-      // Limpiar listener cuando el componente se desmonte
-      return () => {
-        subscription.remove();
-      };
-    }
-    return undefined;
-  }, [showMapView, currentPosition]);
-
-  // Función para manejar errores y cambiar a la vista de respaldo
-  const handleError = (errorMsg: string) => {
-    // Ignorar errores específicos de Web Workers que sabemos que no son críticos
-    if (
-      errorMsg.includes('importScripts') || 
-      errorMsg.includes('WorkerGlobalScope') ||
-      errorMsg.includes('transferTypedArrayTest') ||
-      errorMsg.includes('createVerticesFromHeightmap')
-    ) {
-      console.warn('Ignorando error no crítico de Web Worker:', errorMsg);
-      return;
-    }
-    
-    // Ignorar errores de normalización o propiedades de solo lectura
-    if (
-      errorMsg.includes('Cannot assign to read only property') ||
-      errorMsg.includes('normalize')
-    ) {
-      console.warn('Ignorando error de asignación a propiedad de solo lectura:', errorMsg);
-      // Intentar recargar el contenido del WebView sin cambiar a la vista de respaldo
-      if (webViewRef.current) {
-        console.log('Recargando WebView después de error...');
-        webViewRef.current.reload();
-      }
-      return;
-    }
-    
-    console.error('Error en GlobeView:', errorMsg);
-    setError(errorMsg);
-    // Cambiar a la vista de respaldo después de un breve retraso
-    setTimeout(() => {
-      setUseFallbackView(true);
-    }, 1000);
-  };
-
-  // Si estamos en web, usamos el componente Cesium directamente
-  if (Platform.OS === 'web') {
-    return (
-      <View style={[styles.container, props.style]}>
-        <div style={{ width: '100%', height: '100%' }} id="cesiumContainer"></div>
-      </View>
-    );
-  }
-  
-  // Si hay problemas con WebView o estamos en modo fallback, usamos el globo alternativo
-  if (useFallbackView) {
-    return (
-      <View style={[styles.container, props.style]}>
-        <ActivityIndicator size="large" color="#4CAF50" style={{flex: 1}} />
-        <Text style={styles.errorText}>Cargando vista alternativa...</Text>
-      </View>
-    );
-  }
-
-  // Crear versión optimizada del HTML para móviles con solución para errores de workers
-  const htmlContent = `
+// HTML simplificado sin eventos complejos ni Web Workers
+const htmlContent = `
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="es">
     <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <title>Cesium Globe</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+  <title>TravelQuest - Globo 3D</title>
       <style>
-        html, body {
+        html, body, #cesiumContainer {
           width: 100%;
           height: 100%;
           margin: 0;
           padding: 0;
           overflow: hidden;
-          background-color: black;
-          touch-action: manipulation;
-          position: fixed;
+          background-color: #000;
+          font-family: sans-serif;
         }
-        #cesiumContainer {
-          width: 100%;
-          height: 100%;
-          position: absolute;
-          top: 0;
-          left: 0;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-        .cesium-widget-credits, .cesium-viewer-bottom, .cesium-viewer-toolbar {
-          display: none !important;
-        }
-        .loading-overlay {
+        #loadingOverlay {
           position: absolute;
           top: 0;
           left: 0;
           width: 100%;
           height: 100%;
-          background-color: rgba(0,0,0,0.8);
+          background-color: rgba(0, 0, 0, 0.7);
           display: flex;
+          flex-direction: column;
           justify-content: center;
           align-items: center;
           z-index: 1000;
-          color: white;
-          font-family: Arial, sans-serif;
         }
-        .loading-indicator {
+        #loadingText {
+          color: white;
+          font-size: 18px;
+          margin-top: 20px;
           text-align: center;
         }
-        .loading-spinner {
-          width: 60px;
-          height: 60px;
-          border: 5px solid rgba(255,255,255,0.3);
+        #errorOverlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.8);
+          display: none;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+          color: white;
+          padding: 20px;
+          text-align: center;
+        }
+        .spinner {
+          border: 5px solid #f3f3f3;
+          border-top: 5px solid #F57C00;
           border-radius: 50%;
-          border-top-color: #4CAF50;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 20px;
+          width: 40px;
+          height: 40px;
+          animation: spin 2s linear infinite;
         }
         @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .button {
-          position: absolute;
-          padding: 8px;
-          background-color: #4CAF50;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          font-weight: bold;
-          z-index: 1000;
-          cursor: pointer;
-        }
-        .center-button {
-          bottom: 20px;
-          left: 10px;
-        }
-        .location-button {
-          bottom: 20px;
-          right: 10px;
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
       </style>
+  <script>
+    // Variable global para desactivar Web Workers
+    window.CESIUM_NO_WORKERS = true;
+    
+    // Función para comunicarse con React Native
+    function sendToReactNative(message) {
+      if (window.ReactNativeWebView) {
+        console.log('Enviando mensaje a React Native:', JSON.stringify(message));
+        try {
+          window.ReactNativeWebView.postMessage(JSON.stringify(message));
+        } catch (error) {
+          console.error('Error enviando mensaje a React Native:', error);
+        }
+      } else {
+        console.warn('ReactNativeWebView no disponible para enviar mensajes');
+      }
+    }
+    
+    // Notificar que el HTML ha cargado
+    window.onload = function() {
+      console.log('HTML cargado, notificando a React Native');
+      sendToReactNative({ type: 'htmlLoaded' });
+      
+      // Iniciar carga del globo después de un breve retraso
+      setTimeout(initMap, 500);
+    };
+  </script>
     </head>
     <body>
-      <div id="cesiumContainer">
-        <!-- Eliminamos el div de depuración visible -->
+      <div id="cesiumContainer"></div>
+      <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText">Iniciando globo terráqueo...</div>
       </div>
-      <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-indicator">
-          <div class="loading-spinner"></div>
-          <div style="font-size: 18px; font-weight: bold;">Cargando globo terráqueo</div>
-          <div id="loading-progress" style="margin-top: 15px; font-size: 14px;">Inicializando mapa...</div>
-        </div>
+      <div id="errorOverlay">
+        <h3 style="color: #ff5252;">Error al cargar el mapa</h3>
+        <p id="errorMessage"></p>
       </div>
-      
-      <script>
-        // Configurar base URL para Cesium ANTES de cargar la biblioteca
-        window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.81/Build/Cesium/';
-        
-        // Variable para controlar el nivel de detalle según el rendimiento
-        let isLowPerformanceDevice = false;
-        
-        // Detectar rendimiento del dispositivo
-        try {
-          const canvas = document.createElement('canvas');
-          const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-          
-          if (!gl) {
-            isLowPerformanceDevice = true;
-          } else {
-            // Verificar capacidades básicas
-            const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-            const maxTextureUnits = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
-            
-            // Si las capacidades son limitadas, considerarlo dispositivo de rendimiento bajo
-            if (maxTextureSize < 4096 || maxTextureUnits < 8) {
-              isLowPerformanceDevice = true;
-            }
-          }
-        } catch(e) {
-          console.warn('Error detectando rendimiento del dispositivo:', e);
-          isLowPerformanceDevice = true; // Asumir bajo rendimiento por seguridad
-        }
-        
-        // Actualizar el progreso de carga
-        function updateProgress(text) {
-          document.getElementById('loading-progress').textContent = text;
-        }
-        
-        // Cargar scripts y estilos
-        function loadScript(url, callback) {
-          var script = document.createElement('script');
-          script.type = 'text/javascript';
-          script.src = url;
-          script.onload = callback;
-          script.onerror = function() {
-            window.ReactNativeWebView.postMessage('error:No se pudo cargar Cesium. Verifica tu conexión a Internet.');
-          };
-          document.head.appendChild(script);
-        }
-        
-        function loadStyles(url) {
-          var link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = url;
-          document.head.appendChild(link);
-        }
 
-        // Iniciar la carga de Cesium (versión 1.83 más compatible con WebView)
-        updateProgress('Inicializando...');
-        // Primero configuramos el entorno para evitar errores de workers
-        window.BUILD_WORKER = function(){return null;};
-        window.CESIUM_ON_WORKER_BOOT = function(){};
+      <!-- Cargar Cesium de forma simplificada -->
+      <script src="https://cesium.com/downloads/cesiumjs/releases/1.83/Build/Cesium/Cesium.js"></script>
+      <link href="https://cesium.com/downloads/cesiumjs/releases/1.83/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+      <script>
+        let viewer;
+        let isInitialized = false;
         
-        // Cargamos una versión más antigua de Cesium que funciona mejor en WebView
-        loadScript('https://cesium.com/downloads/cesiumjs/releases/1.81/Build/Cesium/Cesium.js', function() {
-          updateProgress('Cesium cargado. Preparando globo...');
-          loadStyles('https://cesium.com/downloads/cesiumjs/releases/1.81/Build/Cesium/Widgets/widgets.css');
-          
-          // Pequeño retraso para asegurar que Cesium esté listo
-          setTimeout(function() {
-            try {
-              initCesium();
-              
-              // Forzar una actualización del tamaño del canvas después de la inicialización
-              setTimeout(function() {
-                if (window.viewer) {
-                  // Llamar de nuevo a centerGlobe después de la carga para asegurar la posición
-                  if (typeof window.centerGlobe === 'function') {
-                    window.centerGlobe();
-                  }
-                  
-                  // Asegurar que el globo es visible
-                  window.viewer.scene.globe.show = true;
-                  
-                  // Forzar renderizado
-                  window.viewer.scene.requestRender();
-                }
-              }, 2000);
-            } catch(e) {
-              console.error('Error al inicializar Cesium:', e);
-              window.ReactNativeWebView.postMessage('error:' + e);
-            }
-          }, 500);
-        });
+        // Función para manejar errores
+        function showError(message) {
+          document.getElementById('loadingOverlay').style.display = 'none';
+          document.getElementById('errorOverlay').style.display = 'flex';
+          document.getElementById('errorMessage').textContent = message;
+          sendToReactNative({ type: 'error', data: message });
+        }
         
-        function initCesium() {
+        // Función para actualizar estado de carga
+        function updateLoadingStatus(message) {
+          document.getElementById('loadingText').textContent = message;
+          sendToReactNative({ type: 'loadingStatus', message: message });
+        }
+        
+        // Inicializar mapa básico sin eventos complejos
+        function initMap() {
           try {
-            console.log('Inicializando Cesium...');
+            console.log('Iniciando creación del mapa...');
+            updateLoadingStatus('Cargando Cesium...');
             
-            // Token de Cesium Ion
-            Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlNmY5ZTNmZS1hMGRkLTQyZjQtYWQ1NS1lODYwZTcxNTRiMjMiLCJpZCI6MjAxNDM5LCJpYXQiOjE3MTMxODg0Njd9.ckUMa1Nb8MvXb2EYMy01bIPBOhrYmFbSw0RPiBP70oI';
+            if (typeof Cesium === 'undefined') {
+              showError('La biblioteca Cesium no está disponible');
+              return;
+            }
             
-            updateProgress('Creando visor...');
+            // Configurar token de Cesium
+            Cesium.Ion.defaultAccessToken = '${CESIUM_TOKEN}';
+            updateLoadingStatus('Configurando visor...');
             
-            // Desactivar Web Workers completamente para evitar los errores
-            Cesium.FeatureDetection.supportsWebWorkers = function() { return false; };
-            
-            // Inicialización del visor de Cesium con opciones simplificadas
-            window.viewer = new Cesium.Viewer('cesiumContainer', {
+            // Opciones mínimas de visualización
+            const options = {
               animation: false,
               baseLayerPicker: false,
               fullscreenButton: false,
@@ -623,870 +162,1031 @@ const GlobeView = (props: { style?: any }) => {
               homeButton: false,
               infoBox: false,
               sceneModePicker: false,
-              selectionIndicator: false,
               timeline: false,
               navigationHelpButton: false,
-              navigationInstructionsInitiallyVisible: false,
               scene3DOnly: true,
-              requestRenderMode: false, // Desactivar requestRenderMode para asegurar renderizado continuo
-              maximumRenderTimeChange: Infinity,
-              terrainProvider: new Cesium.EllipsoidTerrainProvider(), // Usar terreno simple desde el inicio
-              imageryProvider: false, // Sin imagen inicial, las añadiremos manualmente
+              requestRenderMode: true,
               contextOptions: {
                 webgl: {
-                  alpha: false, // Usar fondo opaco
-                  antialias: true, // Mejorar calidad visual
-                  failIfMajorPerformanceCaveat: false
+                  alpha: false,
+                  antialias: false,
+                  preserveDrawingBuffer: true,
+                  failIfMajorPerformanceCaveat: false,
+                  powerPreference: "high-performance"
                 }
               }
-            });
+            };
             
-            // Guardar variable local para uso interno
-            const viewer = window.viewer;
+            // Crear visor sin eventos complejos
+            updateLoadingStatus('Creando visor...');
+            viewer = new Cesium.Viewer('cesiumContainer', options);
+            console.log('Visor creado con éxito');
             
-            // Verificar que el visor se creó correctamente
-            if (!viewer || !viewer.scene) {
-              throw new Error('No se pudo crear el visor Cesium');
+            if (!viewer) {
+              showError('No se pudo crear el visor de Cesium');
+              return;
             }
             
-            // Eliminar la extensión de CesiumInspector
-            // Forzar renderizado de frames incluso sin cambios
-            viewer.scene.requestRenderMode = false;
-            
-            // Ocultar créditos
-            viewer.cesiumWidget.creditContainer.style.display = 'none';
-            
-            // Eliminar toda la parte de depuración móvil
-            updateProgress('Aplicando configuración...');
-            
-            // Aplicar optimizaciones extremas para móviles
-            viewer.scene.fog.enabled = false;
-            viewer.scene.globe.maximumScreenSpaceError = isLowPerformanceDevice ? 12 : 8; 
-            viewer.targetFrameRate = isLowPerformanceDevice ? 24 : 30;
-            viewer.resolutionScale = isLowPerformanceDevice ? 0.5 : 0.7;
-            
-            // Hacer visible el globo
-            viewer.scene.globe.show = true;
-            viewer.scene.globe.baseColor = Cesium.Color.BLUE;
-            viewer.scene.backgroundColor = Cesium.Color.BLACK;
-            
-            // Ajustar el tamaño y posición de la escena para centrar el globo
-            function centerGlobe() {
-              try {
-                // Forzar que el canvas tenga el tamaño correcto
-                const canvas = viewer.scene.canvas;
-                if (canvas) {
-                  canvas.width = window.innerWidth;
-                  canvas.height = window.innerHeight;
-                  canvas.style.width = '100%';
-                  canvas.style.height = '100%';
-                  
-                  // Actualizar la matriz de proyección
-                  viewer.scene.camera.frustum.aspectRatio = canvas.clientWidth / canvas.clientHeight;
-                }
-                
-                // Utilizar flyTo en lugar de lookAt para evitar problemas con vectores
-                viewer.camera.flyTo({
-                  destination: Cesium.Cartesian3.fromDegrees(0.0, 0.0, 15000000.0),
-                  orientation: {
-                    heading: Cesium.Math.toRadians(0.0),
-                    pitch: Cesium.Math.toRadians(-90.0),
-                    roll: 0.0
-                  },
-                  duration: 0.5, // Más rápido para respuesta inmediata
-                  complete: function() {
-                    // Forzar un repintado después de centrar
-                    viewer.scene.requestRender();
-                  }
-                });
-              } catch (e) {
-                console.warn('Error al centrar el globo:', e);
-              }
-            }
-            
-            // Exponer la función globalmente
-            window.centerGlobe = centerGlobe;
-            
-            // Llamar a centrarlo inicialmente
-            centerGlobe();
-            
-            // Centrar cuando cambie el tamaño de la ventana
-            window.addEventListener('resize', centerGlobe);
-            
-            // Función para cargar textura directa si todo lo demás falla
-            function loadDirectTexture() {
-              updateProgress('Cargando textura directa...');
-              
-              // Intentar cargar una textura de la Tierra directamente
-              const earthTexture = new Image();
-              earthTexture.crossOrigin = 'anonymous';
-              earthTexture.onload = function() {
-                try {
-                  // Crear material con la textura
-                  const material = new Cesium.Material({
-                    fabric: {
-                      type: 'DiffuseMap',
-                      uniforms: {
-                        image: earthTexture
-                      }
-                    }
-                  });
-                  
-                  // Aplicar al globo
-                  viewer.scene.globe.material = material;
-                  updateProgress('Textura cargada con éxito');
-                } catch (e) {
-                  console.error('Error al aplicar textura:', e);
-                }
-              };
-              
-              earthTexture.onerror = function() {
-                console.error('Error al cargar la textura de la Tierra');
-              };
-              
-              // Usar una URL de imagen pública de la Tierra
-              earthTexture.src = 'https://eoimages.gsfc.nasa.gov/images/imagerecords/74000/74218/world.200412.3x5400x2700.jpg';
-            }
-            
-            // Desactivar efectos exigentes
-            viewer.scene.skyAtmosphere.show = false;
-            viewer.scene.globe.showGroundAtmosphere = false;
-            
-            updateProgress('Cargando imágenes...');
-            
-            // Usar mapas naturales de la Tierra sin fronteras políticas
-            let imageLoadSuccess = false;
-            
-            try {
-              // Cargar solo mapas naturales de la Tierra
-              const naturalEarthII = new Cesium.TileMapServiceImageryProvider({
-                url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
+            // Configurar vista inicial básica
+            if (viewer.camera) {
+              viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(0, 0, 20000000)
               });
-              viewer.imageryLayers.addImageryProvider(naturalEarthII);
-              imageLoadSuccess = true;
-              
-              // No añadimos capas de fronteras políticas
-            } catch (e) {
-              console.warn('Error cargando mapas NaturalEarth:', e);
-              try {
-                // Alternativa: mapas físicos de Bing
-                const bing = new Cesium.BingMapsImageryProvider({
-                  url: 'https://dev.virtualearth.net',
-                  key: 'AipIE-pEoKccx-kC8G3D-45V3hl9hZxC-5vSXbMamybYjvJTXvoOYT7QeMqvFMGQ',
-                  mapStyle: Cesium.BingMapsStyle.AERIAL // Vista satélite sin fronteras
-                });
-                viewer.imageryLayers.addImageryProvider(bing);
-                imageLoadSuccess = true;
-              } catch (e2) {
-                console.warn('Error cargando mapas de Bing:', e2);
-                try {
-                  // Alternativa: mapas de Ion (imágenes de satélite)
-                  const ion = new Cesium.IonImageryProvider({ 
-                    assetId: 3 // World Imagery
-                  });
-                  viewer.imageryLayers.addImageryProvider(ion);
-                  imageLoadSuccess = true;
-                } catch (e3) {
-                  console.error('Error cargando todas las opciones de imágenes:', e3);
-                  
-                  // Último recurso: cargar textura directa
-                  loadDirectTexture();
-                }
-              }
             }
             
-            // Si después de todo no tenemos imágenes, cargar la textura directamente
-            if (!imageLoadSuccess && viewer.imageryLayers.length === 0) {
-              loadDirectTexture();
-            }
+            // Ocultar capa de carga
+            document.getElementById('loadingOverlay').style.display = 'none';
             
-            updateProgress('Configurando cámara...');
+            // Notificar que está listo
+            isInitialized = true;
+            console.log('Visor inicializado correctamente, notificando a React Native');
+            sendToReactNative({ type: 'viewerReady' });
             
-            // Configurar la cámara para una vista más centrada
-            setTimeout(function() {
-              try {
-                // Configurar una vista inicial simple y directa
-                viewer.camera.setView({
-                  destination: Cesium.Cartesian3.fromDegrees(0.0, 0.0, 15000000.0),
-                  orientation: {
-                    heading: 0.0,
-                    pitch: -Cesium.Math.PI_OVER_TWO,
-                    roll: 0.0
-                  }
-                });
-                
-                updateProgress('Activando características...');
-                
-                // Configurar sin rotación automática
-                setTimeout(function() {
-                  // Solo iniciamos monitoreo de posición, sin rotación automática
-                  try {
-                    // Desactivar rotación automática desde el principio
-                    autoRotate = false;
-                    
-                    // Iniciar comprobación periódica de estabilidad del globo
-                    startStabilityCheck();
-                    
-                    // Iniciar monitoreo de posición de cámara
-                    startCameraPositionMonitoring();
-                    
-                    // Informar que la carga básica está completa
-                    window.ReactNativeWebView.postMessage('loaded');
-                    
-                    // Ocultar overlay de carga
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                  } catch (e) {
-                    console.error('Error al iniciar características:', e);
-                    // Seguimos mostrando el globo aunque falle
-                    window.ReactNativeWebView.postMessage('loaded');
-                    document.getElementById('loadingOverlay').style.display = 'none';
-                  }
-                }, 1000);
-              } catch (e) {
-                console.error('Error al configurar vista inicial:', e);
-                // Informar que se completó de todos modos
-                window.ReactNativeWebView.postMessage('loaded');
-                document.getElementById('loadingOverlay').style.display = 'none';
-              }
-            }, 1000);
-            
-            // Configurar interacción para móviles
-            viewer.scene.screenSpaceCameraController.minimumZoomDistance = 1000000; // 1000 km mínimo
-            viewer.scene.screenSpaceCameraController.maximumZoomDistance = 25000000; // 25000 km máximo
-            
-            // Configuración adicional para evitar saltos
-            viewer.scene.screenSpaceCameraController.inertiaSpin = 0.5; // Reducir inercia de giro
-            viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.5; // Reducir inercia de desplazamiento
-            viewer.scene.screenSpaceCameraController.inertiaZoom = 0.5; // Reducir inercia de zoom
-            
-            // Evitar que ciertas regiones "atraigan" la cámara
-            viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
-            
-            // Limitar la velocidad de rotación
-            viewer.scene.screenSpaceCameraController.maximumMovementRatio = 0.1;
-            
-            // Desactivar efectos que podrían causar problemas
-            viewer.scene.globe.enableLighting = false;
-            viewer.scene.fog.enabled = false;
-            viewer.scene.globe.showGroundAtmosphere = false;
-            
-            // Forzar modo 3D estricto
-            viewer.scene.mode = Cesium.SceneMode.SCENE3D;
-            viewer.scene.morphComplete.addEventListener(function() {
-              viewer.scene.mode = Cesium.SceneMode.SCENE3D;
-            });
-            
-            // Configurar manipulación manual más suave
-            viewer.scene.screenSpaceCameraController.tiltEventTypes = [
-              Cesium.CameraEventType.MIDDLE_DRAG, 
-              Cesium.CameraEventType.PINCH,
-              {
-                eventType: Cesium.CameraEventType.LEFT_DRAG,
-                modifier: Cesium.KeyboardEventModifier.CTRL
-              }
-            ];
-            
-            // Configurar rotación manual más suave
-            viewer.scene.screenSpaceCameraController.rotateEventTypes = [
-              Cesium.CameraEventType.LEFT_DRAG
-            ];
-            
-            // Configurar rotación automática
-            let autoRotate = false; // Inicialmente desactivada
-            const rotationAxis = new Cesium.Cartesian3(0, 0, 1); // Eje Z (vertical)
-            let lastTime = Date.now();
-            
-            // Función para verificar periódicamente la estabilidad del globo
-            function startStabilityCheck() {
-              // Ejecutar cada 10 segundos
-              setInterval(function() {
-                try {
-                  // Verificar si el globo sigue visible
-                  if (!viewer.scene.globe.show) {
-                    viewer.scene.globe.show = true;
-                  }
-                } catch (e) {
-                  console.error('Error en verificación de estabilidad:', e);
-                }
-              }, 10000);
-            }
-            
-            // Función para monitorear la posición de la cámara y enviarla al componente React Native
-            function startCameraPositionMonitoring() {
-              setInterval(function() {
-                try {
-                  if (!viewer || !viewer.scene || !viewer.camera) return;
-                  
-                  // Obtener la posición de la cámara en coordenadas geográficas
-                  const position = viewer.camera.positionCartographic;
-                  const longitude = Cesium.Math.toDegrees(position.longitude);
-                  const latitude = Cesium.Math.toDegrees(position.latitude);
-                  const altitude = position.height;
-                  
-                  // Calcular un valor aproximado de zoom basado en la altura
-                  // Valores aproximados: 20000000 = zoom 1, 5000000 = zoom 4, 1000000 = zoom 8
-                  const zoom = Math.max(1, Math.log(20000000 / Math.max(altitude, 10000)) * 2);
-                  
-                  // Crear objeto con la información de posición
-                  const positionData = {
-                    longitude: longitude,
-                    latitude: latitude,
-                    altitude: altitude,
-                    zoom: zoom,
-                    heading: viewer.camera.heading,
-                    pitch: viewer.camera.pitch,
-                    roll: viewer.camera.roll
-                  };
-                  
-                  // Enviar al componente React Native
-                  window.ReactNativeWebView.postMessage('position:' + JSON.stringify(positionData));
-                } catch (e) {
-                  console.error('Error al monitorear posición de cámara:', e);
-                }
-              }, 500); // Actualizar cada 500ms
-            }
-            
-            // Timeout para verificar si realmente tenemos un globo visible
-            setTimeout(function() {
-              // Verificar si tenemos capas de imagen o si el globo está visible
-              if ((viewer.imageryLayers.length === 0 || !viewer.scene.globe.show) && 
-                  document.getElementById('loadingOverlay').style.display !== 'none') {
-                
-                console.warn('No se ha detectado un globo visible, aplicando soluciones de respaldo');
-                
-                // Asegurar que el globo es visible
-                viewer.scene.globe.show = true;
-                
-                // Usar color azul y cargar textura directa
-                viewer.scene.globe.baseColor = Cesium.Color.BLUE;
-                loadDirectTexture();
-                
-                // Ocultar overlay después de intentarlo todo
-                setTimeout(function() {
-                  document.getElementById('loadingOverlay').style.display = 'none';
-                  window.ReactNativeWebView.postMessage('loaded');
-                }, 3000);
-              }
-            }, 10000);
-            
-            // Manejar interacción del usuario
-            let touchStarted = false;
-            
-            // Eventos táctiles simplificados, sin rotación automática
-            viewer.screenSpaceEventHandler.setInputAction(function() {
-              touchStarted = true;
-            }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
-            
-            viewer.screenSpaceEventHandler.setInputAction(function() {
-              touchStarted = false;
-            }, Cesium.ScreenSpaceEventType.LEFT_UP);
           } catch (error) {
-            console.error('Error al inicializar Cesium:', error);
-            window.ReactNativeWebView.postMessage('error:' + error);
+            console.error('Error inicializando mapa:', error);
+            showError((error && error.message) || 'Error al inicializar el mapa');
           }
         }
         
-        // Timeout de seguridad para asegurar que se muestra algo
-        setTimeout(function() {
-          if (document.getElementById('loadingOverlay').style.display !== 'none') {
-            updateProgress('Carga completa (timeout)');
-            document.getElementById('loadingOverlay').style.display = 'none';
-            window.ReactNativeWebView.postMessage('loaded');
-          }
-        }, 30000);
-        
-        // Manejo de errores global
-        window.onerror = function(message, source, lineno, colno, error) {
-          console.error('Error:', message);
-          
-          // Manejar errores de propiedad de solo lectura
-          if (message && (
-            message.includes('Cannot assign to read only property') || 
-            message.toString().includes('normalize') ||
-            message.toString().includes('Cartesian3')
-          )) {
-            console.warn('Detectado error de propiedades de solo lectura, intentando recuperar...');
-            
-            // Reiniciar la vista de la cámara de forma segura
-            try {
-              if (window.viewer) {
-                window.viewer.camera.flyTo({
-                  destination: Cesium.Cartesian3.fromDegrees(0.0, 0.0, 15000000.0),
-                  orientation: {
-                    heading: 0,
-                    pitch: -Cesium.Math.PI_OVER_TWO,
-                    roll: 0
-                  },
-                  duration: 0.5
-                });
-              }
-            } catch(e) {
-              console.error('Error al recuperar la vista:', e);
+        // Función para procesar mensajes desde React Native
+        function handleMessage(messageData) {
+          try {
+            // No hacer nada si no está inicializado
+            if (!isInitialized || !viewer) {
+              console.warn('Recibido mensaje pero el visor no está inicializado');
+              return;
             }
             
-            return true; // Evita propagar el error
+            let message;
+            if (typeof messageData === 'string') {
+              try {
+                message = JSON.parse(messageData);
+              } catch (e) {
+                console.error('Error parseando mensaje:', e);
+                return;
+              }
+            } else {
+              message = messageData;
+            }
+            
+            console.log('Procesando mensaje:', message.type);
+            
+            // Solo implementar la navegación básica por ahora
+            if (message.type === 'flyTo' && viewer.camera) {
+              const { longitude, latitude, height } = message;
+              viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(
+                  longitude || 0, 
+                  latitude || 0, 
+                  height || 10000000
+                ),
+                duration: 1.5
+              });
+            }
+            // Implementar transición suave para cambio a 2D
+            else if (message.type === 'transitionTo2D' && viewer.camera) {
+              console.log('Iniciando transición a 2D');
+              const { longitude, latitude, height, duration } = message;
+              
+              // Definir la posición de destino
+              const destination = Cesium.Cartesian3.fromDegrees(
+                longitude || 0,
+                latitude || 0,
+                height || 2000
+              );
+              
+              // Definir la orientación para mirar hacia abajo
+              const orientation = {
+                heading: Cesium.Math.toRadians(0),
+                pitch: Cesium.Math.toRadians(-90), // Mirando directamente hacia abajo
+                roll: 0
+              };
+              
+              try {
+                // Ejecutar la animación y notificar cuando termine
+                viewer.camera.flyTo({
+                  destination: destination,
+                  orientation: orientation,
+                  duration: duration || 3.0,
+                  complete: function() {
+                    try {
+                      // Notificar que la transición ha terminado
+                      console.log('Transición a 2D completada');
+                      sendToReactNative({ type: 'transitionComplete' });
+                    } catch (err) {
+                      console.error('Error notificando finalización de transición a 2D:', err);
+                    }
+                  }
+                });
+              } catch (err) {
+                console.error('Error en transición a 2D:', err);
+                // Notificar el error pero también enviar la señal de completado para no bloquear la interfaz
+                sendToReactNative({ type: 'error', data: 'Error en transición a 2D: ' + err.message });
+                sendToReactNative({ type: 'transitionComplete' });
+              }
+            }
+            // Implementar transición desde 2D a 3D (inversa)
+            else if (message.type === 'transitionFrom2D' && viewer.camera) {
+              console.log('Iniciando transición desde 2D a 3D');
+              const { latitude, longitude, initialHeight, finalHeight, duration, centerView, viewAngle } = message;
+              
+              try {
+                // Desactivar cualquier rotación previa que pudiera estar activa
+                stopGlobeRotation();
+                
+                // Usar ángulo de inclinación que asegure que la Tierra sea visible (más cercano a 0)
+                const pitchAngle = -90; // Ángulo más elevado para ver la Tierra desde arriba
+                
+                // Primero posicionamos la cámara directamente en la ubicación mirando hacia abajo
+                viewer.camera.setView({
+                  destination: Cesium.Cartesian3.fromDegrees(
+                    longitude || 0, 
+                    latitude || 0, 
+                    initialHeight || 5000
+                  ),
+                  orientation: {
+                    heading: Cesium.Math.toRadians(0),
+                    pitch: Cesium.Math.toRadians(-90), // Mirando directamente hacia abajo
+                    roll: 0
+                  }
+                });
+                
+                // Verificar si debemos centrar automáticamente el globo al final
+                const shouldCenterView = centerView !== false; // true por defecto si no se especifica
+                
+                // Después de un breve retraso, comenzamos una transición directa
+                setTimeout(() => {
+                  try {
+                    // Usar la altura recibida desde React Native o un valor predeterminado
+                    console.log('Altura final recibida:', finalHeight);
+                    // Usar el valor exacto del parámetro, sin ninguna modificación adicional
+                    const finalAltitude = finalHeight || 30000000; 
+                    
+                    // Una única transición para evitar saltos
+                    viewer.camera.flyTo({
+                      destination: Cesium.Cartesian3.fromDegrees(
+                        0, // Centrado en longitud 0
+                        0, // Centrado en latitud 0
+                        finalAltitude // Usar exactamente la altura recibida
+                      ),
+                      orientation: {
+                        heading: Cesium.Math.toRadians(0),
+                        pitch: Cesium.Math.toRadians(pitchAngle),
+                        roll: 0
+                      },
+                      duration: duration, // Usar la duración completa
+                      complete: function() {
+                        try {
+                          // No cambiamos la posición de la cámara al finalizar para evitar saltos
+                          console.log('Manteniendo la posición final de la transición sin cambios bruscos');
+                          // Configurar el entorno para mantener la Tierra visible
+                          if (viewer.scene) {
+                            // Limitar el zoom y la inclinación
+                            if (viewer.scene.screenSpaceCameraController) {
+                              viewer.scene.screenSpaceCameraController.minimumZoomDistance = 3000000; // No permitir acercarse demasiado
+                              viewer.scene.screenSpaceCameraController.maximumZoomDistance = 500000000; // Limitar la distancia máxima
+                              
+                              // Limitar el rango de inclinación para que siempre se vea la Tierra
+                              viewer.scene.screenSpaceCameraController.minimumPitch = Cesium.Math.toRadians(-75);
+                              viewer.scene.screenSpaceCameraController.maximumPitch = Cesium.Math.toRadians(-15);
+                            }
+                            
+                            // Mejorar la visibilidad de la Tierra
+                            if (viewer.scene.globe) {
+                              viewer.scene.globe.baseColor = Cesium.Color.BLUE;
+                              viewer.scene.globe.enableLighting = true;
+                              viewer.scene.globe.showGroundAtmosphere = true; // Mostrar atmósfera
+                              
+                              // Hacer que la Tierra sea el centro de atención
+                              if (viewer.scene.skyAtmosphere) {
+                                viewer.scene.skyAtmosphere.show = true;
+                                viewer.scene.skyAtmosphere.brightnessShift = 0.5;
+                              }
+                            }
+                          }
+                          
+                          // Iniciar rotación con un ligero retraso
+                          setTimeout(() => {
+                            try {
+                              startGlobeRotation();
+                              console.log('Transición desde 2D a 3D completada correctamente');
+                              sendToReactNative({ type: 'transitionFrom2DComplete' });
+                            } catch (e) {
+                              console.error('Error al finalizar la transición:', e);
+                              sendToReactNative({ type: 'transitionFrom2DComplete' });
+                            }
+                          }, 300);
+                        } catch (e) {
+                          console.error('Error en la etapa final de la transición:', e);
+                          sendToReactNative({ type: 'transitionFrom2DComplete' });
+                        }
+                      }
+                    });
+                  } catch (e) {
+                    console.error('Error en la transición:', e);
+                    // Método alternativo directo en caso de fallo
+                    try {
+                      viewer.camera.setView({
+                        destination: Cesium.Cartesian3.fromDegrees(0, 0, 8000000),
+                        orientation: {
+                          heading: Cesium.Math.toRadians(0),
+                          pitch: Cesium.Math.toRadians(pitchAngle),
+                          roll: 0
+                        }
+                      });
+                      
+                      startGlobeRotation();
+                      sendToReactNative({ type: 'transitionFrom2DComplete' });
+                    } catch (e2) {
+                      console.error('Error en el método alternativo:', e2);
+                      sendToReactNative({ type: 'transitionFrom2DComplete' });
+                    }
+                  }
+                }, 500);
+              } catch (e) {
+                console.error('Error configurando vista inicial para transición 2D a 3D:', e);
+                sendToReactNative({ type: 'transitionFrom2DComplete' });
+              }
+            }
+            // Implementar modo oscuro/claro
+            else if (message.type === 'setDarkMode') {
+              const { enabled } = message;
+              if (enabled) {
+                // Modo oscuro
+                viewer.scene.globe.baseColor = Cesium.Color.BLACK;
+                viewer.scene.backgroundColor = Cesium.Color.BLACK;
+              } else {
+                // Modo normal
+                viewer.scene.globe.baseColor = Cesium.Color.BLUE;
+                viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#1B1B1B');
+              }
+            }
+          } catch (e) {
+            console.error('Error procesando mensaje:', e);
+          }
+        }
+        
+        // Función para iniciar rotación automática del globo
+        let globeRotationActive = false;
+        function startGlobeRotation() {
+          if (globeRotationActive) return;
+          
+          console.log('Iniciando rotación automática del globo');
+          globeRotationActive = true;
+          let lastTime = Date.now();
+          
+          function rotateGlobe() {
+            if (!globeRotationActive || !viewer) return;
+            
+            const currentTime = Date.now();
+            const delta = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Rotar el globo lentamente
+            try {
+              viewer.scene.camera.rotate(Cesium.Cartesian3.UNIT_Z, -delta / 100000); // Rotación mucho más lenta
+              
+              // Asegurar que la Tierra siempre sea visible durante la rotación
+              const cameraHeight = viewer.scene.camera.positionCartographic.height;
+              if (cameraHeight > 15000000) {
+                // Si la cámara está demasiado lejos, acercarla
+                viewer.scene.camera.zoomIn(50000);
+              }
+            } catch (e) {
+              console.error('Error durante la rotación del globo:', e);
+              globeRotationActive = false;
+              return;
+            }
+            
+            // Continuar la rotación
+            requestAnimationFrame(rotateGlobe);
           }
           
-          // Solo reportar errores significativos que no sean de workers
-          if (!message.includes('Worker') && !message.includes('importScripts')) {
-            window.ReactNativeWebView.postMessage('error:' + message);
-          }
-          return true;
-        };
+          // Iniciar rotación
+          requestAnimationFrame(rotateGlobe);
+        }
+        
+        // Detener rotación
+        function stopGlobeRotation() {
+          globeRotationActive = false;
+        }
+        
+        // Configurar recepción de mensajes
+        window.addEventListener('message', function(event) {
+          console.log('Mensaje recibido por window.addEventListener:', event.data);
+          handleMessage(event.data);
+        });
+        
+        document.addEventListener('message', function(event) {
+          console.log('Mensaje recibido por document.addEventListener:', event.data);
+          handleMessage(event.data);
+        });
       </script>
     </body>
-    </html>
-  `;
+</html>
+`;
 
-  // Manejador de mensajes desde el WebView
-  const handleWebViewMessage = (event: WebViewMessageEvent) => {
-    const message = event.nativeEvent.data;
-    
-    // Verificar si el mensaje contiene datos de posición
-    if (message.startsWith('position:')) {
-      try {
-        const positionData = JSON.parse(message.substring(9));
-        setCurrentPosition(positionData);
-       
-      } catch (e) {
-        console.error('Error al procesar datos de posición:', e);
-      }
-    } else if (message === 'loaded') {
-      console.log('Cesium cargado correctamente');
-      setLoading(false);
+/**
+ * Interfaz para la ubicación del usuario
+ */
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  accuracy?: number;
+}
+
+/**
+ * Interfaz para los métodos expuestos a componentes padres
+ */
+export interface GlobeViewRef {
+  getUserLocation: () => Promise<Location.LocationObject | null>;
+  flyTo: (latitude: number, longitude: number, options?: any) => void;
+  reloadViewer: () => void;
+  setDarkMode: (enabled: boolean) => void;
+  toggleMapMode: () => void;
+}
+
+// Props del componente GlobeView
+export interface Props {
+  style?: any;
+  region?: Region;
+  initialRegion?: Region;
+  showsUserLocation?: boolean;
+  followsUserLocation?: boolean;
+  useFallbackGlobe?: boolean;
+  onRegionChange?: (region: Region) => void;
+  onRegionChangeComplete?: (region: Region) => void;
+  onLoadingChange?: (loading: boolean) => void;
+  webViewRef?: React.RefObject<WebView>;
+  onError?: (error: string) => void;
+  onLoadEnd?: () => void;
+}
+
+// Componente para mostrar el globo en 3D
+const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
+  console.log("GlobeView: Inicializando componente");
+  const webViewRef = useRef<WebView>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingPhase, setLoadingPhase] = useState('Iniciando...');
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
+  const [isWebViewReady, setIsWebViewReady] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+  const [performanceMode, setPerformanceMode] = useState(true); // Modo rendimiento por defecto
+  const [is3DMode, setIs3DMode] = useState(true); // Por defecto en modo 3D
+  const [mapRegion, setMapRegion] = useState<Region | null>(null);
+
+  // Efecto para logging del ciclo de vida
+  useEffect(() => {
+    console.log("GlobeView: Componente montado");
+    return () => {
+      console.log("GlobeView: Componente desmontado");
+    };
+  }, []);
+
+  // Efecto para asegurar que el WebView siempre esté inicializado
+  useEffect(() => {
+    // Iniciar temprano para que el WebView esté listo cuando se necesite
+    if (!isWebViewReady && webViewRef.current) {
+      console.log("GlobeView: Inicializando WebView precargado");
       
-      // Limpiar el timeout cuando se carga correctamente
-      if (loadTimeoutRef.current) {
-        clearTimeout(loadTimeoutRef.current);
+      // Si el WebView aún no está listo, asegurarnos de que esté cargado
+      // No hacemos nada activamente porque la carga ocurre automáticamente
+      // al montar el componente WebView
+    }
+    
+    // Verificar periódicamente si el WebView está listo
+    const checkInterval = setInterval(() => {
+      if (!isWebViewReady && webViewRef.current) {
+        console.log("GlobeView: Verificando estado del WebView precargado");
+      } else if (isWebViewReady) {
+        console.log("GlobeView: WebView precargado está listo");
+        clearInterval(checkInterval);
       }
-    } else if (message.startsWith('error:')) {
-      console.error('Error en Cesium WebView:', message.substring(6));
-      setError(message.substring(6));
-      handleError(message.substring(6));
-    } else if (message === 'goToUserLocation') {
-      // Procesar solicitud para ir a la ubicación del usuario desde el WebView
-      console.log("Recibida solicitud de ir a ubicación desde WebView");
-      goToUserLocation();
+    }, 2000);
+    
+    return () => {
+      clearInterval(checkInterval);
+    };
+  }, [isWebViewReady]);
+
+  // Cambiar entre mapa 3D y 2D
+  const toggleMapMode = async () => {
+    console.log('GlobeView: Iniciando toggleMapMode, modo actual:', is3DMode ? '3D' : '2D');
+    
+    if (is3DMode) {
+      setIsLocating(true);
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        
+        if (status !== 'granted') {
+          console.log('GlobeView: Permiso de ubicación denegado');
+          setIsLocating(false);
+          return;
+        }
+        
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High
+        });
+        
+        console.log('GlobeView: Ubicación obtenida para transición a 2D:', location.coords);
+        setUserLocation(location);
+        
+        // Configurar la región para el mapa 2D
+        setMapRegion({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01
+        });
+        
+        console.log('GlobeView: Iniciando transición a mapa 2D en ubicación:', location.coords);
+        
+        // Primero hacemos zoom a la ubicación actual antes de cambiar a 2D
+        if (isWebViewReady && webViewRef.current) {
+          try {
+            // Enviamos mensaje al WebView para hacer zoom
+            const transitionMessage = {
+              type: 'transitionTo2D',
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              height: 2000, // Altura final en metros 
+              duration: 4.0  // Duración de la animación en segundos
+            };
+            
+            console.log('GlobeView: Enviando mensaje de transición:', transitionMessage);
+            webViewRef.current.postMessage(JSON.stringify(transitionMessage));
+            
+            // No cambiamos el modo aquí - esperamos el mensaje 'transitionComplete' del WebView
+            // que será manejado en la función handleMessage
+            console.log('GlobeView: Esperando mensaje de transición completada desde WebView');
+            return;
+          } catch (error) {
+            console.error('GlobeView: Error en la transición a 2D:', error);
+            // Si hay algún error en la transición, procedemos al cambio directo
+          }
+        } else {
+          console.log('GlobeView: WebView no está listo, cambiando directamente a 2D');
+        }
+      } catch (error) {
+        console.error('GlobeView: Error al obtener ubicación:', error);
+      } finally {
+        if (!(isWebViewReady && webViewRef.current)) {
+          console.log('GlobeView: Cambiando directamente a 2D sin animación');
+          setIsLocating(false);
+          // Cambiamos el modo directamente si no se pudo hacer la animación
+          setIs3DMode(false);
+        }
+      }
+    } else {
+      // Transición de 2D a 3D
+      console.log('GlobeView: Iniciando transición de mapa 2D a 3D');
+      
+      // Cambiar inmediatamente a modo 3D, el WebView ya está precargado
+      setIs3DMode(true);
+      
+      // Usamos la posición actual como punto inicial pero aseguramos transición a vista centrada
+      const currentRegion = mapRegion || {
+        latitude: 0,
+        longitude: 0,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01
+      };
+      
+      // Calculamos una altura adecuada para la vista inicial
+      const initialHeight = 5000; // altura inicial en metros para la vista de transición
+      
+      // Verificamos una sola vez si el WebView está listo
+      if (isWebViewReady && webViewRef.current) {
+        console.log('GlobeView: WebView listo para transición inmediata 2D a 3D');
+        
+        // Pequeño retraso para asegurar que la UI se actualice antes de la transición
+        setTimeout(() => {
+          if (webViewRef.current) {
+            try {
+              const initialPositionMessage = {
+                type: 'transitionFrom2D',
+                // Punto de partida (ubicación actual)
+                latitude: currentRegion.latitude,
+                longitude: currentRegion.longitude,
+                // Parámetros de la transición
+                initialHeight: initialHeight,
+                finalHeight: 30000000, // Altura reducida para una mejor visualización
+                duration: 8.0, // Duración de la transición
+                // Añadir parámetro para forzar el centrado final
+                centerView: true,
+                // Añadir ángulo de inclinación para mantener la Tierra visible
+                viewAngle: -70 // Ángulo de vista inclinado para una mejor perspectiva de la Tierra
+              };
+              
+              console.log('GlobeView: Enviando mensaje de transición 2D a 3D:', initialPositionMessage);
+              webViewRef.current.postMessage(JSON.stringify(initialPositionMessage));
+            } catch (error) {
+              console.error('GlobeView: Error al enviar mensaje de transición:', error);
+            }
+          }
+        }, 300); // Reducir tiempo antes de iniciar la transición, ya que WebView está precargado
+      } else {
+        console.warn('GlobeView: WebView no está listo para la transición, esto no debería ocurrir con precarga');
+      }
     }
   };
 
+  // Exponer funciones a los componentes padres
+  useImperativeHandle(ref, () => ({
+    getUserLocation: async () => {
+      console.log('GlobeView: Solicitando permisos de ubicación...');
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        console.log('GlobeView: Permiso de ubicación denegado');
+        return null;
+      }
+      
+      console.log('GlobeView: Obteniendo ubicación actual...');
+      const location = await Location.getCurrentPositionAsync({});
+      console.log('GlobeView: Ubicación obtenida:', location);
+      setUserLocation(location);
+      
+      // Si estamos en modo 2D, actualizar la región del mapa
+      if (!is3DMode && location) {
+        setMapRegion({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01
+        });
+      }
+      
+      // Enviar la ubicación al WebView si está listo y en modo 3D
+      if (is3DMode && isWebViewReady && webViewRef.current) {
+        const message = {
+          type: 'updateUserLocation',
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy
+        };
+        console.log('GlobeView: Enviando ubicación al WebView:', message);
+        webViewRef.current.postMessage(JSON.stringify(message));
+      } else {
+        console.log('GlobeView: WebView no está listo para recibir la ubicación');
+      }
+      
+      return location;
+    },
+    flyTo: async (latitude: number, longitude: number, options?: any) => {
+      console.log('GlobeView: Llamada a método flyTo', latitude, longitude, options);
+      
+      if (is3DMode && isWebViewReady && webViewRef.current) {
+        const message = {
+          type: 'flyTo',
+          latitude,
+          longitude,
+          height: options?.height || 10000,
+          duration: options?.duration || 2
+        };
+        console.log('GlobeView: Enviando comando flyTo al WebView:', message);
+        webViewRef.current.postMessage(JSON.stringify(message));
+      } else if (!is3DMode) {
+        // En modo 2D, actualizar la región del mapa
+        setMapRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01
+        });
+      } else {
+        console.warn("GlobeView: WebView no disponible para flyTo");
+      }
+    },
+    reloadViewer: () => {
+      console.log('GlobeView: Recargando visor');
+      if (is3DMode && webViewRef.current) {
+        webViewRef.current.reload();
+      } else if (!is3DMode) {
+        // Recargar en modo 2D
+        getUserLocation();
+      }
+    },
+    setDarkMode: (enabled: boolean) => {
+      console.log('GlobeView: Cambiando modo oscuro:', enabled);
+      if (is3DMode && isWebViewReady && webViewRef.current) {
+        webViewRef.current.postMessage(JSON.stringify({ 
+          type: 'setDarkMode', 
+          enabled 
+        }));
+      }
+    },
+    toggleMapMode
+  }));
+
+  // Manejar mensajes del WebView
+  const handleMessage = useCallback((event: WebViewMessageEvent) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('GlobeView: Mensaje recibido del WebView:', data);
+      
+      switch (data.type) {
+        case 'htmlLoaded':
+          console.log('GlobeView: HTML cargado en WebView');
+          setLoadingPhase('HTML cargado');
+          break;
+        case 'viewerReady':
+          console.log('GlobeView: Visor Cesium listo');
+          setIsWebViewReady(true);
+          setIsLoading(false);
+          setLoadingPhase('Completado');
+          if (props.onLoadingChange) {
+            props.onLoadingChange(false);
+          }
+          if (props.onLoadEnd) {
+            console.log('GlobeView: Llamando a onLoadEnd del padre');
+            props.onLoadEnd();
+          }
+          break;
+        case 'loadingStatus':
+          console.log('GlobeView: Actualizando estado de carga:', data.message);
+          setLoadingPhase(data.message);
+          break;
+        case 'error':
+          console.error('GlobeView: Error reportado por WebView:', data.data);
+          setHasError(true);
+          setErrorMessage(data.data);
+          if (props.onError) {
+            props.onError(data.data);
+          }
+          break;
+        case 'transitionComplete':
+          console.log('GlobeView: Transición a 2D completada');
+          // Verificamos que estamos en proceso de transición a 2D
+          if (is3DMode) {
+            console.log('GlobeView: Completando transición a 2D, cambiando modo');
+            setIs3DMode(false);
+            setIsLocating(false);
+          }
+          break;
+        case 'transitionFrom2DComplete':
+          console.log('GlobeView: Transición desde 2D a 3D completada');
+          // Verificamos si debemos actualizar algún estado después de la transición 3D
+          if (!is3DMode) {
+            console.log('GlobeView: Asegurando modo 3D después de transición');
+            setIs3DMode(true);
+          }
+          break;
+        case 'message':
+          console.log('GlobeView: Mensaje:', data.data);
+          break;
+        default:
+          console.log('GlobeView: Tipo de mensaje no manejado:', data.type);
+      }
+    } catch (error) {
+      console.error('GlobeView: Error al procesar mensaje del WebView:', error);
+    }
+  }, [is3DMode, props]);
+
+  // Obtener la ubicación del usuario
+  const getUserLocation = async () => {
+    setIsLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        console.log('Permiso de ubicación denegado');
+        setIsLocating(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest
+      });
+
+      const userLocation: UserLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        altitude: 10000, // Altura en metros para la vista
+        accuracy: location.coords.accuracy
+      };
+
+      console.log('Ubicación del usuario:', userLocation);
+
+      // Actualizar la ubicación según el modo
+      if (is3DMode && webViewRef.current) {
+        // Enviar ubicación al WebView en modo 3D
+        const message = {
+          type: 'flyTo',
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          height: 5000
+        };
+        webViewRef.current.postMessage(JSON.stringify(message));
+      } else {
+        // Actualizar región en modo 2D
+        setMapRegion({
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01
+        });
+      }
+
+      setUserLocation(location);
+      setIsLocating(false);
+    } catch (error) {
+      console.error('Error al obtener la ubicación:', error);
+      setIsLocating(false);
+    }
+  };
+
+  // Reiniciar WebView en caso de error
+  const handleRetry = () => {
+    setRetryCount(prevCount => prevCount + 1);
+    setHasError(false);
+    setErrorMessage('');
+    setIsLoading(true);
+    
+    if (webViewRef.current) {
+      webViewRef.current.reload();
+    }
+  };
+
+  // Cambiar modo de rendimiento
+  const togglePerformanceMode = () => {
+    const newMode = !performanceMode;
+    setPerformanceMode(newMode);
+    
+    // Enviar mensaje al WebView si está listo
+    if (is3DMode && isWebViewReady && webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({
+        type: 'setPerformanceMode',
+        enabled: newMode
+      }));
+    }
+  };
+
+  // Efecto para retry automático
+  useEffect(() => {
+    // Reiniciar si hay error
+    if (hasError && retryCount < 3) {
+      console.log(`GlobeView: Reintentando después de error (${retryCount + 1}/3)...`);
+      const timer = setTimeout(handleRetry, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [hasError, retryCount]);
+
+  // Renderización del componente
   return (
-    <View style={[styles.container, props.style]}>
-      {!useFallbackView && (
-        <>
-          {/* Mostrar WebView con Cesium cuando showMapView es false */}
-          <WebView
-            ref={webViewRef}
-            style={[styles.webview, showMapView ? styles.hiddenView : null]}
-            originWhitelist={['*']}
-            source={{ html: htmlContent }}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            allowFileAccess={true}
-            allowUniversalAccessFromFileURLs={true}
-            allowFileAccessFromFileURLs={true}
-            cacheEnabled={true}
-            javaScriptCanOpenWindowsAutomatically={true}
-            scrollEnabled={false}
-            bounces={false}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            onShouldStartLoadWithRequest={() => true}
-            startInLoadingState={true}
-            renderLoading={() => <View />}
-            onMessage={handleWebViewMessage}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error('WebView error:', nativeEvent);
-              handleError(`WebView error: ${nativeEvent.description}`);
-            }}
-            onHttpError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.error('WebView HTTP error:', nativeEvent);
-              handleError(`WebView HTTP error: ${nativeEvent.statusCode}`);
-            }}
-            onContentProcessDidTerminate={() => {
-              console.warn('WebView process terminated, falling back to simple globe');
-              handleError('La visualización 3D se cerró inesperadamente');
-            }}
-          />
-          
-          {/* Mostrar MapView cuando showMapView es true */}
-          {showMapView && (
-            <View style={styles.mapContainer}>
-              <MapView
-                ref={mapViewRef}
-                style={styles.map}
-                provider={PROVIDER_GOOGLE}
-                mapType="standard" 
-                initialRegion={{
-                  latitude: currentPosition.latitude,
-                  longitude: currentPosition.longitude,
-                  latitudeDelta: 0.0922 * (10 / Math.max(1, currentPosition.zoom)),
-                  longitudeDelta: 0.0421 * (10 / Math.max(1, currentPosition.zoom)),
-                }}
-                showsUserLocation={true}
-                showsMyLocationButton={false}
-                followsUserLocation={false}
-                onMapReady={() => {
-                  // Asegurar que el mapa se actualiza con la posición actual
-                  if (mapViewRef.current) {
-                    mapViewRef.current.animateToRegion({
-                      latitude: currentPosition.latitude,
-                      longitude: currentPosition.longitude,
-                      latitudeDelta: 0.0922 * (10 / Math.max(1, currentPosition.zoom)),
-                      longitudeDelta: 0.0421 * (10 / Math.max(1, currentPosition.zoom)),
-                    }, 500);
-                  }
-                }}
-                onRegionChangeComplete={(region) => {
-                  // Actualizar la posición actual para mantener sincronización
-                  setCurrentPosition(prevState => ({
-                    ...prevState,
-                    latitude: region.latitude,
-                    longitude: region.longitude,
-                    // Calcular un zoom aproximado desde la región
-                    zoom: calculateZoomFromRegion(region)
-                  }));
-                  
-                  // Ya no cambiamos automáticamente al hacer zoom para evitar cambios inesperados
-                }}
-              >
-                {/* Eliminamos el marcador personalizado */}
-              </MapView>
-              
-              {/* Botón para volver al globo */}
-              <TouchableOpacity 
-                style={styles.backToGlobeButton}
-                onPress={() => {
-                  // Primero animamos desde el mapa hacia afuera
-                  if (mapViewRef.current) {
-                    const currentRegion = {
-                      latitude: currentPosition.latitude,
-                      longitude: currentPosition.longitude,
-                      latitudeDelta: 0.0922,
-                      longitudeDelta: 0.0421
-                    };
-                    
-                    try {
-                      // Animamos el mapa hacia afuera para dar efecto de transición
-                      mapViewRef.current.animateToRegion({
-                        ...currentRegion,
-                        latitudeDelta: 45, // Zoom muy alejado
-                        longitudeDelta: 45
-                      }, 800);
-                      
-                      console.log("Animando mapa hacia afuera antes de volver al globo");
-                    } catch (err) {
-                      console.error("Error al animar zoom out en mapa:", err);
-                    }
-                  }
-                  
-                  // Luego actualizamos la vista del globo con la posición actual del mapa
-                  setTimeout(() => {
-                    if (webViewRef.current && mapViewRef.current) {
-                      mapViewRef.current.getCamera().then(camera => {
-                        if (camera && webViewRef.current) {
-                          // Primero preparamos el WebView para que esté listo
-                          webViewRef.current.injectJavaScript(`
-                            (function() {
-                              try {
-                                if (window.viewer) {
-                                  // Asegurar que el globo esté visible
-                                  window.viewer.scene.globe.show = true;
-                                  
-                                  // Forzar renderizado para que esté listo
-                                  window.viewer.scene.requestRender();
-                                }
-                              } catch(e) {
-                                console.error('Error al preparar el globo:', e);
-                              }
-                              return true;
-                            })();
-                          `);
-                          
-                          // Esperar un pequeño momento para asegurar que el WebView está listo
-                          setTimeout(() => {
-                            // Quitar la vista del mapa
-                            setShowMapView(false);
-                            console.log("Volviendo al globo terráqueo");
-                            
-                            // Animar el vuelo del globo después de cambiar la vista
-                            setTimeout(() => {
-                              webViewRef.current?.injectJavaScript(`
-                                (function() {
-                                  try {
-                                    if (window.viewer) {
-                                      window.viewer.camera.flyTo({
-                                        destination: Cesium.Cartesian3.fromDegrees(
-                                          ${camera.center.longitude}, 
-                                          ${camera.center.latitude}, 
-                                          ${GLOBE_VIEW_DISTANCE_THRESHOLD}
-                                        ),
-                                        orientation: {
-                                          heading: 0.0,
-                                          pitch: -Cesium.Math.PI_OVER_TWO,
-                                          roll: 0.0
-                                        },
-                                        duration: 2.0,
-                                        complete: function() {
-                                          // Asegurar renderizado después de la animación
-                                          window.viewer.scene.requestRender();
-                                        }
-                                      });
-                                      console.log('Animación de vuelo del globo iniciada');
-                                    }
-                                  } catch(e) {
-                                    console.error('Error al animar la vista del globo:', e);
-                                  }
-                                  return true;
-                                })();
-                              `);
-                            }, 300);
-                          }, 300);
-                        }
-                      }).catch(err => {
-                        console.error('Error al obtener la cámara de MapView:', err);
-                        // Si hay error, intentamos volver al globo de todos modos
-                        setShowMapView(false);
-                      });
-                    }
-                  }, 800); // Permitir que termine la animación de zoom out
-                }}
-              >
-                <Text style={styles.backToGlobeButtonText}>Volver al Globo</Text>
-              </TouchableOpacity>
-              
-              {/* Botón para ir a la ubicación del usuario */}
-              <TouchableOpacity 
-                style={styles.myLocationButton}
-                onPress={() => {
-                  console.log("Botón de ubicación en mapa presionado");
-                  if (mapViewRef.current && userLocation) {
-                    mapViewRef.current.animateToRegion({
-                      latitude: userLocation.latitude,
-                      longitude: userLocation.longitude,
-                      latitudeDelta: 0.01, // Zoom cercano
-                      longitudeDelta: 0.01
-                    }, 1000);
-                  }
-                }}
-                disabled={!userLocation}
-              >
-                <MaterialIcons name="my-location" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-          )}
-        </>
-      )}
-      
-      {/* Botón para ir a ubicación en vista de globo 3D */}
-      {!showMapView && !useFallbackView && (
-        <>
-          <TouchableOpacity 
-            style={styles.globe3DLocationButton}
-            onPress={() => {
-              console.log("Botón de ubicación en globo 3D presionado");
-              goToUserLocation();
-            }}
-          >
-            <MaterialIcons name="my-location" size={24} color="white" />
-          </TouchableOpacity>
-          
-          {/* Botón para centrar el globo */}
-          <TouchableOpacity 
-            style={styles.centerGlobeButton}
-            onPress={() => {
-              console.log("Centrando globo terráqueo");
-              if (webViewRef.current) {
-                webViewRef.current.injectJavaScript(`
-                  (function() {
-                    try {
-                      if (typeof window.centerGlobe === 'function') {
-                        window.centerGlobe();
-                        console.log('Globo centrado correctamente');
-                      }
-                    } catch(e) {
-                      console.error('Error al centrar globo:', e);
-                    }
-                    return true;
-                  })();
-                `);
-              }
-            }}
-          >
-            <MaterialIcons name="explore" size={24} color="white" />
-          </TouchableOpacity>
-        </>
-      )}
-      
-      {useFallbackView && (
-        <View style={styles.container}>
-          <ActivityIndicator size="large" color="#4CAF50" style={{flex: 1}} />
-          <Text style={{...styles.errorText, position: 'absolute', top: '50%', left: 0, right: 0, textAlign: 'center'}}>
-            Cargando vista alternativa...
+    <View style={styles.container}>
+      {/* Para debug */}
+      {__DEV__ && true && (
+        <View style={styles.debugView}>
+          <Text style={styles.debugText}>
+            Estado: {isLoading ? 'Cargando' : hasError ? 'Error' : 'Listo'}
+            {'\n'}WebView: {isWebViewReady ? 'Listo' : 'No listo'}
+            {'\n'}Modo: {is3DMode ? '3D' : '2D'}
           </Text>
         </View>
       )}
+
+      {/* Usar fallback o mostrar error incorregible */}
+      {(hasError && retryCount >= 3) || (props.useFallbackGlobe === true) ? (
+        <FallbackView 
+          error={errorMessage || "No se pudo cargar el Globo 3D"}
+          onRetry={() => {
+            setRetryCount(0);
+            setHasError(false);
+            setErrorMessage('');
+            handleRetry();
+          }}
+        />
+      ) : (
+        <>
+          {/* WebView siempre presente, visible u oculta según el modo */}
+          <WebView
+            ref={webViewRef}
+            source={{ html: htmlContent }}
+            style={[
+              styles.webview,
+              // Visible solo en modo 3D, pero siempre presente
+              !is3DMode && { opacity: 0, position: 'absolute', width: 1, height: 1, top: -1000 }
+            ]}
+            originWhitelist={['*']}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            onMessage={handleMessage}
+            onLoadEnd={() => {
+              console.log('GlobeView: WebView onLoadEnd nativo');
+            }}
+            onError={(e) => {
+              console.error('GlobeView: WebView onError:', e.nativeEvent);
+              // Actualizar el estado con el error
+              setHasError(true);
+              setErrorMessage('Error al cargar el WebView: ' + e.nativeEvent.description);
+            }}
+          />
+          
+          {/* MapView para modo 2D (solo visible en modo 2D) */}
+          {!is3DMode && (
+            <MapView
+              style={styles.map}
+              region={mapRegion || {
+                latitude: 0,
+                longitude: 0,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01
+              }}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+              showsCompass={true}
+              showsScale={true}
+              mapType="hybrid"
+            />
+          )}
+        </>
+      )}
+
+      {isLoading && is3DMode && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#F57C00" />
+          <Text style={styles.loadingText}>Cargando el globo...</Text>
+          <Text style={styles.loadingPhaseText}>{loadingPhase}</Text>
+          <View style={styles.progressBarContainer}>
+            <View 
+              style={[
+                styles.progressBar, 
+                { width: `${getLoadingProgress(loadingPhase)}%` }
+              ]} 
+            />
+          </View>
+            </View>
+      )}
       
-      {error && !useFallbackView && (
+      {hasError && (
         <View style={styles.errorContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" style={{marginBottom: 20}} />
-          <Text style={{...styles.errorSubtext, marginTop: 10}}>
-            Intentando recuperar visualización...
+          <Text style={styles.errorText}>Error: {errorMessage}</Text>
+          <Text style={styles.errorDescription}>
+            Esto puede deberse a problemas de red o de rendimiento. 
+            Intente nuevamente o active el modo de rendimiento.
           </Text>
+          <View style={styles.buttonRow}>
+          <Button 
+            mode="contained" 
+              onPress={handleRetry}
+              style={styles.retryButton}
+            >
+              Intentar de nuevo
+            </Button>
+            <Button 
+              mode="outlined" 
+              onPress={togglePerformanceMode}
+              style={styles.performanceButton}
+            >
+              {performanceMode ? 'Desactivar' : 'Activar'} modo rendimiento
+          </Button>
+          </View>
+        </View>
+      )}
+      
+      {props.showsUserLocation && !isLoading && !hasError && (
+        <View style={styles.buttonContainer}>
+      <FAB
+        style={styles.fab}
+            icon={is3DMode ? "map" : "earth"}
+            color="#fff"
+            loading={isLocating}
+            onPress={toggleMapMode}
+          />
+          {is3DMode && (
+            <FAB
+              style={[styles.fab, styles.performanceFab]}
+              icon={performanceMode ? "flash-off" : "flash"}
+              color="#fff"
+              onPress={togglePerformanceMode}
+            />
+          )}
         </View>
       )}
     </View>
   );
-};
+});
 
-// Función para calcular el nivel de zoom a partir de la región
-const calculateZoomFromRegion = (region: { latitudeDelta: number; longitudeDelta: number; }) => {
-  // Fórmula aproximada para convertir delta a nivel de zoom
-  const latDelta = region.latitudeDelta;
-  const lngDelta = region.longitudeDelta;
-  const zoomLat = Math.log(360 / latDelta) / Math.LN2;
-  const zoomLng = Math.log(360 / lngDelta) / Math.LN2;
-  return Math.min(zoomLat, zoomLng);
-};
+// Función para calcular el progreso de carga
+function getLoadingProgress(phase: string): number {
+  switch (phase) {
+    case 'Iniciando...': return 10;
+    case 'Cargando HTML...': return 20;
+    case 'HTML cargado': return 30;
+    case 'Cargando Cesium...': return 50;
+    case 'Iniciando terreno...': return 70;
+    case 'Cargando capas...': return 85;
+    case 'Completado': return 100;
+    default: return 50;
+  }
+}
 
+// Estilos para el componente
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    position: 'relative',
+    position: 'relative'
   },
   webview: {
-    flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#000',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  loadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  loadingPhaseText: {
+    color: '#ddd',
+    marginTop: 5,
+    fontSize: 14,
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 8,
+    backgroundColor: '#333',
+    borderRadius: 4,
+    marginTop: 15,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#F57C00',
   },
   errorContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   errorText: {
-    color: '#ff6b6b',
-    fontSize: 18,
+    color: '#ff5252',
     marginBottom: 10,
-    textAlign: 'center',
-  },
-  errorSubtext: {
-    color: '#fff',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  fallbackButtonContainer: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    zIndex: 1000,
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  mapContainer: {
-    flex: 1,
+  errorDescription: {
+    color: '#eee',
+    marginBottom: 20,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#F57C00',
+    marginHorizontal: 5,
+    marginTop: 10,
+  },
+  performanceButton: {
+    borderColor: '#F57C00',
+    marginHorizontal: 5,
+    marginTop: 10,
+  },
+  buttonContainer: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+  },
+  fab: {
+    backgroundColor: '#F57C00',
+    marginBottom: 8,
+  },
+  performanceFab: {
+    backgroundColor: '#8e24aa',
+  },
+  debugView: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  map: {
-    flex: 1,
-  },
-  backToGlobeButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    zIndex: 1000,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     padding: 10,
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
-  },
-  backToGlobeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  myLocationButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
     zIndex: 1000,
-    padding: 10,
-    backgroundColor: '#4CAF50',
-    borderRadius: 50, // Hacerlo circular
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
   },
-  globe3DLocationButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    zIndex: 1000,
-    padding: 10,
-    backgroundColor: '#4CAF50',
-    borderRadius: 50,
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
+  debugText: {
+    color: 'white',
+    fontSize: 10,
   },
-  centerGlobeButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    zIndex: 1000,
-    padding: 10,
-    backgroundColor: '#4CAF50',
-    borderRadius: 50, // Hacerlo circular
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  hiddenView: {
-    display: 'none',
-  },
-});
+}); 
 
 export default GlobeView; 

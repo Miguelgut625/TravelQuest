@@ -148,7 +148,7 @@ const ChatScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#005F9E" />
+        <ActivityIndicator size={40} color="#005F9E" />
       </View>
     );
   }

@@ -1,33 +1,71 @@
 {
   "expo": {
     "name": "TravelQuest",
-    "slug": "travelquest",
+    "slug": "TravelQuest",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.travelquest.app"
+      "bundleIdentifier": "com.travelquest.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
+        "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
+        "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para tomar fotos de tus misiones.",
+        "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a tu biblioteca de fotos para seleccionar imágenes de tus misiones."
+      }
     },
     "android": {
-      "package": "com.travelquest.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ]
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE"
+      ],
+      "package": "com.travelquest.app"
     },
-    "scheme": "travelquest",
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "locales": {
+      "en": "./assets/locales/en.json",
+      "es": "./assets/locales/es.json",
+      "fr": "./assets/locales/fr.json",
+      "de": "./assets/locales/de.json"
+    },
     "plugins": [
-      "expo-location",
-      "expo-image-picker"
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow TravelQuest to use your location."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TravelQuest to access your photos.",
+          "cameraPermission": "Allow TravelQuest to access your camera."
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "c2ecce27-7f4c-4193-afb9-b7c7a30e1339"
+        "projectId": ""
       }
-    }
+    },
+    "newArchEnabled": false
   }
 }

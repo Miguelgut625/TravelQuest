@@ -3,9 +3,9 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { Provider } from 'react-redux';
 import { store, persistor } from './src/features/store';
 import AppNavigator from './src/navigation/AppNavigator';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, View, Text, Platform } from 'react-native';
 import { supabase } from './src/services/supabase';
-import { setAuthState, setUser, logout } from './src/features/authSlice';
+import { setAuthState, setUser } from './src/features/auth/authSlice';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
@@ -31,7 +31,12 @@ const App = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('Iniciando la aplicación...');
+        console.log(`Iniciando la aplicación en plataforma: ${Platform.OS}`);
+        
+        // Comprobar si hay alguna incompatibilidad específica de la plataforma
+        if (Platform.OS === 'web') {
+          console.log('Ejecutando en modo web');
+        }
         
         // Verificar sesión actual
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -61,31 +66,66 @@ const App = () => {
           store.dispatch(setAuthState('unauthenticated'));
         }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error inicializando la app:', error);
-        setError('Error al inicializar la aplicación');
-        store.dispatch(logout());
+        // Mensaje de error más descriptivo
+        setError(`Error al inicializar la aplicación: ${error.message || 'Error desconocido'}`);
+        store.dispatch(setAuthState('unauthenticated'));
       } finally {
-        setIsLoading(false);
+        // Añadir un pequeño retraso para asegurar que todos los componentes se inicialicen correctamente
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
       }
     };
 
     initializeApp();
+    
+    // Manejador global de errores no capturados
+    const handleError = (error: Error) => {
+      console.error('Error no capturado:', error);
+    };
+    
+    // Configurar listeners globales de error
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('error', (event) => {
+        handleError(event.error);
+      });
+      
+      window.addEventListener('unhandledrejection', (event) => {
+        handleError(event.reason);
+      });
+      
+      // Limpiar listeners al desmontar
+      return () => {
+        window.removeEventListener('error', (event) => {
+          handleError(event.error);
+        });
+        window.removeEventListener('unhandledrejection', (event) => {
+          handleError(event.reason);
+        });
+      };
+    }
   }, []);
 
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#005F9E" />
-        <Text style={{ marginTop: 10 }}>Cargando...</Text>
+        <ActivityIndicator size={24} color="#005F9E" />
+        <Text style={{ marginTop: 10 }}>Cargando TravelQuest...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: 'red' }}>{error}</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Text style={{ color: 'red', textAlign: 'center', marginBottom: 10 }}>
+          {error}
+        </Text>
+        <Text style={{ textAlign: 'center' }}>
+          Por favor, intenta recargar la aplicación o contacta con soporte.
+        </Text>
       </View>
     );
   }
@@ -94,7 +134,7 @@ const App = () => {
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <PaperProvider theme={theme}>
-          <SafeAreaProvider>
+          <SafeAreaProvider style={{ paddingTop: 30, backgroundColor: 'white' }}>
             <AppNavigator />
           </SafeAreaProvider>
         </PaperProvider>

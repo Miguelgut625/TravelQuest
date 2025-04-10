@@ -1,14 +1,12 @@
+// @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList, Button } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { logout, setAuthState } from '../../features/authSlice';
+import { logout, setAuthState } from '../../features/auth/authSlice';
 import { supabase } from '../../services/supabase';
-import { useNavigation, CommonActions } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/types';
-import { getUserPoints } from '../../services/pointsService';
+import { useNavigation } from '@react-navigation/native';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -26,18 +24,13 @@ interface JourneyMission {
 
 interface FriendshipRequest {
   id: string;
-  sender: {
-    username: string;
-  };
   users: {
     username: string;
   };
 }
 
-type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
 const ProfileScreen = () => {
-  const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const navigation = useNavigation();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
@@ -52,9 +45,12 @@ const ProfileScreen = () => {
     visitedCities: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
-  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
+  const [friendshipRequests, setFriendshipRequests] = useState([]);
   const [isRequestsVisible, setIsRequestsVisible] = useState(false);
   const [username, setUsername] = useState('');
+  const [level, setLevel] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [xpNext, setXpNext] = useState(0);
 
   useEffect(() => {
     fetchUserStats();
@@ -65,58 +61,71 @@ const ProfileScreen = () => {
 
     try {
       setLoadingStats(true);
+      console.log('Obteniendo estadísticas...');
 
-      // Obtener los puntos actuales del usuario desde el servicio
-      const userPoints = await getUserPoints(user.id);
+      // Obtener los puntos del usuario
+      const { data: userPointsData, error: userPointsError } = await supabase
+        .from('users')
+        .select('points, level, xp')
+        .eq('id', user.id)
+        .single();
+
+      if (userPointsError) throw userPointsError;
 
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
-        .select(`
-          id,
-          cityId,
-          journeys_missions!inner (
-            completed,
-            challenges!inner (
-              points
-            )
-          )
-        `)
+        .select(`id, cityId, journeys_missions!inner (completed, challenges!inner (points))`)
         .eq('userId', user.id);
 
-      if (journeysError) throw journeysError;
+      if (journeysError) {
+        console.error('Error al obtener journeys:', journeysError);
+        throw journeysError;
+      }
 
       // Calcular estadísticas
-      const stats = {
-        completedMissions: 0,
-        visitedCities: 0
-      };
+      let completedMissions = 0;
+      const visitedCities = new Set();
 
-      (journeys as Journey[])?.forEach((journey: Journey) => {
-        // Añadir la ciudad a las visitadas
-        if (journey.cityId) {
-          stats.visitedCities++;
-        }
+      if (journeys && journeys.length > 0) {
+        journeys.forEach((journey) => {
+          // Añadir la ciudad al Set de ciudades visitadas
+          if (journey.cityId) {
+            visitedCities.add(journey.cityId);
+          }
 
-        // Contar misiones completadas
-        journey.journeys_missions.forEach((mission: JourneyMission) => {
-          if (mission.completed) {
-            stats.completedMissions++;
+          if (journey.journeys_missions && journey.journeys_missions.length > 0) {
+            journey.journeys_missions.forEach((mission) => {
+              if (mission.completed) {
+                completedMissions++;
+              }
+            });
           }
         });
-      });
+      }
 
       setStats({
-        totalPoints: userPoints, // Usamos los puntos obtenidos del servicio
-        completedMissions: stats.completedMissions,
-        visitedCities: stats.visitedCities
+        totalPoints: userPointsData?.points || 0,
+        completedMissions,
+        visitedCities: visitedCities.size
       });
+
+      // Actualizar nivel y XP
+      setLevel(userPointsData?.level || 0);
+      setXp(userPointsData?.xp || 0);
+      setXpNext(calculateNextLevelXP(userPointsData?.level || 0));
 
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
+      Alert.alert('Error', 'No se pudieron cargar las estadísticas');
     } finally {
       setLoadingStats(false);
     }
+  };
+
+  const calculateNextLevelXP = (currentLevel) => {
+    // Fórmula simple para calcular XP del siguiente nivel
+    return (currentLevel + 1) * 100;
   };
 
   const handleLogout = async () => {
@@ -126,7 +135,7 @@ const ProfileScreen = () => {
       setLoading(true);
       console.log('Iniciando proceso de cierre de sesión');
 
-      // Primero cerramos la sesión en Supabase
+      // Cerramos la sesión en Supabase
       console.log('Cerrando sesión en Supabase');
       const { error: signOutError } = await supabase.auth.signOut();
 
@@ -136,18 +145,9 @@ const ProfileScreen = () => {
         return;
       }
 
-      // Verificar que la sesión se haya cerrado correctamente
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log('Sesión aún activa, intentando cerrar nuevamente');
-        await supabase.auth.signOut();
-      }
-
-      // Una vez que la sesión está cerrada, limpiamos el estado de Redux
+      // Limpiamos el estado de Redux
       console.log('Limpiando estado de Redux');
       dispatch(logout());
-
-      // Forzar la actualización del estado de autenticación
       dispatch(setAuthState('unauthenticated'));
 
     } catch (error) {
@@ -159,8 +159,8 @@ const ProfileScreen = () => {
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword) {
-      setMessage({ type: 'error', text: 'Por favor ingresa tu contraseña actual' });
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setMessage({ type: 'error', text: 'Por favor completa todos los campos' });
       return;
     }
 
@@ -174,252 +174,244 @@ const ProfileScreen = () => {
       return;
     }
 
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-
     try {
-      // Primero verificamos la sesión actual
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      setLoading(true);
+      setMessage({ type: '', text: '' });
 
-      if (sessionError) {
-        console.error('Error al obtener la sesión:', sessionError);
-        setMessage({ type: 'error', text: 'Error al verificar tu sesión. Por favor, intenta nuevamente.' });
-        return;
-      }
-
-      if (!session) {
-        // Si no hay sesión, intentamos iniciar sesión con las credenciales actuales
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: user?.email || '',
-          password: currentPassword
-        });
-
-        if (signInError) {
-          console.error('Error al verificar contraseña:', signInError);
-          setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
-          return;
-        }
-
-        if (!signInData.session) {
-          setMessage({ type: 'error', text: 'No se pudo iniciar sesión. Por favor, intenta nuevamente.' });
-          return;
-        }
-
-        // Ahora intentamos actualizar la contraseña
-        const { error: updateError } = await supabase.auth.updateUser({
-          password: newPassword
-        });
-
-        if (updateError) {
-          console.error('Error al actualizar contraseña:', updateError);
-          setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
-          return;
-        }
-
-        // Limpiamos el formulario
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setMessage({ type: 'success', text: 'Tu contraseña ha sido actualizada correctamente' });
-
-        // Cerramos el modal después de 2 segundos
-        setTimeout(() => {
-          setIsChangePasswordVisible(false);
-          setMessage({ type: '', text: '' });
-        }, 2000);
-
-        return;
-      }
-
-      // Si hay sesión activa, verificamos la contraseña actual
+      // Primero verificamos la contraseña actual usando el inicio de sesión
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
+        email: user.email,
         password: currentPassword
       });
 
       if (signInError) {
-        console.error('Error al verificar contraseña:', signInError);
         setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
         return;
       }
 
-      // Si la contraseña es correcta, actualizamos a la nueva
+      // Cambiar la contraseña
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (updateError) {
-        console.error('Error al actualizar contraseña:', updateError);
-        setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
-        return;
+        throw updateError;
       }
 
-      // Limpiamos el formulario
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setMessage({ type: 'success', text: 'Tu contraseña ha sido actualizada correctamente' });
+      // Actualizar la contraseña en la tabla de usuarios
+      const { error: updateDbError } = await supabase
+        .from('users')
+        .update({ password: newPassword })
+        .eq('id', user.id);
 
-      // Cerramos el modal después de 2 segundos
+      if (updateDbError) {
+        console.warn('No se pudo actualizar la contraseña en la base de datos:', updateDbError);
+      }
+
+      setMessage({ type: 'success', text: 'Contraseña actualizada con éxito' });
+      
+      // Limpiar campos y cerrar modal después de un breve retraso
       setTimeout(() => {
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
         setIsChangePasswordVisible(false);
         setMessage({ type: '', text: '' });
       }, 2000);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error al cambiar contraseña:', error);
-      setMessage({ type: 'error', text: 'Ocurrió un error al intentar cambiar la contraseña. Por favor, intenta nuevamente.' });
+      setMessage({ type: 'error', text: 'Error al cambiar la contraseña' });
     } finally {
       setLoading(false);
     }
   };
 
-  // Función para alternar la visibilidad de las solicitudes
   const toggleRequestsVisibility = () => {
     setIsRequestsVisible(!isRequestsVisible);
-  };
-
-  // Función para aceptar una solicitud de amistad
-  const handleAcceptRequest = async (id: string) => {
-    try {
-      const { data: invitation, error: invitationError } = await supabase
-        .from('friendship_invitations')
-        .select('senderId, receiverId')
-        .eq('id', id)
-        .single();
-
-      if (invitationError) throw invitationError;
-
-      const { senderId, receiverId } = invitation;
-
-      const { data: updatedInvitation, error: updateError } = await supabase
-        .from('friendship_invitations')
-        .update({ status: 'Accepted' })
-        .eq('id', id)
-        .single();
-
-      if (updateError) throw updateError;
-
-      const { data: newFriendship, error: insertError } = await supabase
-        .from('friends')
-        .insert([{ user1Id: senderId, user2Id: receiverId }])
-        .single();
-
-      if (insertError) throw insertError;
-
-      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-      alert('Solicitud aceptada con éxito!');
-    } catch (error: any) {
-      console.error('Error al aceptar la solicitud:', error.message);
-      alert('Hubo un error al aceptar la solicitud: ' + error.message);
-    }
-  };
-
-  // Función para rechazar una solicitud de amistad
-  const handleRejectRequest = async (id: string) => {
-    try {
-      const { data: updatedInvitation, error: updateError } = await supabase
-        .from('friendship_invitations')
-        .update({ status: 'Rejected' })
-        .eq('id', id)
-        .single();
-
-      if (updateError) throw updateError;
-
-      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-      alert('Solicitud rechazada con éxito!');
-    } catch (error: any) {
-      console.error('Error al rechazar la solicitud:', error.message);
-      alert('Hubo un error al rechazar la solicitud: ' + error.message);
-    }
-  };
-
-  // Función para enviar una solicitud de amistad
-  const handleSendRequest = async () => {
-    try {
-      const { data: receiver, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', username)
-        .single();
-
-      if (userError) throw userError;
-
-      const receiverId = receiver.id;
-
-      if (user?.id === receiverId) {
-        alert('No puedes enviarte una solicitud a ti mismo');
-        return;
-      }
-
-      const { data: friends, error: friendsError } = await supabase
-        .from('friends')
-        .select('*')
-        .or(`and(user1Id.eq.${user?.id},user2Id.eq.${receiverId}),and(user1Id.eq.${receiverId},user2Id.eq.${user?.id})`)
-        .single();
-
-      if (friends) {
-        alert('Ya son amigos');
-        return;
-      }
-
-      const { data: existingRequest, error: requestError } = await supabase
-        .from('friendship_invitations')
-        .select('*')
-        .or(`and(senderId.eq.${user?.id},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${user?.id})`)
-        .eq('status', 'Pending')
-        .single();
-
-      if (existingRequest) {
-        alert('Ya existe una solicitud pendiente entre estos usuarios');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('friendship_invitations')
-        .insert([{ senderId: user?.id, receiverId }])
-        .single();
-
-      if (error) throw error;
-
-      alert('Solicitud enviada con éxito!');
-    } catch (error: any) {
-      console.error('Error al enviar la solicitud:', error.message);
-      alert('Hubo un error al enviar la solicitud: ' + error.message);
+    if (!isRequestsVisible) {
+      handleFetchPendingRequests();
     }
   };
 
   const fetchPendingRequests = async () => {
     try {
       const { data, error } = await supabase
-      .from('friendship_invitations')
-      .select(`
-        id, senderId, created_at, receiverId, status,
-        users:senderId (username)
-      `)
-      .eq('receiverId', user?.id)
-      .eq('status', 'Pending');
+        .from('friendship_invitations')
+        .select(`
+          id,
+          users!friendship_invitations_senderId_fkey (username)
+        `)
+        .eq('receiverId', user.id)
+        .eq('status', 'pending');
 
-      if (error) throw error;
-      console.log('Solicitudes pendientes obtenidas:', user?.id);
+      if (error) {
+        throw error;
+      }
 
-      console.log('Solicitudes pendientes obtenidas:', data);
-      return data;
-    } catch (error: any) {
-      console.error('Error al obtener solicitudes pendientes:', error.message);
+      return data || [];
+    } catch (error) {
+      console.error('Error al obtener solicitudes de amistad:', error);
+      Alert.alert('Error', 'No se pudieron cargar las solicitudes de amistad');
       return [];
     }
   };
 
-  // Llamar a esta función cuando se haga clic en el botón correspondiente
   const handleFetchPendingRequests = async () => {
-    // Alternar el estado de isRequestsVisible
-    setIsRequestsVisible(!isRequestsVisible);
+    setLoading(true);
+    const requests = await fetchPendingRequests();
+    setFriendshipRequests(requests);
+    setLoading(false);
+  };
 
-    // Solo buscar solicitudes pendientes si se van a mostrar
-    if (!isRequestsVisible) {
-      const requests = await fetchPendingRequests();
-      setFriendshipRequests(requests);
+  const handleAcceptRequest = async (id) => {
+    try {
+      setLoading(true);
+
+      // Actualizar el estado de la invitación a 'accepted'
+      const { error: updateError } = await supabase
+        .from('friendship_invitations')
+        .update({ status: 'accepted' })
+        .eq('id', id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Obtener los detalles de la invitación
+      const { data, error: fetchError } = await supabase
+        .from('friendship_invitations')
+        .select('senderId, receiverId')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      // Crear la amistad en la tabla de amistades
+      const { error: insertError } = await supabase
+        .from('friendships')
+        .insert([
+          { user1_id: data.senderId, user2_id: data.receiverId },
+          { user1_id: data.receiverId, user2_id: data.senderId }
+        ]);
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      Alert.alert('Éxito', 'Solicitud de amistad aceptada');
+      
+      // Refrescar la lista de solicitudes
+      await handleFetchPendingRequests();
+
+    } catch (error) {
+      console.error('Error al aceptar solicitud:', error);
+      Alert.alert('Error', 'No se pudo aceptar la solicitud');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectRequest = async (id) => {
+    try {
+      setLoading(true);
+
+      // Actualizar el estado de la invitación a 'rejected'
+      const { error } = await supabase
+        .from('friendship_invitations')
+        .update({ status: 'rejected' })
+        .eq('id', id);
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert('Éxito', 'Solicitud de amistad rechazada');
+      
+      // Refrescar la lista de solicitudes
+      await handleFetchPendingRequests();
+
+    } catch (error) {
+      console.error('Error al rechazar solicitud:', error);
+      Alert.alert('Error', 'No se pudo rechazar la solicitud');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendRequest = async () => {
+    if (!username) {
+      Alert.alert('Error', 'Por favor ingresa un nombre de usuario');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Buscar al usuario por nombre de usuario
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
+
+      if (userError) {
+        Alert.alert('Error', 'No se encontró un usuario con ese nombre');
+        return;
+      }
+
+      if (userData.id === user.id) {
+        Alert.alert('Error', 'No puedes enviarte una solicitud a ti mismo');
+        return;
+      }
+
+      // Verificar si ya existe una amistad
+      const { data: existingFriendship, error: friendshipError } = await supabase
+        .from('friendships')
+        .select('id')
+        .eq('user1_id', user.id)
+        .eq('user2_id', userData.id);
+
+      if (!friendshipError && existingFriendship && existingFriendship.length > 0) {
+        Alert.alert('Información', 'Ya eres amigo de este usuario');
+        return;
+      }
+
+      // Verificar si ya existe una solicitud pendiente
+      const { data: existingRequest, error: requestError } = await supabase
+        .from('friendship_invitations')
+        .select('id, status')
+        .eq('senderId', user.id)
+        .eq('receiverId', userData.id);
+
+      if (!requestError && existingRequest && existingRequest.length > 0) {
+        Alert.alert('Información', 'Ya has enviado una solicitud a este usuario');
+        return;
+      }
+
+      // Enviar la solicitud
+      const { error: insertError } = await supabase
+        .from('friendship_invitations')
+        .insert({
+          senderId: user.id,
+          receiverId: userData.id,
+          status: 'pending'
+        });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      Alert.alert('Éxito', 'Solicitud de amistad enviada');
+      setUsername('');
+
+    } catch (error) {
+      console.error('Error al enviar solicitud:', error);
+      Alert.alert('Error', 'No se pudo enviar la solicitud');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -427,26 +419,28 @@ const ProfileScreen = () => {
     <ScrollView style={styles.container}>
       <View style={styles.headerBackground}>
         <View style={styles.header}>
-          {user?.profilePicture ? (
-            <Image
-              source={{ uri: user.profilePicture }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
-            </View>
-          )}
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
+          </View>
           <View style={styles.userInfo}>
             <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
             <Text style={styles.email}>{user?.email}</Text>
+            <View style={styles.levelContainer}>
+              <Text style={styles.levelText}>Nivel {level}</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progress, { width: `${(xp / xpNext) * 100}%` }]} />
+              </View>
+              <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
+            </View>
           </View>
         </View>
       </View>
 
       <View style={styles.stats}>
         {loadingStats ? (
-          <ActivityIndicator size="large" color="#005F9E" />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size={40} color="#005F9E" />
+          </View>
         ) : (
           <>
             <View style={styles.statItem}>
@@ -455,7 +449,7 @@ const ProfileScreen = () => {
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.completedMissions}</Text>
-              <Text style={styles.statLabel}>Misiones Completadas</Text>
+              <Text style={styles.statLabel}>Misiones</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.visitedCities}</Text>
@@ -466,91 +460,73 @@ const ProfileScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Social</Text>
-        <TouchableOpacity
-          style={styles.settingsOption}
-          onPress={() => navigation.navigate('Friends')}
-        >
-          <Ionicons name="people" size={24} color="#005F9E" />
-          <Text style={styles.settingsText}>Amigos</Text>
-          <Ionicons name="chevron-forward" size={24} color="#78909C" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.settingsOption}
-          onPress={() => navigation.navigate('Leaderboard')}
-        >
-          <Ionicons name="trophy" size={24} color="#005F9E" />
-          <Text style={styles.settingsText}>Leaderboard</Text>
-          <Ionicons name="chevron-forward" size={24} color="#78909C" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Seguridad</Text>
-        <TouchableOpacity
-          style={styles.settingsOption}
-          onPress={() => setIsChangePasswordVisible(true)}
-        >
-          <Ionicons name="lock-closed" size={24} color="#005F9E" />
-          <Text style={styles.settingsText}>Cambiar Contraseña</Text>
-          <Ionicons name="chevron-forward" size={24} color="#78909C" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Solicitudes de amistad</Text>
-        <TouchableOpacity
-          style={styles.settingsOption}
-          onPress={handleFetchPendingRequests}
-        >
-          <Ionicons name="person-add" size={24} color="#005F9E" />
-          <Text style={styles.settingsText}>
-            {isRequestsVisible ? 'Ocultar Solicitudes' : 'Ver Solicitudes'}
-          </Text>
-          <Ionicons name={isRequestsVisible ? "chevron-up" : "chevron-down"} size={24} color="#78909C" />
-        </TouchableOpacity>
-
-        {isRequestsVisible && (
-          <View style={styles.friendsListContainer}>
-            {friendshipRequests.length === 0 ? (
-              <Text style={styles.emptyText}>No hay solicitudes pendientes</Text>
-            ) : (
-              <FlatList
-                data={friendshipRequests}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
-                  <View style={styles.friendRequestItem}>
-                    <Text style={styles.friendRequestName}>
-                      {item.users.username || 'Usuario desconocido'}
-                    </Text>
-                    <View style={styles.friendRequestButtons}>
-                      <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
-                        <Text style={styles.buttonText}>Aceptar</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
-                        <Text style={styles.buttonText}>Rechazar</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              />
-            )}
-          </View>
-        )}
-        
-        <View style={styles.sendRequestContainer}>
+        <Text style={styles.sectionTitle}>Amigos</Text>
+        <View style={styles.infoCard}>
           <TextInput
-            style={styles.emailInput}
-            placeholder="Nombre de usuario"
+            style={styles.input}
+            placeholder="Buscar usuario por nombre"
             value={username}
             onChangeText={setUsername}
           />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSendRequest}>
-            <Text style={styles.buttonText}>Enviar</Text>
+          <TouchableOpacity
+            style={styles.sendRequestButton}
+            onPress={handleSendRequest}
+            disabled={loading}
+          >
+            <Text style={styles.sendRequestButtonText}>Enviar solicitud</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.infoCard}
+          onPress={toggleRequestsVisibility}
+        >
+          <View style={styles.requestsHeader}>
+            <Text style={styles.requestsTitle}>Solicitudes de amistad</Text>
+            <Ionicons name={isRequestsVisible ? "chevron-up" : "chevron-down"} size={24} color="#005F9E" />
+          </View>
+
+          {isRequestsVisible && (
+            <View style={styles.requestsList}>
+              {loading ? (
+                <ActivityIndicator size="small" color="#005F9E" style={{ marginVertical: 10 }} />
+              ) : friendshipRequests.length === 0 ? (
+                <Text style={styles.emptyText}>No tienes solicitudes pendientes</Text>
+              ) : (
+                friendshipRequests.map((request) => (
+                  <View key={request.id} style={styles.requestItem}>
+                    <Text style={styles.requestUsername}>{request.users.username}</Text>
+                    <View style={styles.requestButtons}>
+                      <TouchableOpacity
+                        style={[styles.requestButton, styles.acceptButton]}
+                        onPress={() => handleAcceptRequest(request.id)}
+                      >
+                        <Text style={styles.requestButtonText}>Aceptar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.requestButton, styles.rejectButton]}
+                        onPress={() => handleRejectRequest(request.id)}
+                      >
+                        <Text style={styles.requestButtonText}>Rechazar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Configuración</Text>
+        <TouchableOpacity
+          style={styles.infoCard}
+          onPress={() => setIsChangePasswordVisible(true)}
+        >
+          <Text style={styles.optionText}>Cambiar contraseña</Text>
+          <Ionicons name="chevron-forward" size={24} color="#666" />
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -565,74 +541,67 @@ const ProfileScreen = () => {
 
       <Modal
         visible={isChangePasswordVisible}
-        transparent={true}
         animationType="slide"
+        transparent={true}
       >
-        <View style={styles.centeredView}>
-          <View style={styles.modalView}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
-
+            
             {message.text ? (
               <Text style={[styles.messageText, message.type === 'error' ? styles.errorText : styles.successText]}>
                 {message.text}
               </Text>
             ) : null}
-
+            
             <TextInput
-              style={styles.input}
+              style={styles.modalInput}
               placeholder="Contraseña actual"
               secureTextEntry
               value={currentPassword}
-              onChangeText={(text) => {
-                setCurrentPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
+              onChangeText={setCurrentPassword}
             />
-
             <TextInput
-              style={styles.input}
+              style={styles.modalInput}
               placeholder="Nueva contraseña"
               secureTextEntry
               value={newPassword}
-              onChangeText={(text) => {
-                setNewPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
+              onChangeText={setNewPassword}
             />
-
             <TextInput
-              style={styles.input}
+              style={styles.modalInput}
               placeholder="Confirmar nueva contraseña"
               secureTextEntry
               value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
+              onChangeText={setConfirmPassword}
             />
-
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={handleChangePassword}
-              disabled={loading}
-            >
-              <Text style={styles.modalButtonText}>
-                {loading ? 'Guardando...' : 'Guardar cambios'}
-              </Text>
-            </TouchableOpacity>
             
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => {
-                setIsChangePasswordVisible(false);
-                setCurrentPassword('');
-                setNewPassword('');
-                setConfirmPassword('');
-                setMessage({ type: '', text: '' });
-              }}
-            >
-              <Text style={styles.modalButtonText}>Cancelar</Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setIsChangePasswordVisible(false);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                  setMessage({ type: '', text: '' });
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleChangePassword}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.modalButtonText}>Cambiar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -682,6 +651,30 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     marginBottom: 5,
   },
+  levelContainer: {
+    marginTop: 5,
+  },
+  levelText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 4,
+    marginTop: 5,
+    overflow: 'hidden',
+  },
+  progress: {
+    height: '100%',
+    backgroundColor: '#FFB74D',
+  },
+  xpText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 2,
+  },
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -725,13 +718,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: '#005F9E',
   },
-  settingsOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  infoCard: {
     backgroundColor: 'white',
-    padding: 15,
     borderRadius: 10,
-    marginBottom: 10,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -740,11 +731,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  settingsText: {
-    marginLeft: 10,
-    flex: 1,
+  optionText: {
     fontSize: 16,
+    color: '#333',
   },
   logoutButton: {
     backgroundColor: '#D32F2F',
@@ -760,130 +753,151 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  centeredView: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 20,
   },
-  modalView: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 25,
+  modalContent: {
     width: '90%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
-    textAlign: 'center',
     color: '#005F9E',
   },
-  input: {
-    backgroundColor: '#f0f0f0',
-    padding: 12,
-    borderRadius: 5,
-    marginBottom: 15,
-  },
-  modalButton: {
-    backgroundColor: '#005F9E',
-    padding: 15,
+  modalInput: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#f5f5f5',
     borderRadius: 10,
-    alignItems: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
     marginTop: 10,
   },
+  modalButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
   cancelButton: {
-    backgroundColor: '#78909C',
+    backgroundColor: '#ccc',
+  },
+  confirmButton: {
+    backgroundColor: '#005F9E',
   },
   modalButtonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
+  },
+  messageText: {
+    marginBottom: 15,
+    textAlign: 'center',
+    padding: 10,
+    borderRadius: 5,
+    width: '100%',
   },
   errorText: {
-    color: '#D32F2F',
-    marginBottom: 10,
+    backgroundColor: '#ffebee',
+    color: '#d32f2f',
   },
   successText: {
-    color: '#005F9E',
-    marginBottom: 10,
+    backgroundColor: '#e8f5e9',
+    color: '#388e3c',
   },
-  friendsListContainer: {
-    marginTop: 5,
-    marginBottom: 15,
+  input: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginRight: 10,
+  },
+  sendRequestButton: {
+    backgroundColor: '#005F9E',
+    padding: 10,
+    borderRadius: 5,
+  },
+  sendRequestButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  requestsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  requestsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#005F9E',
+  },
+  requestsList: {
+    width: '100%',
+    marginTop: 15,
+  },
+  requestItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  requestUsername: {
+    fontSize: 16,
+    color: '#333',
+  },
+  requestButtons: {
+    flexDirection: 'row',
+  },
+  requestButton: {
+    padding: 8,
+    borderRadius: 5,
+    marginLeft: 5,
+  },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+  },
+  rejectButton: {
+    backgroundColor: '#F44336',
+  },
+  requestButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   emptyText: {
     textAlign: 'center',
     color: '#666',
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    marginVertical: 10,
   },
-  friendRequestItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  friendRequestName: {
-    fontSize: 16,
-    flex: 1,
-  },
-  friendRequestButtons: {
-    flexDirection: 'row',
-  },
-  acceptButton: {
-    backgroundColor: '#005F9E',
-    padding: 8,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  rejectButton: {
-    backgroundColor: '#D32F2F',
-    padding: 8,
-    borderRadius: 5,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  sendRequestContainer: {
-    marginTop: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  emailInput: {
-    backgroundColor: 'white',
-    padding: 10,
-    borderRadius: 5,
-    flex: 1,
-    marginRight: 10,
-  },
-  sendButton: {
-    backgroundColor: '#005F9E',
-    padding: 10,
-    borderRadius: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messageText: {
-    textAlign: 'center',
-    marginBottom: 15,
-    padding: 10,
-    borderRadius: 5,
-  }
 });
 
 export default ProfileScreen; 

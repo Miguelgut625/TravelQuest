@@ -54,7 +54,7 @@ const LeaderboardScreen = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#005F9E" />
+        <ActivityIndicator size={50} color="#005F9E" />
       </View>
     );
   }

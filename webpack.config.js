@@ -12,9 +12,16 @@ module.exports = async function (env, argv) {
     ...config.resolve.alias,
     'react-native$': 'react-native-web',
     'react-native/Libraries/Utilities/codegenNativeCommands': 'react-native-web/dist/vendor/react-native/NativeCommands',
-    'react-native-maps': 'react-native-web-maps',
     // Cesium aliases
-    cesium: path.resolve(__dirname, 'node_modules/cesium')
+    cesium: path.resolve(__dirname, 'node_modules/cesium'),
+    // Supabase shims
+    '@supabase/postgrest-js': path.resolve(__dirname, 'src/services/postgrest-shim.js'),
+    '@supabase/functions-js': path.resolve(__dirname, 'src/services/supabase-shims.js'),
+    '@supabase/realtime-js': path.resolve(__dirname, 'src/services/supabase-shims.js'),
+    '@supabase/storage-js': path.resolve(__dirname, 'src/services/supabase-shims.js'),
+    // Versiones web de componentes específicos
+    './src/services/supabase.ts': path.resolve(__dirname, 'src/services/supabase.web.ts'),
+    './src/screens/main/MapScreen.tsx': path.resolve(__dirname, 'src/screens/main/MapScreen.web.tsx')
   };
 
   // Configuración para Cesium
@@ -22,21 +29,13 @@ module.exports = async function (env, argv) {
     new CopyWebpackPlugin({
       patterns: [
         {
-          from: 'node_modules/cesium/Build/Cesium/Workers',
-          to: 'Workers'
-        },
-        {
-          from: 'node_modules/cesium/Build/Cesium/Assets',
-          to: 'Assets'
-        },
-        {
-          from: 'node_modules/cesium/Build/Cesium/Widgets',
-          to: 'Widgets'
+          from: 'node_modules/cesium/Build/Cesium',
+          to: 'cesium'
         }
       ]
     }),
     new DefinePlugin({
-      CESIUM_BASE_URL: JSON.stringify('')
+      CESIUM_BASE_URL: JSON.stringify('/cesium')
     })
   );
 
@@ -45,13 +44,20 @@ module.exports = async function (env, argv) {
   config.module.rules = config.module.rules || [];
   config.module.rules.push({
     test: /\.js$/,
-    include: path.resolve(__dirname, 'node_modules/cesium/Source'),
-    use: { loader: 'babel-loader' }
+    include: /cesium/,
+    use: {
+      loader: 'babel-loader',
+      options: {
+        presets: ['@babel/preset-env']
+      }
+    }
   });
 
   // Configurar la salida de Cesium
   config.output = config.output || {};
   config.output.sourcePrefix = '';
+  config.output.globalObject = 'window';
+  config.output.publicPath = '/';
 
   return config;
 };
