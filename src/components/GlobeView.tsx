@@ -415,7 +415,7 @@ const htmlContent = `
                 // Modo oscuro
                 viewer.scene.globe.baseColor = Cesium.Color.BLACK;
                 viewer.scene.backgroundColor = Cesium.Color.BLACK;
-              } else {
+                } else {
                 // Modo normal
                 viewer.scene.globe.baseColor = Cesium.Color.BLUE;
                 viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#1B1B1B');
@@ -684,7 +684,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
               
               console.log('GlobeView: Enviando mensaje de transición 2D a 3D:', initialPositionMessage);
               webViewRef.current.postMessage(JSON.stringify(initialPositionMessage));
-            } catch (error) {
+          } catch (error) {
               console.error('GlobeView: Error al enviar mensaje de transición:', error);
             }
           }
@@ -842,7 +842,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         default:
           console.log('GlobeView: Tipo de mensaje no manejado:', data.type);
       }
-    } catch (error) {
+          } catch (error) {
       console.error('GlobeView: Error al procesar mensaje del WebView:', error);
     }
   }, [is3DMode, props]);
@@ -882,7 +882,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           height: 5000
         };
         webViewRef.current.postMessage(JSON.stringify(message));
-      } else {
+        } else {
         // Actualizar región en modo 2D
         setMapRegion({
           latitude: userLocation.latitude,
@@ -964,17 +964,17 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       ) : (
         <>
           {/* WebView siempre presente, visible u oculta según el modo */}
-          <WebView
-            ref={webViewRef}
+        <WebView
+          ref={webViewRef}
             source={{ html: htmlContent }}
             style={[
               styles.webview,
               // Visible solo en modo 3D, pero siempre presente
               !is3DMode && { opacity: 0, position: 'absolute', width: 1, height: 1, top: -1000 }
             ]}
-            originWhitelist={['*']}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
+          originWhitelist={['*']}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
             onMessage={handleMessage}
             onLoadEnd={() => {
               console.log('GlobeView: WebView onLoadEnd nativo');
@@ -1045,7 +1045,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
             >
               {performanceMode ? 'Desactivar' : 'Activar'} modo rendimiento
           </Button>
-          </View>
+        </View>
         </View>
       )}
       
