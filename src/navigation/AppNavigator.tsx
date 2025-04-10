@@ -15,6 +15,7 @@ import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import LeaderboardScreen from '../screens/main/LeaderboardScreen';
 import FriendsScreen from '../screens/main/FriendsScreen';
+import NotificationsScreen from '../screens/main/NotificationsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
@@ -33,6 +34,7 @@ export type TabParamList = {
   Profile: undefined;
   Leaderboard: undefined;
   Friends: undefined;
+  Notifications: undefined;
 };
 
 const Stack = createNativeStackNavigator();
@@ -69,10 +71,11 @@ const AppNavigator = () => {
                 iconName = focused ? 'people' : 'people-outline';
               } else if (route.name === 'Leaderboard') {
                 iconName = focused ? 'trophy' : 'trophy-outline';
+              } else if (route.name === 'Notifications') {
+                iconName = focused ? 'notifications' : 'notifications-outline';
               } else if (route.name === 'Profile') {
                 iconName = focused ? 'person' : 'person-outline';
               }
-              
 
               return <Ionicons name={iconName as any} size={size} color={color} />;
             },
@@ -85,8 +88,8 @@ const AppNavigator = () => {
           <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} />
           <Tab.Screen name="Friends" component={FriendsScreen} />
           <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
+          <Tab.Screen name="Notifications" component={NotificationsScreen} />
           <Tab.Screen name="Profile" component={ProfileScreen} />
-          
         </Tab.Navigator>
       ) : (
         <Stack.Navigator

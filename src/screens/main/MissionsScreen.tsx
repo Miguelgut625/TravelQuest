@@ -13,6 +13,7 @@ import { setRefreshJournal } from '../../features/journalSlice';
 import { createJournalEntry } from '../../services/journalService';
 import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
+import NotificationService from '../../services/NotificationService';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -72,6 +73,15 @@ interface Journey {
 interface SharedJourney {
   journeyId: string;
   journeys: Journey;
+}
+
+interface ExpiringMission {
+  id: string;
+  end_date: string;
+  completed: boolean;
+  journeys: {
+    description: string;
+  };
 }
 
 const getTimeRemaining = (endDate: string) => {
@@ -364,9 +374,53 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     }
   };
 
+  const checkExpiringMissions = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data: missions, error } = await supabase
+        .from('journeys_missions')
+        .select(`
+          id,
+          end_date,
+          completed,
+          journeys (
+            description
+          )
+        `)
+        .eq('completed', false)
+        .not('end_date', 'is', null);
+
+      if (error) throw error;
+
+      const now = new Date();
+      missions?.forEach((mission: ExpiringMission) => {
+        const endDate = new Date(mission.end_date);
+        const hoursLeft = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+
+        // Notificar cuando queden 24 horas o menos
+        if (hoursLeft <= 24 && hoursLeft > 0) {
+          NotificationService.getInstance().notifyJourneyEnding(
+            user.id,
+            mission.journeys.description,
+            hoursLeft
+          );
+        }
+      });
+    } catch (error) {
+      console.error('Error al verificar misiones por expirar:', error);
+    }
+  };
+
   useEffect(() => {
     fetchMissions();
     fetchInitialPoints();
+
+    // Verificar misiones por expirar al cargar y cada hora
+    checkExpiringMissions();
+    const interval = setInterval(checkExpiringMissions, 60 * 60 * 1000); // Cada hora
+
+    return () => clearInterval(interval);
   }, [journeyId]);
 
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {

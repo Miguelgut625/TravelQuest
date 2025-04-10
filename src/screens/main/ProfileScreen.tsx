@@ -23,13 +23,6 @@ interface JourneyMission {
   };
 }
 
-interface FriendshipRequest {
-  id: string;
-  sender: {
-    username: string;
-  };
-}
-
 type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const ProfileScreen = () => {
@@ -48,9 +41,6 @@ const ProfileScreen = () => {
     visitedCities: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
-  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
-  const [isRequestsVisible, setIsRequestsVisible] = useState(false);
-  const [username, setUsername] = useState('');
 
   useEffect(() => {
     fetchUserStats();
@@ -277,155 +267,6 @@ const ProfileScreen = () => {
     }
   };
 
-  // Función para alternar la visibilidad de las solicitudes
-  const toggleRequestsVisibility = () => {
-    setIsRequestsVisible(!isRequestsVisible);
-  };
-
-  // Función para aceptar una solicitud de amistad
-  const handleAcceptRequest = async (id: string) => {
-    try {
-      const { data: invitation, error: invitationError } = await supabase
-        .from('friendship_invitations')
-        .select('senderId, receiverId')
-        .eq('id', id)
-        .single();
-
-      if (invitationError) throw invitationError;
-
-      const { senderId, receiverId } = invitation;
-
-      const { data: updatedInvitation, error: updateError } = await supabase
-        .from('friendship_invitations')
-        .update({ status: 'Accepted' })
-        .eq('id', id)
-        .single();
-
-      if (updateError) throw updateError;
-
-      const { data: newFriendship, error: insertError } = await supabase
-        .from('friends')
-        .insert([{ user1Id: senderId, user2Id: receiverId }])
-        .single();
-
-      if (insertError) throw insertError;
-
-      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-      alert('Solicitud aceptada con éxito!');
-    } catch (error: any) {
-      console.error('Error al aceptar la solicitud:', error.message);
-      alert('Hubo un error al aceptar la solicitud: ' + error.message);
-    }
-  };
-
-  // Función para rechazar una solicitud de amistad
-  const handleRejectRequest = async (id: string) => {
-    try {
-      const { data: updatedInvitation, error: updateError } = await supabase
-        .from('friendship_invitations')
-        .update({ status: 'Rejected' })
-        .eq('id', id)
-        .single();
-
-      if (updateError) throw updateError;
-
-      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-      alert('Solicitud rechazada con éxito!');
-    } catch (error: any) {
-      console.error('Error al rechazar la solicitud:', error.message);
-      alert('Hubo un error al rechazar la solicitud: ' + error.message);
-    }
-  };
-
-  // Función para enviar una solicitud de amistad
-  const handleSendRequest = async () => {
-    try {
-      const { data: receiver, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', username)
-        .single();
-
-      if (userError) throw userError;
-
-      const receiverId = receiver.id;
-
-      if (user?.id === receiverId) {
-        alert('No puedes enviarte una solicitud a ti mismo');
-        return;
-      }
-
-      const { data: friends, error: friendsError } = await supabase
-        .from('friends')
-        .select('*')
-        .or(`and(user1Id.eq.${user?.id},user2Id.eq.${receiverId}),and(user1Id.eq.${receiverId},user2Id.eq.${user?.id})`)
-        .single();
-
-      if (friends) {
-        alert('Ya son amigos');
-        return;
-      }
-
-      const { data: existingRequest, error: requestError } = await supabase
-        .from('friendship_invitations')
-        .select('*')
-        .or(`and(senderId.eq.${user?.id},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${user?.id})`)
-        .eq('status', 'Pending')
-        .single();
-
-      if (existingRequest) {
-        alert('Ya existe una solicitud pendiente entre estos usuarios');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('friendship_invitations')
-        .insert([{ senderId: user?.id, receiverId }])
-        .single();
-
-      if (error) throw error;
-
-      alert('Solicitud enviada con éxito!');
-    } catch (error: any) {
-      console.error('Error al enviar la solicitud:', error.message);
-      alert('Hubo un error al enviar la solicitud: ' + error.message);
-    }
-  };
-
-  const fetchPendingRequests = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('friendship_invitations')
-        .select(`
-        id, senderId, created_at, receiverId, status,
-        users:senderId (username)
-      `)
-        .eq('receiverId', user?.id)
-        .eq('status', 'Pending');
-
-      if (error) throw error;
-      console.log('Solicitudes pendientes obtenidas:', user?.id);
-
-      console.log('Solicitudes pendientes obtenidas:', data);
-      return data;
-    } catch (error: any) {
-      console.error('Error al obtener solicitudes pendientes:', error.message);
-      return [];
-    }
-  };
-
-  // Llamar a esta función cuando se haga clic en el botón correspondiente
-  const handleFetchPendingRequests = async () => {
-    // Alternar el estado de isRequestsVisible
-    setIsRequestsVisible(!isRequestsVisible);
-
-    // Solo buscar solicitudes pendientes si se van a mostrar
-    if (!isRequestsVisible) {
-      const requests = await fetchPendingRequests();
-      setFriendshipRequests(requests);
-    }
-  };
-
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -499,48 +340,6 @@ const ProfileScreen = () => {
             Actualiza tu contraseña para mantener tu cuenta segura
           </Text>
         </View>
-      </View>
-
-      <View style={styles.requestsContainer}>
-        <TouchableOpacity onPress={handleFetchPendingRequests}>
-          <Text style={styles.requestsTitle}>
-            {isRequestsVisible ? 'Ocultar Solicitudes' : 'Ver Solicitudes'}
-          </Text>
-        </TouchableOpacity>
-
-        {isRequestsVisible && (
-          friendshipRequests.length === 0 ? (
-            <Text style={styles.noRequestsText}>No hay solicitudes pendientes</Text>
-          ) : (
-            <FlatList
-              data={friendshipRequests}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.requestItem}>
-                  <Text style={styles.requestText}>
-                    {item.users.username || 'Usuario desconocido'} te ha enviado una solicitud.
-                  </Text>
-                  <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
-                    <Text style={styles.acceptButtonText}>Aceptar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
-                    <Text style={styles.rejectButtonText}>Rechazar</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            />
-          )
-        )}
-      </View>
-
-      <View style={styles.sendRequestContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre de usuario"
-          value={username}
-          onChangeText={setUsername}
-        />
-        <Button title="Enviar Solicitud" onPress={handleSendRequest} />
       </View>
 
       <TouchableOpacity
@@ -848,76 +647,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-  },
-  requestsContainer: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  requestsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  requestItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  requestText: {
-    flex: 1,
-    color: '#333',
-  },
-  acceptButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
-    padding: 5,
-    marginLeft: 10,
-  },
-  acceptButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  rejectButton: {
-    backgroundColor: '#f44336',
-    borderRadius: 5,
-    padding: 5,
-    marginLeft: 10,
-  },
-  rejectButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  sendRequestContainer: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  noRequestsText: {
-    textAlign: 'center',
-    color: '#666',
-    marginBottom: 10,
   },
 });
 

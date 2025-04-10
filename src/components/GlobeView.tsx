@@ -34,10 +34,10 @@ const GlobeView = (props: { style?: any }) => {
     altitude: 15000000,
     zoom: 2
   });
-  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState<boolean>(true);
-  
+
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cesiumContainerRef = useRef<HTMLDivElement>(null);
@@ -46,57 +46,22 @@ const GlobeView = (props: { style?: any }) => {
   // Función para obtener la ubicación del usuario
   const getUserLocation = async () => {
     try {
-      console.log("Iniciando obtención de ubicación en segundo plano");
-      
-      // Solicitar permisos
       const { status } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(status === 'granted');
-      
+
       if (status === 'granted') {
-        // Obtenemos la ubicación del usuario en segundo plano sin bloquear la UI
-        console.log("Permiso concedido, obteniendo ubicación en segundo plano");
-        
-        // Primero intentamos con una precisión alta pero con un timeout bajo
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Highest,
-          // Opciones avanzadas solo disponibles en algunas plataformas
-          // Estas opciones podrían no estar disponibles en todas las plataformas
-          // maximumAge: 10000,
-          // timeout: 5000
-        }).then(location => {
-          console.log("Ubicación obtenida (primera llamada):", location);
-          setUserLocation({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude
-          });
-          setIsLoadingLocation(false);
-        }).catch(err => {
-          console.log("Error en primera llamada de ubicación, intentando con menor precisión:", err);
-          
-          // Si falla, intentamos con precisión más baja para obtener una ubicación rápida
-          Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-            // Opciones avanzadas
-            // maximumAge: 30000,
-            // timeout: 10000
-          }).then(location => {
-            console.log("Ubicación obtenida (segunda llamada):", location);
-            setUserLocation({
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude
-            });
-            setIsLoadingLocation(false);
-          }).catch(secondErr => {
-            console.error("Error obteniendo ubicación incluso con menor precisión:", secondErr);
-            setIsLoadingLocation(false);
-          });
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced
         });
-      } else {
-        console.log('Permiso de ubicación denegado');
+
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude
+        });
         setIsLoadingLocation(false);
       }
-    } catch (err) {
-      console.error('Error al obtener la ubicación:', err);
+    } catch (error) {
+      console.error('Error al obtener ubicación:', error);
       setIsLoadingLocation(false);
     }
   };
@@ -104,7 +69,7 @@ const GlobeView = (props: { style?: any }) => {
   // Función para ir a la ubicación del usuario
   const goToUserLocation = () => {
     console.log("goToUserLocation llamada con userLocation:", userLocation);
-    
+
     if (!userLocation) {
       console.log("No hay ubicación disponible, intentando obtener ubicación ahora");
       // Intentar obtener la ubicación nuevamente
@@ -116,9 +81,9 @@ const GlobeView = (props: { style?: any }) => {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude
         };
-        
+
         setUserLocation(newLocation);
-        
+
         // Llamar recursivamente a la función después de obtener la ubicación
         setTimeout(() => goToUserLocation(), 500);
       }).catch(err => {
@@ -126,11 +91,11 @@ const GlobeView = (props: { style?: any }) => {
       });
       return;
     }
-    
+
     // Si estamos en la vista de globo, cambiamos a la vista de mapa con zoom
     if (!showMapView) {
       console.log("Cambiando de globo a mapa. userLocation:", userLocation);
-      
+
       // Primero animamos el globo hacia la ubicación antes de cambiar a la vista de mapa
       if (webViewRef.current) {
         console.log("Animando globo hacia la ubicación del usuario");
@@ -177,7 +142,7 @@ const GlobeView = (props: { style?: any }) => {
           })();
         `);
       }
-      
+
       // Actualizamos la posición para que el WebView sepa dónde mirar
       setCurrentPosition(prevState => {
         console.log("Actualizando currentPosition a:", {
@@ -195,12 +160,12 @@ const GlobeView = (props: { style?: any }) => {
           zoom: 12
         };
       });
-      
+
       // Añadimos un mayor retraso para permitir que la animación del globo termine
       setTimeout(() => {
         setShowMapView(true);
         console.log("Vista de mapa activada");
-        
+
         // Animamos el mapa a la ubicación del usuario
         if (mapViewRef.current) {
           console.log("Animando mapa a:", userLocation);
@@ -221,7 +186,7 @@ const GlobeView = (props: { style?: any }) => {
           console.log("mapViewRef.current es null");
         }
       }, 2000); // 2 segundos para permitir que termine la animación del globo
-      
+
       // Detenemos rotación en el WebView
       if (webViewRef.current) {
         console.log("Deteniendo rotación del WebView");
@@ -265,10 +230,10 @@ const GlobeView = (props: { style?: any }) => {
     // Indicamos inmediatamente que el globo está cargado
     // para que se muestre sin esperar a la ubicación
     setLoading(false);
-    
+
     // Obtenemos la ubicación del usuario en paralelo
     getUserLocation();
-    
+
     // Opcionalmente, intentar obtener la ubicación periódicamente si no se obtiene la primera vez
     const locationInterval = setInterval(() => {
       if (!userLocation && locationPermission) {
@@ -309,7 +274,7 @@ const GlobeView = (props: { style?: any }) => {
         if (webViewRef.current) {
           // Intentar recargar antes de cambiar a la vista de respaldo
           webViewRef.current.reload();
-          
+
           // Si aún hay problemas después de recargar, entonces cambiar a vista de respaldo
           setTimeout(() => {
             if (loading) {
@@ -336,7 +301,7 @@ const GlobeView = (props: { style?: any }) => {
     if (Platform.OS !== 'web') {
       // Obtener dimensiones iniciales
       const initialDimensions = Dimensions.get('window');
-      
+
       // Función para manejar cambios de dimensiones
       const dimensionsChangeHandler = ({ window }: { window: { width: number; height: number } }) => {
         // Si estamos en el mapa, actualizar la región
@@ -351,10 +316,10 @@ const GlobeView = (props: { style?: any }) => {
           }, 300);
         }
       };
-      
+
       // Añadir listener para cambios de dimensiones
       const subscription = Dimensions.addEventListener('change', dimensionsChangeHandler);
-      
+
       // Limpiar listener cuando el componente se desmonte
       return () => {
         subscription.remove();
@@ -367,7 +332,7 @@ const GlobeView = (props: { style?: any }) => {
   const handleError = (errorMsg: string) => {
     // Ignorar errores específicos de Web Workers que sabemos que no son críticos
     if (
-      errorMsg.includes('importScripts') || 
+      errorMsg.includes('importScripts') ||
       errorMsg.includes('WorkerGlobalScope') ||
       errorMsg.includes('transferTypedArrayTest') ||
       errorMsg.includes('createVerticesFromHeightmap')
@@ -375,7 +340,7 @@ const GlobeView = (props: { style?: any }) => {
       console.warn('Ignorando error no crítico de Web Worker:', errorMsg);
       return;
     }
-    
+
     // Ignorar errores de normalización o propiedades de solo lectura
     if (
       errorMsg.includes('Cannot assign to read only property') ||
@@ -389,7 +354,7 @@ const GlobeView = (props: { style?: any }) => {
       }
       return;
     }
-    
+
     console.error('Error en GlobeView:', errorMsg);
     setError(errorMsg);
     // Cambiar a la vista de respaldo después de un breve retraso
@@ -406,12 +371,12 @@ const GlobeView = (props: { style?: any }) => {
       </View>
     );
   }
-  
+
   // Si hay problemas con WebView o estamos en modo fallback, usamos el globo alternativo
   if (useFallbackView) {
     return (
       <View style={[styles.container, props.style]}>
-        <ActivityIndicator size="large" color="#4CAF50" style={{flex: 1}} />
+        <ActivityIndicator size="large" color="#4CAF50" style={{ flex: 1 }} />
         <Text style={styles.errorText}>Cargando vista alternativa...</Text>
       </View>
     );
@@ -1041,20 +1006,20 @@ const GlobeView = (props: { style?: any }) => {
   // Manejador de mensajes desde el WebView
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     const message = event.nativeEvent.data;
-    
+
     // Verificar si el mensaje contiene datos de posición
     if (message.startsWith('position:')) {
       try {
         const positionData = JSON.parse(message.substring(9));
         setCurrentPosition(positionData);
-       
+
       } catch (e) {
         console.error('Error al procesar datos de posición:', e);
       }
     } else if (message === 'loaded') {
       console.log('Cesium cargado correctamente');
       setLoading(false);
-      
+
       // Limpiar el timeout cuando se carga correctamente
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
@@ -1110,7 +1075,7 @@ const GlobeView = (props: { style?: any }) => {
               handleError('La visualización 3D se cerró inesperadamente');
             }}
           />
-          
+
           {/* Mostrar MapView cuando showMapView es true */}
           {showMapView && (
             <View style={styles.mapContainer}>
@@ -1118,7 +1083,7 @@ const GlobeView = (props: { style?: any }) => {
                 ref={mapViewRef}
                 style={styles.map}
                 provider={PROVIDER_GOOGLE}
-                mapType="standard" 
+                mapType="standard"
                 initialRegion={{
                   latitude: currentPosition.latitude,
                   longitude: currentPosition.longitude,
@@ -1148,15 +1113,15 @@ const GlobeView = (props: { style?: any }) => {
                     // Calcular un zoom aproximado desde la región
                     zoom: calculateZoomFromRegion(region)
                   }));
-                  
+
                   // Ya no cambiamos automáticamente al hacer zoom para evitar cambios inesperados
                 }}
               >
                 {/* Eliminamos el marcador personalizado */}
               </MapView>
-              
+
               {/* Botón para volver al globo */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.backToGlobeButton}
                 onPress={() => {
                   // Primero animamos desde el mapa hacia afuera
@@ -1167,7 +1132,7 @@ const GlobeView = (props: { style?: any }) => {
                       latitudeDelta: 0.0922,
                       longitudeDelta: 0.0421
                     };
-                    
+
                     try {
                       // Animamos el mapa hacia afuera para dar efecto de transición
                       mapViewRef.current.animateToRegion({
@@ -1175,13 +1140,13 @@ const GlobeView = (props: { style?: any }) => {
                         latitudeDelta: 45, // Zoom muy alejado
                         longitudeDelta: 45
                       }, 800);
-                      
+
                       console.log("Animando mapa hacia afuera antes de volver al globo");
                     } catch (err) {
                       console.error("Error al animar zoom out en mapa:", err);
                     }
                   }
-                  
+
                   // Luego actualizamos la vista del globo con la posición actual del mapa
                   setTimeout(() => {
                     if (webViewRef.current && mapViewRef.current) {
@@ -1204,13 +1169,13 @@ const GlobeView = (props: { style?: any }) => {
                               return true;
                             })();
                           `);
-                          
+
                           // Esperar un pequeño momento para asegurar que el WebView está listo
                           setTimeout(() => {
                             // Quitar la vista del mapa
                             setShowMapView(false);
                             console.log("Volviendo al globo terráqueo");
-                            
+
                             // Animar el vuelo del globo después de cambiar la vista
                             setTimeout(() => {
                               webViewRef.current?.injectJavaScript(`
@@ -1256,9 +1221,9 @@ const GlobeView = (props: { style?: any }) => {
               >
                 <Text style={styles.backToGlobeButtonText}>Volver al Globo</Text>
               </TouchableOpacity>
-              
+
               {/* Botón para ir a la ubicación del usuario */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.myLocationButton}
                 onPress={() => {
                   console.log("Botón de ubicación en mapa presionado");
@@ -1279,11 +1244,11 @@ const GlobeView = (props: { style?: any }) => {
           )}
         </>
       )}
-      
+
       {/* Botón para ir a ubicación en vista de globo 3D */}
       {!showMapView && !useFallbackView && (
         <>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.globe3DLocationButton}
             onPress={() => {
               console.log("Botón de ubicación en globo 3D presionado");
@@ -1292,9 +1257,9 @@ const GlobeView = (props: { style?: any }) => {
           >
             <MaterialIcons name="my-location" size={24} color="white" />
           </TouchableOpacity>
-          
+
           {/* Botón para centrar el globo */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.centerGlobeButton}
             onPress={() => {
               console.log("Centrando globo terráqueo");
@@ -1319,20 +1284,20 @@ const GlobeView = (props: { style?: any }) => {
           </TouchableOpacity>
         </>
       )}
-      
+
       {useFallbackView && (
         <View style={styles.container}>
-          <ActivityIndicator size="large" color="#4CAF50" style={{flex: 1}} />
-          <Text style={{...styles.errorText, position: 'absolute', top: '50%', left: 0, right: 0, textAlign: 'center'}}>
+          <ActivityIndicator size="large" color="#4CAF50" style={{ flex: 1 }} />
+          <Text style={{ ...styles.errorText, position: 'absolute', top: '50%', left: 0, right: 0, textAlign: 'center' }}>
             Cargando vista alternativa...
           </Text>
         </View>
       )}
-      
+
       {error && !useFallbackView && (
         <View style={styles.errorContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" style={{marginBottom: 20}} />
-          <Text style={{...styles.errorSubtext, marginTop: 10}}>
+          <ActivityIndicator size="large" color="#4CAF50" style={{ marginBottom: 20 }} />
+          <Text style={{ ...styles.errorSubtext, marginTop: 10 }}>
             Intentando recuperar visualización...
           </Text>
         </View>

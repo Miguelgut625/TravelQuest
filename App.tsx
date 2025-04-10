@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { PersistGate } from 'redux-persist/integration/react';
 import { Provider } from 'react-redux';
 import { store, persistor } from './src/features/store';
@@ -9,6 +9,9 @@ import { setAuthState, setUser, logout } from './src/features/authSlice';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
+import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
+import NotificationService from './src/services/NotificationService';
 
 const theme = {
   ...DefaultTheme,
@@ -19,63 +22,53 @@ const theme = {
   },
 };
 
+// Configurar el comportamiento de las notificaciones
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 const App = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const notificationListener = useRef<any>();
+  const responseListener = useRef<any>();
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('Iniciando la aplicación...');
-        
-        // Verificar sesión actual
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // Configurar listeners de notificaciones
+        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+          console.log('Notificación recibida:', notification);
+        });
 
-        if (sessionError) {
-          console.error('Error obteniendo sesión:', sessionError);
-          throw sessionError;
-        }
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+          console.log('Usuario interactuó con la notificación:', response);
+        });
 
-        // Verificar configuración de Cloudinary
-        const cloudinaryConfig = getCloudinaryConfigInfo();
-        console.log('Estado configuración Cloudinary:',
-          cloudinaryConfig.isConfigured ? 'OK' : 'No configurado',
-          __DEV__ && cloudinaryConfig.usingFallback ? '(usando fallback)' : ''
-        );
-
-        if (session?.user) {
-          console.log('Usuario autenticado encontrado:', session.user.email);
-          store.dispatch(setUser({
-            email: session.user.email || '',
-            id: session.user.id,
-            username: session.user.user_metadata?.username
-          }));
-          store.dispatch(setAuthState('authenticated'));
-        } else {
-          console.log('No hay sesión activa');
-          store.dispatch(setAuthState('unauthenticated'));
-        }
-
-      } catch (error) {
-        console.error('Error inicializando la app:', error);
+        // Inicializar otros servicios
+        await getCloudinaryConfigInfo();
+        setIsReady(true);
+      } catch (err) {
+        console.error('Error inicializando la app:', err);
         setError('Error al inicializar la aplicación');
-        store.dispatch(logout());
-      } finally {
-        setIsLoading(false);
       }
     };
 
     initializeApp();
-  }, []);
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={{ marginTop: 10 }}>Cargando...</Text>
-      </View>
-    );
-  }
+    return () => {
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+      }
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
+    };
+  }, []);
 
   if (error) {
     return (
@@ -85,11 +78,20 @@ const App = () => {
     );
   }
 
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
+      <PersistGate loading={<ActivityIndicator size="large" color={theme.colors.primary} />} persistor={persistor}>
         <PaperProvider theme={theme}>
           <SafeAreaProvider>
+            <StatusBar style="auto" />
             <AppNavigator />
           </SafeAreaProvider>
         </PaperProvider>

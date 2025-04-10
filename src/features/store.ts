@@ -5,6 +5,20 @@ import missionReducer from './missionSlice';
 import journalReducer from '../features/journalSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import journeyReducer from './journey/journeySlice';
+import { combineReducers } from '@reduxjs/toolkit';
+import { createMigrate } from 'redux-persist';
+
+const migrations = {
+  0: (state: any) => {
+    return {
+      ...state,
+      auth: {
+        ...state.auth,
+        _persist: state.auth?._persist
+      }
+    };
+  }
+};
 
 const persistConfig = {
   key: 'root',
@@ -13,20 +27,24 @@ const persistConfig = {
   blacklist: ['missions', 'journal', 'journey'],
   debug: true, // Habilitar logs de depuración
   timeout: 0, // Evitar timeout en la persistencia
+  version: 0,
+  migrate: createMigrate(migrations, { debug: true }),
   writeFailHandler: (err: any) => {
     console.error('Error al persistir el estado:', err);
   }
 };
 
-const persistedAuthReducer = persistReducer(persistConfig, authReducer);
+const rootReducer = combineReducers({
+  auth: authReducer,
+  missions: missionReducer,
+  journal: journalReducer,
+  journey: journeyReducer,
+});
+
+const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
-  reducer: {
-    auth: persistedAuthReducer,
-    missions: missionReducer,
-    journal: journalReducer,
-    journey: journeyReducer,
-  },
+  reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
