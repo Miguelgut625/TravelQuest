@@ -266,14 +266,35 @@ class NotificationService {
 
             if (createError) throw createError;
 
-            // Programar la notificación local solo si se creó correctamente en la base de datos
-            if (newNotification) {
-                await this.scheduleLocalNotification(
-                    title,
-                    message,
-                    { seconds: 1 },
-                    userId
-                );
+            // Mostrar notificación local sin crear una nueva en la base de datos
+            if (Platform.OS === 'web') {
+                if (typeof window !== 'undefined' && 'Notification' in window) {
+                    if (window.Notification.permission === "granted") {
+                        new window.Notification(title, {
+                            body: message,
+                            icon: '/icon.png'
+                        });
+                    } else if (window.Notification.permission !== "denied") {
+                        window.Notification.requestPermission().then((permission: string) => {
+                            if (permission === "granted") {
+                                new window.Notification(title, {
+                                    body: message,
+                                    icon: '/icon.png'
+                                });
+                            }
+                        });
+                    }
+                }
+            } else {
+                await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title,
+                        body: message,
+                        sound: true,
+                        priority: Notifications.AndroidNotificationPriority.HIGH,
+                    },
+                    trigger: { seconds: 1 },
+                });
             }
         } catch (error) {
             console.error('Error al notificar fin de viaje:', error);
