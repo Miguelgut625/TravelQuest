@@ -44,6 +44,11 @@ const ProfileScreen = () => {
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
 
   useEffect(() => {
     fetchUserStats();
@@ -275,6 +280,80 @@ const ProfileScreen = () => {
     }
   };
 
+  const searchFriends = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, username, email')
+        .ilike('username', `%${searchQuery}%`)
+        .neq('id', user?.id)
+        .limit(10);
+
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error('Error buscando amigos:', error);
+      Alert.alert('Error', 'No se pudo buscar amigos');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const fetchFriendRequests = async () => {
+    if (!user?.id) return;
+    
+    setIsLoadingRequests(true);
+    try {
+      const { data, error } = await supabase
+        .from('friend_requests')
+        .select(`
+          id,
+          sender_id,
+          status,
+          created_at,
+          users:sender_id (
+            id,
+            username,
+            email
+          )
+        `)
+        .eq('receiver_id', user.id)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+      setFriendRequests(data || []);
+    } catch (error) {
+      console.error('Error obteniendo solicitudes:', error);
+      Alert.alert('Error', 'No se pudieron obtener las solicitudes');
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  };
+
+  const handleFriendRequest = async (requestId: string, action: 'accept' | 'reject') => {
+    try {
+      const { error } = await supabase
+        .from('friend_requests')
+        .update({ status: action === 'accept' ? 'accepted' : 'rejected' })
+        .eq('id', requestId);
+
+      if (error) throw error;
+      
+      // Actualizar la lista de solicitudes
+      await fetchFriendRequests();
+    } catch (error) {
+      console.error('Error procesando solicitud:', error);
+      Alert.alert('Error', 'No se pudo procesar la solicitud');
+    }
+  };
+
+  useEffect(() => {
+    fetchFriendRequests();
+  }, [user?.id]);
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -332,6 +411,67 @@ const ProfileScreen = () => {
             <Text style={styles.socialButtonText}>Amigos</Text>
           </TouchableOpacity>
           <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
+
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar amigos..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={searchFriends}
+            />
+            <TouchableOpacity
+              style={styles.searchButton}
+              onPress={searchFriends}
+              disabled={isSearching}
+            >
+              <Ionicons name="search" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          {isSearching ? (
+            <ActivityIndicator size="small" color="#4CAF50" />
+          ) : (
+            searchResults.map((result) => (
+              <View key={result.id} style={styles.searchResult}>
+                <Text style={styles.searchResultText}>{result.username}</Text>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => {/* Implementar envío de solicitud */}}
+                >
+                  <Ionicons name="person-add" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+
+          <Text style={styles.sectionSubtitle}>Solicitudes Pendientes</Text>
+          {isLoadingRequests ? (
+            <ActivityIndicator size="small" color="#4CAF50" />
+          ) : (
+            friendRequests.map((request) => (
+              <View key={request.id} style={styles.requestItem}>
+                <Text style={styles.requestText}>
+                  {request.users?.username} quiere ser tu amigo
+                </Text>
+                <View style={styles.requestButtons}>
+                  <TouchableOpacity
+                    style={[styles.requestButton, styles.acceptButton]}
+                    onPress={() => handleFriendRequest(request.id, 'accept')}
+                  >
+                    <Ionicons name="checkmark" size={20} color="white" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.requestButton, styles.rejectButton]}
+                    onPress={() => handleFriendRequest(request.id, 'reject')}
+                  >
+                    <Ionicons name="close" size={20} color="white" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+
           <TouchableOpacity
             style={styles.socialButton}
             onPress={() => navigation.navigate('Leaderboard')}
@@ -695,6 +835,78 @@ const styles = StyleSheet.create({
   xpTitle: {
     fontSize: 16,
     color: '#666',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    width: '100%',
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginRight: 10,
+  },
+  searchButton: {
+    backgroundColor: '#2196F3',
+    padding: 10,
+    borderRadius: 5,
+  },
+  searchResult: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    backgroundColor: 'white',
+    borderRadius: 5,
+    marginBottom: 5,
+    width: '100%',
+  },
+  searchResultText: {
+    fontSize: 16,
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
+    padding: 5,
+    borderRadius: 5,
+  },
+  sectionSubtitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 15,
+    marginBottom: 10,
+    color: '#333',
+  },
+  requestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    backgroundColor: 'white',
+    borderRadius: 5,
+    marginBottom: 5,
+    width: '100%',
+  },
+  requestText: {
+    fontSize: 16,
+    flex: 1,
+  },
+  requestButtons: {
+    flexDirection: 'row',
+  },
+  requestButton: {
+    padding: 5,
+    borderRadius: 5,
+    marginLeft: 5,
+  },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+  },
+  rejectButton: {
+    backgroundColor: '#f44336',
   },
 });
 

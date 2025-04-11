@@ -19,5 +19,7 @@ export type RootStackParamList = {
     Friends: undefined;
     Leaderboard: undefined;
     NotificationTest: undefined;
+    FindFriends: undefined;
+    FriendRequests: undefined;
     // Añade aquí más pantallas según sea necesario
 }; 
