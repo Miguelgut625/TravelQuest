@@ -164,6 +164,7 @@ const ProfileScreen = () => {
           .subscribe();
         
         return () => {
+          console.log('Limpiando suscripciones de tiempo real');
           journeysSubscription.unsubscribe();
           missionsSubscription.unsubscribe();
           challengesSubscription.unsubscribe();
@@ -258,42 +259,24 @@ const ProfileScreen = () => {
   };
 
   const fetchPendingRequests = async () => {
-    if (!user?.id) return [];
-    
     try {
       const { data, error } = await supabase
         .from('friendship_invitations')
-        .select('id, users: senderId (username)')
-        .eq('receiverId', user.id)
+        .select(`
+        id, senderId, created_at, receiverId, status,
+        users:senderId (username)
+      `)
+        .eq('receiverId', user?.id)
         .eq('status', 'Pending');
-      
+
       if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error obteniendo solicitudes pendientes:', error);
+      console.log('Solicitudes pendientes obtenidas:', user?.id);
+
+      console.log('Solicitudes pendientes obtenidas:', data);
+      return data;
+    } catch (error: any) {
+      console.error('Error al obtener solicitudes pendientes:', error.message);
       return [];
-    }
-  };
-
-  const searchFriends = async () => {
-    if (!searchQuery.trim()) return;
-    
-    setIsSearching(true);
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, username, email')
-        .ilike('username', `%${searchQuery}%`)
-        .neq('id', user?.id)
-        .limit(10);
-
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
-      console.error('Error buscando amigos:', error);
-      Alert.alert('Error', 'No se pudo buscar amigos');
-    } finally {
-      setIsSearching(false);
     }
   };
 
@@ -325,6 +308,28 @@ const ProfileScreen = () => {
       Alert.alert('Error', 'No se pudieron obtener las solicitudes');
     } finally {
       setIsLoadingRequests(false);
+    }
+  };
+
+  const searchFriends = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, username, email')
+        .ilike('username', `%${searchQuery}%`)
+        .neq('id', user?.id)
+        .limit(10);
+
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error('Error buscando amigos:', error);
+      Alert.alert('Error', 'No se pudo buscar amigos');
+    } finally {
+      setIsSearching(false);
     }
   };
 
