@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList, Button } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -41,6 +41,9 @@ const ProfileScreen = () => {
     visitedCities: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
+  const [level, setLevel] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [xpNext, setXpNext] = useState(0);
 
   useEffect(() => {
     fetchUserStats();
@@ -52,10 +55,10 @@ const ProfileScreen = () => {
     try {
       setLoadingStats(true);
 
-      // Obtener los puntos del usuario
+      // Obtener los datos del usuario (puntos, nivel, xp)
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('points')
+        .select('points, level, xp, xp_next')
         .eq('id', user.id)
         .single();
 
@@ -104,6 +107,11 @@ const ProfileScreen = () => {
         completedMissions: stats.completedMissions,
         visitedCities: stats.visitedCities.size
       });
+
+      // Actualizar nivel y XP
+      setLevel(userData?.level || 0);
+      setXp(userData?.xp || 0);
+      setXpNext(userData?.xp_next || 100);
 
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
@@ -303,6 +311,14 @@ const ProfileScreen = () => {
             </View>
           </>
         )}
+      </View>
+
+      <View style={styles.levelContainer}>
+        <Text style={styles.levelTitle}>Nivel: {level}</Text>
+        <Text style={styles.xpTitle}>XP: {xp} / {xpNext}</Text>
+        <View style={styles.progressBar}>
+          <View style={{ width: `${(xp / xpNext) * 100}%`, backgroundColor: '#4CAF50', height: '100%' }} />
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -647,6 +663,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#ddd',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginTop: 5,
+    width: '100%',
+  },
+  levelContainer: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+    alignItems: 'center',
+  },
+  levelTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  xpTitle: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 
