@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 
-// Definir interfaces para los tipos de datos
 interface Journey {
   id: string;
   cityId: string;
@@ -36,39 +35,163 @@ const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
+  
+  // Estados para cambio de contraseña
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  
+  // Estados para estadísticas
   const [stats, setStats] = useState({
     totalPoints: 0,
     completedMissions: 0,
     visitedCities: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
-  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
-  const [isRequestsVisible, setIsRequestsVisible] = useState(false);
-  const [username, setUsername] = useState('');
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(0);
+  
+  // Estados para funcionalidad social
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
+  const [isRequestsVisible, setIsRequestsVisible] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [username, setUsername] = useState('');
 
   useEffect(() => {
     fetchUserStats();
-  }, [user?.id]);
+    
+    const setupRealtime = async () => {
+      try {
+        const { valid, session, error } = await ensureValidSession();
+        if (!valid) {
+          console.error('Sesión inválida para suscripciones en tiempo real:', error);
+          Alert.alert('Error de sesión', 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+          dispatch(logout());
+          return;
+        }
+        
+        const journeysSubscription = supabase
+          .channel('journeys-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'journeys',
+              filter: `userId=eq.${user?.id}`
+            },
+            (payload) => {
+              console.log('Cambio detectado en journeys:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        const missionsSubscription = supabase
+          .channel('journeys-missions-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'journeys_missions'
+            },
+            (payload) => {
+              console.log('Cambio detectado en misiones:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        const challengesSubscription = supabase
+          .channel('challenges-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'challenges'
+            },
+            (payload) => {
+              console.log('Cambio detectado en challenges:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        const userStatsSubscription = supabase
+          .channel('user-stats-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'users',
+              filter: `id=eq.${user?.id}`
+            },
+            (payload) => {
+              console.log('Cambio detectado en stats de usuario:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        const friendshipSubscription = supabase
+          .channel('friendship-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'friendship_invitations',
+              filter: `receiverId=eq.${user?.id}`
+            },
+            (payload) => {
+              console.log('Cambio detectado en solicitudes de amistad:', payload);
+              if (isRequestsVisible) {
+                fetchPendingRequests().then(requests => setFriendshipRequests(requests));
+              }
+            }
+          )
+          .subscribe();
+        
+        return () => {
+          journeysSubscription.unsubscribe();
+          missionsSubscription.unsubscribe();
+          challengesSubscription.unsubscribe();
+          userStatsSubscription.unsubscribe();
+          friendshipSubscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Error configurando suscripciones en tiempo real:', error);
+      }
+    };
+    
+    const cleanupFn = setupRealtime();
+    
+    return () => {
+      if (cleanupFn && typeof cleanupFn.then === 'function') {
+        cleanupFn.then(cleanup => {
+          if (cleanup && typeof cleanup === 'function') {
+            cleanup();
+          }
+        });
+      }
+    };
+  }, [user?.id, isRequestsVisible, dispatch]);
 
   const fetchUserStats = async () => {
     if (!user?.id) return;
 
     try {
-      // Verificar sesión válida antes de obtener estadísticas
       const { valid, error: sessionError } = await ensureValidSession();
       if (!valid) {
         console.error('Sesión inválida para obtener estadísticas:', sessionError);
@@ -80,7 +203,6 @@ const ProfileScreen = () => {
       setLoadingStats(true);
       console.log('Obteniendo estadísticas actualizadas...');
 
-      // Obtener los datos del usuario (puntos, nivel, xp)
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('points, level, xp, xp_next')
@@ -89,20 +211,13 @@ const ProfileScreen = () => {
 
       if (userError) throw userError;
 
-      // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
         .select(`id, cityId, journeys_missions!inner (completed, challenges!inner (points))`)
         .eq('userId', user.id);
 
-      if (journeysError) {
-        console.error('Error al obtener journeys:', journeysError);
-        throw journeysError;
-      }
+      if (journeysError) throw journeysError;
 
-      console.log('Journeys obtenidos:', journeys);
-
-      // Calcular estadísticas
       const stats = {
         totalPoints: userData?.points || 0,
         completedMissions: 0,
@@ -111,7 +226,6 @@ const ProfileScreen = () => {
 
       if (journeys && journeys.length > 0) {
         (journeys as Journey[]).forEach((journey: Journey) => {
-          // Añadir la ciudad al Set de ciudades visitadas
           if (journey.cityId) {
             stats.visitedCities.add(journey.cityId);
           }
@@ -126,9 +240,6 @@ const ProfileScreen = () => {
         });
       }
 
-      console.log('Estadísticas calculadas:', stats);
-
-      // Actualizar nivel y XP
       setLevel(userData?.level || 0);
       setXp(userData?.xp || 0);
       setXpNext(userData?.xp_next || 100);
@@ -139,8 +250,6 @@ const ProfileScreen = () => {
         visitedCities: stats.visitedCities.size
       });
 
-      console.log('Estadísticas actualizadas correctamente');
-
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
     } finally {
@@ -148,158 +257,21 @@ const ProfileScreen = () => {
     }
   };
 
-  const handleLogout = async () => {
-    if (loading) return;
-
+  const fetchPendingRequests = async () => {
+    if (!user?.id) return [];
+    
     try {
-      setLoading(true);
-      console.log('Iniciando proceso de cierre de sesión');
-
-      // Primero cerramos la sesión en Supabase
-      console.log('Cerrando sesión en Supabase');
-      const { error: signOutError } = await supabase.auth.signOut();
-
-      if (signOutError) {
-        console.error('Error al cerrar sesión en Supabase:', signOutError);
-        Alert.alert('Error', 'No se pudo cerrar la sesión en Supabase');
-        return;
-      }
-
-      // Verificar que la sesión se haya cerrado correctamente
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log('Sesión aún activa, intentando cerrar nuevamente');
-        await supabase.auth.signOut();
-      }
-
-      // Una vez que la sesión está cerrada, limpiamos el estado de Redux
-      console.log('Limpiando estado de Redux');
-      dispatch(logout());
-
-      // Forzar la actualización del estado de autenticación
-      dispatch(setAuthState('unauthenticated'));
-
+      const { data, error } = await supabase
+        .from('friendship_invitations')
+        .select('id, users: senderId (username)')
+        .eq('receiverId', user.id)
+        .eq('status', 'Pending');
+      
+      if (error) throw error;
+      return data || [];
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-      Alert.alert('Error', 'Ocurrió un error al cerrar sesión');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (!currentPassword) {
-      setMessage({ type: 'error', text: 'Por favor ingresa tu contraseña actual' });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: 'Las contraseñas nuevas no coinciden' });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' });
-      return;
-    }
-
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-
-    try {
-      // Primero verificamos la sesión actual
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        console.error('Error al obtener la sesión:', sessionError);
-        setMessage({ type: 'error', text: 'Error al verificar tu sesión. Por favor, intenta nuevamente.' });
-        return;
-      }
-
-      if (!session) {
-        // Si no hay sesión, intentamos iniciar sesión con las credenciales actuales
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: user?.email || '',
-          password: currentPassword
-        });
-
-        if (signInError) {
-          console.error('Error al verificar contraseña:', signInError);
-          setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
-          return;
-        }
-
-        if (!signInData.session) {
-          setMessage({ type: 'error', text: 'No se pudo iniciar sesión. Por favor, intenta nuevamente.' });
-          return;
-        }
-
-        // Ahora intentamos actualizar la contraseña
-        const { error: updateError } = await supabase.auth.updateUser({
-          password: newPassword
-        });
-
-        if (updateError) {
-          console.error('Error al actualizar contraseña:', updateError);
-          setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
-          return;
-        }
-
-        // Limpiamos el formulario
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setMessage({ type: 'success', text: 'Tu contraseña ha sido actualizada correctamente' });
-
-        // Cerramos el modal después de 2 segundos
-        setTimeout(() => {
-          setIsChangePasswordVisible(false);
-          setMessage({ type: '', text: '' });
-        }, 2000);
-
-        return;
-      }
-
-      // Si hay sesión activa, verificamos la contraseña actual
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: currentPassword
-      });
-
-      if (signInError) {
-        console.error('Error al verificar contraseña:', signInError);
-        setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
-        return;
-      }
-
-      // Si la contraseña es correcta, actualizamos a la nueva
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (updateError) {
-        console.error('Error al actualizar contraseña:', updateError);
-        setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
-        return;
-      }
-
-      // Limpiamos el formulario
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setMessage({ type: 'success', text: 'Tu contraseña ha sido actualizada correctamente' });
-
-      // Cerramos el modal después de 2 segundos
-      setTimeout(() => {
-        setIsChangePasswordVisible(false);
-        setMessage({ type: '', text: '' });
-      }, 2000);
-
-    } catch (error: any) {
-      console.error('Error al cambiar contraseña:', error);
-      setMessage({ type: 'error', text: 'Ocurrió un error al intentar cambiar la contraseña. Por favor, intenta nuevamente.' });
-    } finally {
-      setLoading(false);
+      console.error('Error obteniendo solicitudes pendientes:', error);
+      return [];
     }
   };
 
@@ -364,8 +336,6 @@ const ProfileScreen = () => {
         .eq('id', requestId);
 
       if (error) throw error;
-      
-      // Actualizar la lista de solicitudes
       await fetchFriendRequests();
     } catch (error) {
       console.error('Error procesando solicitud:', error);
@@ -373,18 +343,252 @@ const ProfileScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchFriendRequests();
-  }, [user?.id]);
+  const handleAcceptRequest = async (id: string) => {
+    try {
+      const { data: invitation, error: invitationError } = await supabase
+        .from('friendship_invitations')
+        .select('senderId, receiverId')
+        .eq('id', id)
+        .single();
+
+      if (invitationError) throw invitationError;
+
+      const { senderId, receiverId } = invitation;
+
+      const { data: updatedInvitation, error: updateError } = await supabase
+        .from('friendship_invitations')
+        .update({ status: 'Accepted' })
+        .eq('id', id)
+        .single();
+
+      if (updateError) throw updateError;
+
+      const { data: newFriendship, error: insertError } = await supabase
+        .from('friends')
+        .insert([{ user1Id: senderId, user2Id: receiverId }])
+        .single();
+
+      if (insertError) throw insertError;
+
+      setFriendshipRequests(prevRequests => prevRequests.filter(request => request.id !== id));
+      Alert.alert('Solicitud aceptada con éxito!');
+    } catch (error: any) {
+      console.error('Error al aceptar la solicitud:', error.message);
+      Alert.alert('Error', 'Hubo un error al aceptar la solicitud: ' + error.message);
+    }
+  };
+
+  const handleRejectRequest = async (id: string) => {
+    try {
+      const { data: updatedInvitation, error: updateError } = await supabase
+        .from('friendship_invitations')
+        .update({ status: 'Rejected' })
+        .eq('id', id)
+        .single();
+
+      if (updateError) throw updateError;
+
+      setFriendshipRequests(prevRequests => prevRequests.filter(request => request.id !== id));
+      Alert.alert('Solicitud rechazada con éxito!');
+    } catch (error: any) {
+      console.error('Error al rechazar la solicitud:', error.message);
+      Alert.alert('Error', 'Hubo un error al rechazar la solicitud: ' + error.message);
+    }
+  };
+
+  const handleSendRequest = async () => {
+    try {
+      const { data: receiver, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
+
+      if (userError) {
+        Alert.alert('Error', 'No se encontró el usuario');
+        return;
+      }
+
+      const receiverId = receiver.id;
+
+      if (user?.id === receiverId) {
+        Alert.alert('Error', 'No puedes enviarte una solicitud a ti mismo');
+        return;
+      }
+
+      const { data: friends, error: friendsError } = await supabase
+        .from('friends')
+        .select('*')
+        .or(`and(user1Id.eq.${user?.id},user2Id.eq.${receiverId}),and(user1Id.eq.${receiverId},user2Id.eq.${user?.id})`)
+        .single();
+
+      if (friends) {
+        Alert.alert('Error', 'Ya son amigos');
+        return;
+      }
+
+      const { data: existingRequest, error: requestError } = await supabase
+        .from('friendship_invitations')
+        .select('*')
+        .or(`and(senderId.eq.${user?.id},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${user?.id})`)
+        .eq('status', 'Pending')
+        .single();
+
+      if (existingRequest) {
+        Alert.alert('Error', 'Ya existe una solicitud pendiente entre estos usuarios');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('friendship_invitations')
+        .insert([{ senderId: user?.id, receiverId: receiverId, status: 'Pending' }])
+        .single();
+
+      if (error) throw error;
+
+      Alert.alert('Éxito', 'Solicitud de amistad enviada');
+      setUsername('');
+    } catch (error: any) {
+      console.error('Error al enviar solicitud:', error.message);
+      Alert.alert('Error', 'Hubo un error al enviar la solicitud: ' + error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+      const { error: signOutError } = await supabase.auth.signOut();
+
+      if (signOutError) {
+        Alert.alert('Error', 'No se pudo cerrar la sesión en Supabase');
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await supabase.auth.signOut();
+      }
+
+      dispatch(logout());
+      dispatch(setAuthState('unauthenticated'));
+
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      Alert.alert('Error', 'Ocurrió un error al cerrar sesión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      setMessage({ type: 'error', text: 'Por favor ingresa tu contraseña actual' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Las contraseñas nuevas no coinciden' });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        setMessage({ type: 'error', text: 'Error al verificar tu sesión. Por favor, intenta nuevamente.' });
+        return;
+      }
+
+      if (!session) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: user?.email || '',
+          password: currentPassword
+        });
+
+        if (signInError) {
+          setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
+          return;
+        }
+
+        if (!signInData.session) {
+          setMessage({ type: 'error', text: 'No se pudo iniciar sesión. Por favor, intenta nuevamente.' });
+          return;
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: newPassword
+        });
+
+        if (updateError) {
+          setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
+          return;
+        }
+
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setMessage({ type: 'success', text: 'Tu contraseña ha sido actualizada correctamente' });
+
+        setTimeout(() => {
+          setIsChangePasswordVisible(false);
+          setMessage({ type: '', text: '' });
+        }, 2000);
+
+        return;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: currentPassword
+      });
+
+      if (signInError) {
+        setMessage({ type: 'error', text: 'La contraseña actual es incorrecta' });
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) {
+        setMessage({ type: 'error', text: 'No se pudo actualizar la contraseña: ' + updateError.message });
+        return;
+      }
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setMessage({ type: 'success', text: 'Tu contraseña ha sido actualizada correctamente' });
+
+      setTimeout(() => {
+        setIsChangePasswordVisible(false);
+        setMessage({ type: '', text: '' });
+      }, 2000);
+
+    } catch (error: any) {
+      setMessage({ type: 'error', text: 'Ocurrió un error al intentar cambiar la contraseña. Por favor, intenta nuevamente.' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
+      {/* Header con avatar e información del usuario */}
       <View style={styles.header}>
         {user?.profilePicture ? (
-          <Image
-            source={{ uri: user.profilePicture }}
-            style={styles.avatar}
-          />
+          <Image source={{ uri: user.profilePicture }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarContainer}>
             <Ionicons name="person-circle" size={100} color="white" />
@@ -394,6 +598,7 @@ const ProfileScreen = () => {
         <Text style={styles.email}>{user?.email}</Text>
       </View>
 
+      {/* Estadísticas del usuario */}
       <View style={styles.statsContainer}>
         {loadingStats ? (
           <ActivityIndicator size="large" color="#4CAF50" />
@@ -415,6 +620,7 @@ const ProfileScreen = () => {
         )}
       </View>
 
+      {/* Barra de progreso de nivel */}
       <View style={styles.levelContainer}>
         <Text style={styles.levelTitle}>Nivel: {level}</Text>
         <Text style={styles.xpTitle}>XP: {xp} / {xpNext}</Text>
@@ -423,6 +629,7 @@ const ProfileScreen = () => {
         </View>
       </View>
 
+      {/* Sección Social */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Social</Text>
         <View style={styles.socialContainer}>
@@ -435,6 +642,7 @@ const ProfileScreen = () => {
           </TouchableOpacity>
           <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
 
+          {/* Búsqueda de amigos */}
           <View style={styles.searchContainer}>
             <TextInput
               style={styles.searchInput}
@@ -460,7 +668,10 @@ const ProfileScreen = () => {
                 <Text style={styles.searchResultText}>{result.username}</Text>
                 <TouchableOpacity
                   style={styles.addButton}
-                  onPress={() => {/* Implementar envío de solicitud */}}
+                  onPress={() => {
+                    setUsername(result.username);
+                    handleSendRequest();
+                  }}
                 >
                   <Ionicons name="person-add" size={20} color="white" />
                 </TouchableOpacity>
@@ -468,6 +679,7 @@ const ProfileScreen = () => {
             ))
           )}
 
+          {/* Solicitudes de amistad pendientes */}
           <Text style={styles.sectionSubtitle}>Solicitudes Pendientes</Text>
           {isLoadingRequests ? (
             <ActivityIndicator size="small" color="#4CAF50" />
@@ -495,6 +707,7 @@ const ProfileScreen = () => {
             ))
           )}
 
+          {/* Leaderboard */}
           <TouchableOpacity
             style={styles.socialButton}
             onPress={() => navigation.navigate('Leaderboard')}
@@ -506,6 +719,7 @@ const ProfileScreen = () => {
         </View>
       </View>
 
+      {/* Sección de Seguridad */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Seguridad</Text>
         <View style={styles.privacyContainer}>
@@ -521,6 +735,7 @@ const ProfileScreen = () => {
         </View>
       </View>
 
+      {/* Botón de Cerrar Sesión */}
       <TouchableOpacity
         style={[styles.logoutButton, loading && styles.disabledButton]}
         onPress={handleLogout}
@@ -531,6 +746,7 @@ const ProfileScreen = () => {
         </Text>
       </TouchableOpacity>
 
+      {/* Modal para cambiar contraseña */}
       <Modal
         visible={isChangePasswordVisible}
         transparent={true}
@@ -610,6 +826,7 @@ const ProfileScreen = () => {
   );
 };
 
+// Estilos (mantener los mismos que en tu código original)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -933,4 +1150,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen; 
+export default ProfileScreen;
