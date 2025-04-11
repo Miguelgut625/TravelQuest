@@ -26,13 +26,14 @@ export const sendMessage = async (senderId: string, receiverId: string, content:
 
     if (error) {
       console.error('Error enviando mensaje:', error);
-      return null;
+      throw error;
     }
 
+    console.log('Mensaje enviado con éxito:', data);
     return data;
   } catch (error) {
     console.error('Error inesperado enviando mensaje:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -47,13 +48,14 @@ export const getConversation = async (userId1: string, userId2: string): Promise
 
     if (error) {
       console.error('Error obteniendo conversación:', error);
-      return [];
+      throw error;
     }
 
+    console.log(`Conversación entre ${userId1} y ${userId2} cargada: ${data?.length || 0} mensajes`);
     return data || [];
   } catch (error) {
     console.error('Error inesperado obteniendo conversación:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -69,9 +71,13 @@ export const markMessagesAsRead = async (receiverId: string, senderId: string): 
 
     if (error) {
       console.error('Error marcando mensajes como leídos:', error);
+      throw error;
     }
+    
+    console.log(`Mensajes de ${senderId} a ${receiverId} marcados como leídos`);
   } catch (error) {
     console.error('Error inesperado marcando mensajes como leídos:', error);
+    throw error;
   }
 };
 
@@ -81,56 +87,54 @@ export const subscribeToMessages = (
   onNewMessage: (message: Message) => void,
   friendId?: string
 ) => {
-  // Si tenemos un friendId, nos suscribimos a mensajes entre dos usuarios específicos
-  if (friendId) {
-    return supabase
-      .channel(`messages-channel-${userId}-${friendId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `and(or(sender_id.eq.${userId},sender_id.eq.${friendId}),or(receiver_id.eq.${userId},receiver_id.eq.${friendId}))`,
-        },
-        (payload: { new: Message }) => {
-          // Verificar que el mensaje es parte de la conversación entre estos dos usuarios
-          const newMsg = payload.new;
-          if (
-            (newMsg.sender_id === userId && newMsg.receiver_id === friendId) ||
-            (newMsg.sender_id === friendId && newMsg.receiver_id === userId)
-          ) {
-            console.log('Nuevo mensaje en conversación específica:', newMsg);
-            onNewMessage(newMsg);
-          }
-        }
-      )
-      .subscribe();
-  }
+  // Crear un nombre único para el canal basado en los IDs
+  const channelName = friendId ? 
+    `messages-channel-${[userId, friendId].sort().join('-')}` : 
+    `messages-channel-${userId}`;
 
-  // Suscripción general a todos los mensajes donde el usuario es receptor
-  return supabase
-    .channel(`messages-channel-${userId}`)
+  console.log(`Creando suscripción a canal: ${channelName}`);
+
+  const channel = supabase
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
-        filter: `receiver_id=eq.${userId}`,
+        filter: friendId ? 
+          `or(and(sender_id.eq.${userId},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${userId}))` :
+          `or(sender_id.eq.${userId},receiver_id.eq.${userId})`
       },
       (payload: { new: Message }) => {
-        console.log('Nuevo mensaje recibido:', payload.new);
+        console.log('Nuevo mensaje recibido en suscripción:', payload.new);
         onNewMessage(payload.new);
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log(`Estado de suscripción a canal ${channelName}:`, status);
+      
+      // Registrar errores de conexión si los hay
+      if (status === 'CHANNEL_ERROR') {
+        console.error(`Error en canal ${channelName}. Reconectando...`);
+        
+        // Intentar reconectar después de un breve retraso
+        setTimeout(() => {
+          channel.subscribe();
+        }, 2000);
+      }
+      
+      if (status === 'SUBSCRIBED') {
+        console.log(`Canal ${channelName} suscrito correctamente`);
+      }
+    });
+
+  return channel;
 };
 
 // Función para obtener las conversaciones recientes
 export const getRecentConversations = async (userId: string) => {
   try {
-    // Obtenemos los mensajes más recientes para cada conversación
     const { data, error } = await supabase
       .rpc('get_recent_conversations', {
         user_id: userId
@@ -138,13 +142,13 @@ export const getRecentConversations = async (userId: string) => {
 
     if (error) {
       console.error('Error obteniendo conversaciones recientes:', error);
-      return [];
+      throw error;
     }
 
     return data || [];
   } catch (error) {
     console.error('Error inesperado obteniendo conversaciones recientes:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -159,12 +163,12 @@ export const countUnreadMessages = async (userId: string): Promise<number> => {
 
     if (error) {
       console.error('Error contando mensajes no leídos:', error);
-      return 0;
+      throw error;
     }
 
     return count || 0;
   } catch (error) {
     console.error('Error inesperado contando mensajes no leídos:', error);
-    return 0;
+    throw error;
   }
 }; 
