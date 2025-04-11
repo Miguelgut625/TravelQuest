@@ -54,7 +54,7 @@ const LeaderboardScreen = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size={50} color="#005F9E" />
       </View>
     );
   }
@@ -70,7 +70,7 @@ const LeaderboardScreen = () => {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color="#007bff" />
+        <Ionicons name="arrow-back" size={24} color="#005F9E" />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Tabla de clasificación</Text>
@@ -97,14 +97,14 @@ const styles = StyleSheet.create({
   backButtonText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#007bff',
+    color: '#005F9E',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
-    color: '#343a40', // Color del texto del título
+    color: '#005F9E', // Color del texto del título
   },
   itemContainer: {
     padding: 12,
@@ -142,10 +142,10 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007bff', // Color para los títulos de los demás lugares
+    color: '#005F9E', // Color para los títulos de los demás lugares
   },
   errorText: {
-    color: 'red',
+    color: '#D32F2F',
     textAlign: 'center',
     marginTop: 20,
   },

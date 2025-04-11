@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   },
   link: {
     marginTop: 20,
-    color: '#4CAF50',
+    color: '#005F9E',
     textDecorationLine: 'underline',
   },
   errorText: {

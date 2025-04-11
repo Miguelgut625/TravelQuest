@@ -186,6 +186,7 @@ const organizeCityEntries = (
   
   data.forEach((entry: any) => {
     // Intentar todas las posibles formas del nombre de la ciudad
+    // Nota: Se usa el nombre de ciudad corregido siempre que esté disponible
     let cityName = 'Ciudad Desconocida';
     
     // Orden de prioridad para obtener el nombre de la ciudad
@@ -193,6 +194,8 @@ const organizeCityEntries = (
       cityName = entry.cities.name;
     } else if (entry.city_name) {
       cityName = entry.city_name;
+    } else if (entry.correctedCityName) {
+      cityName = entry.correctedCityName;
     } else if (entry.cityName) {
       cityName = entry.cityName;
     } else if (entry.cityname) {

@@ -16,7 +16,7 @@ const CompletingMissionModal = ({ visible }: CompletingMissionModalProps) => {
     >
       <View style={styles.modalContainer}>
         <View style={styles.loadingCard}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size={40} color="#005F9E" />
           <Text style={styles.loadingTitle}>Completando misión</Text>
           <Text style={styles.loadingDescription}>
             Estamos guardando tu progreso...
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   loadingTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#005F9E',
     marginTop: 15,
     marginBottom: 10,
   },

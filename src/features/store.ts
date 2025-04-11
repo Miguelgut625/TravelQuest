@@ -5,12 +5,13 @@ import missionReducer from './missionSlice';
 import journalReducer from '../features/journalSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import journeyReducer from './journey/journeySlice';
+import cityReducer from '../../app/redux/slices/citySlice';
 
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
   whitelist: ['auth'],
-  blacklist: ['missions', 'journal', 'journey'],
+  blacklist: ['missions', 'journal', 'journey', 'cities'],
   debug: true, // Habilitar logs de depuración
   timeout: 0, // Evitar timeout en la persistencia
   writeFailHandler: (err: any) => {
@@ -20,13 +21,16 @@ const persistConfig = {
 
 const persistedAuthReducer = persistReducer(persistConfig, authReducer);
 
+const rootReducer = {
+  auth: persistedAuthReducer,
+  missions: missionReducer,
+  journal: journalReducer,
+  journey: journeyReducer,
+  cities: cityReducer,
+};
+
 export const store = configureStore({
-  reducer: {
-    auth: persistedAuthReducer,
-    missions: missionReducer,
-    journal: journalReducer,
-    journey: journeyReducer,
-  },
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
@@ -44,7 +48,8 @@ store.subscribe(() => {
     auth: state.auth,
     missions: state.missions,
     journal: state.journal,
-    journey: state.journey
+    journey: state.journey,
+    cities: state.cities
   });
 });
 

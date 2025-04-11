@@ -14,6 +14,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { uploadImageToCloudinary, isCloudinaryConfigured } from '../services/cloudinaryService';
 import CloudinaryConfigGuide from './CloudinaryConfigGuide';
+import { getMissionHint, HINT_COST } from '../services/missionService';
+import { useSelector } from 'react-redux';
+import { RootState } from '../features/store';
 
 interface ImageUploadModalProps {
   visible: boolean;
@@ -30,11 +33,14 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onClose,
   onSuccess
 }) => {
+  const user = useSelector((state: RootState) => state.auth.user);
   const [image, setImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfigGuide, setShowConfigGuide] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [hint, setHint] = useState<string | null>(null);
+  const [loadingHint, setLoadingHint] = useState(false);
 
   const pickImage = async () => {
     setError(null);
@@ -239,6 +245,52 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     onClose();
   };
 
+  const getHint = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Debes iniciar sesión para obtener pistas');
+      return;
+    }
+
+    setLoadingHint(true);
+    setError(null);
+
+    try {
+      // Confirmar que el usuario quiere gastar los puntos
+      Alert.alert(
+        "Obtener pista",
+        `¿Quieres recibir una pista? Esto costará ${HINT_COST} puntos.`,
+        [
+          {
+            text: "Cancelar",
+            style: "cancel",
+            onPress: () => setLoadingHint(false)
+          },
+          {
+            text: "Obtener pista",
+            onPress: async () => {
+              try {
+                const hintData = await getMissionHint(user.id, missionId);
+                setHint(hintData.hint);
+              } catch (error: any) {
+                if (error.message.includes('No hay suficientes puntos')) {
+                  Alert.alert('Error', 'No tienes suficientes puntos para obtener una pista');
+                } else {
+                  Alert.alert('Error', 'No se pudo obtener la pista. Inténtalo de nuevo.');
+                }
+                console.error('Error al obtener pista:', error);
+              } finally {
+                setLoadingHint(false);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error al mostrar diálogo de pista:', error);
+      setLoadingHint(false);
+    }
+  };
+
   return (
     <Modal
       animationType="slide"
@@ -294,6 +346,29 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               </View>
             )}
             
+            {/* Sección de pista */}
+            {hint ? (
+              <View style={styles.hintContainer}>
+                <Text style={styles.hintTitle}>Pista:</Text>
+                <Text style={styles.hintText}>{hint}</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.hintButton}
+                onPress={getHint}
+                disabled={loadingHint}
+              >
+                {loadingHint ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Ionicons name="bulb" size={20} color="white" />
+                    <Text style={styles.hintButtonText}>Dar pista ({HINT_COST} puntos)</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+            
             {error && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
@@ -324,22 +399,29 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               </View>
             )}
             
-            <TouchableOpacity
-              style={[
-                styles.uploadButton,
-                (!image || uploading) && styles.disabledButton
-              ]}
-              onPress={uploadImage}
-              disabled={!image || uploading}
-            >
-              {uploading ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Text style={styles.uploadButtonText}>
-                  Completar misión
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={[styles.button, { backgroundColor: '#005F9E' }]}
+                onPress={uploadImage}
+                disabled={uploading}
+              >
+                <Text style={styles.buttonText}>
+                  {uploading ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    'Completar misión'
+                  )}
                 </Text>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, { backgroundColor: '#78909C' }]}
+                onPress={handleClose}
+                disabled={uploading}
+              >
+                <Text style={styles.buttonText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
@@ -352,14 +434,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalView: {
     width: '90%',
-    maxWidth: 400,
+    maxHeight: '90%',
     backgroundColor: 'white',
-    borderRadius: 15,
+    borderRadius: 20,
     padding: 20,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -430,16 +513,17 @@ const styles = StyleSheet.create({
     color: '#005F9E',
     textDecorationLine: 'underline',
   },
-  uploadButton: {
-    backgroundColor: '#4CAF50',
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 15,
+  },
+  button: {
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
   },
-  disabledButton: {
-    backgroundColor: '#cccccc',
-  },
-  uploadButtonText: {
+  buttonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
@@ -457,7 +541,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     borderRadius: 5,
   },
   progressText: {
@@ -484,6 +568,45 @@ const styles = StyleSheet.create({
     color: '#005F9E',
     fontSize: 14,
     fontWeight: '500',
+  },
+  loadingIndicator: {
+    marginTop: 10,
+  },
+  hintButton: {
+    backgroundColor: '#FFB74D',
+    padding: 12,
+    borderRadius: 10,
+    marginVertical: 15,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  hintButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  hintContainer: {
+    backgroundColor: '#E3F2FD',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 15,
+    borderLeftWidth: 4,
+    borderLeftColor: '#005F9E',
+    width: '100%',
+  },
+  hintTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#005F9E',
+    marginBottom: 5,
+  },
+  hintText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
   },
 });
 

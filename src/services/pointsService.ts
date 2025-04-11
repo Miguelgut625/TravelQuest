@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { createJournalEntry } from './journalService';
+import { addExperienceToUser } from './experienceService';
 
 export const getUserPoints = async (userId: string) => {
     try {
@@ -33,6 +34,9 @@ export const addPointsToUser = async (userId: string, points: number) => {
             .eq('id', userId);
 
         if (error) throw error;
+        
+        // Añadir experiencia al usuario (relación 1:1 entre puntos y experiencia)
+        await addExperienceToUser(userId, points);
 
         return currentPoints + points;
     } catch (error) {
