@@ -155,4 +155,46 @@ export const searchCities = async (searchTerm: string) => {
     console.error('Error searching cities:', error);
     return [];
   }
+};
+
+export const ensureValidSession = async () => {
+  try {
+    // Obtener la sesión actual
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('Error al obtener la sesión:', sessionError);
+      return { valid: false, error: sessionError };
+    }
+
+    // Si no hay sesión, retornar error
+    if (!session) {
+      return { valid: false, error: new Error('No hay sesión activa') };
+    }
+
+    // Verificar si la sesión está expirada
+    const now = new Date();
+    const expiresAt = new Date(session.expires_at!);
+    
+    if (now >= expiresAt) {
+      // Intentar refrescar la sesión
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.error('Error al refrescar la sesión:', refreshError);
+        return { valid: false, error: refreshError };
+      }
+
+      if (!refreshedSession) {
+        return { valid: false, error: new Error('No se pudo refrescar la sesión') };
+      }
+
+      return { valid: true, session: refreshedSession };
+    }
+
+    return { valid: true, session };
+  } catch (error) {
+    console.error('Error inesperado al verificar la sesión:', error);
+    return { valid: false, error };
+  }
 }; 

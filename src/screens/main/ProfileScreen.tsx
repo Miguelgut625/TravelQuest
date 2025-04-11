@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Aler
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState } from '../../features/authSlice';
-import { supabase } from '../../services/supabase';
-import { useNavigation } from '@react-navigation/native';
+import { supabase, ensureValidSession } from '../../services/supabase';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -20,6 +20,13 @@ interface JourneyMission {
   completed: boolean;
   challenges: {
     points: number;
+  };
+}
+
+interface FriendshipRequest {
+  id: string;
+  users: {
+    username: string;
   };
 }
 
@@ -41,6 +48,9 @@ const ProfileScreen = () => {
     visitedCities: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
+  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
+  const [isRequestsVisible, setIsRequestsVisible] = useState(false);
+  const [username, setUsername] = useState('');
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(0);
@@ -58,7 +68,17 @@ const ProfileScreen = () => {
     if (!user?.id) return;
 
     try {
+      // Verificar sesión válida antes de obtener estadísticas
+      const { valid, error: sessionError } = await ensureValidSession();
+      if (!valid) {
+        console.error('Sesión inválida para obtener estadísticas:', sessionError);
+        Alert.alert('Error de sesión', 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        dispatch(logout());
+        return;
+      }
+      
       setLoadingStats(true);
+      console.log('Obteniendo estadísticas actualizadas...');
 
       // Obtener los datos del usuario (puntos, nivel, xp)
       const { data: userData, error: userError } = await supabase
@@ -72,19 +92,15 @@ const ProfileScreen = () => {
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
-        .select(`
-          id,
-          cityId,
-          journeys_missions!inner (
-            completed,
-            challenges!inner (
-              points
-            )
-          )
-        `)
+        .select(`id, cityId, journeys_missions!inner (completed, challenges!inner (points))`)
         .eq('userId', user.id);
 
-      if (journeysError) throw journeysError;
+      if (journeysError) {
+        console.error('Error al obtener journeys:', journeysError);
+        throw journeysError;
+      }
+
+      console.log('Journeys obtenidos:', journeys);
 
       // Calcular estadísticas
       const stats = {
@@ -93,19 +109,29 @@ const ProfileScreen = () => {
         visitedCities: new Set<string>()
       };
 
-      (journeys as Journey[])?.forEach((journey: Journey) => {
-        // Añadir la ciudad al Set de ciudades visitadas
-        if (journey.cityId) {
-          stats.visitedCities.add(journey.cityId);
-        }
+      if (journeys && journeys.length > 0) {
+        (journeys as Journey[]).forEach((journey: Journey) => {
+          // Añadir la ciudad al Set de ciudades visitadas
+          if (journey.cityId) {
+            stats.visitedCities.add(journey.cityId);
+          }
 
-        // Contar misiones completadas
-        journey.journeys_missions.forEach((mission: JourneyMission) => {
-          if (mission.completed) {
-            stats.completedMissions++;
+          if (journey.journeys_missions && journey.journeys_missions.length > 0) {
+            journey.journeys_missions.forEach((mission: JourneyMission) => {
+              if (mission.completed) {
+                stats.completedMissions++;
+              }
+            });
           }
         });
-      });
+      }
+
+      console.log('Estadísticas calculadas:', stats);
+
+      // Actualizar nivel y XP
+      setLevel(userData?.level || 0);
+      setXp(userData?.xp || 0);
+      setXpNext(userData?.xp_next || 100);
 
       setStats({
         totalPoints: stats.totalPoints,
@@ -113,10 +139,7 @@ const ProfileScreen = () => {
         visitedCities: stats.visitedCities.size
       });
 
-      // Actualizar nivel y XP
-      setLevel(userData?.level || 0);
-      setXp(userData?.xp || 0);
-      setXpNext(userData?.xp_next || 100);
+      console.log('Estadísticas actualizadas correctamente');
 
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
