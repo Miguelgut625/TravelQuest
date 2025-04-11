@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { setAuthState } from '../../features/auth/authSlice';
-import { logout, ensureValidSession } from '../../services/auth';
+import { logout, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,37 +23,27 @@ interface JourneyMission {
   };
 }
 
-type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
+type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useDispatch();
-  const user = useSelector((state: RootState) => state.auth.user);
-  const [loading, setLoading] = useState(false);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [stats, setStats] = useState({
-    totalPoints: 0,
-    completedMissions: 0,
-    visitedCities: 0,
-  });
-  const [level, setLevel] = useState(1);
-  const [xp, setXp] = useState(0);
-  const [xpNext, setXpNext] = useState(100);
+  const { user } = useSelector((state: RootState) => state.auth);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const isValid = await ensureValidSession();
-      if (!isValid) {
-        navigation.navigate('Auth');
-      }
-    };
-    checkSession();
-  }, [navigation]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [stats, setStats] = useState({
+    totalPoints: 0,
+    completedMissions: 0,
+    visitedCities: 0
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [level, setLevel] = useState(0);
+  const [xp, setXp] = useState(0);
+  const [xpNext, setXpNext] = useState(0);
 
   useEffect(() => {
     fetchUserStats();
@@ -120,7 +109,7 @@ const ProfileScreen = () => {
       });
 
       // Actualizar nivel y XP
-      setLevel(userData?.level || 1);
+      setLevel(userData?.level || 0);
       setXp(userData?.xp || 0);
       setXpNext(userData?.xp_next || 100);
 
@@ -329,6 +318,28 @@ const ProfileScreen = () => {
         <Text style={styles.xpTitle}>XP: {xp} / {xpNext}</Text>
         <View style={styles.progressBar}>
           <View style={{ width: `${(xp / xpNext) * 100}%`, backgroundColor: '#4CAF50', height: '100%' }} />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Social</Text>
+        <View style={styles.socialContainer}>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('Friends')}
+          >
+            <Ionicons name="people" size={24} color="white" />
+            <Text style={styles.socialButtonText}>Amigos</Text>
+          </TouchableOpacity>
+          <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('Leaderboard')}
+          >
+            <Ionicons name="trophy" size={24} color="white" />
+            <Text style={styles.socialButtonText}>Leaderboard</Text>
+          </TouchableOpacity>
+          <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
         </View>
       </View>
 

@@ -201,68 +201,83 @@ class NotificationService {
         }
     }
 
-    // Método para notificar cuando quedan pocas horas para terminar un viaje
+    // Método para limpiar notificaciones antiguas
+    private async cleanupOldNotifications(userId: string): Promise<void> {
+        try {
+            const { error } = await supabase
+                .from('notifications')
+                .delete()
+                .eq('userid', userId)
+                .lt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+            if (error) throw error;
+            console.log('Notificaciones antiguas limpiadas correctamente');
+        } catch (error) {
+            console.error('Error al limpiar notificaciones antiguas:', error);
+        }
+    }
+
+    // Método para notificar sobre un viaje que está por terminar
     public async notifyJourneyEnding(
         userId: string,
-        journeyName: string,
+        journeyDescription: string,
         hoursLeft: number
-    ) {
-        const title = '¡Tu viaje está por terminar!';
-        const body = `El viaje "${journeyName}" termina en ${hoursLeft} hora${hoursLeft === 1 ? '' : 's'}`;
-
+    ): Promise<void> {
         try {
-            // Guardar en base de datos
-            const { error } = await supabase
+            // Limpiar notificaciones antiguas primero
+            await this.cleanupOldNotifications(userId);
+
+            // Verificar si ya existe una notificación similar en las últimas 24 horas
+            const { data: existingNotifications, error: checkError } = await supabase
+                .from('notifications')
+                .select('id, created_at')
+                .eq('userid', userId)
+                .eq('type', 'journey_ending')
+                .eq('data->>journeyDescription', journeyDescription)
+                .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+                .limit(1);
+
+            if (checkError) throw checkError;
+
+            // Si ya existe una notificación en las últimas 24 horas, no crear una nueva
+            if (existingNotifications && existingNotifications.length > 0) {
+                console.log('Ya existe una notificación para este viaje en las últimas 24 horas');
+                return;
+            }
+
+            const title = '¡Tu viaje está por terminar!';
+            const message = `Te quedan ${hoursLeft} horas para completar las misiones de ${journeyDescription}. ¡No te quedes sin puntos!`;
+
+            // Crear la notificación en la base de datos
+            const { data: newNotification, error: createError } = await supabase
                 .from('notifications')
                 .insert({
                     userid: userId,
                     title,
-                    message: body,
+                    message,
                     type: 'journey_ending',
                     read: false,
+                    data: { journeyDescription, hoursLeft },
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
-                });
+                })
+                .select()
+                .single();
 
-            if (error) {
-                console.error('Error al guardar notificación de fin de viaje:', error);
-                return;
-            }
+            if (createError) throw createError;
 
-            // Mostrar notificación local sin guardarla en la base de datos
-            if (Platform.OS === 'web') {
-                // Verificar si el navegador soporta notificaciones
-                if (typeof window !== 'undefined' && 'Notification' in window) {
-                    if (window.Notification.permission === "granted") {
-                        new window.Notification(title, {
-                            body: body,
-                            icon: '/icon.png'
-                        });
-                    } else if (window.Notification.permission !== "denied") {
-                        window.Notification.requestPermission().then((permission: string) => {
-                            if (permission === "granted") {
-                                new window.Notification(title, {
-                                    body: body,
-                                    icon: '/icon.png'
-                                });
-                            }
-                        });
-                    }
-                }
-            } else {
-                // Para plataformas móviles
-                await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title,
-                        body,
-                        sound: true,
-                        priority: Notifications.AndroidNotificationPriority.HIGH,
-                    },
-                    trigger: { seconds: 1 },
-                });
+            // Programar la notificación local solo si se creó correctamente en la base de datos
+            if (newNotification) {
+                await this.scheduleLocalNotification(
+                    title,
+                    message,
+                    { seconds: 1 },
+                    userId
+                );
             }
         } catch (error) {
-            console.error('Error al enviar notificación de fin de viaje:', error);
+            console.error('Error al notificar fin de viaje:', error);
+            throw error;
         }
     }
 
@@ -351,12 +366,28 @@ class NotificationService {
     // Método para marcar una notificación como leída
     public async markNotificationAsRead(notificationId: string): Promise<void> {
         try {
-            const { error } = await supabase
+            // Primero obtenemos la notificación para verificar que existe
+            const { data: notification, error: fetchError } = await supabase
                 .from('notifications')
-                .update({ read: true })
+                .select('*')
+                .eq('id', notificationId)
+                .single();
+
+            if (fetchError) throw fetchError;
+            if (!notification) throw new Error('Notificación no encontrada');
+
+            // Actualizar la notificación como leída
+            const { error: updateError } = await supabase
+                .from('notifications')
+                .update({ 
+                    read: true,
+                    updated_at: new Date().toISOString()
+                })
                 .eq('id', notificationId);
 
-            if (error) throw error;
+            if (updateError) throw updateError;
+
+            console.log('Notificación marcada como leída correctamente');
         } catch (error) {
             console.error('Error al marcar notificación como leída:', error);
             throw error;
