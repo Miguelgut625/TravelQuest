@@ -227,6 +227,18 @@ class NotificationService {
             // Limpiar notificaciones antiguas primero
             await this.cleanupOldNotifications(userId);
 
+            // Determinar el tipo de notificación basado en las horas restantes
+            let notificationType = '';
+            if (hoursLeft === 24) {
+                notificationType = '24_hours';
+            } else if (hoursLeft === 12) {
+                notificationType = '12_hours';
+            } else if (hoursLeft === 1) {
+                notificationType = '1_hour';
+            } else {
+                return; // No enviar notificación si no es uno de los momentos específicos
+            }
+
             // Verificar si ya existe una notificación similar en las últimas 24 horas
             const { data: existingNotifications, error: checkError } = await supabase
                 .from('notifications')
@@ -234,6 +246,7 @@ class NotificationService {
                 .eq('userid', userId)
                 .eq('type', 'journey_ending')
                 .eq('data->>journeyDescription', journeyDescription)
+                .eq('data->>notificationType', notificationType)
                 .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
                 .limit(1);
 
@@ -241,12 +254,25 @@ class NotificationService {
 
             // Si ya existe una notificación en las últimas 24 horas, no crear una nueva
             if (existingNotifications && existingNotifications.length > 0) {
-                console.log('Ya existe una notificación para este viaje en las últimas 24 horas');
+                console.log(`Ya existe una notificación de ${notificationType} para este viaje`);
                 return;
             }
 
+            // Crear mensaje personalizado según el tipo de notificación
+            let message = '';
+            switch (notificationType) {
+                case '24_hours':
+                    message = `¡Tu viaje "${journeyDescription}" termina en 24 horas! Asegúrate de completar todas tus misiones.`;
+                    break;
+                case '12_hours':
+                    message = `¡Solo quedan 12 horas para que termine tu viaje "${journeyDescription}"! No te quedes sin puntos.`;
+                    break;
+                case '1_hour':
+                    message = `¡Última hora! Tu viaje "${journeyDescription}" está por terminar. ¡Completa tus misiones ahora!`;
+                    break;
+            }
+
             const title = '¡Tu viaje está por terminar!';
-            const message = `Te quedan ${hoursLeft} horas para completar las misiones de ${journeyDescription}. ¡No te quedes sin puntos!`;
 
             // Crear la notificación en la base de datos
             const { data: newNotification, error: createError } = await supabase
@@ -257,7 +283,11 @@ class NotificationService {
                     message,
                     type: 'journey_ending',
                     read: false,
-                    data: { journeyDescription, hoursLeft },
+                    data: { 
+                        journeyDescription, 
+                        hoursLeft,
+                        notificationType 
+                    },
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 })

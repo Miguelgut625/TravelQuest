@@ -55,22 +55,31 @@ const MissionsScreen: React.FC = () => {
         }
     }, []);
 
-    const checkExpiringMissions = useCallback(async (missions: Mission[], userId: string) => {
-        // Evitar múltiples ejecuciones simultáneas
-        if (isChecking.current) return;
-        isChecking.current = true;
-
+    const checkExpiringMissions = async (missions: Mission[], userId: string) => {
         try {
-            // Procesar cada misión secuencialmente
+            const now = new Date();
+            
+            // Verificar cada misión
             for (const mission of missions) {
-                await checkAndNotifyMission(mission, userId);
+                const endDate = new Date(mission.end_date);
+                const hoursLeft = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+                
+                // Solo verificar misiones no completadas
+                if (!mission.completed) {
+                    // Verificar si estamos en uno de los momentos específicos
+                    if (hoursLeft === 24 || hoursLeft === 12 || hoursLeft === 1) {
+                        await notificationService.notifyJourneyEnding(
+                            userId,
+                            mission.description,
+                            hoursLeft
+                        );
+                    }
+                }
             }
         } catch (error) {
             console.error('Error al verificar misiones expirando:', error);
-        } finally {
-            isChecking.current = false;
         }
-    }, [checkAndNotifyMission]);
+    };
 
     // Verificar misiones cuando cambian
     useEffect(() => {
