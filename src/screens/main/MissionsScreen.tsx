@@ -13,6 +13,7 @@ import { setRefreshJournal } from '../../features/journalSlice';
 import { createJournalEntry } from '../../services/journalService';
 import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
+import { checkMissionBadges, checkLevelBadges, awardSpecificBadges } from '../../services/badgeService';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -504,6 +505,21 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
         // Actualizar los puntos del usuario local
         setUserPoints(newXp);
+        
+        // Verificar si el usuario ha ganado nuevas insignias
+        try {
+          // Verificar insignias de misiones y de nivel en paralelo
+          await Promise.all([
+            checkMissionBadges(user?.id || ''),
+            checkLevelBadges(user?.id || ''),
+            awardSpecificBadges(user?.id || '', 'completeMission')
+          ]);
+          
+          console.log('Verificación de insignias completada');
+        } catch (badgeError) {
+          console.error('Error al verificar insignias:', badgeError);
+          // No interrumpir el flujo principal si falla la verificación de insignias
+        }
       }
 
       // Mostrar el modal de misión completada

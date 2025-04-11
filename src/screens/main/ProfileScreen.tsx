@@ -642,6 +642,26 @@ const ProfileScreen = () => {
         </View>
       </View>
 
+      {/* Sección para Insignias */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Logros</Text>
+        <View style={styles.badgesContainer}>
+          <TouchableOpacity
+            style={styles.badgesButton}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('BadgesScreen');
+            }}
+          >
+            <View style={styles.badgesButtonContent}>
+              <Ionicons name="medal" size={24} color="white" />
+              <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
+              <Ionicons name="chevron-forward" size={20} color="white" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Social</Text>
         <View style={styles.socialContainer}>
@@ -1128,6 +1148,37 @@ const styles = StyleSheet.create({
   xpTitle: {
     fontSize: 16,
     color: '#666',
+  },
+  badgesContainer: {
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  badgesButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  badgesButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badgesButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 10,
+  },
+  badgesDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
