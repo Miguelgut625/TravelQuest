@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, Switch, TouchableOpacity, Alert } from 'react-native';
 import GlobeView, { GlobeViewRef } from '../GlobeView';

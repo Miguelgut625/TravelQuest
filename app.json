@@ -21,7 +21,8 @@
         "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
         "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
         "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para tomar fotos de tus misiones.",
-        "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a tu biblioteca de fotos para seleccionar imágenes de tus misiones."
+        "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a tu biblioteca de fotos para seleccionar imágenes de tus misiones.",
+        "NSUserNotificationUsageDescription": "Necesitamos permisos para enviarte notificaciones sobre nuevos mensajes y actividades."
       }
     },
     "android": {
@@ -32,9 +33,18 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.FOREGROUND_SERVICE"
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
       ],
-      "package": "com.travelquest.app"
+      "package": "com.travelquest.app",
+      "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "MAPS_API_KEY"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -58,6 +68,14 @@
         {
           "photosPermission": "Allow TravelQuest to access your photos.",
           "cameraPermission": "Allow TravelQuest to access your camera."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#005F9E",
+          "sounds": ["./assets/notification-sound.wav"]
         }
       ]
     ],

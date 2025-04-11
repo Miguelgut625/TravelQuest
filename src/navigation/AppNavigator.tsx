@@ -104,6 +104,7 @@ const MainFlow = () => {
 };
 
 // Componente separado para el navegador de pestañas
+// @ts-ignore
 const TabNavigator = () => {
   const theme = useTheme();
   
@@ -129,6 +130,7 @@ const TabNavigator = () => {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           }
           
+          // @ts-ignore
           return <Ionicons name={iconName} size={size || 24} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,

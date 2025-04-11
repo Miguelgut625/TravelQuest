@@ -1,70 +1,91 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, Modal, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+interface MissionInfo {
+  title: string;
+  points: number;
+  cityName: string;
+  levelUp?: boolean;
+  newLevel?: number;
+  xpGained?: number;
+  remainingXP?: number;
+  xpNext?: number;
+}
 
 interface MissionCompletedModalProps {
   visible: boolean;
-  missionInfo: {
-    title: string;
-    points: number;
-    cityName: string;
-  } | null;
-  onFinished: () => void;
+  info: MissionInfo | null;
+  onFinished?: () => void;
 }
 
-const MissionCompletedModal = ({ visible, missionInfo, onFinished }: MissionCompletedModalProps) => {
-  // Efecto para cerrar el modal después de 3 segundos
-  useEffect(() => {
-    if (visible) {
-      const timer = setTimeout(() => {
-        onFinished();
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [visible, onFinished]);
-
-  // Animación de la barra de progreso
-  const [width, setWidth] = useState(0);
-  
-  useEffect(() => {
-    if (visible) {
-      setWidth(0);
-      const timer = setTimeout(() => {
-        setWidth(100);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [visible]);
-
-  if (!visible) return null;
+const MissionCompletedModal = ({ visible, info, onFinished }: MissionCompletedModalProps) => {
+  if (!info) return null;
 
   return (
     <Modal
-      transparent={true}
       visible={visible}
+      transparent={true}
       animationType="fade"
     >
       <View style={styles.modalContainer}>
-        <View style={styles.successCard}>
-          <Ionicons name="checkmark-circle" size={70} color="#005F9E" />
-          <Text style={styles.successTitle}>¡Misión completada!</Text>
-          {missionInfo && (
-            <>
-              <Text style={styles.successMissionTitle}>{missionInfo.title}</Text>
-              <Text style={styles.successCityName}>{missionInfo.cityName}</Text>
-              <View style={styles.pointsContainer}>
-                <Text style={styles.pointsLabel}>+ </Text>
-                <Text style={styles.pointsValue}>{missionInfo.points}</Text>
-                <Text style={styles.pointsLabel}> puntos</Text>
-              </View>
-            </>
-          )}
-          <Text style={styles.successHint}>
-            Redirigiendo al diario de viaje para ver tus logros...
-          </Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressAnimation, { width: `${width}%` }]} />
+        <View style={styles.modalContent}>
+          <View style={styles.confettiContainer}>
+            <Ionicons name="checkmark-circle" size={70} color="#4CAF50" />
           </View>
+          
+          <Text style={styles.modalTitle}>¡Misión Completada!</Text>
+          <Text style={styles.modalText}>{info.title}</Text>
+          <Text style={styles.modalCity}>en {info.cityName}</Text>
+          <Text style={styles.modalPoints}>+{info.points} puntos</Text>
+          <Text style={styles.modalXP}>+{info.xpGained || info.points} XP</Text>
+          
+          {info.levelUp && info.newLevel ? (
+            <View style={styles.levelUpContainer}>
+              <Text style={styles.levelUpText}>¡Has subido al nivel {info.newLevel}!</Text>
+              
+              {info.remainingXP !== undefined && info.xpNext !== undefined && (
+                <View style={styles.xpProgressContainer}>
+                  <View style={styles.xpProgressBar}>
+                    <View 
+                      style={[
+                        styles.xpProgress, 
+                        { width: `${(info.remainingXP / info.xpNext) * 100}%` }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.xpProgressText}>
+                    {info.remainingXP}/{info.xpNext} XP para nivel {info.newLevel + 1}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.xpProgressContainer}>
+              {info.remainingXP !== undefined && info.xpNext !== undefined && (
+                <>
+                  <View style={styles.xpProgressBar}>
+                    <View 
+                      style={[
+                        styles.xpProgress, 
+                        { width: `${(info.remainingXP / info.xpNext) * 100}%` }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.xpProgressText}>
+                    {info.remainingXP}/{info.xpNext} XP para el siguiente nivel
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
+          
+          <TouchableOpacity
+            style={styles.button}
+            onPress={onFinished}
+          >
+            <Text style={styles.buttonText}>Continuar</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -78,66 +99,97 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  successCard: {
+  modalContent: {
     backgroundColor: 'white',
+    borderRadius: 15,
     padding: 20,
-    borderRadius: 10,
     alignItems: 'center',
-    width: '85%',
-    maxWidth: 350,
+    width: '80%',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  successTitle: {
+  confettiContainer: {
+    marginBottom: 20,
+  },
+  modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#005F9E',
-    marginTop: 10,
-    marginBottom: 15,
-  },
-  successMissionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  successCityName: {
-    fontSize: 16,
-    color: '#666',
+    color: '#4CAF50',
     marginBottom: 10,
   },
-  pointsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  pointsLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#005F9E',
-  },
-  pointsValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFB74D',
-  },
-  successHint: {
-    color: '#666',
-    marginBottom: 15,
+  modalText: {
+    fontSize: 18,
+    color: '#333',
     textAlign: 'center',
-  },
-  progressBar: {
-    height: 4,
-    width: '100%',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    overflow: 'hidden',
     marginBottom: 5,
   },
-  progressAnimation: {
+  modalCity: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 15,
+  },
+  modalPoints: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFA000',
+    marginBottom: 5,
+  },
+  modalXP: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#5C6BC0',
+    marginBottom: 10,
+  },
+  levelUpContainer: {
+    marginTop: 10,
+    backgroundColor: '#FFD700',
+    padding: 10,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  levelUpText: {
+    color: '#7B4513',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  xpProgressContainer: {
+    width: '100%',
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  xpProgressBar: {
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 4,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  xpProgress: {
     height: '100%',
-    backgroundColor: '#005F9E',
-    borderRadius: 10,
+    backgroundColor: '#5C6BC0',
+    borderRadius: 4,
+  },
+  xpProgressText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  button: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 10,
+    borderRadius: 25,
+    marginTop: 20,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

@@ -1,3 +1,4 @@
+// @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import * as React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';

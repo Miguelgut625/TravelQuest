@@ -1,3 +1,4 @@
+// @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';

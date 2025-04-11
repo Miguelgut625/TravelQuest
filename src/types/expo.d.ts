@@ -1,5 +1,6 @@
 // Declaraciones de tipo para los módulos de Expo
 
+// Definición única y correcta para @expo/vector-icons
 declare module '@expo/vector-icons' {
   import React from 'react';
   
@@ -10,6 +11,7 @@ declare module '@expo/vector-icons' {
     style?: any;
   }
 
+  // Componentes exportados correctamente
   export class Ionicons extends React.Component<IconProps> {}
   export class FontAwesome extends React.Component<IconProps> {}
   export class MaterialIcons extends React.Component<IconProps> {}
@@ -77,12 +79,15 @@ declare module 'expo-image-picker' {
   }
 
   export interface ImagePickerResult {
-    cancelled: boolean;
-    uri?: string;
-    width?: number;
-    height?: number;
-    type?: string;
-    base64?: string;
+    canceled: boolean;
+    assets?: Array<{
+      uri: string;
+      width?: number;
+      height?: number;
+      type?: string;
+      fileName?: string;
+      fileSize?: number;
+    }>;
   }
 
   export function launchImageLibraryAsync(options?: ImagePickerOptions): Promise<ImagePickerResult>;
@@ -91,25 +96,10 @@ declare module 'expo-image-picker' {
   export function requestCameraPermissionsAsync(): Promise<{ status: string; granted: boolean }>;
 }
 
-// Definiciones de tipos para expo
-declare module '@expo/vector-icons' {
-  export const Ionicons: any;
-  export const FontAwesome: any;
-  export const MaterialIcons: any;
-  export const MaterialCommunityIcons: any;
-}
-
 declare global {
   var __DEV__: boolean;
 }
 
 declare module 'expo' {
   export function registerRootComponent(component: React.ComponentType<any>): void;
-}
-
-declare module '@expo/vector-icons' {
-  export const Ionicons: any;
-  export const MaterialIcons: any;
-  export const FontAwesome: any;
-  export const Feather: any;
 } 

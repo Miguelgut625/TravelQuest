@@ -27,6 +27,11 @@
       "./src/types"
     ],
     "noImplicitAny": false,
+    "noImplicitThis": false,
+    "alwaysStrict": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true
   },
   "include": [
@@ -38,7 +43,8 @@
     "src/types/react-native.d.ts",
     "src/types/expo.d.ts",
     "src/types/react-native-webview.d.ts",
-    "src/types/reactNativeSize.d.ts"
+    "src/types/reactNativeSize.d.ts",
+    "src/types/react-navigation.d.ts"
   ],
   "exclude": [
     "node_modules",

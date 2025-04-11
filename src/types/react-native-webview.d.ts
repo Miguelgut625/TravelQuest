@@ -1,20 +1,50 @@
 import 'react-native-webview';
 
 declare module 'react-native-webview' {
-  import { Component } from 'react';
+  import * as React from 'react';
   
   export interface WebViewProps {
     source?: { uri: string } | { html: string };
-    style?: any;
-    javaScriptEnabled?: boolean;
-    onMessage?: (event: any) => void;
-    onLoadEnd?: () => void;
-    onLoadStart?: () => void;
-    onError?: (event: any) => void;
     originWhitelist?: string[];
+    onLoadEnd?: () => void;
+    onError?: (event: any) => void;
+    onMessage?: (event: any) => void;
+    onLoadStart?: (event: any) => void;
+    onLoad?: (event: any) => void;
+    javaScriptEnabled?: boolean;
+    domStorageEnabled?: boolean;
+    style?: any;
+    injectedJavaScript?: string;
+    injectedJavaScriptBeforeContentLoaded?: string;
+    scrollEnabled?: boolean;
+    bounces?: boolean;
+    decelerationRate?: 'normal' | 'fast' | number;
+    showsHorizontalScrollIndicator?: boolean;
+    showsVerticalScrollIndicator?: boolean;
+    directionalLockEnabled?: boolean;
+    useWebKit?: boolean;
+    userAgent?: string;
+    cacheEnabled?: boolean;
+    allowsInlineMediaPlayback?: boolean;
     startInLoadingState?: boolean;
-    [key: string]: any;
+    scalesPageToFit?: boolean;
+    allowFileAccess?: boolean;
+    geolocationEnabled?: boolean;
+    allowsBackForwardNavigationGestures?: boolean;
+    allowsLinkPreview?: boolean;
+    renderLoading?: () => React.ReactElement;
+    renderError?: (
+      errorDomain: string | undefined,
+      errorCode: number,
+      errorDesc: string
+    ) => React.ReactElement;
   }
   
-  export default class WebView extends Component<WebViewProps> {}
+  export class WebView extends React.Component<WebViewProps> {
+    reload: () => void;
+    stopLoading: () => void;
+    goBack: () => void;
+    goForward: () => void;
+    injectJavaScript: (script: string) => void;
+  }
 } 

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { createJournalEntry } from './journalService';
+import { addExperienceToUser } from './experienceService';
 
 export const getUserPoints = async (userId: string) => {
     try {
@@ -33,38 +34,13 @@ export const addPointsToUser = async (userId: string, points: number) => {
             .eq('id', userId);
 
         if (error) throw error;
+        
+        // Añadir experiencia al usuario (relación 1:1 entre puntos y experiencia)
+        await addExperienceToUser(userId, points);
 
         return currentPoints + points;
     } catch (error) {
         console.error('Error añadiendo puntos al usuario:', error);
-        throw error;
-    }
-};
-
-export const deductPointsFromUser = async (userId: string, points: number) => {
-    try {
-        // Primero obtenemos los puntos actuales
-        const currentPoints = await getUserPoints(userId);
-        
-        // Verificamos que el usuario tenga suficientes puntos
-        if (currentPoints < points) {
-            throw new Error('No hay suficientes puntos para realizar esta acción');
-        }
-
-        // Actualizamos los puntos
-        const { error } = await supabase
-            .from('users')
-            .update({
-                points: currentPoints - points,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', userId);
-
-        if (error) throw error;
-
-        return currentPoints - points;
-    } catch (error) {
-        console.error('Error descontando puntos del usuario:', error);
         throw error;
     }
 };

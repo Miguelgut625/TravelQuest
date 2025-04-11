@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, Platform } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
