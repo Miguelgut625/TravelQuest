@@ -1,96 +1,87 @@
 import { supabase } from './supabase';
 
 /**
- * Calcula la experiencia necesaria para el siguiente nivel
- * @param currentLevel Nivel actual del usuario
- * @returns XP necesaria para subir al siguiente nivel
+ * Calcula la cantidad de XP necesaria para el siguiente nivel
+ * @param level Nivel actual del usuario
+ * @returns Cantidad de XP necesaria para el siguiente nivel
  */
-export const calculateNextLevelXP = (currentLevel: number): number => {
-  // Fórmula simple para calcular XP del siguiente nivel
-  // Según la tabla de usuarios, el mínimo es 50
-  return Math.max(50, (currentLevel + 1) * 50);
+export const calculateNextLevelXP = (level: number): number => {
+  return (level + 1) * 50;
 };
 
 /**
- * Obtiene el nivel y experiencia actual del usuario
- * @param userId ID del usuario
- * @returns Objeto con nivel, experiencia actual y experiencia para siguiente nivel
+ * Calcula el nivel basado en la cantidad de puntos
+ * @param points Puntos totales del usuario
+ * @returns Nivel calculado
  */
-export const getUserLevelAndXP = async (userId: string) => {
+export const calculateLevel = (points: number): number => {
+  // Fórmula: nivel = max(1, floor(sqrt(points / 25)))
+  return Math.max(1, Math.floor(Math.sqrt(points / 25)));
+};
+
+/**
+ * Calcula la XP actual dentro del nivel
+ * @param points Puntos totales del usuario
+ * @param level Nivel actual
+ * @returns XP actual dentro del nivel
+ */
+export const calculateCurrentXP = (points: number, level: number): number => {
+  // XP actual = puntos % (nivel * 50)
+  return points % (level * 50);
+};
+
+/**
+ * Añade experiencia a un usuario y actualiza su nivel si es necesario
+ * @param userId ID del usuario
+ * @param xpToAdd Cantidad de XP a añadir
+ * @returns Objeto con información del usuario actualizado, incluye si subió de nivel
+ */
+export const addExperienceToUser = async (userId: string, xpToAdd: number) => {
   try {
-    const { data, error } = await supabase
+    // Obtener datos actuales del usuario
+    const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('level, xp, xp_next')
+      .select('points, level, xp, xp_next')
       .eq('id', userId)
       .single();
-
-    if (error) throw error;
-
-    return {
-      level: data?.level || 1,
-      xp: data?.xp || 0,
-      xpNext: data?.xp_next || 50
-    };
-  } catch (error) {
-    console.error('Error obteniendo nivel y XP del usuario:', error);
-    return { level: 1, xp: 0, xpNext: 50 };
-  }
-};
-
-/**
- * Añade experiencia al usuario y sube de nivel si corresponde
- * @param userId ID del usuario
- * @param experience Cantidad de experiencia a añadir
- * @returns Objeto con el nuevo nivel y experiencia
- */
-export const addExperienceToUser = async (userId: string, experience: number) => {
-  try {
-    // Obtener nivel, XP y XP para el siguiente nivel actuales
-    const { level: currentLevel, xp: currentXP, xpNext } = await getUserLevelAndXP(userId);
+      
+    if (userError) throw userError;
     
-    // Convertir a números para asegurar cálculos correctos
-    const numCurrentLevel = Number(currentLevel);
-    const numCurrentXP = Number(currentXP);
-    const numXPNext = Number(xpNext);
-    
-    // Calcular la nueva XP
-    let newXP = numCurrentXP + experience;
-    
-    // Calcular si hay que subir de nivel
-    let newLevel = numCurrentLevel;
-    let remainingXP = newXP;
-    let newXPNext = numXPNext;
-    let leveledUp = false;
-    
-    // Mientras la XP supere lo necesario para el siguiente nivel, subir de nivel
-    while (remainingXP >= newXPNext) {
-      remainingXP -= newXPNext;
-      newLevel++;
-      leveledUp = true;
-      newXPNext = calculateNextLevelXP(newLevel);
+    if (!userData) {
+      throw new Error('Usuario no encontrado');
     }
     
-    // Actualizar en la base de datos
-    const { error } = await supabase
+    const { points, level, xp, xp_next } = userData;
+    
+    // Calcular nuevos puntos
+    const newPoints = points + xpToAdd;
+    
+    // Actualizar los puntos del usuario
+    const { data: updatedUser, error: updateError } = await supabase
       .from('users')
-      .update({
-        level: newLevel,
-        xp: remainingXP,
-        xp_next: newXPNext,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userId);
+      .update({ points: newPoints })
+      .eq('id', userId)
+      .select('points, level, xp, xp_next')
+      .single();
+      
+    if (updateError) throw updateError;
+    
+    if (!updatedUser) {
+      throw new Error('Error al actualizar el usuario');
+    }
 
-    if (error) throw error;
-
+    // Comprobar si el usuario ha subido de nivel
+    const leveledUp = updatedUser.level > level;
+    
     return {
-      level: newLevel,
-      xp: remainingXP,
-      xpNext: newXPNext,
-      leveledUp: leveledUp
+      ...updatedUser,
+      leveledUp,
+      oldLevel: level,
+      xpGained: xpToAdd,
+      remainingXP: updatedUser.xp_next - updatedUser.xp
     };
   } catch (error) {
-    console.error('Error añadiendo experiencia al usuario:', error);
+    console.error('Error al añadir experiencia:', error);
     throw error;
   }
 }; 

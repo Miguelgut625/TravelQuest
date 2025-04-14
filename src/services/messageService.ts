@@ -1,14 +1,18 @@
 import { supabase } from './supabase';
 import { uploadImageToCloudinary } from './cloudinaryService';
-import { sendPushNotification } from './notificationService';
+import { sendPushNotification } from './NotificationService';
+import { getUserInfoById } from './userService';
 
 export interface Message {
   id: string;
   sender_id: string;
-  receiver_id: string;
-  content: string;
+  receiver_id?: string | null;
+  group_id?: string | null;
+  text?: string;
+  image_url?: string | null;
   created_at: string;
   read: boolean;
+  sender_username?: string;
 }
 
 // Función para enviar un mensaje de texto
@@ -306,4 +310,198 @@ export async function sendNewMessageNotification(
       senderName: senderName 
     }
   );
-} 
+}
+
+// Función para enviar un mensaje a un grupo
+export const sendGroupMessage = async (
+  groupId: string, 
+  text: string,
+  imageUrl?: string | null
+): Promise<Message | null> => {
+  try {
+    console.log(`Enviando mensaje a grupo ${groupId}: ${text.substring(0, 20)}...`);
+    
+    // Obtener ID del usuario autenticado
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('No hay sesión de usuario');
+    }
+    
+    const userId = session.user.id;
+    
+    // Obtener información del usuario remitente
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('username')
+      .eq('id', userId)
+      .single();
+      
+    if (userError) {
+      console.error('Error obteniendo datos del usuario:', userError);
+      return null;
+    }
+    
+    // Crear el mensaje
+    const { data, error } = await supabase
+      .from('group_messages')
+      .insert({
+        sender_id: userId,
+        group_id: groupId,
+        text: text,
+        image_url: imageUrl,
+        created_at: new Date().toISOString(),
+        read: false,
+        sender_username: userData.username
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error enviando mensaje de grupo:', error);
+      throw error;
+    }
+    
+    // Obtener los miembros del grupo para enviar notificaciones
+    const { data: members, error: membersError } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', groupId)
+      .eq('status', 'accepted');
+      
+    if (membersError) {
+      console.error('Error obteniendo miembros del grupo:', membersError);
+    } else if (members) {
+      // Enviar notificación a cada miembro del grupo (excepto al remitente)
+      for (const member of members) {
+        if (member.user_id !== userId) {
+          try {
+            // Obtener nombre del grupo
+            const { data: groupData } = await supabase
+              .from('groups')
+              .select('name')
+              .eq('id', groupId)
+              .single();
+              
+            const groupName = groupData?.name || 'Grupo';
+            
+            // Enviar notificación
+            await sendPushNotification(
+              member.user_id,
+              `${groupName}`,
+              `${userData.username}: ${text.length > 40 ? text.substring(0, 37) + '...' : text}`,
+              {
+                type: 'group_message',
+                groupId,
+                senderId: userId,
+                senderName: userData.username
+              }
+            );
+          } catch (notifError) {
+            console.error('Error enviando notificación a miembro del grupo:', notifError);
+          }
+        }
+      }
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error inesperado enviando mensaje de grupo:', error);
+    return null;
+  }
+};
+
+// Función para obtener los mensajes de un grupo
+export const getGroupMessages = async (groupId: string): Promise<Message[]> => {
+  try {
+    console.log(`Obteniendo mensajes del grupo ${groupId}`);
+    
+    const { data, error } = await supabase
+      .from('group_messages')
+      .select(`
+        id,
+        sender_id,
+        group_id,
+        text,
+        image_url,
+        created_at,
+        read,
+        sender_username
+      `)
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: true });
+      
+    if (error) {
+      console.error('Error obteniendo mensajes del grupo:', error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log(`No hay mensajes en el grupo ${groupId}`);
+      return [];
+    }
+    
+    console.log(`Se encontraron ${data.length} mensajes en el grupo ${groupId}`);
+    
+    // Obtener nombres de usuario si no están incluidos
+    const messagesWithUsernames = await Promise.all(data.map(async (message) => {
+      if (!message.sender_username) {
+        try {
+          const userInfo = await getUserInfoById(message.sender_id);
+          return {
+            ...message,
+            sender_username: userInfo?.username || 'Usuario desconocido'
+          };
+        } catch (error) {
+          console.error('Error obteniendo nombre de usuario:', error);
+          return {
+            ...message,
+            sender_username: 'Usuario desconocido'
+          };
+        }
+      }
+      return message;
+    }));
+    
+    return messagesWithUsernames;
+  } catch (error) {
+    console.error('Error inesperado obteniendo mensajes del grupo:', error);
+    return [];
+  }
+};
+
+// Función para suscribirse a mensajes de un grupo específico
+export const subscribeToGroupMessages = (
+  groupId: string,
+  onNewMessage: (message: Message) => void
+) => {
+  try {
+    console.log(`Creando suscripción a mensajes del grupo ${groupId}`);
+    
+    const channelName = `group_messages_${groupId}`;
+    
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'group_messages',
+          filter: `group_id=eq.${groupId}`
+        },
+        (payload: { new: Message }) => {
+          console.log('Nuevo mensaje de grupo recibido:', payload.new);
+          onNewMessage(payload.new);
+        }
+      )
+      .subscribe();
+      
+    // Devolver la función para desuscribirse
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (error) {
+    console.error('Error creando suscripción a mensajes de grupo:', error);
+    return () => {}; // Función vacía como fallback
+  }
+}; 

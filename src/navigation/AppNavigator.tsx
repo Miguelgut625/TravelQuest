@@ -18,6 +18,7 @@ import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import LeaderboardScreen from '../screens/main/LeaderboardScreen';
 import FriendsScreen from '../screens/main/FriendsScreen';
+import GroupsScreen from '../screens/main/GroupsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
@@ -39,6 +40,7 @@ export type TabParamList = {
   Profile: undefined;
   Leaderboard: undefined;
   Friends: undefined;
+  Groups: undefined;
   Conversations: undefined;
   Chat: {
     friendId: string;
@@ -122,6 +124,8 @@ const TabNavigator = () => {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Friends') {
             iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'Groups') {
+            iconName = focused ? 'people-circle' : 'people-circle-outline';
           } else if (route.name === 'Leaderboard') {
             iconName = focused ? 'trophy' : 'trophy-outline';
           } else if (route.name === 'Profile') {
@@ -148,6 +152,7 @@ const TabNavigator = () => {
       <Tab.Screen name="Missions" component={MissionsScreen} />
       <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} />
       <Tab.Screen name="Friends" component={FriendsScreen} />
+      <Tab.Screen name="Groups" component={GroupsScreen} options={{ title: 'Grupos' }} />
       <Tab.Screen
         name="Conversations"
         component={ConversationsScreen}

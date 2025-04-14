@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "TravelQuest",
-    "slug": "TravelQuest",
+    "slug": "travelquest",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -36,7 +36,8 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.travelquest.app",
       "googleServicesFile": "./google-services.json",
@@ -75,15 +76,18 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#005F9E",
-          "sounds": ["./assets/notification-sound.wav"]
+          "sounds": [
+            "./assets/notification-sound.wav"
+          ]
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "c2ecce27-7f4c-4193-afb9-b7c7a30e1339"
       }
     },
-    "newArchEnabled": false
+    "newArchEnabled": false,
+    "owner": "miguel625guti"
   }
 }

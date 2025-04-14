@@ -9,7 +9,7 @@ import { setAuthState, setUser } from './src/features/auth/authSlice';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
-import { registerForPushNotificationsAsync, saveUserPushToken } from './src/services/notificationService';
+import { registerForPushNotificationsAsync, saveUserPushToken } from './src/services/NotificationService';
 import * as Notifications from 'expo-notifications';
 
 // Configurar el comportamiento de las notificaciones
@@ -78,19 +78,39 @@ const App = () => {
           // Registrar el dispositivo para notificaciones push
           try {
             console.log('Registrando dispositivo para notificaciones push...');
+            
             // Obtener token de notificaciones
-            const pushToken = await registerForPushNotificationsAsync();
-            console.log('Token obtenido:', pushToken ? 'Sí' : 'No');
+            let pushToken = null;
+            try {
+              pushToken = await registerForPushNotificationsAsync();
+              console.log('Token obtenido:', pushToken ? 'Sí' : 'No');
+            } catch (tokenError) {
+              console.error('Error obteniendo token de notificaciones:', tokenError);
+              // No interrumpir la inicialización por errores de notificaciones
+            }
             
             if (pushToken) {
               // Guardar el token en la base de datos
-              const tokenSaved = await saveUserPushToken(session.user.id, pushToken);
-              console.log('Token guardado en base de datos:', tokenSaved ? 'Éxito' : 'Fallo');
+              try {
+                const tokenSaved = await saveUserPushToken(session.user.id, pushToken);
+                console.log('Token guardado en base de datos:', tokenSaved ? 'Éxito' : 'Fallo');
+              } catch (saveError) {
+                console.error('Error guardando token en base de datos:', saveError);
+                // No interrumpir la inicialización por errores de notificaciones
+              }
             } else {
-              console.warn('No se pudo obtener un token de notificaciones. Verifica los permisos del dispositivo.');
+              console.warn('No se pudo obtener un token de notificaciones. Es posible que los permisos no estén concedidos o que haya problemas con la configuración.');
             }
           } catch (notificationError) {
             console.error('Error registrando notificaciones push:', notificationError);
+            // No propagamos este error para que no impida que la aplicación se inicie
+            // Solo lo registramos y permitimos que la aplicación continúe
+            
+            if (__DEV__) {
+              // En modo desarrollo, mostramos más información en consola
+              console.log('Nota para desarrollo: Las notificaciones push pueden no funcionar correctamente en modo desarrollo.');
+              console.log('Esto no afectará la funcionalidad principal de la aplicación.');
+            }
           }
         } else {
           console.log('No hay sesión activa');

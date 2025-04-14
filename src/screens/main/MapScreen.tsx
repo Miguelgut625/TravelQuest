@@ -1,6 +1,6 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator, ScrollView, Alert, FlatList } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import * as Location from 'expo-location';
@@ -16,17 +16,25 @@ import { searchCities } from '../../services/supabase';
 import GlobeView from '../../components/GlobeView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MissionResponse } from '../../hooks/useFetchMissions';
-import { FlatList } from 'react-native-web';
 import { FontAwesome } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import FallbackView from '../../components/FallbackView';
 import { GlobeViewRef } from '../../components/GlobeView';
+import { shareJourney } from '../../services/shareService';
+import { supabase } from '../../services/supabase';
+import * as Notifications from 'expo-notifications';
 
 interface City {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
+}
+
+interface Friend {
+  user2Id: string;
+  username: string;
+  points: number;
 }
 
 type RootStackParamList = {
@@ -52,6 +60,92 @@ const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep:
   </Modal>
 );
 
+// Añadir el componente FriendSelectionModal
+const FriendSelectionModal = ({ visible, onClose, onSelect }: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (friend: Friend) => void;
+}) => {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState(true);
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  useEffect(() => {
+    if (visible) {
+      const fetchFriends = async () => {
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+        try {
+          setLoading(true);
+          const { data: friendData, error } = await supabase
+            .from('friends')
+            .select('user2Id')
+            .eq('user1Id', user.id);
+          if (error) throw error;
+
+          const friendDetails = await Promise.all(
+            friendData.map(async (friend: { user2Id: string }) => {
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('username, points')
+                .eq('id', friend.user2Id)
+                .single();
+              if (userError) return null;
+              return {
+                user2Id: friend.user2Id,
+                username: userData.username,
+                points: userData.points,
+              };
+            })
+          );
+
+          setFriends(friendDetails.filter((f) => f !== null) as Friend[]);
+        } catch (error) {
+          console.error('Error fetching friends:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchFriends();
+    }
+  }, [visible, user]);
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
+      <View style={styles.shareModalOverlay}>
+        <View style={styles.shareModalContent}>
+          <Text style={styles.shareModalTitle}>¿Quieres compartir tu aventura?</Text>
+          <Text style={styles.shareModalSubtitle}>Selecciona un amigo para compartir este viaje</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color="#005F9E" />
+          ) : (
+            <FlatList
+              data={friends}
+              keyExtractor={(item) => item.user2Id}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.friendItem} onPress={() => onSelect(item)}>
+                  <Text style={styles.friendName}>{item.username}</Text>
+                  <Text style={styles.friendPoints}>Puntos: {item.points}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>No tienes amigos agregados</Text>
+              }
+            />
+          )}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelButtonText}>No compartir</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const DateRangePickerMobile: React.FC<{
   startDateProp: Date | null;
   endDateProp: Date | null;
@@ -63,6 +157,10 @@ const DateRangePickerMobile: React.FC<{
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [markedDates, setMarkedDates] = useState<any>({});
+  // Fecha mínima: hoy (evitar seleccionar fechas pasadas)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
+  const minDate = today;
 
   useEffect(() => {
     if (startDateProp !== startDate) {
@@ -126,6 +224,16 @@ const DateRangePickerMobile: React.FC<{
   const handleDayPress = (day: any) => {
     const date = new Date(day.dateString);
     date.setHours(12, 0, 0, 0); // Mediodía para evitar problemas de zona horaria
+    
+    // Validar que la fecha no sea pasada
+    if (date < today) {
+      Alert.alert(
+        "Fecha no válida", 
+        "No puedes seleccionar fechas en el pasado. Por favor, elige una fecha futura.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
     
     if (!startDate || (startDate && endDate)) {
       // Si no hay fecha de inicio o ambas fechas están establecidas, empezar de nuevo
@@ -196,27 +304,28 @@ const DateRangePickerMobile: React.FC<{
                 </TouchableOpacity>
               </View>
               
-          <Calendar
+              <Calendar
                 markingType={'period'}
                 markedDates={markedDates}
-            onDayPress={handleDayPress}
+                onDayPress={handleDayPress}
                 monthFormat={'MMMM yyyy'}
                 hideExtraDays={true}
                 firstDay={1}
                 enableSwipeMonths={true}
-            theme={{
-              calendarBackground: '#ffffff',
-              textSectionTitleColor: '#b6c1cd',
-              selectedDayBackgroundColor: '#005F9E',
-              selectedDayTextColor: '#ffffff',
-              todayTextColor: '#005F9E',
-              dayTextColor: '#2d4150',
-              textDisabledColor: '#d9e1e8',
-              dotColor: '#005F9E',
-              selectedDotColor: '#ffffff',
-              arrowColor: '#005F9E',
-              monthTextColor: '#005F9E',
-              indicatorColor: '#005F9E',
+                minDate={minDate}
+                theme={{
+                  calendarBackground: '#ffffff',
+                  textSectionTitleColor: '#b6c1cd',
+                  selectedDayBackgroundColor: '#005F9E',
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: '#005F9E',
+                  dayTextColor: '#2d4150',
+                  textDisabledColor: '#d9e1e8',
+                  dotColor: '#005F9E',
+                  selectedDotColor: '#ffffff',
+                  arrowColor: '#005F9E',
+                  monthTextColor: '#005F9E',
+                  indicatorColor: '#005F9E',
                   textDayFontWeight: '300',
                   textDayHeaderFontWeight: '300',
                   textDayFontSize: 14,
@@ -256,6 +365,10 @@ const DateRangePickerWeb: React.FC<{
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  
+  // Obtener fecha de hoy para validación
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
   
   useEffect(() => {
     if (startDateProp !== startDate) {
@@ -298,6 +411,15 @@ const DateRangePickerWeb: React.FC<{
   };
   
   const handleDateClick = (date: Date) => {
+    // Validar que no sea una fecha pasada
+    if (date < today) {
+      // En web usamos una alerta nativa
+      if (typeof window !== 'undefined') {
+        window.alert("No puedes seleccionar fechas en el pasado. Por favor, elige una fecha futura.");
+      }
+      return;
+    }
+    
     if (!startDate || (startDate && endDate)) {
       // Si no hay fecha de inicio o ambas fechas están establecidas, empezar de nuevo
       setStartDate(date);
@@ -590,89 +712,140 @@ const MapScreen = () => {
     });
   };
 
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [generatedJourneyId, setGeneratedJourneyId] = useState<string | null>(null);
+
+  const handleShareJourney = async (friend: Friend) => {
+    if (!generatedJourneyId || !user?.id) return;
+
+    const success = await shareJourney(generatedJourneyId, user.id, friend);
+
+    if (success) {
+      navigation.navigate('Missions', {
+        journeyId: generatedJourneyId,
+        challenges: []
+      });
+    }
+
+    setShowShareModal(false);
+    setGeneratedJourneyId(null);
+  };
+
   const handleSearch = async () => {
-    if (!user?.id) {
-      setErrorMsg('Debes iniciar sesión para generar misiones');
-      return;
-    }
-
-    const missionCountNum = parseInt(missionCount) || 3; // Usar 3 como valor por defecto si no hay número
-
-    if (!duration || duration <= 0) {
-      setErrorMsg('Por favor, selecciona fechas válidas para crear un viaje');
-      return;
-    }
-
-    if (!startDate || !endDate) {
-      setErrorMsg('Selecciona fechas de inicio y fin');
-      return;
-    }
-
-    if (!searchCity) {
-      setErrorMsg('Por favor, ingresa una ciudad de destino');
-      return;
-    }
-
     try {
-      const validStartDate = new Date(startDate.getTime());
-      const validEndDate = new Date(endDate.getTime());
+      setIsLoading(true);
+      setErrorMsg(null);
+      
+      // Validar fechas
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
 
-      if (validEndDate < validStartDate) {
-        setErrorMsg('La fecha de fin no puede ser anterior a la fecha de inicio');
+      if (startDate && startDate < today) {
+        // Si la fecha de inicio es pasada, ajustarla a hoy
+        console.log('Ajustando fecha de inicio pasada a la fecha actual');
+        const newStartDate = new Date(today);
+        setStartDate(newStartDate);
+        
+        if (endDate && (endDate < today || endDate < newStartDate)) {
+          // Si la fecha de fin también es inválida, avanzarla 3 días desde hoy
+          const newEndDate = new Date(today);
+          newEndDate.setDate(today.getDate() + 3);
+          setEndDate(newEndDate);
+          onDatesChange([newStartDate, newEndDate]);
+          
+          // Mostrar alerta informando al usuario
+          Alert.alert(
+            "Fechas ajustadas", 
+            "Las fechas seleccionadas eran pasadas y han sido ajustadas a fechas futuras.",
+            [{ text: "OK" }]
+          );
+        } else {
+          onDatesChange([newStartDate, endDate]);
+        }
+      }
+      
+      if (!user?.id) {
+        setErrorMsg('Debes iniciar sesión para generar misiones');
         return;
       }
 
-      // Iniciar el proceso de generación
-      setIsLoading(true);
-      setErrorMsg(null);
-
-      // Paso 1: Preparando el viaje
-      setCurrentStep(`Preparando tu viaje a ${searchCity}...`);
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Paso 2: Buscando lugares
-      setCurrentStep(`Buscando lugares interesantes en ${searchCity}...`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Paso 3: Creando misiones
-      setCurrentStep(`Creando ${missionCountNum} misiones emocionantes...`);
-      
-      // Obtener la ciudad seleccionada del filtro de ciudades
-      let selectedCity = filteredCities.find(city => city.name.toUpperCase() === searchCity);
-      
-      // Si no se encuentra una coincidencia exacta, usar la ciudad escrita por el usuario
-      const cityName = selectedCity ? selectedCity.name : searchCity;
-      
-      // Llamar a la API para generar las misiones con el nombre real de la ciudad
-      const result = await generateMission(
-        cityName,
-        duration,
-        missionCountNum,
-        user.id,
-        validStartDate,
-        validEndDate,
-        selectedTags // Pasar los tags seleccionados
-      );
-      
-      if (!result.journeyId) {
-        throw new Error('No se recibió el ID del journey');
+      if (!duration || duration <= 0) {
+        setErrorMsg('Por favor, selecciona fechas válidas para crear un viaje');
+        return;
       }
 
-      // Paso final: Completado
-      setCurrentStep('¡Aventura generada con éxito!');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!startDate || !endDate) {
+        setErrorMsg('Selecciona fechas de inicio y fin');
+        return;
+      }
 
-      // Navegar a la pantalla de misiones
-      navigation.navigate('Missions', {
-        journeyId: result.journeyId,
-        challenges: result.challenges || []
-      });
-    } catch (error) {
-      console.error('Error generando misiones:', error);
-      setErrorMsg('Error al generar las misiones. Por favor, intenta de nuevo.');
-    } finally {
+      if (!searchCity) {
+        setErrorMsg('Por favor, ingresa una ciudad de destino');
+        return;
+      }
+
+      try {
+        // Iniciar el proceso de generación
+        setCurrentStep(`Preparando tu viaje a ${searchCity}...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Paso 2: Buscando lugares
+        setCurrentStep(`Buscando lugares interesantes en ${searchCity}...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Paso 3: Creando misiones
+        const missionCountNum = parseInt(missionCount) || 3; // Usar 3 como valor por defecto si no hay número
+        setCurrentStep(`Creando ${missionCountNum} misiones emocionantes...`);
+        
+        // Obtener la ciudad seleccionada del filtro de ciudades
+        let selectedCityObj = filteredCities.find(city => city.name.toUpperCase() === searchCity);
+        
+        // Si no se encuentra una coincidencia exacta, usar la ciudad escrita por el usuario
+        const cityName = selectedCityObj ? selectedCityObj.name : searchCity;
+        
+        // Llamar a la API para generar las misiones con el nombre real de la ciudad
+        const result = await generateMission(
+          cityName,
+          duration,
+          missionCountNum,
+          user.id,
+          startDate,
+          endDate,
+          selectedTags // Pasar los tags seleccionados
+        );
+        
+        if (!result.journeyId) {
+          throw new Error('No se recibió el ID del journey');
+        }
+
+        // Guardar el ID del journey generado
+        setGeneratedJourneyId(result.journeyId);
+
+        // Mostrar notificación de viaje generado
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "¡Nuevo viaje creado!",
+            body: `Tu viaje a ${cityName} ha sido generado con éxito con ${missionCountNum} misiones.`,
+            data: { journeyId: result.journeyId },
+            sound: 'default',
+          },
+          trigger: null, // Mostrar inmediatamente
+        });
+
+        // Mostrar el modal de compartir
+        setShowShareModal(true);
+        
+      } catch (error) {
+        console.error('Error generando misiones:', error);
+        setErrorMsg('Error al generar las misiones. Por favor, intenta de nuevo.');
+      } finally {
+        setIsLoading(false);
+        setCurrentStep('');
+      }
+    } catch (error: any) {
+      console.error('Error al buscar misiones:', error);
+      setErrorMsg(error.message || 'Error al buscar misiones');
       setIsLoading(false);
-      setCurrentStep('');
     }
   };
 
@@ -871,6 +1044,22 @@ const MapScreen = () => {
       )}
 
       <LoadingModal visible={isLoading} currentStep={currentStep} />
+
+      <FriendSelectionModal
+        visible={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          // Si el usuario no quiere compartir, navegar directamente a misiones
+          if (generatedJourneyId) {
+            navigation.navigate('Missions', {
+              journeyId: generatedJourneyId,
+              challenges: []
+            });
+            setGeneratedJourneyId(null);
+          }
+        }}
+        onSelect={handleShareJourney}
+      />
 
       {/* Overlay para cambiar entre vistas */}
       {changingView && (
@@ -1336,6 +1525,72 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  shareModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 10,
+  },
+  shareModalContent: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  shareModalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  shareModalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  friendItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  friendName: {
+    fontSize: 16,
+    color: '#333',
+  },
+  friendPoints: {
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  cancelButton: {
+    backgroundColor: '#005F9E',
+    padding: 10,
+    borderRadius: 5,
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

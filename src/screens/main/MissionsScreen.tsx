@@ -4,10 +4,6 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Scr
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
-import { completeMission } from '../../services/pointsService';
-import { RouteProp } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { Card, ProgressBar, useTheme, Surface } from 'react-native-paper';
 import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
 import ImageUploadModal from '../../components/ImageUploadModal';
 import { setRefreshJournal } from '../../features/journalSlice';
@@ -15,6 +11,11 @@ import { createJournalEntry } from '../../services/journalService';
 import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
 import { addExperienceToUser } from '../../services/experienceService';
+import { scheduleMissionExpirationReminder } from '../../services/NotificationService';
+import { useTheme } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import { RouteProp } from '@react-navigation/native';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -374,6 +375,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     }
 
     try {
+      setLoading(true);
+      setError(null);
+
       const { data: journeys, error: journeysError } = await supabase
         .from('journeys')
         .select(`
@@ -439,6 +443,33 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           missionsByCity[mission.cityName].pending.push(mission);
         }
       });
+
+      // Programar recordatorios para misiones no completadas
+      if (user && allMissions.length > 0) {
+        for (const mission of allMissions) {
+          // Solo programar recordatorios para misiones no completadas que tienen fecha de expiración
+          if (!mission.completed && mission.end_date) {
+            const expirationDate = new Date(mission.end_date);
+            
+            // Verificar que la fecha de expiración es futura
+            const now = new Date();
+            if (expirationDate > now) {
+              try {
+                await scheduleMissionExpirationReminder(
+                  user.id,
+                  mission.id,
+                  mission.challenge.title,
+                  expirationDate
+                );
+                console.log(`Recordatorio programado para misión: ${mission.challenge.title}`);
+              } catch (reminderError) {
+                console.error('Error al programar recordatorio:', reminderError);
+                // No mostrar error al usuario, es un proceso en segundo plano
+              }
+            }
+          }
+        }
+      }
 
       setCityMissions(missionsByCity);
     } catch (error) {

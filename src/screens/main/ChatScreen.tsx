@@ -1,5 +1,5 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   Platform,
   Alert,
   Image,
-  Modal
+  Modal,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -22,25 +23,93 @@ import { getConversation, sendMessage, markMessagesAsRead, subscribeToMessages, 
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadImage } from '../../services/cloudinaryService';
+import NotificationService from '../../services/NotificationService';
 
 const ChatScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { friendId, friendName } = route.params;
-  const [messages, setMessages] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [inputText, setInputText] = React.useState('');
-  const [sending, setSending] = React.useState(false);
-  const [selectedImage, setSelectedImage] = React.useState(null);
-  const [imagePreviewVisible, setImagePreviewVisible] = React.useState(false);
-  const [fullImageViewVisible, setFullImageViewVisible] = React.useState(false);
-  const [currentFullImage, setCurrentFullImage] = React.useState('');
+  const { friendId, friendName, groupId, groupName } = route.params || {};
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<any>(null);
+  const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
+  const [fullImageViewVisible, setFullImageViewVisible] = useState(false);
+  const [currentFullImage, setCurrentFullImage] = useState('');
   const user = useSelector((state: RootState) => state.auth.user);
-  const flatListRef = React.useRef(null);
-  const subscriptionRef = React.useRef(null);
-  const initialLoadRef = React.useRef(true);
-  const messageCountRef = React.useRef(0);
+  const flatListRef = useRef<FlatList>(null);
+  const subscriptionRef = useRef(null);
+  const initialLoadRef = useRef(true);
+  const messageCountRef = useRef(0);
+  const [isGroupChat, setIsGroupChat] = useState(false);
+  const [groupInfo, setGroupInfo] = useState<any>(null);
+
+  // Verificar si es un chat grupal
+  useEffect(() => {
+    if (route.params?.isGroupChat) {
+      setIsGroupChat(true);
+    }
+  }, [route.params]);
+
+  // Cargar los datos iniciales
+  useEffect(() => {
+    checkUserAuth();
+    
+    if (isGroupChat && groupId) {
+      loadGroupChat();
+    } else if (friendId) {
+      loadFriendChat();
+    }
+  }, [isGroupChat, groupId, friendId]);
+
+  // Cargar información del chat grupal
+  const loadGroupChat = async () => {
+    try {
+      setLoading(true);
+      
+      // Obtener información del grupo
+      const groupData = await getGroupById(groupId);
+      if (groupData) {
+        setGroupInfo(groupData);
+        
+        // Cargar mensajes del grupo
+        const groupMessages = await getGroupMessages(groupId);
+        if (groupMessages && groupMessages.length > 0) {
+          setMessages(groupMessages);
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando información del grupo:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar información del chat individual
+  const loadFriendChat = async () => {
+    try {
+      setLoading(true);
+      
+      // Obtener información del amigo
+      const friendData = await getUserInfo(friendId);
+      if (friendData) {
+        setGroupInfo(friendData);
+      }
+      
+      // Cargar mensajes con este amigo
+      const chatMessages = await getMessages(friendId);
+      if (chatMessages && chatMessages.length > 0) {
+        setMessages(chatMessages);
+      }
+    } catch (error) {
+      console.error('Error cargando información del amigo:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Manejador para nuevos mensajes recibidos
   const handleNewMessage = React.useCallback((newMessage: Message) => {
@@ -300,28 +369,96 @@ const ChatScreen = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !user?.id || sending) return;
-    
-    setSending(true);
-    const trimmedMessage = inputText.trim();
-    setInputText('');
-    
-    console.log('Enviando mensaje a', friendId);
-    
+    if ((!inputText.trim() && !selectedImage) || !user) {
+      return;
+    }
+
     try {
-      const newMessage = await sendMessage(user.id, friendId, trimmedMessage);
-      if (newMessage) {
-        console.log('Mensaje enviado con éxito:', newMessage.id);
-        handleNewMessage(newMessage);
+      let newMessage: Message = {
+        id: `temp-${Date.now()}`,
+        sender_id: user.id,
+        receiver_id: isGroupChat ? null : friendId,
+        group_id: isGroupChat ? groupId : null,
+        text: inputText.trim(),
+        created_at: new Date().toISOString(),
+        read: false,
+        sender_username: user.username,
+        image_url: null
+      };
+
+      // Si hay una imagen seleccionada, subirla primero
+      if (selectedImage) {
+        const imageUrl = await uploadImage(selectedImage);
+        if (imageUrl) {
+          newMessage.image_url = imageUrl;
+        }
+      }
+
+      // Agregar el mensaje a la UI inmediatamente
+      setMessages(prevMessages => [...prevMessages, newMessage]);
+      
+      // Limpiar campos
+      setInputText('');
+      setSelectedImage(null);
+      setImagePreviewVisible(false);
+
+      // Mover automáticamente al final de la lista
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd();
+      }, 100);
+
+      // Guardar el mensaje en la base de datos
+      const savedMessage = isGroupChat
+        ? await sendGroupMessage(groupId, inputText.trim(), newMessage.image_url)
+        : await sendMessage(friendId, inputText.trim(), newMessage.image_url);
+        
+      if (!savedMessage) {
+        // Si falla, podríamos mostrar un error o reintentar
+        console.error('Error al enviar mensaje');
       }
     } catch (error) {
-      console.error('Error enviando mensaje:', error);
+      console.error('Error al enviar mensaje:', error);
       Alert.alert('Error', 'No se pudo enviar el mensaje');
-      setInputText(trimmedMessage); // Restaurar el mensaje si falla
-    } finally {
-      setSending(false);
     }
   };
+
+  // Personalizar el encabezado de navegación
+  useEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      headerTitle: () => (
+        <View style={styles.headerTitle}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          {isGroupChat ? (
+            <View style={styles.headerGroupInfo}>
+              <Text style={styles.headerName}>{groupName || 'Grupo'}</Text>
+              <Text style={styles.headerSubtitle}>
+                {groupInfo?.members?.length || 0} miembros
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.headerUserInfo}>
+              <Text style={styles.headerName}>{friendName}</Text>
+              {groupInfo?.status && (
+                <Text style={styles.headerSubtitle}>
+                  {groupInfo.status}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+      ),
+      headerStyle: {
+        backgroundColor: '#005F9E',
+      },
+      headerTintColor: 'white',
+    });
+  }, [navigation, friendName, isGroupChat, groupName, groupInfo]);
 
   if (loading && !refreshing) {
     return (
@@ -333,33 +470,37 @@ const ChatScreen = () => {
 
   // Renderizar un mensaje individual
   const renderMessageItem = ({ item }: { item: Message }) => {
-    const isMyMessage = item.sender_id === user?.id;
-    const isImageMessage = item.content.startsWith('http') && 
-      (item.content.includes('.jpg') || 
-       item.content.includes('.jpeg') || 
-       item.content.includes('.png') || 
-       item.content.includes('.gif') ||
-       item.content.includes('cloudinary.com'));
+    const isOwnMessage = item.sender_id === user?.id;
+    const messageDate = new Date(item.created_at);
+    const timeString = messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
+    // Para mensajes grupales, mostrar el nombre del remitente si no es propio
+    const shouldShowSender = isGroupChat && !isOwnMessage;
+
     return (
       <View style={[
         styles.messageContainer,
-        isMyMessage ? styles.myMessage : styles.friendMessage,
+        isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
       ]}>
-        {isImageMessage ? (
-          <TouchableOpacity onPress={() => viewFullImage(item.content)}>
+        {shouldShowSender && (
+          <Text style={styles.messageSender}>{item.sender_username}</Text>
+        )}
+        
+        {item.image_url && (
+          <TouchableOpacity onPress={() => viewFullImage(item.image_url)}>
             <Image 
-              source={{ uri: item.content }}
-              style={styles.messageImage}
+              source={{ uri: item.image_url }} 
+              style={styles.messageImage} 
               resizeMode="cover"
             />
           </TouchableOpacity>
-        ) : (
-          <Text style={styles.messageText}>{item.content}</Text>
         )}
-        <Text style={styles.messageTime}>
-          {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+        
+        {item.text && (
+          <Text style={styles.messageText}>{item.text}</Text>
+        )}
+        
+        <Text style={styles.messageTime}>{timeString}</Text>
       </View>
     );
   };
@@ -508,11 +649,11 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     borderRadius: 10,
   },
-  myMessage: {
+  ownMessageContainer: {
     alignSelf: 'flex-end',
     backgroundColor: '#005F9E',
   },
-  friendMessage: {
+  otherMessageContainer: {
     alignSelf: 'flex-start',
     backgroundColor: '#000000',
   },
@@ -623,6 +764,36 @@ const styles = StyleSheet.create({
     top: 40,
     right: 20,
     zIndex: 10,
+  },
+  // Estilos para el encabezado
+  headerTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerUserInfo: {
+    marginLeft: 10,
+  },
+  headerGroupInfo: {
+    marginLeft: 10,
+  },
+  headerName: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+  },
+  backButton: {
+    padding: 5,
+  },
+  // Estilos para mensajes grupales
+  messageSender: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#0084FF',
+    marginBottom: 2,
   },
 });
 
