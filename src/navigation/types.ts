@@ -18,5 +18,6 @@ export type RootStackParamList = {
     };
     Friends: undefined;
     Leaderboard: undefined;
+    BadgesScreen: undefined;
     // Añade aquí más pantallas según sea necesario
 }; 

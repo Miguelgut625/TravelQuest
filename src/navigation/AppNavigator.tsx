@@ -18,6 +18,7 @@ import JournalScreen from '../screens/main/JournalScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import LeaderboardScreen from '../screens/main/LeaderboardScreen';
 import FriendsScreen from '../screens/main/FriendsScreen';
+import BadgesScreen from '../screens/main/BadgesScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
@@ -44,6 +45,7 @@ export type TabParamList = {
     friendId: string;
     friendName: string;
   };
+  BadgesScreen: undefined;
 };
 
 type RootStackParamList = {
@@ -128,6 +130,8 @@ const TabNavigator = () => {
             iconName = focused ? 'person' : 'person-outline';
           } else if (route.name === 'Conversations') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          } else if (route.name === 'BadgesScreen') {
+            iconName = focused ? 'medal' : 'medal-outline';
           }
           
           // @ts-ignore
@@ -157,6 +161,13 @@ const TabNavigator = () => {
       />
       <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="BadgesScreen" 
+        component={BadgesScreen}
+        options={{
+          title: 'Insignias'
+        }}
+      />
     </Tab.Navigator>
   );
 };

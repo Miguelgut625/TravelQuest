@@ -15,6 +15,7 @@ import { createJournalEntry } from '../../services/journalService';
 import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
 import { addExperienceToUser } from '../../services/experienceService';
+import { awardSpecificBadges } from '../../services/badgeService';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -494,6 +495,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         user?.id || '', 
         imageUrl
       );
+
+      // Otorgar insignias por completar misión
+      await awardSpecificBadges(user.id, 'completeMission');
 
       // Añadir experiencia y verificar si subió de nivel
       const experienceResult = await addExperienceToUser(user.id, foundMissionPoints);

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList, Button } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList } from 'react-native';
+import { Button } from 'react-native-paper';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -27,6 +28,9 @@ interface JourneyMission {
 interface FriendshipRequest {
   id: string;
   sender: {
+    username: string;
+  };
+  users: {
     username: string;
   };
 }
@@ -481,7 +485,24 @@ const ProfileScreen = () => {
           </>
         )}
       </View>
-
+      {/* Sección para Insignias */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Logros</Text>
+        <View style={styles.badgesContainer}>
+          <TouchableOpacity
+            style={styles.badgesButton}
+            onPress={() => {
+              navigation.navigate('BadgesScreen');
+            }}
+          >
+            <View style={styles.badgesButtonContent}>
+              <Ionicons name="medal" size={24} color="white" />
+              <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
+              <Ionicons name="chevron-forward" size={20} color="white" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Social</Text>
         <View style={styles.socialContainer}>
@@ -970,6 +991,28 @@ const styles = StyleSheet.create({
   xpText: {
     color: '#fff',
     fontSize: 12,
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgesButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  badgesButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badgesButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
 });
 
