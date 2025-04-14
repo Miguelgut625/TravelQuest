@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator, Alert, ScrollView, FlatList } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import Map from '../../components/maps';
@@ -12,12 +12,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { format } from 'date-fns';
 import { searchCities } from '../../services/supabase';
+import GlobeView from '../../components/GlobeView';
+import { supabase } from '../../services/supabase';
+import { shareJourney } from '../../services/shareService';
 
 interface City {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
+}
+
+interface Friend {
+  user2Id: string;
+  username: string;
+  points: number;
 }
 
 type RootStackParamList = {
@@ -42,15 +51,15 @@ const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep:
         <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={styles.loadingTitle}>Generando tu aventura</Text>
         <Text style={styles.loadingStep}>{currentStep}</Text>
-        
+
         {/* Indicador de progreso visual */}
         <View style={styles.progressBar}>
           <View style={[
-            styles.progressFill, 
-            { 
-              width: currentStep.includes('Preparando') ? '30%' : 
-                    currentStep.includes('Buscando') ? '60%' : 
-                    currentStep.includes('Creando') ? '90%' : '10%' 
+            styles.progressFill,
+            {
+              width: currentStep.includes('Preparando') ? '30%' :
+                currentStep.includes('Buscando') ? '60%' :
+                  currentStep.includes('Creando') ? '90%' : '10%'
             }
           ]} />
         </View>
@@ -67,58 +76,58 @@ const DateRangePickerMobile: React.FC<{
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<{[date: string]: any}>({});
+  const [selectedDates, setSelectedDates] = useState<{ [date: string]: any }>({});
 
   useEffect(() => {
     setStartDate(startDateProp);
     setEndDate(endDateProp);
-    
+
     if (startDateProp || endDateProp) {
       updateMarkedDates(startDateProp, endDateProp);
     }
   }, [startDateProp, endDateProp]);
 
   const updateMarkedDates = (start: Date | null, end: Date | null) => {
-    const newMarkedDates: {[date: string]: any} = {};
-    
+    const newMarkedDates: { [date: string]: any } = {};
+
     if (start) {
       const startStr = format(start, 'yyyy-MM-dd');
-      newMarkedDates[startStr] = { 
-        startingDay: true, 
+      newMarkedDates[startStr] = {
+        startingDay: true,
         color: '#005F9E',
         textColor: 'white'
       };
     }
-    
+
     if (end) {
       const endStr = format(end, 'yyyy-MM-dd');
-      newMarkedDates[endStr] = { 
-        endingDay: true, 
+      newMarkedDates[endStr] = {
+        endingDay: true,
         color: '#005F9E',
         textColor: 'white'
       };
     }
-    
+
     if (start && end) {
       let currentDate = new Date(start);
       currentDate.setDate(currentDate.getDate() + 1);
-      
+
       while (currentDate < end) {
         const dateStr = format(currentDate, 'yyyy-MM-dd');
-        newMarkedDates[dateStr] = { 
+        newMarkedDates[dateStr] = {
           color: '#e5f3ff',
           textColor: '#005F9E'
         };
         currentDate.setDate(currentDate.getDate() + 1);
       }
     }
-    
+
     setSelectedDates(newMarkedDates);
   };
 
   const handleDayPress = (day: any) => {
     const selectedDate = new Date(day.dateString);
-    
+
     if (!startDate || (startDate && endDate)) {
       const newStart = selectedDate;
       setStartDate(newStart);
@@ -150,7 +159,7 @@ const DateRangePickerMobile: React.FC<{
     if (!startDate && !endDate) {
       return 'Selecciona fechas';
     }
-    
+
     const formatDate = (date: Date | null): string => {
       if (!date) return '';
       return format(date, 'dd MMM');
@@ -218,28 +227,28 @@ const DateRangePickerWeb: React.FC<{
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  
+
   useEffect(() => {
     setStartDate(startDateProp);
     setEndDate(endDateProp);
   }, [startDateProp, endDateProp]);
-  
+
   // Función para generar el calendario
   const generateCalendar = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
-    
+
     // Obtener el primer día del mes
     const firstDay = new Date(year, month, 1);
     const startingDayOfWeek = firstDay.getDay(); // 0 = domingo
-    
+
     // Obtener el último día del mes
     const lastDay = new Date(year, month + 1, 0);
     const totalDays = lastDay.getDate();
-    
+
     // Crear un array para los días del mes
     const days = [];
-    
+
     // Agregar días del mes anterior para completar la primera semana
     for (let i = 0; i < startingDayOfWeek; i++) {
       const prevMonthDay = new Date(year, month, -i);
@@ -250,22 +259,22 @@ const DateRangePickerWeb: React.FC<{
         isSelected: false
       });
     }
-    
+
     // Agregar los días del mes actual
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     for (let i = 1; i <= totalDays; i++) {
       const currentDate = new Date(year, month, i);
       currentDate.setHours(0, 0, 0, 0);
-      
+
       const isToday = currentDate.getTime() === today.getTime();
-      const isStartDate = startDate && currentDate.getTime() === new Date(startDate).setHours(0,0,0,0);
-      const isEndDate = endDate && currentDate.getTime() === new Date(endDate).setHours(0,0,0,0);
-      const isInRange = startDate && endDate && 
-                        currentDate.getTime() > new Date(startDate).setHours(0,0,0,0) && 
-                        currentDate.getTime() < new Date(endDate).setHours(0,0,0,0);
-      
+      const isStartDate = startDate && currentDate.getTime() === new Date(startDate).setHours(0, 0, 0, 0);
+      const isEndDate = endDate && currentDate.getTime() === new Date(endDate).setHours(0, 0, 0, 0);
+      const isInRange = startDate && endDate &&
+        currentDate.getTime() > new Date(startDate).setHours(0, 0, 0, 0) &&
+        currentDate.getTime() < new Date(endDate).setHours(0, 0, 0, 0);
+
       days.push({
         date: currentDate,
         isCurrentMonth: true,
@@ -276,7 +285,7 @@ const DateRangePickerWeb: React.FC<{
         isInRange
       });
     }
-    
+
     // Agregar días del mes siguiente para completar la última semana
     const remainingDays = 7 - (days.length % 7);
     if (remainingDays < 7) {
@@ -290,19 +299,19 @@ const DateRangePickerWeb: React.FC<{
         });
       }
     }
-    
+
     return days;
   };
-  
+
   const handleDateClick = (date: Date) => {
     // No permitir seleccionar fechas en el pasado
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     if (date < today) {
       return;
     }
-    
+
     if (!startDate || (startDate && endDate)) {
       // Si no hay fecha de inicio o ambas fechas están seleccionadas, establecer como nueva fecha de inicio
       setStartDate(date);
@@ -321,7 +330,7 @@ const DateRangePickerWeb: React.FC<{
       }
     }
   };
-  
+
   const formatMonth = (date: Date) => {
     const months = [
       'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -329,36 +338,36 @@ const DateRangePickerWeb: React.FC<{
     ];
     return `${months[date.getMonth()]} ${date.getFullYear()}`;
   };
-  
+
   const changeMonth = (offset: number) => {
     const newMonth = new Date(currentMonth);
     newMonth.setMonth(newMonth.getMonth() + offset);
     setCurrentMonth(newMonth);
   };
-  
+
   const days = generateCalendar(currentMonth);
   const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  
+
   const calculateDuration = (start: Date | null, end: Date | null): number => {
     if (!start || !end) return 0;
     const diffTime = Math.abs(end.getTime() - start.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
-  
+
   const formatDate = (date: Date | null): string => {
     if (!date) return '';
     return `${date.getDate()} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][date.getMonth()]}`;
   };
-  
+
   const formatDateRange = (): string => {
     if (!startDate && !endDate) {
       return 'Selecciona fechas';
     }
-    
+
     const startStr = formatDate(startDate);
     const endStr = formatDate(endDate);
     const duration = calculateDuration(startDate, endDate);
-    
+
     if (startStr && endStr) {
       return `${startStr} - ${endStr} · ${duration} noches`;
     } else if (startStr) {
@@ -379,9 +388,9 @@ const DateRangePickerWeb: React.FC<{
           <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={24} color="white" />
         </View>
       </TouchableOpacity>
-      
+
       {isOpen && (
-    <div style={{ 
+        <div style={{
           position: 'absolute',
           top: '100%',
           left: 0,
@@ -405,10 +414,10 @@ const DateRangePickerWeb: React.FC<{
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center'
-    }}>
-      <button
+            }}>
+              <button
                 onClick={() => changeMonth(-1)}
-        style={{
+                style={{
                   background: 'none',
                   border: 'none',
                   fontSize: 24,
@@ -417,14 +426,14 @@ const DateRangePickerWeb: React.FC<{
                 }}
               >
                 &larr;
-      </button>
+              </button>
               <h3 style={{
                 margin: '0 15px',
                 color: '#005F9E'
               }}>
                 {formatMonth(currentMonth)}
               </h3>
-              <button 
+              <button
                 onClick={() => changeMonth(1)}
                 style={{
                   background: 'none',
@@ -437,12 +446,12 @@ const DateRangePickerWeb: React.FC<{
                 &rarr;
               </button>
             </div>
-            
+
             <div style={{
               display: 'flex',
               alignItems: 'center'
             }}>
-              <button 
+              <button
                 onClick={() => {
                   setStartDate(null);
                   setEndDate(null);
@@ -460,7 +469,7 @@ const DateRangePickerWeb: React.FC<{
               </button>
             </div>
           </div>
-          
+
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(7, 1fr)',
@@ -476,25 +485,25 @@ const DateRangePickerWeb: React.FC<{
                 {day}
               </div>
             ))}
-            
+
             {days.map((day, index) => (
-              <div 
+              <div
                 key={index}
                 onClick={() => day.isCurrentMonth && handleDateClick(day.date)}
-          style={{
+                style={{
                   padding: 10,
                   cursor: day.isCurrentMonth ? 'pointer' : 'default',
-                  backgroundColor: day.isStartDate || day.isEndDate 
-                    ? '#005F9E' 
-                    : day.isInRange 
-                      ? '#e5f3ff' 
+                  backgroundColor: day.isStartDate || day.isEndDate
+                    ? '#005F9E'
+                    : day.isInRange
+                      ? '#e5f3ff'
                       : 'transparent',
-                  color: day.isStartDate || day.isEndDate 
-                    ? 'white' 
-                    : !day.isCurrentMonth 
-                      ? '#ccc' 
-                      : day.isToday 
-                        ? '#005F9E' 
+                  color: day.isStartDate || day.isEndDate
+                    ? 'white'
+                    : !day.isCurrentMonth
+                      ? '#ccc'
+                      : day.isToday
+                        ? '#005F9E'
                         : '#333',
                   fontWeight: day.isToday ? 'bold' : 'normal',
                   borderRadius: 4,
@@ -502,14 +511,162 @@ const DateRangePickerWeb: React.FC<{
                 }}
               >
                 {day.date.getDate()}
-        </div>
+              </div>
             ))}
-    </div>
+          </div>
         </div>
       )}
     </View>
   );
 };
+
+const FriendSelectionModal = ({ visible, onClose, onSelect }: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (friend: Friend) => void;
+}) => {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState(true);
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  useEffect(() => {
+    if (visible) {
+      const fetchFriends = async () => {
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+        try {
+          setLoading(true);
+          const { data: friendData, error } = await supabase
+            .from('friends')
+            .select('user2Id')
+            .eq('user1Id', user.id);
+          if (error) throw error;
+
+          const friendDetails = await Promise.all(
+            friendData.map(async (friend: { user2Id: string }) => {
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('username, points')
+                .eq('id', friend.user2Id)
+                .single();
+              if (userError) return null;
+              return {
+                user2Id: friend.user2Id,
+                username: userData.username,
+                points: userData.points,
+              };
+            })
+          );
+
+          setFriends(friendDetails.filter((f) => f !== null) as Friend[]);
+        } catch (error) {
+          console.error('Error fetching friends:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchFriends();
+    }
+  }, [visible, user]);
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
+      <View style={modalStyles.modalOverlay}>
+        <View style={modalStyles.modalContent}>
+          <Text style={modalStyles.modalTitle}>¿Quieres compartir tu aventura?</Text>
+          <Text style={modalStyles.modalSubtitle}>Selecciona un amigo para compartir este viaje</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color="#4CAF50" />
+          ) : (
+            <FlatList
+              data={friends}
+              keyExtractor={(item) => item.user2Id}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={modalStyles.friendItem} onPress={() => onSelect(item)}>
+                  <Text style={modalStyles.friendName}>{item.username}</Text>
+                  <Text style={modalStyles.friendPoints}>Puntos: {item.points}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={modalStyles.emptyText}>No tienes amigos agregados</Text>
+              }
+            />
+          )}
+          <View style={modalStyles.buttonContainer}>
+            <TouchableOpacity style={modalStyles.cancelButton} onPress={onClose}>
+              <Text style={modalStyles.cancelButtonText}>No compartir</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const modalStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    maxHeight: '80%'
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center'
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  friendItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  friendName: {
+    fontSize: 16,
+    fontWeight: '500'
+  },
+  friendPoints: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4
+  },
+  buttonContainer: {
+    marginTop: 20,
+    flexDirection: 'row',
+    justifyContent: 'center'
+  },
+  cancelButton: {
+    backgroundColor: '#f44336',
+    padding: 12,
+    borderRadius: 5,
+    minWidth: 120,
+    alignItems: 'center'
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold'
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+    padding: 20
+  }
+});
 
 const MapScreen = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -537,17 +694,19 @@ const MapScreen = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [generatedJourneyId, setGeneratedJourneyId] = useState<string | null>(null);
 
   useEffect(() => {
     const getLocation = async () => {
       try {
         setIsLoadingLocation(true);
         setErrorLocationMsg(null);
-        
+
         console.log('Solicitando permisos de ubicación...');
         let { status } = await Location.requestForegroundPermissionsAsync();
         console.log('Estado de permisos de ubicación:', status);
-        
+
         if (status !== 'granted') {
           console.warn('Permiso de ubicación denegado');
           setErrorLocationMsg('Permiso de ubicación denegado. La aplicación necesita acceso a tu ubicación para funcionar correctamente.');
@@ -556,7 +715,7 @@ const MapScreen = () => {
         }
 
         console.log('Permisos concedidos, obteniendo ubicación actual...');
-        
+
         // Configurar opciones para obtener la ubicación para Android
         const options = Platform.OS === 'android' ? {
           accuracy: Location.Accuracy.Balanced,
@@ -566,20 +725,20 @@ const MapScreen = () => {
         } : {
           accuracy: Location.Accuracy.Balanced
         };
-        
+
         console.log('Usando opciones de ubicación:', JSON.stringify(options));
-        
+
         try {
           console.log('Intentando obtener ubicación...');
           let location = await Location.getCurrentPositionAsync(options);
           console.log('Ubicación obtenida:', JSON.stringify(location.coords));
-          
+
           // Actualizar estado con la ubicación obtenida
           setUserLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           });
-          
+
           // Actualizar el estado de la región del mapa
           setRegion({
             latitude: location.coords.latitude,
@@ -587,11 +746,11 @@ const MapScreen = () => {
             latitudeDelta: 0.0922,
             longitudeDelta: 0.0421,
           });
-            
+
           setIsLoadingLocation(false);
         } catch (locationError: any) {
           console.error('Error específico al obtener ubicación:', locationError);
-          
+
           // Intentar con el método getLastKnownPositionAsync como fallback
           console.log('Intentando obtener última ubicación conocida...');
           try {
@@ -602,28 +761,28 @@ const MapScreen = () => {
                 latitude: lastLocation.coords.latitude,
                 longitude: lastLocation.coords.longitude,
               });
-              
+
               setRegion({
                 latitude: lastLocation.coords.latitude,
                 longitude: lastLocation.coords.longitude,
                 latitudeDelta: 0.0922,
                 longitudeDelta: 0.0421,
               });
-              
+
               setIsLoadingLocation(false);
               return;
             }
           } catch (lastLocError) {
             console.error('Error al obtener última ubicación conocida:', lastLocError);
           }
-          
+
           throw locationError; // Propagar el error original si no pudimos recuperar
         }
       } catch (error: any) {
         console.error('Error al obtener la ubicación:', error);
         setErrorLocationMsg(`Error al obtener la ubicación: ${error.message}. Usando ubicación por defecto.`);
         setIsLoadingLocation(false);
-        
+
         // Usar una ubicación por defecto en caso de error
         setUserLocation({
           latitude: 40.416775,
@@ -651,7 +810,7 @@ const MapScreen = () => {
   const handleCitySearch = async (text: string) => {
     const upperText = text.toUpperCase();
     setSearchCity(upperText);
-    
+
     if (text.length > 2) {
       try {
         const cities = await searchCities(upperText);
@@ -676,6 +835,22 @@ const MapScreen = () => {
       latitudeDelta: 0.0922,
       longitudeDelta: 0.0421,
     });
+  };
+
+  const handleShareJourney = async (friend: Friend) => {
+    if (!generatedJourneyId || !user?.id) return;
+
+    const success = await shareJourney(generatedJourneyId, user.id, friend);
+
+    if (success) {
+      navigation.navigate('Missions', {
+        journeyId: generatedJourneyId,
+        challenges: []
+      });
+    }
+
+    setShowShareModal(false);
+    setGeneratedJourneyId(null);
   };
 
   const handleSearch = async () => {
@@ -724,7 +899,7 @@ const MapScreen = () => {
 
       // Paso 3: Creando misiones
       setCurrentStep(`Creando ${missionCountNum} misiones emocionantes...`);
-      
+
       // Llamar a la API para generar las misiones
       const result = await generateMission(
         searchCity.toUpperCase(),
@@ -734,7 +909,7 @@ const MapScreen = () => {
         validStartDate,
         validEndDate
       );
-      
+
       if (!result.journeyId) {
         throw new Error('No se recibió el ID del journey');
       }
@@ -743,11 +918,12 @@ const MapScreen = () => {
       setCurrentStep('¡Aventura generada con éxito!');
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Navegar a la pantalla de misiones
-      navigation.navigate('Missions', {
-        journeyId: result.journeyId,
-        challenges: result.challenges || []
-      });
+      // Guardar el ID del journey generado
+      setGeneratedJourneyId(result.journeyId);
+
+      // Mostrar el modal de compartir
+      setShowShareModal(true);
+
     } catch (error) {
       console.error('Error generando misiones:', error);
       setErrorMsg('Error al generar las misiones. Por favor, intenta de nuevo.');
@@ -759,12 +935,12 @@ const MapScreen = () => {
 
   const onDatesChange = (dates: [Date | null, Date | null]) => {
     const [start, end] = dates;
-    
+
     console.log('MapScreen - Fechas seleccionadas:', { start, end });
-    
+
     setStartDate(start);
     setEndDate(end);
-    
+
     if (start && end) {
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const newDuration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -781,24 +957,24 @@ const MapScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Buscar ciudad"
-            value={searchCity}
-            onChangeText={handleCitySearch}
-          />
-          {showSuggestions && filteredCities.length > 0 && (
+        <TextInput
+          style={styles.input}
+          placeholder="Buscar ciudad"
+          value={searchCity}
+          onChangeText={handleCitySearch}
+        />
+        {showSuggestions && filteredCities.length > 0 && (
           <View style={styles.suggestionsList}>
             {filteredCities.map((city) => (
-                <TouchableOpacity
+              <TouchableOpacity
                 key={city.id}
-                  style={styles.suggestionItem}
+                style={styles.suggestionItem}
                 onPress={() => handleCitySelect(city)}
-                >
+              >
                 <Text style={styles.suggestionText}>{city.name}</Text>
-                </TouchableOpacity>
+              </TouchableOpacity>
             ))}
-        </View>
+          </View>
         )}
         <TextInput
           style={styles.input}
@@ -807,7 +983,7 @@ const MapScreen = () => {
           onChangeText={setMissionCount}
           keyboardType="numeric"
         />
-        
+
         <DateRangePicker
           startDateProp={startDate}
           endDateProp={endDate}
@@ -839,8 +1015,8 @@ const MapScreen = () => {
             {errorLocationMsg && (
               <Text style={styles.errorText}>{errorLocationMsg}</Text>
             )}
-            <TouchableOpacity 
-              style={styles.retryButton} 
+            <TouchableOpacity
+              style={styles.retryButton}
               onPress={() => {
                 console.log('Reintentando obtener ubicación...');
                 setIsLoadingLocation(true);
@@ -851,31 +1027,31 @@ const MapScreen = () => {
                     if (status !== 'granted') {
                       throw new Error('Permiso de ubicación denegado');
                     }
-                    
+
                     const location = await Location.getCurrentPositionAsync({
                       accuracy: Location.Accuracy.Balanced,
                     });
-                    
+
                     console.log('Nueva ubicación obtenida:', JSON.stringify(location.coords));
-                    
+
                     setUserLocation({
                       latitude: location.coords.latitude,
                       longitude: location.coords.longitude,
                     });
-                    
+
                     setRegion({
                       latitude: location.coords.latitude,
                       longitude: location.coords.longitude,
                       latitudeDelta: 0.0922,
                       longitudeDelta: 0.0421,
                     });
-                    
+
                     setIsLoadingLocation(false);
                   } catch (error: any) {
                     console.error('Error al reintentar obtener ubicación:', error);
                     setErrorLocationMsg(`Error: ${error.message}`);
                     setIsLoadingLocation(false);
-                    
+
                     // Usar ubicación por defecto
                     setUserLocation({
                       latitude: 40.416775,
@@ -887,9 +1063,9 @@ const MapScreen = () => {
             >
               <Text style={styles.retryButtonText}>Reintentar</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.retryButton, { marginTop: 10, backgroundColor: '#FFA000' }]} 
+
+            <TouchableOpacity
+              style={[styles.retryButton, { marginTop: 10, backgroundColor: '#FFA000' }]}
               onPress={() => {
                 console.log('Usando ubicación por defecto...');
                 setUserLocation({
@@ -915,22 +1091,28 @@ const MapScreen = () => {
                 <Text style={styles.errorText}>{errorLocationMsg}</Text>
               </View>
             )}
-            <Map
-              region={region}
-              style={styles.map}
-              showsUserLocation={true}
-              onRegionChangeComplete={(newRegion) => {
-                console.log('Región del mapa cambiada:', newRegion);
-              }}
-              onMapReady={() => {
-                console.log('Mapa listo');
-              }}
-            />
+            <GlobeView style={styles.map} />
           </View>
         )}
       </View>
 
       <LoadingModal visible={isLoading} currentStep={currentStep} />
+
+      <FriendSelectionModal
+        visible={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          // Si el usuario no quiere compartir, navegar directamente a misiones
+          if (generatedJourneyId) {
+            navigation.navigate('Missions', {
+              journeyId: generatedJourneyId,
+              challenges: []
+            });
+            setGeneratedJourneyId(null);
+          }
+        }}
+        onSelect={handleShareJourney}
+      />
     </View>
   );
 };

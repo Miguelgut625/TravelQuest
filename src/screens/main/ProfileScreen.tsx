@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Aler
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState } from '../../features/authSlice';
-import { supabase } from '../../services/supabase';
+import { supabase, ensureValidSession } from '../../services/supabase';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -58,83 +58,163 @@ const ProfileScreen = () => {
   useEffect(() => {
     fetchUserStats();
     
-    // Suscripción a cambios en journeys del usuario
-    const journeysSubscription = supabase
-      .channel('journeys-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'journeys',
-          filter: `userId=eq.${user?.id}`
-        },
-        () => fetchUserStats()
-      )
-      .subscribe();
-      
-    // Suscripción a cambios en las misiones del usuario
-    const missionsSubscription = supabase
-      .channel('journeys-missions-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'journeys_missions'
-        },
-        () => fetchUserStats()
-      )
-      .subscribe();
-      
-    // Suscripción a cambios en el usuario (nivel, xp)
-    const userStatsSubscription = supabase
-      .channel('user-stats-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'users',
-          filter: `id=eq.${user?.id}`
-        },
-        () => fetchUserStats()
-      )
-      .subscribe();
-      
-    // Suscripción a cambios en solicitudes de amistad
-    const friendshipSubscription = supabase
-      .channel('friendship-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'friendship_invitations',
-          filter: `receiverId=eq.${user?.id}`
-        },
-        () => {
-          if (isRequestsVisible) {
-            fetchPendingRequests().then(requests => setFriendshipRequests(requests));
-          }
+    // Verificar sesión válida para las suscripciones
+    const setupRealtime = async () => {
+      try {
+        const { valid, session, error } = await ensureValidSession();
+        if (!valid) {
+          console.error('Sesión inválida para suscripciones en tiempo real:', error);
+          Alert.alert('Error de sesión', 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+          dispatch(logout());
+          return;
         }
-      )
-      .subscribe();
-    
-    // Limpieza de suscripciones
-    return () => {
-      journeysSubscription.unsubscribe();
-      missionsSubscription.unsubscribe();
-      userStatsSubscription.unsubscribe();
-      friendshipSubscription.unsubscribe();
+        
+        // Suscripción a cambios en journeys del usuario
+        const journeysSubscription = supabase
+          .channel('journeys-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'journeys',
+              filter: `userId=eq.${user?.id}`
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en journeys:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en las misiones del usuario
+        const missionsSubscription = supabase
+          .channel('journeys-missions-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'journeys_missions'
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en misiones:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en challenges
+        const challengesSubscription = supabase
+          .channel('challenges-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'challenges'
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en challenges:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en el usuario (nivel, xp)
+        const userStatsSubscription = supabase
+          .channel('user-stats-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'users',
+              filter: `id=eq.${user?.id}`
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en stats de usuario:', payload);
+              fetchUserStats();
+            }
+          )
+          .subscribe();
+          
+        // Suscripción a cambios en solicitudes de amistad
+        const friendshipSubscription = supabase
+          .channel('friendship-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'friendship_invitations',
+              filter: `receiverId=eq.${user?.id}`
+            },
+            // @ts-ignore - Ignorar error de tipado para el payload
+            (payload) => {
+              console.log('Cambio detectado en solicitudes de amistad:', payload);
+              if (isRequestsVisible) {
+                fetchPendingRequests().then(requests => setFriendshipRequests(requests));
+              }
+            }
+          )
+          .subscribe();
+        
+        // Limpieza de suscripciones
+        return () => {
+          console.log('Limpiando suscripciones de tiempo real');
+          journeysSubscription.unsubscribe();
+          missionsSubscription.unsubscribe();
+          challengesSubscription.unsubscribe();
+          userStatsSubscription.unsubscribe();
+          friendshipSubscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Error configurando suscripciones en tiempo real:', error);
+      }
     };
-  }, [user?.id, isRequestsVisible]);
+    
+    const cleanupFn = setupRealtime();
+    
+    return () => {
+      if (cleanupFn && typeof cleanupFn.then === 'function') {
+        cleanupFn.then(cleanup => {
+          if (cleanup && typeof cleanup === 'function') {
+            cleanup();
+          }
+        });
+      }
+    };
+  }, [user?.id, isRequestsVisible, dispatch]);
 
   const fetchUserStats = async () => {
     if (!user?.id) return;
 
     try {
+      // Verificar sesión válida antes de obtener estadísticas
+      const { valid, error: sessionError } = await ensureValidSession();
+      if (!valid) {
+        console.error('Sesión inválida para obtener estadísticas:', sessionError);
+        Alert.alert('Error de sesión', 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        dispatch(logout());
+        return;
+      }
+      
       setLoadingStats(true);
+      console.log('Obteniendo estadísticas actualizadas...');
+
+      // Obtener los puntos del usuario
+      const { data: userPointsData, error: userPointsError } = await supabase
+        .from('users')
+        .select('points')
+        .eq('id', user.id)
+        .single();
+
+      if (userPointsError) throw userPointsError;
 
       // Obtener los journeys del usuario con sus misiones completadas
       const { data: journeys, error: journeysError } = await supabase
@@ -142,46 +222,64 @@ const ProfileScreen = () => {
         .select(`id, cityId, journeys_missions!inner (completed, challenges!inner (points))`)
         .eq('userId', user.id);
 
-      if (journeysError) throw journeysError;
+      if (journeysError) {
+        console.error('Error al obtener journeys:', journeysError);
+        throw journeysError;
+      }
+
+      console.log('Journeys obtenidos:', journeys);
 
       // Calcular estadísticas
       const stats = {
-        totalPoints: 0,
+        totalPoints: userPointsData?.points || 0,
         completedMissions: 0,
-        visitedCities: 0
+        visitedCities: new Set<string>()
       };
 
-      (journeys as Journey[])?.forEach((journey: Journey) => {
-        if (journey.cityId) {
-          stats.visitedCities++;
-        }
+      if (journeys && journeys.length > 0) {
+        (journeys as Journey[]).forEach((journey: Journey) => {
+          // Añadir la ciudad al Set de ciudades visitadas
+          if (journey.cityId) {
+            stats.visitedCities.add(journey.cityId);
+          }
 
-        journey.journeys_missions.forEach((mission: JourneyMission) => {
-          if (mission.completed) {
-            stats.completedMissions++;
-            stats.totalPoints += mission.challenges.points;
+          if (journey.journeys_missions && journey.journeys_missions.length > 0) {
+            journey.journeys_missions.forEach((mission: JourneyMission) => {
+              if (mission.completed) {
+                stats.completedMissions++;
+              }
+            });
           }
         });
-      });
+      }
+
+      console.log('Estadísticas calculadas:', stats);
 
       // Obtener el nivel, xp y xp_next del usuario
-      const userStats = await supabase
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('level, xp, xp_next')
         .eq('id', user.id)
         .single();
 
-      if (userStats.error) throw userStats.error;
+      if (userError) {
+        console.error('Error al obtener datos del usuario:', userError);
+        throw userError;
+      }
 
-      setLevel(userStats.data.level);
-      setXp(userStats.data.xp);
-      setXpNext(userStats.data.xp_next);
+      console.log('Datos de usuario obtenidos:', userData);
+
+      setLevel(userData.level || 0);
+      setXp(userData.xp || 0);
+      setXpNext(userData.xp_next || 100);
 
       setStats({
         totalPoints: stats.totalPoints,
         completedMissions: stats.completedMissions,
-        visitedCities: stats.visitedCities
+        visitedCities: stats.visitedCities.size
       });
+
+      console.log('Estadísticas actualizadas correctamente');
 
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
@@ -297,7 +395,7 @@ const ProfileScreen = () => {
         setTimeout(() => {
           setIsChangePasswordVisible(false);
           setMessage({ type: '', text: '' });
-        }, 2000);
+        }, 2000)
 
         return;
       }
@@ -414,7 +512,10 @@ const ProfileScreen = () => {
         .eq('username', username)
         .single();
 
-      if (userError) throw userError;
+      if (userError) {
+        alert('No se encontró el usuario');
+        return;
+      }
 
       const receiverId = receiver.id;
 
@@ -463,13 +564,13 @@ const ProfileScreen = () => {
   const fetchPendingRequests = async () => {
     try {
       const { data, error } = await supabase
-      .from('friendship_invitations')
-      .select(`
+        .from('friendship_invitations')
+        .select(`
         id, senderId, created_at, receiverId, status,
         users:senderId (username)
       `)
-      .eq('receiverId', user?.id)
-      .eq('status', 'Pending');
+        .eq('receiverId', user?.id)
+        .eq('status', 'Pending');
 
       if (error) throw error;
       console.log('Solicitudes pendientes obtenidas:', user?.id);
@@ -538,6 +639,26 @@ const ProfileScreen = () => {
         <Text style={styles.xpTitle}>XP: {xp} / {xpNext}</Text>
         <View style={styles.progressBar}>
           <View style={{ width: `${(xp / xpNext) * 100}%`, backgroundColor: '#4CAF50', height: '100%' }} />
+        </View>
+      </View>
+
+      {/* Sección para Insignias */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Logros</Text>
+        <View style={styles.badgesContainer}>
+          <TouchableOpacity
+            style={styles.badgesButton}
+            onPress={() => {
+              // @ts-ignore
+              navigation.navigate('BadgesScreen');
+            }}
+          >
+            <View style={styles.badgesButtonContent}>
+              <Ionicons name="medal" size={24} color="white" />
+              <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
+              <Ionicons name="chevron-forward" size={20} color="white" />
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1027,6 +1148,37 @@ const styles = StyleSheet.create({
   xpTitle: {
     fontSize: 16,
     color: '#666',
+  },
+  badgesContainer: {
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  badgesButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  badgesButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badgesButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 10,
+  },
+  badgesDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

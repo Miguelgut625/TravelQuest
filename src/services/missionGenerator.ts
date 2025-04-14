@@ -57,7 +57,7 @@ const getOrCreateUser = async (userId: string) => {
 };
 
 // Función para obtener o crear una ciudad
-const getOrCreateCity = async (cityName: string) => {
+const getOrCreateCity = async (cityName: string, userId?: string) => {
   try {
     // Primero intentamos encontrar la ciudad
     const { data: existingCity, error: searchError } = await supabase
@@ -82,6 +82,30 @@ const getOrCreateCity = async (cityName: string) => {
       .single();
 
     if (insertError) throw insertError;
+
+    // Si tenemos el userId y hemos creado una nueva ciudad, otorgar el logro
+    if (userId) {
+      try {
+        // Importar directamente en lugar de usar require para mejor manejo de tipos
+        const badgeService = await import('./badgeService');
+        console.log('Otorgando logro de nueva ciudad al usuario:', userId);
+        const result = await badgeService.checkNewCityBadgeAndAwardPoints(userId);
+        
+        if (result.alreadyHasBadge) {
+          console.log(`Usuario ${userId} ya tenía el logro de nueva ciudad, se le otorgaron ${result.pointsAwarded} puntos extra`);
+          
+          // La notificación ahora se crea en la función checkNewCityBadgeAndAwardPoints
+          // Aunque está comentada porque notifications aún no existe en esta rama
+        } else if (result.badgeName) {
+          console.log(`Usuario ${userId} obtuvo el logro de nueva ciudad: ${result.badgeName}`);
+          // La notificación del nuevo logro ya se crea en checkNewCityBadgeAndAwardPoints
+          // Aunque está comentada porque notifications aún no existe en esta rama
+        }
+      } catch (badgeError) {
+        console.error('Error al otorgar insignia de nueva ciudad:', badgeError);
+        // No interrumpimos el flujo principal si falla la asignación de la insignia
+      }
+    }
 
     return newCity.id;
   } catch (error) {
@@ -192,7 +216,7 @@ export const generateMission = async (
     await getOrCreateUser(userId);
 
     // Obtener o crear la ciudad
-    const cityId = await getOrCreateCity(cityName);
+    const cityId = await getOrCreateCity(cityName, userId);
     console.log('CityId obtenido/creado:', cityId);
 
     // Crear un nuevo journey

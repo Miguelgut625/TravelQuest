@@ -17,6 +17,71 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Agregar un listener para errores de autenticación
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth state changed:', event);
+  
+  // Si el token expiró o hubo un error, intentamos refrescar la sesión
+  if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+    console.log('Token refreshed successfully');
+  } else if (event === 'SIGNED_OUT') {
+    console.log('User signed out');
+  }
+});
+
+// Función para refrescar manualmente la sesión
+export const refreshSession = async () => {
+  try {
+    console.log('Intentando refrescar la sesión...');
+    const { data, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+      console.error('Error refreshing session:', error);
+      return { success: false, error };
+    }
+    
+    console.log('Sesión refrescada exitosamente');
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error inesperado al refrescar sesión:', error);
+    return { success: false, error };
+  }
+};
+
+// Función para verificar y refrescar la sesión antes de operaciones críticas
+export const ensureValidSession = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      console.log('No hay sesión activa');
+      return { valid: false };
+    }
+    
+    // Verificar si el token expira en menos de 5 minutos
+    const expiresAt = new Date(session.expires_at || 0);
+    const now = new Date();
+    const fiveMinutes = 5 * 60 * 1000;
+    
+    if (expiresAt.getTime() - now.getTime() < fiveMinutes) {
+      console.log('Token cerca de expirar, refrescando...');
+      const { success, data, error } = await refreshSession();
+      
+      if (!success) {
+        console.error('No se pudo refrescar el token:', error);
+        return { valid: false, error };
+      }
+      
+      return { valid: true, session: data.session };
+    }
+    
+    return { valid: true, session };
+  } catch (error) {
+    console.error('Error al verificar la sesión:', error);
+    return { valid: false, error };
+  }
+};
+
 // Función para probar la autenticación
 export const testAuth = async (email: string, password: string) => {
   try {
