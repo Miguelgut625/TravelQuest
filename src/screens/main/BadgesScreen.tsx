@@ -69,12 +69,6 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-{/*         <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#4CAF50" />
-        </TouchableOpacity> */}
         <Text style={styles.title}>Mis Insignias</Text>
       </View>
       

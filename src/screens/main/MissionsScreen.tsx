@@ -466,7 +466,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       if (userError) throw userError;
 
       if (userData) {
-        const xpToAdd = Math.floor(foundMissionPoints / 2);
+        const xpToAdd = foundMissionPoints ;
 
         // Calcular nueva XP temporal
         let tempXp = userData.xp + xpToAdd;

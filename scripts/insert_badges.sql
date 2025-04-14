@@ -54,4 +54,20 @@ WHERE name = 'Descubridor' AND category = 'special';
 -- Crear el logro específico para completar la primera misión con el ID requerido
 INSERT INTO public.badges (id, name, description, icon, category, threshold)
 VALUES 
-('dc8272f5-d661-402f-a9a3-46bf86289bd3', 'Primera Aventura', 'Has completado tu primera misión. ¡El inicio de una gran aventura!', 'https://example.com/icons/first_adventure.png', 'missions', 1); 
+('dc8272f5-d661-402f-a9a3-46bf86289bd3', 'Primera Aventura', 'Has completado tu primera misión. ¡El inicio de una gran aventura!', 'https://example.com/icons/first_adventure.png', 'missions', 1);
+
+-- Crear el logro de descubridor de nuevas ciudades con el ID específico requerido
+INSERT INTO public.badges (id, name, description, icon, category, threshold)
+VALUES 
+('e733a802-553b-4a69-ae09-9b772dd7f8f1', 'Explorador de Nuevas Ciudades', 'Has encontrado una ciudad que no estaba en nuestra base de datos. ¡Gracias por contribuir!', 'https://example.com/icons/city_explorer.png', 'special', 1)
+ON CONFLICT (id) 
+DO UPDATE SET 
+  name = 'Explorador de Nuevas Ciudades',
+  description = 'Has encontrado una ciudad que no estaba en nuestra base de datos. ¡Gracias por contribuir!',
+  icon = 'https://example.com/icons/city_explorer.png',
+  category = 'special',
+  threshold = 1;
+
+-- Puedes ejecutar el siguiente comando para asignar manualmente el logro a un usuario específico (reemplaza 'ID_DE_TU_USUARIO')
+-- INSERT INTO public.user_badges (userId, badgeId, unlocked_at)
+-- VALUES ('ID_DE_TU_USUARIO', 'e733a802-553b-4a69-ae09-9b772dd7f8f1', now()); 

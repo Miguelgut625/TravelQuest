@@ -60,6 +60,27 @@ export const getUserBadges = async (userId: string): Promise<UserBadge[]> => {
 // Desbloquear una insignia para un usuario
 export const unlockBadge = async (userId: string, badgeId: string): Promise<boolean> => {
   try {
+    console.log(`Intentando desbloquear insignia: ID=${badgeId} para usuario: ID=${userId}`);
+    
+    // Verificar si existe la insignia en la tabla badges
+    const { data: badgeExists, error: badgeError } = await supabase
+      .from('badges')
+      .select('id, name')
+      .eq('id', badgeId)
+      .single();
+      
+    if (badgeError) {
+      console.error(`Error al verificar si la insignia ${badgeId} existe:`, badgeError);
+      return false;
+    }
+    
+    if (!badgeExists) {
+      console.error(`La insignia con ID ${badgeId} no existe en la tabla badges`);
+      return false;
+    }
+    
+    console.log(`Insignia encontrada: ${badgeExists.name} (${badgeId})`);
+    
     // Verificar si el usuario ya tiene esta insignia
     const { data: existingBadge, error: checkError } = await supabase
       .from('user_badges')
@@ -70,14 +91,20 @@ export const unlockBadge = async (userId: string, badgeId: string): Promise<bool
 
     if (checkError && checkError.code !== 'PGRST116') {
       // PGRST116 es el código de "no se encontró registro", que es lo que esperamos
+      console.error(`Error al verificar si el usuario ya tiene la insignia:`, checkError);
       throw checkError;
     }
 
     // Si ya tiene la insignia, no hacer nada
-    if (existingBadge) return true;
+    if (existingBadge) {
+      console.log(`El usuario ${userId} ya tiene la insignia ${badgeId}`);
+      return true;
+    }
 
+    console.log(`Intentando insertar nueva insignia para usuario ${userId}: ${badgeId}`);
+    
     // Añadir la insignia al usuario
-    const { error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await supabase
       .from('user_badges')
       .insert([
         {
@@ -85,9 +112,15 @@ export const unlockBadge = async (userId: string, badgeId: string): Promise<bool
           badgeId,
           unlocked_at: new Date().toISOString()
         }
-      ]);
+      ])
+      .select();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error(`Error al insertar insignia en user_badges:`, insertError);
+      throw insertError;
+    }
+    
+    console.log(`Insignia otorgada exitosamente. Datos insertados:`, insertData);
     return true;
   } catch (error) {
     console.error('Error al desbloquear insignia:', error);
@@ -314,7 +347,7 @@ const specificBadgesMap: Record<string, string[]> = {
     // Aquí se pueden añadir más IDs de insignias relacionadas
   ],
   'visitNewCity': [
-    '49a07ba9-f0c6-40f1-ab8e-f4f7d56c3f2e', // Insignia por visitar una nueva ciudad
+    'e733a802-553b-4a69-ae09-9b772dd7f8f1', // Insignia por visitar una nueva ciudad
   ],
   'uploadPhotos': [
     // ID para la insignia de Fotógrafo Viajero - implementar cuando se tenga el ID
@@ -385,7 +418,7 @@ export const checkNewCityBadgeAndAwardPoints = async (userId: string): Promise<{
     if (!userId) return { alreadyHasBadge: false, pointsAwarded: 0 };
     
     // ID de la insignia de nueva ciudad
-    const newCityBadgeId = '49a07ba9-f0c6-40f1-ab8e-f4f7d56c3f2e';
+    const newCityBadgeId = 'e733a802-553b-4a69-ae09-9b772dd7f8f1';
     
     // Obtener el nombre de la insignia
     const { data: badgeData } = await supabase
@@ -437,12 +470,62 @@ export const checkNewCityBadgeAndAwardPoints = async (userId: string): Promise<{
         return { alreadyHasBadge: true, pointsAwarded: 0, badgeName };
       }
       
+      // Crear notificación para los puntos extra
+      /* 
+      try {
+        await supabase
+          .from('notifications')
+          .insert([{
+            userId: userId,
+            title: '¡500 puntos extra!',
+            message: `Has recibido 500 puntos extra por descubrir una nueva ciudad teniendo ya el logro de "${badgeName}".`,
+            type: 'points',
+            read: false,
+            created_at: new Date().toISOString()
+          }]);
+      } catch (notifyError) {
+        console.error('Error al crear notificación de puntos:', notifyError);
+      }
+      */
+      
       return { alreadyHasBadge: true, pointsAwarded: 500, badgeName };
     }
     
-    // Si el usuario no tiene la insignia, solo intentamos otorgarla
-    await awardSpecificBadges(userId, 'visitNewCity');
-    return { alreadyHasBadge: false, pointsAwarded: 0, badgeName };
+    // Si el usuario no tiene la insignia, otorgarla directamente
+    try {
+      console.log(`Otorgando insignia de Descubridor (ID: ${newCityBadgeId}) al usuario ${userId}`);
+      const unlocked = await unlockBadge(userId, newCityBadgeId);
+      
+      if (unlocked) {
+        console.log(`Insignia otorgada correctamente: ${badgeName}`);
+        
+        // Crear notificación para el usuario
+        /*
+        try {
+          await supabase
+            .from('notifications')
+            .insert([{
+              userId: userId,
+              title: '¡Nuevo logro desbloqueado!',
+              message: `Has desbloqueado el logro "${badgeName}" por descubrir una nueva ciudad.`,
+              type: 'achievement',
+              read: false,
+              created_at: new Date().toISOString()
+            }]);
+        } catch (notifyError) {
+          console.error('Error al crear notificación:', notifyError);
+        }
+        */
+        
+        return { alreadyHasBadge: false, pointsAwarded: 0, badgeName };
+      } else {
+        console.error('Error al desbloquear insignia de nueva ciudad');
+        return { alreadyHasBadge: false, pointsAwarded: 0 };
+      }
+    } catch (unlockError) {
+      console.error('Error en proceso de desbloqueo de insignia:', unlockError);
+      return { alreadyHasBadge: false, pointsAwarded: 0 };
+    }
   } catch (error) {
     console.error('Error en checkNewCityBadgeAndAwardPoints:', error);
     return { alreadyHasBadge: false, pointsAwarded: 0 };
