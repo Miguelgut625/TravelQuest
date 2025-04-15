@@ -14,15 +14,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
-import { getRecentConversations } from '../../services/messageService';
+import { getAllConversations } from '../../services/messageService';
 import { supabase } from '../../services/supabase';
 
 interface Conversation {
-  conversation_user_id: string;
-  username: string;
+  conversation_id: string;
+  is_group: boolean;
+  name: string;
   last_message: string;
   created_at: string;
   unread_count: number;
+  last_message_sender?: string;
 }
 
 const ConversationsScreen = () => {
@@ -82,7 +84,8 @@ const ConversationsScreen = () => {
     }
 
     try {
-      const conversationsData = await getRecentConversations(user.id);
+      // Usamos la nueva función que combina chats personales y grupales
+      const conversationsData = await getAllConversations(user.id);
       setConversations(conversationsData);
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -103,9 +106,21 @@ const ConversationsScreen = () => {
     fetchConversations();
   };
 
-  const openChat = (friendId: string, friendName: string) => {
-    // @ts-ignore
-    navigation.navigate('Chat', { friendId, friendName });
+  const openChat = (conversation: Conversation) => {
+    if (conversation.is_group) {
+      // Navegar al chat grupal
+      navigation.navigate('Chat', { 
+        groupId: conversation.conversation_id, 
+        groupName: conversation.name,
+        isGroupChat: true
+      });
+    } else {
+      // Navegar al chat individual
+      navigation.navigate('Chat', { 
+        friendId: conversation.conversation_id, 
+        friendName: conversation.name 
+      });
+    }
   };
 
   if (loading) {
@@ -126,25 +141,37 @@ const ConversationsScreen = () => {
       ? messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : messageDate.toLocaleDateString();
 
-    // Avatar placeholder seguro cuando no hay username
-    const avatarLetter = item.username && item.username.length > 0 
-      ? item.username.charAt(0).toUpperCase() 
+    // Avatar placeholder seguro cuando no hay nombre
+    const avatarLetter = item.name && item.name.length > 0 
+      ? item.name.charAt(0).toUpperCase() 
       : '?';
+
+    // Formatear mensaje con nombre en chats grupales
+    const formattedMessage = item.is_group && item.last_message_sender && item.last_message
+      ? `${item.last_message_sender}: ${item.last_message}`
+      : item.last_message || 'No hay mensajes';
 
     return (
       <TouchableOpacity
         style={styles.conversationItem}
-        onPress={() => openChat(item.conversation_user_id, item.username || 'Usuario')}
+        onPress={() => openChat(item)}
       >
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {avatarLetter}
-          </Text>
+        <View style={[
+          styles.avatar,
+          item.is_group ? styles.groupAvatar : styles.userAvatar
+        ]}>
+          {item.is_group ? (
+            <Ionicons name="people" size={24} color="white" />
+          ) : (
+            <Text style={styles.avatarText}>
+              {avatarLetter}
+            </Text>
+          )}
         </View>
         
         <View style={styles.messageInfo}>
           <View style={styles.headerRow}>
-            <Text style={styles.username}>{item.username || 'Usuario'}</Text>
+            <Text style={styles.username}>{item.name || 'Usuario'}</Text>
             <Text style={styles.timestamp}>{formattedDate}</Text>
           </View>
           
@@ -157,7 +184,7 @@ const ConversationsScreen = () => {
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              {item.last_message || 'No hay mensajes'}
+              {formattedMessage}
             </Text>
             
             {item.unread_count > 0 && (
@@ -184,14 +211,14 @@ const ConversationsScreen = () => {
             No tienes conversaciones aún.
           </Text>
           <Text style={styles.emptySubtext}>
-            Ve a la pantalla de amigos para iniciar un chat.
+            Ve a la pantalla de amigos o grupos para iniciar un chat.
           </Text>
         </View>
       ) : (
         <FlatList
           data={conversations}
           renderItem={renderConversationItem}
-          keyExtractor={(item) => item.conversation_user_id}
+          keyExtractor={(item) => `${item.is_group ? 'group' : 'direct'}-${item.conversation_id}`}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -252,10 +279,15 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
+  },
+  userAvatar: {
+    backgroundColor: '#4CAF50',
+  },
+  groupAvatar: {
+    backgroundColor: '#005F9E',
   },
   avatarText: {
     color: 'white',

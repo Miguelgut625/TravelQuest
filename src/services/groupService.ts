@@ -440,4 +440,70 @@ export const makeGroupAdmin = async (groupId: string, userId: string): Promise<b
     console.error('Error al hacer administrador:', error);
     return false;
   }
+};
+
+/**
+ * Elimina un grupo
+ * @param groupId El ID del grupo a eliminar
+ * @param userId El ID del usuario que intenta eliminar el grupo
+ * @returns true si la eliminación fue exitosa, false en caso contrario
+ */
+export const deleteGroup = async (groupId: string, userId: string): Promise<boolean> => {
+  try {
+    // Verificar si el usuario es administrador del grupo
+    const { data: memberData, error: memberError } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .single();
+
+    if (memberError || !memberData || memberData.role !== 'admin') {
+      console.error('Error: El usuario no es administrador del grupo o no existe');
+      return false;
+    }
+
+    // Eliminar primero los miembros del grupo
+    const { error: membersError } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId);
+
+    if (membersError) {
+      console.error('Error al eliminar miembros del grupo:', membersError);
+      return false;
+    }
+
+    // Eliminar los mensajes del grupo si existe una tabla para ellos
+    try {
+      const { error: messagesError } = await supabase
+        .from('group_messages')
+        .delete()
+        .eq('group_id', groupId);
+
+      if (messagesError) {
+        console.error('Error al eliminar mensajes del grupo:', messagesError);
+        // Continuamos con la eliminación del grupo aunque falle la eliminación de mensajes
+      }
+    } catch (error) {
+      console.error('Error al intentar eliminar mensajes:', error);
+      // Continuamos con la eliminación del grupo aunque falle la eliminación de mensajes
+    }
+
+    // Finalmente eliminar el grupo
+    const { error } = await supabase
+      .from('groups')
+      .delete()
+      .eq('id', groupId);
+
+    if (error) {
+      console.error('Error al eliminar grupo:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error al eliminar grupo:', error);
+    return false;
+  }
 }; 

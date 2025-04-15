@@ -29,7 +29,6 @@ export async function registerForPushNotificationsAsync() {
     }
 
     if (!Device.isDevice) {
-      console.log('Las notificaciones push no funcionan en emuladores/simuladores');
       return null;
     }
     
@@ -42,34 +41,24 @@ export async function registerForPushNotificationsAsync() {
     }
     
     if (finalStatus !== 'granted') {
-      console.log('No se pudo obtener permiso para las notificaciones push');
       return null;
     }
-    
-    // Información de depuración
-    console.log('------- DEPURACIÓN NOTIFICACIONES -------');
-    console.log('Plataforma:', Platform.OS);
-    console.log('¿Es desarrollo?', __DEV__ ? 'Sí' : 'No');
     
     // Intentar obtener un token de notificación usando el método clásico
     // sin especificar experienceId o projectId
     try {
-      console.log('Intentando obtener token usando método clásico...');
       // Opción 1: Sin parámetros (enfoque más simple)
       const tokenResponse = await Notifications.getExpoPushTokenAsync();
       token = tokenResponse.data;
-      console.log('Token obtenido correctamente (método clásico):', token);
       return token;
     } catch (error) {
-      console.warn('Error obteniendo token con método clásico:', error);
+      console.error('Error obteniendo token con método clásico:', error);
       // Continuar con las alternativas...
     }
     
     // Si el método clásico falla, probar con un enfoque más compatible
     // con versiones anteriores de Expo para desarrollo local
     try {
-      console.log('Intentando método alternativo para desarrollo...');
-      
       // Esta solución solo para desarrollo local o depuración
       // Usar una experienceId basada en el usuario actual
       const devOptions = {
@@ -78,28 +67,24 @@ export async function registerForPushNotificationsAsync() {
       
       const tokenResponseDev = await Notifications.getExpoPushTokenAsync(devOptions);
       token = tokenResponseDev.data;
-      console.log('Token obtenido correctamente (método desarrollo):', token);
       return token;
     } catch (devError) {
-      console.warn('Error obteniendo token (método desarrollo):', devError);
+      console.error('Error obteniendo token (método desarrollo):', devError);
       
       // Último intento: usar directamente el projectId, pero solo si estamos en producción
       if (!__DEV__) {
         try {
-          console.log('Último intento: usando projectId directamente...');
           const projectId = Constants.expoConfig?.extra?.eas?.projectId;
           
           if (projectId) {
             // Intentar con el projectId limpiando espacios y asegurando formato
             const cleanProjectId = projectId.trim();
-            console.log('Usando projectId limpio:', cleanProjectId);
             
             const tokenResponseProd = await Notifications.getExpoPushTokenAsync({
               projectId: cleanProjectId
             });
             
             token = tokenResponseProd.data;
-            console.log('Token obtenido correctamente (método producción):', token);
             return token;
           }
         } catch (prodError) {
@@ -110,8 +95,6 @@ export async function registerForPushNotificationsAsync() {
       
       // Si todos los métodos fallan
       if (__DEV__) {
-        console.log('Todos los métodos fallaron. En desarrollo, esto puede ser normal.');
-        console.log('Las notificaciones push probablemente no funcionarán hasta que configures correctamente el entorno.');
         return null;
       } else {
         throw new Error('No se pudo obtener token de notificaciones por ningún método');
@@ -122,7 +105,6 @@ export async function registerForPushNotificationsAsync() {
     
     // En desarrollo, no bloquear la aplicación por este error
     if (__DEV__) {
-      console.log('Error en desarrollo - continuando sin notificaciones push');
       return null;
     }
     
@@ -133,12 +115,7 @@ export async function registerForPushNotificationsAsync() {
 // Función para guardar el token de notificaciones push del usuario
 export async function saveUserPushToken(userId: string, pushToken: string) {
   try {
-    console.log('Guardando token de notificaciones para usuario:', userId);
-    console.log('Token a guardar:', pushToken);
-    
     // Intentar obtener las columnas de la tabla para confirmar su estructura
-    console.log('Verificando estructura de la tabla user_push_tokens...');
-    
     const { data: columnsData, error: columnsError } = await supabase
       .from('information_schema.columns')
       .select('column_name')
@@ -150,7 +127,6 @@ export async function saveUserPushToken(userId: string, pushToken: string) {
       
       // Si tenemos un error con information_schema, intentar una solución alternativa
       // simplemente intentar guardar el token directamente con la columna 'token'
-      console.log('Intentando usar estructura predeterminada (columna token)...');
       
       // Primero comprobar si ya existe el token (lo cual es válido)
       try {
@@ -162,11 +138,9 @@ export async function saveUserPushToken(userId: string, pushToken: string) {
           .single();
           
         if (!checkError && existingToken) {
-          console.log('El token ya existe para este usuario, no hay necesidad de actualizar.');
           return true;
         }
       } catch (checkTokenError) {
-        console.log('Error verificando token existente:', checkTokenError);
         // Continuamos con la inserción
       }
 
@@ -178,8 +152,6 @@ export async function saveUserPushToken(userId: string, pushToken: string) {
         device_id: `${Platform.OS}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
       };
       
-      console.log('Datos a insertar (modo alternativo):', tokenData);
-      
       // Realizar la operación upsert usando la estructura conocida
       const { error } = await supabase
         .from('user_push_tokens')
@@ -189,7 +161,6 @@ export async function saveUserPushToken(userId: string, pushToken: string) {
         // Si el error es por clave duplicada, esto es técnicamente un éxito
         // ya que significa que el token ya está registrado
         if (error.code === '23505' && error.message.includes('user_push_tokens_user_id_token_key')) {
-          console.log('El token ya existe para este usuario (detectado por error de duplicado).');
           return true;
         }
         
@@ -197,13 +168,11 @@ export async function saveUserPushToken(userId: string, pushToken: string) {
         return false;
       }
       
-      console.log('Token guardado correctamente en modo alternativo');
       return true;
     }
     
     // Obtener los nombres de las columnas como un array
     const columnNames = columnsData?.map(col => col.column_name.toLowerCase()) || [];
-    console.log('Columnas disponibles:', columnNames);
     
     // Construir el objeto de datos basado en las columnas disponibles
     const tokenData: Record<string, any> = {
@@ -237,28 +206,30 @@ export async function saveUserPushToken(userId: string, pushToken: string) {
         const deviceId = `${Platform.OS}_${Device.modelName || 'unknown'}_${deviceType}_${Date.now()}`;
         tokenData.device_id = deviceId;
       } catch (deviceIdError) {
-        console.warn('No se pudo obtener información del dispositivo:', deviceIdError);
         // Generar un ID aleatorio como fallback
         tokenData.device_id = `${Platform.OS}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
       }
     }
-    
-    console.log('Datos a insertar:', tokenData);
     
     // Realizar la operación upsert
     const { error } = await supabase
       .from('user_push_tokens')
       .upsert(tokenData);
       
+    // Si hay un error, el token podría existir
     if (error) {
+      if (error.code === '23505') {
+        // Error de duplicado, lo cual es técnicamente correcto ya que el token ya existe
+        return true;
+      }
+      
       console.error('Error al guardar token de notificaciones:', error);
       return false;
     }
     
-    console.log('Token guardado correctamente en la base de datos');
     return true;
   } catch (error) {
-    console.error('Error inesperado al guardar token:', error);
+    console.error('Error general al guardar token:', error);
     return false;
   }
 }
@@ -297,144 +268,177 @@ export async function scheduleMissionExpirationReminder(
     
     // Si ya existe una notificación programada para esta misión, no crear otra
     if (existingNotification) {
-      console.log(`Ya existe una notificación programada para la misión ${missionId}. No se creará otra.`);
       return true;
     }
     
-    // Calcular cuándo enviar la notificación (1 día antes de que expire)
-    const reminderDate = new Date(expirationDate);
-    reminderDate.setDate(reminderDate.getDate() - 1);
-    
     const now = new Date();
     
-    // Si la fecha de recordatorio ya pasó o está muy cerca (menos de 1 hora)
-    if (reminderDate <= now) {
-      console.log(`La fecha de recordatorio para la misión ${missionId} ya pasó o está muy próxima`);
-      
-      // Si estamos a menos de 24 horas de la expiración pero aún no ha expirado, enviar notificación inmediata
-      if (expirationDate > now) {
-        // Calcular horas restantes
-        const hoursLeft = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60));
-        
-        // Programar notificación inmediata
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "¡Misión a punto de expirar!",
-            body: `Tu misión "${missionTitle}" expirará en ${hoursLeft} horas. ¡Complétala pronto!`,
-            data: { missionId, type: 'mission_expiration_soon' },
-            sound: 'default',
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-          },
-          trigger: null // Mostrar inmediatamente
-        });
-        
-        console.log(`Notificación inmediata enviada para misión ${missionId} que expira en ${hoursLeft} horas`);
-        return true;
-      }
-      
-      return false;
-    }
-
-    console.log(`Recordatorio para misión ${missionId} programado para: ${reminderDate.toISOString()}`);
+    // Calcular la diferencia en horas entre la fecha actual y la fecha de expiración
+    const hoursToExpiration = (expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     
-    // Primero verificar si la tabla scheduled_notifications existe
-    try {
-      const { data: tableExists, error: tableError } = await supabase
-        .from('information_schema.tables')
-        .select('*')
-        .eq('table_schema', 'public')
-        .eq('table_name', 'scheduled_notifications')
-        .single();
-
-      // Si hay error o la tabla no existe, ignorar el guardado en base de datos
-      if (tableError || !tableExists) {
-        console.log('La tabla scheduled_notifications no existe o no es accesible. Solo se programará la notificación local.');
-        
-        // Programar la notificación local aunque no podamos guardar en BD
-        const notificationId = await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "¡Misión por expirar!",
-            body: `Tu misión "${missionTitle}" expirará mañana. ¡Complétala pronto!`,
-            data: { missionId, type: 'mission_expiration' },
-            sound: 'default',
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-          },
-          trigger: null // Notificación inmediata en vez de programada debido a problemas con los tipos
-        });
-        
-        console.log(`Notificación local programada con ID: ${notificationId}`);
-        return true;
-      }
+    // Solo enviar notificación si la misión caduca en menos de 24 horas (1 día)
+    if (hoursToExpiration <= 24 && hoursToExpiration > 0) {
+      // Calcular horas restantes
+      const hoursLeft = Math.ceil(hoursToExpiration);
       
-      // Verificar si ya existe un recordatorio en la base de datos para esta misión
-      const { data: existingReminder, error: checkError } = await supabase
-        .from('scheduled_notifications')
-        .select('id')
-        .eq('mission_id', missionId)
-        .eq('status', 'pending')
-        .maybeSingle();
-        
-      if (!checkError && existingReminder) {
-        console.log(`Ya existe un recordatorio en la BD para la misión ${missionId}. No se creará uno nuevo.`);
-        return true;
-      }
+      // Título y mensaje de la notificación
+      const title = "¡Misión a punto de expirar!";
+      const message = `Tu misión "${missionTitle}" expirará en ${hoursLeft} horas. ¡Complétala pronto!`;
       
-      // Guardar un nuevo registro
-      const { error } = await supabase
-        .from('scheduled_notifications')
+      // Guardar en la tabla 'notifications'
+      const { error: dbError } = await supabase
+        .from('notifications')
         .insert({
-          user_id: userId,
-          mission_id: missionId,
-          mission_title: missionTitle,
-          scheduled_at: reminderDate.toISOString(),
-          type: 'mission_expiration',
+          userid: userId,
+          title: title,
+          message: message,
+          type: 'mission_expiration_soon',
+          read: false,
+          data: JSON.stringify({ 
+            missionId, 
+            hoursLeft,
+            expirationDate: expirationDate.toISOString()
+          }),
           created_at: new Date().toISOString(),
-          status: 'pending'
+          updated_at: new Date().toISOString()
         });
-
-      if (error) {
-        console.error('Error al guardar el recordatorio en la base de datos:', error);
-        // Continuar para programar la notificación local aunque falle el guardado
-      } else {
-        console.log('Recordatorio guardado correctamente en la base de datos');
+        
+      if (dbError) {
+        // Si hay error al guardar en la base de datos, continuar con la notificación local
+        console.error('Error al guardar notificación en base de datos:', dbError);
       }
       
-      // Programar notificación local independientemente del resultado en BD
-      const notificationId = await Notifications.scheduleNotificationAsync({
+      // Programar notificación inmediata en el dispositivo
+      await Notifications.scheduleNotificationAsync({
         content: {
-          title: "¡Misión por expirar!",
-          body: `Tu misión "${missionTitle}" expirará mañana. ¡Complétala pronto!`,
-          data: { missionId, type: 'mission_expiration' },
+          title: title,
+          body: message,
+          data: { missionId, type: 'mission_expiration_soon' },
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: null // Notificación inmediata en vez de programada debido a problemas con los tipos
+        trigger: null // Mostrar inmediatamente
       });
       
-      console.log(`Notificación local programada con ID: ${notificationId}`);
-      
-    } catch (tableCheckError) {
-      console.error('Error al verificar la tabla scheduled_notifications:', tableCheckError);
-      
-      // Aún así, programar la notificación local
-      const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "¡Misión por expirar!",
-          body: `Tu misión "${missionTitle}" expirará mañana. ¡Complétala pronto!`,
-          data: { missionId, type: 'mission_expiration' },
-          sound: 'default',
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: null // Notificación inmediata en vez de programada debido a problemas con los tipos
-      });
-      
-      console.log(`Solo se programó la notificación local con ID: ${notificationId}`);
+      return true;
     }
-
-    console.log(`Recordatorio programado con éxito para: ${reminderDate.toISOString()}`);
-    return true;
+    
+    // No programar notificación si la misión no caduca pronto o ya ha caducado
+    return false;
   } catch (error) {
     console.error('Error al programar recordatorio de misión:', error);
+    return false;
+  }
+}
+
+// Función para crear la tabla de notificaciones programadas si no existe
+export async function createScheduledNotificationsTable() {
+  try {
+    console.log('Verificando si existe la tabla scheduled_notifications...');
+    
+    // Verificar si la tabla existe
+    const { data: tableExists, error: tableError } = await supabase
+      .from('information_schema.tables')
+      .select('*')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'scheduled_notifications')
+      .single();
+
+    // Si la tabla ya existe, no hacer nada
+    if (!tableError && tableExists) {
+      console.log('La tabla scheduled_notifications ya existe');
+      return true;
+    }
+    
+    console.log('La tabla scheduled_notifications no existe. No se puede crear automáticamente.');
+    console.log('Para habilitar esta funcionalidad, crea manualmente la tabla en la interfaz de Supabase.');
+    console.log('Instrucciones de SQL para crear la tabla:');
+    console.log(`
+    CREATE TABLE IF NOT EXISTS scheduled_notifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL,
+      mission_id UUID NOT NULL,
+      mission_title TEXT NOT NULL,
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ,
+      sent_at TIMESTAMPTZ
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_user_id ON scheduled_notifications(user_id);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_mission_id ON scheduled_notifications(mission_id);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_status ON scheduled_notifications(status);
+    `);
+    
+    // No podemos crear la tabla en tiempo de ejecución sin función RPC
+    return false;
+  } catch (error) {
+    console.error('Error al verificar la tabla scheduled_notifications:', error);
+    return false;
+  }
+}
+
+// Función para verificar si tenemos acceso de administrador en Supabase
+export async function checkAdminAccess(): Promise<boolean> {
+  try {
+    // Intentamos una operación simple que requeriría acceso admin
+    const { data, error } = await supabase.rpc('check_admin_access', {});
+    
+    // Si hay un error, probablemente no tenemos permisos admin
+    if (error) {
+      console.log('No hay acceso admin en Supabase:', error.message);
+      
+      // Si el error es específico de función no existente, crear la función
+      if (error.message.includes('function') && error.message.includes('does not exist')) {
+        // Intentar crear la función check_admin_access
+        const createFunctionResult = await createCheckAdminFunction();
+        if (createFunctionResult) {
+          // Intentar nuevamente
+          const { data: retryData, error: retryError } = await supabase.rpc('check_admin_access', {});
+          return !retryError && !!retryData;
+        }
+      }
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error al verificar acceso admin:', error);
+    return false;
+  }
+}
+
+// Función para crear la función check_admin_access en Supabase
+async function createCheckAdminFunction(): Promise<boolean> {
+  try {
+    const { error } = await supabase.rpc('exec_sql', {
+      sql: `
+      CREATE OR REPLACE FUNCTION check_admin_access()
+      RETURNS boolean AS $$
+      BEGIN
+        -- Intentar realizar una operación que requiere acceso admin
+        -- Esta es una verificación simple que fallará si no hay permisos
+        RETURN true;
+      EXCEPTION
+        WHEN insufficient_privilege THEN
+          RETURN false;
+        WHEN OTHERS THEN
+          RETURN false;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+      `
+    });
+    
+    if (error) {
+      console.error('Error al crear función check_admin_access:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error al crear función check_admin_access:', error);
     return false;
   }
 }
@@ -443,14 +447,45 @@ class NotificationService {
   private static instance: NotificationService;
 
   private constructor() {
-    // Inicialización del servicio
+    // Inicialización privada
   }
 
+  // Patrón Singleton para asegurar una sola instancia
   public static getInstance(): NotificationService {
     if (!NotificationService.instance) {
       NotificationService.instance = new NotificationService();
     }
     return NotificationService.instance;
+  }
+
+  // Inicializar el servicio
+  public async init() {
+    // Inicialización de tablas necesarias
+    try {
+      // Verificar si estamos en un entorno de desarrollo con acceso admin
+      const hasAccess = await checkAdminAccess();
+      
+      if (hasAccess) {
+        console.log('Inicializando servicio de notificaciones con acceso admin...');
+        // Crear tabla de notificaciones programadas si no existe
+        await createScheduledNotificationsTable();
+      } else {
+        console.log('Inicializando servicio de notificaciones sin acceso admin');
+      }
+      
+      // Registrar los manejadores de notificaciones
+      this.registerNotificationHandlers();
+      
+      return true;
+    } catch (error) {
+      console.error('Error al inicializar el servicio de notificaciones:', error);
+      return false;
+    }
+  }
+
+  // Registrar manejadores de notificaciones
+  private registerNotificationHandlers() {
+    // Implementar según sea necesario para manejar interacciones con notificaciones
   }
 
   // Método para notificar un nuevo mensaje
@@ -499,10 +534,6 @@ class NotificationService {
           },
           trigger: null, // Mostrar inmediatamente
         });
-        console.log('Notificación local de nuevo mensaje enviada');
-      } else {
-        // Para web
-        console.log('Notificación web de nuevo mensaje:', title, body);
       }
 
       // También enviar notificación push
@@ -559,9 +590,6 @@ class NotificationService {
           },
           trigger: null,
         });
-      } else {
-        // Para web, podríamos usar notificaciones del navegador si estuvieran disponibles
-        console.log('Notificación web:', title, body);
       }
     } catch (error) {
       console.error('Error al enviar notificación de viaje compartido:', error);
@@ -627,9 +655,6 @@ class NotificationService {
           },
           trigger: null, // Mostrar inmediatamente
         });
-      } else {
-        // Para web, podríamos usar notificaciones del navegador si estuvieran disponibles
-        console.log('Notificación web de invitación a viaje:', title, body);
       }
 
       // También enviar notificación push

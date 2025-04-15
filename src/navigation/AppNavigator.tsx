@@ -124,8 +124,6 @@ const TabNavigator = () => {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Friends') {
             iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Groups') {
-            iconName = focused ? 'people-circle' : 'people-circle-outline';
           } else if (route.name === 'Leaderboard') {
             iconName = focused ? 'trophy' : 'trophy-outline';
           } else if (route.name === 'Profile') {
@@ -152,7 +150,6 @@ const TabNavigator = () => {
       <Tab.Screen name="Missions" component={MissionsScreen} />
       <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} />
       <Tab.Screen name="Friends" component={FriendsScreen} />
-      <Tab.Screen name="Groups" component={GroupsScreen} options={{ title: 'Grupos' }} />
       <Tab.Screen
         name="Conversations"
         component={ConversationsScreen}

@@ -431,7 +431,6 @@ const htmlContent = `
         function startGlobeRotation() {
           if (globeRotationActive) return;
           
-          console.log('Iniciando rotación automática del globo');
           globeRotationActive = true;
           let lastTime = Date.now();
           
@@ -453,7 +452,6 @@ const htmlContent = `
                 viewer.scene.camera.zoomIn(50000);
               }
             } catch (e) {
-              console.error('Error durante la rotación del globo:', e);
               globeRotationActive = false;
               return;
             }
@@ -473,12 +471,10 @@ const htmlContent = `
         
         // Configurar recepción de mensajes
         window.addEventListener('message', function(event) {
-          console.log('Mensaje recibido por window.addEventListener:', event.data);
           handleMessage(event.data);
         });
         
         document.addEventListener('message', function(event) {
-          console.log('Mensaje recibido por document.addEventListener:', event.data);
           handleMessage(event.data);
         });
       </script>
@@ -525,7 +521,6 @@ export interface Props {
 
 // Componente para mostrar el globo en 3D
 const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
-  console.log("GlobeView: Inicializando componente");
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingPhase, setLoadingPhase] = useState('Iniciando...');
@@ -541,9 +536,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
   // Efecto para logging del ciclo de vida
   useEffect(() => {
-    console.log("GlobeView: Componente montado");
     return () => {
-      console.log("GlobeView: Componente desmontado");
     };
   }, []);
 
@@ -551,7 +544,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   useEffect(() => {
     // Iniciar temprano para que el WebView esté listo cuando se necesite
     if (!isWebViewReady && webViewRef.current) {
-      console.log("GlobeView: Inicializando WebView precargado");
       
       // Si el WebView aún no está listo, asegurarnos de que esté cargado
       // No hacemos nada activamente porque la carga ocurre automáticamente
@@ -561,9 +553,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
     // Verificar periódicamente si el WebView está listo
     const checkInterval = setInterval(() => {
       if (!isWebViewReady && webViewRef.current) {
-        console.log("GlobeView: Verificando estado del WebView precargado");
       } else if (isWebViewReady) {
-        console.log("GlobeView: WebView precargado está listo");
         clearInterval(checkInterval);
       }
     }, 2000);
@@ -575,15 +565,12 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
   // Cambiar entre mapa 3D y 2D
   const toggleMapMode = async () => {
-    console.log('GlobeView: Iniciando toggleMapMode, modo actual:', is3DMode ? '3D' : '2D');
-    
     if (is3DMode) {
       setIsLocating(true);
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         
         if (status !== 'granted') {
-          console.log('GlobeView: Permiso de ubicación denegado');
           setIsLocating(false);
           return;
         }
@@ -592,7 +579,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           accuracy: Location.Accuracy.High
         });
         
-        console.log('GlobeView: Ubicación obtenida para transición a 2D:', location.coords);
         setUserLocation(location);
         
         // Configurar la región para el mapa 2D
@@ -602,8 +588,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           latitudeDelta: 0.01,
           longitudeDelta: 0.01
         });
-        
-        console.log('GlobeView: Iniciando transición a mapa 2D en ubicación:', location.coords);
         
         // Primero hacemos zoom a la ubicación actual antes de cambiar a 2D
         if (isWebViewReady && webViewRef.current) {
@@ -684,7 +668,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
               
               console.log('GlobeView: Enviando mensaje de transición 2D a 3D:', initialPositionMessage);
               webViewRef.current.postMessage(JSON.stringify(initialPositionMessage));
-          } catch (error) {
+            } catch (error) {
               console.error('GlobeView: Error al enviar mensaje de transición:', error);
             }
           }
@@ -698,17 +682,13 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   // Exponer funciones a los componentes padres
   useImperativeHandle(ref, () => ({
     getUserLocation: async () => {
-      console.log('GlobeView: Solicitando permisos de ubicación...');
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        console.log('GlobeView: Permiso de ubicación denegado');
         return null;
       }
       
-      console.log('GlobeView: Obteniendo ubicación actual...');
       const location = await Location.getCurrentPositionAsync({});
-      console.log('GlobeView: Ubicación obtenida:', location);
       setUserLocation(location);
       
       // Si estamos en modo 2D, actualizar la región del mapa
@@ -729,16 +709,12 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           longitude: location.coords.longitude,
           accuracy: location.coords.accuracy
         };
-        console.log('GlobeView: Enviando ubicación al WebView:', message);
         webViewRef.current.postMessage(JSON.stringify(message));
-      } else {
-        console.log('GlobeView: WebView no está listo para recibir la ubicación');
       }
       
       return location;
     },
     flyTo: async (latitude: number, longitude: number, options?: any) => {
-      console.log('GlobeView: Llamada a método flyTo', latitude, longitude, options);
       
       if (is3DMode && isWebViewReady && webViewRef.current) {
         const message = {
@@ -748,7 +724,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           height: options?.height || 10000,
           duration: options?.duration || 2
         };
-        console.log('GlobeView: Enviando comando flyTo al WebView:', message);
         webViewRef.current.postMessage(JSON.stringify(message));
       } else if (!is3DMode) {
         // En modo 2D, actualizar la región del mapa
@@ -763,7 +738,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       }
     },
     reloadViewer: () => {
-      console.log('GlobeView: Recargando visor');
       if (is3DMode && webViewRef.current) {
         webViewRef.current.reload();
       } else if (!is3DMode) {
@@ -772,7 +746,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       }
     },
     setDarkMode: (enabled: boolean) => {
-      console.log('GlobeView: Cambiando modo oscuro:', enabled);
       if (is3DMode && isWebViewReady && webViewRef.current) {
         webViewRef.current.postMessage(JSON.stringify({ 
           type: 'setDarkMode', 
@@ -787,15 +760,12 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('GlobeView: Mensaje recibido del WebView:', data);
       
       switch (data.type) {
         case 'htmlLoaded':
-          console.log('GlobeView: HTML cargado en WebView');
           setLoadingPhase('HTML cargado');
           break;
         case 'viewerReady':
-          console.log('GlobeView: Visor Cesium listo');
           setIsWebViewReady(true);
           setIsLoading(false);
           setLoadingPhase('Completado');
@@ -803,16 +773,13 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
             props.onLoadingChange(false);
           }
           if (props.onLoadEnd) {
-            console.log('GlobeView: Llamando a onLoadEnd del padre');
             props.onLoadEnd();
           }
           break;
         case 'loadingStatus':
-          console.log('GlobeView: Actualizando estado de carga:', data.message);
           setLoadingPhase(data.message);
           break;
         case 'error':
-          console.error('GlobeView: Error reportado por WebView:', data.data);
           setHasError(true);
           setErrorMessage(data.data);
           if (props.onError) {
@@ -820,30 +787,25 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           }
           break;
         case 'transitionComplete':
-          console.log('GlobeView: Transición a 2D completada');
           // Verificamos que estamos en proceso de transición a 2D
           if (is3DMode) {
-            console.log('GlobeView: Completando transición a 2D, cambiando modo');
             setIs3DMode(false);
             setIsLocating(false);
           }
           break;
         case 'transitionFrom2DComplete':
-          console.log('GlobeView: Transición desde 2D a 3D completada');
           // Verificamos si debemos actualizar algún estado después de la transición 3D
           if (!is3DMode) {
-            console.log('GlobeView: Asegurando modo 3D después de transición');
             setIs3DMode(true);
           }
           break;
         case 'message':
-          console.log('GlobeView: Mensaje:', data.data);
           break;
         default:
-          console.log('GlobeView: Tipo de mensaje no manejado:', data.type);
+          break;
       }
-          } catch (error) {
-      console.error('GlobeView: Error al procesar mensaje del WebView:', error);
+    } catch (error) {
+      // Error al procesar mensaje del WebView
     }
   }, [is3DMode, props]);
 
@@ -854,7 +816,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        console.log('Permiso de ubicación denegado');
         setIsLocating(false);
         return;
       }
@@ -869,8 +830,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         altitude: 10000, // Altura en metros para la vista
         accuracy: location.coords.accuracy
       };
-
-      console.log('Ubicación del usuario:', userLocation);
 
       // Actualizar la ubicación según el modo
       if (is3DMode && webViewRef.current) {
@@ -895,7 +854,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       setUserLocation(location);
       setIsLocating(false);
     } catch (error) {
-      console.error('Error al obtener la ubicación:', error);
       setIsLocating(false);
     }
   };
@@ -930,7 +888,6 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   useEffect(() => {
     // Reiniciar si hay error
     if (hasError && retryCount < 3) {
-      console.log(`GlobeView: Reintentando después de error (${retryCount + 1}/3)...`);
       const timer = setTimeout(handleRetry, 2000);
       return () => clearTimeout(timer);
     }
@@ -977,11 +934,9 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           domStorageEnabled={true}
             onMessage={handleMessage}
             onLoadEnd={() => {
-              console.log('GlobeView: WebView onLoadEnd nativo');
+              // mantener vacío tras eliminar console.log
             }}
             onError={(e) => {
-              console.error('GlobeView: WebView onError:', e.nativeEvent);
-              // Actualizar el estado con el error
               setHasError(true);
               setErrorMessage('Error al cargar el WebView: ' + e.nativeEvent.description);
             }}

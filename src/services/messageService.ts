@@ -8,6 +8,7 @@ export interface Message {
   sender_id: string;
   receiver_id?: string | null;
   group_id?: string | null;
+  content?: string;
   text?: string;
   image_url?: string | null;
   created_at: string;
@@ -16,8 +17,19 @@ export interface Message {
 }
 
 // Función para enviar un mensaje de texto
-export const sendMessage = async (senderId: string, receiverId: string, content: string): Promise<Message | null> => {
+export const sendMessage = async (receiverId: string, text: string, imageUrl?: string | null): Promise<Message | null> => {
   try {
+    // Si se proporciona una imagen, usar esa URL como contenido
+    const content = imageUrl || text;
+    
+    // Obtener ID del usuario autenticado
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('No hay sesión de usuario');
+    }
+    
+    const senderId = session.user.id;
+    
     console.log(`Enviando mensaje: De ${senderId} a ${receiverId} - Contenido: ${content.substring(0, 20)}...`);
     
     const { data, error } = await supabase
@@ -52,7 +64,7 @@ export const sendMessage = async (senderId: string, receiverId: string, content:
         sendNewMessageNotification(
           receiverId, 
           senderData.username || 'Usuario', 
-          content,
+          imageUrl ? '📷 Te ha enviado una imagen' : text,
           senderId
         ).catch(notifError => {
           console.error('Error enviando notificación push:', notifError);
@@ -62,7 +74,22 @@ export const sendMessage = async (senderId: string, receiverId: string, content:
       console.error('Error obteniendo datos del remitente:', userError);
     }
 
-    return data;
+    // Transformar el mensaje para que sea compatible con la interfaz
+    const isImageContent = 
+      content.startsWith('http') && 
+      (content.includes('.jpg') || 
+       content.includes('.jpeg') || 
+       content.includes('.png') || 
+       content.includes('.gif') || 
+       content.includes('cloudinary'));
+       
+    const transformedMessage = {
+      ...data,
+      text: isImageContent ? '' : content, // Si es una imagen, no mostrar texto
+      image_url: isImageContent ? content : imageUrl
+    };
+
+    return transformedMessage;
   } catch (error) {
     console.error('Error inesperado enviando mensaje:', error);
     throw error;
@@ -126,7 +153,15 @@ export const sendImageMessage = async (senderId: string, receiverId: string, ima
     }
 
     console.log('Mensaje con imagen enviado con éxito:', data);
-    return data;
+    
+    // Transformar el mensaje para que sea compatible con la interfaz
+    const transformedMessage = {
+      ...data,
+      text: '',
+      image_url: imageUrl
+    };
+    
+    return transformedMessage;
   } catch (error) {
     console.error('Error inesperado enviando mensaje con imagen:', error);
     throw error;
@@ -153,6 +188,26 @@ export const getConversation = async (userId1: string, userId2: string): Promise
     
     if (data && data.length > 0) {
       console.log('Último mensaje:', data[data.length - 1]);
+      
+      // Transformar los mensajes para que sean compatibles con la interfaz Message
+      const transformedMessages = data.map(msg => {
+        const isImageContent = 
+          msg.content && 
+          msg.content.startsWith('http') && 
+          (msg.content.includes('.jpg') || 
+           msg.content.includes('.jpeg') || 
+           msg.content.includes('.png') || 
+           msg.content.includes('.gif') || 
+           msg.content.includes('cloudinary'));
+        
+        return {
+          ...msg,
+          text: isImageContent ? '' : msg.content, // Si es imagen, no mostrar texto
+          image_url: isImageContent ? msg.content : null // Si content parece una URL de imagen, asignarla a image_url
+        };
+      });
+      
+      return transformedMessages;
     }
     
     return data || [];
@@ -193,13 +248,12 @@ export const subscribeToMessages = (
   friendId?: string
 ) => {
   try {
-    // Crear un nombre único para el canal basado en los IDs
-    const sortedIds = [userId, friendId].filter(Boolean).sort();
-    const channelName = `messages_${sortedIds.join('_')}`;
+    // Usar un canal más simple sin IDs para evitar colisiones y errores
+    const channelName = `messages_user_${userId}_${Date.now()}`;
 
     console.log(`Creando suscripción a canal: ${channelName}`);
   
-    // Definir el filtro de forma directa para evitar problemas con caracteres especiales
+    // Creamos un canal único para este usuario
     const channel = supabase
       .channel(channelName)
       .on(
@@ -207,13 +261,11 @@ export const subscribeToMessages = (
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'messages',
-          // No usar filter para evitar problemas, hacemos el filtrado manual
-          filter: ''
+          table: 'messages'
         },
         (payload: { new: Message }) => {
           const message = payload.new;
-          console.log('Mensaje recibido en canal:', message);
+          console.log('Mensaje recibido:', message);
           
           // Verificar si el mensaje pertenece a la conversación que nos interesa
           const isRelevantMessage = friendId
@@ -221,34 +273,22 @@ export const subscribeToMessages = (
               (message.sender_id === friendId && message.receiver_id === userId)
             : message.sender_id === userId || message.receiver_id === userId;
           
-          console.log(`¿Mensaje relevante para ${userId}? ${isRelevantMessage}`);
-          
           if (isRelevantMessage) {
             onNewMessage(message);
           }
         }
       )
-      .subscribe((status) => {
-        console.log(`Estado de suscripción a canal ${channelName}:`, status);
-        
-        if (status === 'SUBSCRIBED') {
-          console.log(`✅ Canal ${channelName} suscrito correctamente`);
-        }
-        
-        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          console.error(`❌ Error en canal ${channelName}, intentando reconectar...`);
-          // Eliminamos el intento de reconexión automática ya que puede causar el error
-          // "tried to subscribe multiple times"
-        }
-      });
+      .subscribe();
     
-    return channel;
+    // Devolver función para desuscribirse
+    return () => {
+      console.log(`Desuscribiendo del canal ${channelName}`);
+      supabase.removeChannel(channel);
+    };
   } catch (error) {
     console.error('Error al configurar suscripción:', error);
     // Retornar un objeto con método unsubscribe para evitar errores
-    return {
-      unsubscribe: () => console.log('Nada que desuscribir (suscripción falló)')
-    };
+    return () => console.log('Nada que desuscribir (suscripción falló)');
   }
 };
 
@@ -503,5 +543,148 @@ export const subscribeToGroupMessages = (
   } catch (error) {
     console.error('Error creando suscripción a mensajes de grupo:', error);
     return () => {}; // Función vacía como fallback
+  }
+};
+
+// Función para obtener las conversaciones recientes de grupos
+export const getRecentGroupConversations = async (userId: string) => {
+  try {
+    // Primero obtenemos los grupos a los que pertenece el usuario
+    const { data: memberGroups, error: memberError } = await supabase
+      .from('group_members')
+      .select(`
+        group_id,
+        groups(
+          id,
+          name,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'accepted');
+
+    if (memberError) {
+      console.error('Error obteniendo grupos del usuario:', memberError);
+      return [];
+    }
+
+    if (!memberGroups || memberGroups.length === 0) {
+      return [];
+    }
+
+    // Para cada grupo, obtenemos el último mensaje
+    const groupConversations = await Promise.all(
+      memberGroups.map(async (membership) => {
+        const groupId = membership.group_id;
+        const groupInfo = membership.groups;
+
+        try {
+          // Obtener el último mensaje del grupo
+          const { data: lastMessage, error: messageError } = await supabase
+            .from('group_messages')
+            .select('*')
+            .eq('group_id', groupId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (messageError) {
+            // Si no hay mensajes, devolvemos info básica del grupo
+            return {
+              conversation_id: groupId,
+              is_group: true,
+              name: groupInfo.name,
+              last_message: '',
+              created_at: groupInfo.updated_at || groupInfo.created_at,
+              unread_count: 0
+            };
+          }
+
+          // Contar mensajes no leídos
+          const { count: unreadCount, error: countError } = await supabase
+            .from('group_messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('group_id', groupId)
+            .eq('read', false)
+            .neq('sender_id', userId);
+
+          return {
+            conversation_id: groupId,
+            is_group: true,
+            name: groupInfo.name,
+            last_message: lastMessage.text || '(Imagen)',
+            created_at: lastMessage.created_at,
+            unread_count: unreadCount || 0,
+            last_message_sender: lastMessage.sender_username || 'Usuario'
+          };
+        } catch (error) {
+          console.error(`Error procesando grupo ${groupId}:`, error);
+          return null;
+        }
+      })
+    );
+
+    // Filtrar los null y ordenar por fecha más reciente
+    return groupConversations
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch (error) {
+    console.error('Error obteniendo conversaciones de grupos:', error);
+    return [];
+  }
+};
+
+// Función para obtener todas las conversaciones recientes (directas y grupales)
+export const getAllConversations = async (userId: string) => {
+  try {
+    // Obtener conversaciones directas
+    const directConversations = await getRecentConversations(userId);
+    
+    // Transformar para tener el mismo formato que las conversaciones grupales
+    const formattedDirectConvs = directConversations.map(conv => ({
+      conversation_id: conv.conversation_user_id,
+      is_group: false,
+      name: conv.username || 'Usuario',
+      last_message: conv.last_message || '',
+      created_at: conv.created_at,
+      unread_count: conv.unread_count || 0
+    }));
+
+    // Obtener conversaciones grupales
+    const groupConversations = await getRecentGroupConversations(userId);
+
+    // Combinar y ordenar por fecha más reciente
+    const allConversations = [...formattedDirectConvs, ...groupConversations]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return allConversations;
+  } catch (error) {
+    console.error('Error obteniendo todas las conversaciones:', error);
+    return [];
+  }
+};
+
+// Función para marcar mensajes grupales como leídos
+export const markGroupMessagesAsRead = async (groupId: string, userId: string): Promise<void> => {
+  try {
+    console.log(`Marcando mensajes del grupo ${groupId} como leídos para usuario ${userId}`);
+    
+    const { error } = await supabase
+      .from('group_messages')
+      .update({ read: true })
+      .eq('group_id', groupId)
+      .neq('sender_id', userId)
+      .eq('read', false);
+
+    if (error) {
+      console.error('Error marcando mensajes grupales como leídos:', error);
+      throw error;
+    }
+    
+    console.log(`Mensajes de grupo ${groupId} marcados como leídos`);
+  } catch (error) {
+    console.error('Error inesperado marcando mensajes grupales como leídos:', error);
+    throw error;
   }
 }; 

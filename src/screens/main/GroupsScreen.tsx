@@ -10,7 +10,8 @@ import {
   RefreshControl,
   Alert,
   Modal,
-  Image
+  Image,
+  TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -22,13 +23,13 @@ import {
   acceptGroupInvitation,
   rejectGroupInvitation,
   renameGroup,
-  GroupWithMembers
+  GroupWithMembers,
+  deleteGroup
 } from '../../services/groupService';
 import { 
   acceptJourneyInvitation, 
   rejectJourneyInvitation 
 } from '../../services/shareService';
-import { TextInput } from 'react-native-gesture-handler';
 
 const GroupsScreen = () => {
   const [groups, setGroups] = useState<GroupWithMembers[]>([]);
@@ -38,6 +39,7 @@ const GroupsScreen = () => {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<GroupWithMembers | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
   
   const user = useSelector((state: RootState) => state.auth.user);
   const navigation = useNavigation();
@@ -116,11 +118,58 @@ const GroupsScreen = () => {
     }
   };
 
-  // Abrir modal para renombrar grupo
-  const openRenameModal = (group: GroupWithMembers) => {
+  // Mostrar opciones para el grupo
+  const showGroupOptions = (group: GroupWithMembers) => {
     setSelectedGroup(group);
-    setNewGroupName(group.name);
+    setOptionsModalVisible(true);
+  };
+
+  // Abrir modal para renombrar grupo
+  const openRenameModal = () => {
+    if (!selectedGroup) return;
+    setOptionsModalVisible(false);
+    setNewGroupName(selectedGroup.name);
     setRenameModalVisible(true);
+  };
+
+  // Manejar la eliminación de un grupo
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup || !user?.id) return;
+    
+    setOptionsModalVisible(false);
+    
+    Alert.alert(
+      "Eliminar Grupo",
+      "¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const success = await deleteGroup(selectedGroup.id, user.id);
+              
+              if (success) {
+                Alert.alert('Éxito', 'Grupo eliminado correctamente');
+                loadData();
+              } else {
+                Alert.alert('Error', 'No se pudo eliminar el grupo. Asegúrate de que seas el administrador.');
+              }
+            } catch (error) {
+              console.error('Error al eliminar grupo:', error);
+              Alert.alert('Error', 'No se pudo eliminar el grupo');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Manejar el renombrar un grupo
@@ -188,7 +237,7 @@ const GroupsScreen = () => {
                 style={styles.editButton}
                 onPress={(e) => {
                   e.stopPropagation();
-                  openRenameModal(item);
+                  showGroupOptions(item);
                 }}
               >
                 <Ionicons name="ellipsis-vertical" size={18} color="#777" />
@@ -288,6 +337,38 @@ const GroupsScreen = () => {
         )}
       </View>
 
+      {/* Modal para opciones del grupo */}
+      <Modal
+        visible={optionsModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setOptionsModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setOptionsModalVisible(false)}
+        >
+          <View style={styles.optionsModalContent}>
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={openRenameModal}
+            >
+              <Ionicons name="create-outline" size={22} color="#005F9E" />
+              <Text style={styles.optionText}>Renombrar grupo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.optionItem, styles.deleteOption]}
+              onPress={handleDeleteGroup}
+            >
+              <Ionicons name="trash-outline" size={22} color="#f44336" />
+              <Text style={[styles.optionText, styles.deleteText]}>Eliminar grupo</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Modal para renombrar grupo */}
       <Modal
         visible={renameModalVisible}
@@ -370,7 +451,7 @@ const styles = StyleSheet.create({
   invitationsList: {
     maxHeight: 200, // Limitar altura para las invitaciones
   },
-  // Nuevos estilos para el chat de WhatsApp
+  // Estilos para el chat
   chatGroup: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -425,7 +506,7 @@ const styles = StyleSheet.create({
   editButton: {
     padding: 5,
   },
-  // Mantener estilos existentes para invitaciones y modal
+  // Estilos para invitaciones
   invitationCard: {
     backgroundColor: '#e6f7ff',
     borderRadius: 8,
@@ -470,6 +551,39 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
+  // Estilos para modal de opciones
+  optionsModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    width: '80%',
+    marginTop: 'auto',
+    marginBottom: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  deleteOption: {
+    borderBottomWidth: 0,
+  },
+  optionText: {
+    fontSize: 16,
+    marginLeft: 10,
+    color: '#333',
+  },
+  deleteText: {
+    color: '#f44336',
+  },
+  // Estilos para modal de renombrar
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

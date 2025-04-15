@@ -453,17 +453,32 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             
             // Verificar que la fecha de expiración es futura
             const now = new Date();
-            if (expirationDate > now) {
+            
+            // Calcular diferencia en horas hasta la expiración
+            const hoursToExpiration = (expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+            
+            // Solo programar recordatorios si la misión expira en menos de 24 horas (1 día)
+            if (expirationDate > now && hoursToExpiration <= 24) {
               try {
-                await scheduleMissionExpirationReminder(
-                  user.id,
-                  mission.id,
-                  mission.challenge.title,
-                  expirationDate
-                );
-                console.log(`Recordatorio programado para misión: ${mission.challenge.title}`);
+                // Verificar si ya existe una notificación para esta misión en la base de datos
+                const { data: existingNotifications, error: notifError } = await supabase
+                  .from('notifications')
+                  .select('id')
+                  .eq('userid', user.id)
+                  .eq('type', 'mission_expiration_soon')
+                  .like('data', `%${mission.id}%`)
+                  .maybeSingle();
+                
+                // Solo programar recordatorio si no existe una notificación previa
+                if (!existingNotifications) {
+                  await scheduleMissionExpirationReminder(
+                    user.id,
+                    mission.id,
+                    mission.challenge.title,
+                    expirationDate
+                  );
+                }
               } catch (reminderError) {
-                console.error('Error al programar recordatorio:', reminderError);
                 // No mostrar error al usuario, es un proceso en segundo plano
               }
             }

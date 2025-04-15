@@ -18,11 +18,7 @@ export async function sendPushNotification(
   data: Record<string, any> = {}
 ): Promise<boolean> {
   try {
-    console.log(`Enviando notificación push a usuario: ${receiverId}`);
-    
     // Primero intentamos obtener el token directamente, sin verificar la estructura
-    console.log('Intentando obtener el token directamente...');
-    
     try {
       // Intento directo para buscar en columna 'token' (predeterminada)
       const { data: tokenDataDirect, error: tokenErrorDirect } = await supabase
@@ -34,7 +30,6 @@ export async function sendPushNotification(
       if (!tokenErrorDirect && tokenDataDirect && tokenDataDirect.token) {
         // Si encontramos un token, lo usamos directamente
         const pushToken = tokenDataDirect.token;
-        console.log(`Token encontrado directamente: ${pushToken.substring(0, 10)}...`);
         
         // Enviar la notificación con el token encontrado
         return await sendActualNotification(pushToken, title, body, data);
@@ -49,16 +44,13 @@ export async function sendPushNotification(
         
       if (!pushTokenError && pushTokenData && pushTokenData.push_token) {
         const pushToken = pushTokenData.push_token;
-        console.log(`Token alternativo encontrado: ${pushToken.substring(0, 10)}...`);
         
         // Enviar la notificación con el token encontrado
         return await sendActualNotification(pushToken, title, body, data);
       }
       
       // Si llegamos aquí, es que no hemos encontrado token por los métodos directos
-      console.log('No se encontró token mediante acceso directo, intentando método avanzado...');
     } catch (directError) {
-      console.log('Error al intentar el método directo:', directError);
       // Continuar con el método avanzado
     }
     
@@ -70,12 +62,11 @@ export async function sendPushNotification(
       .eq('table_name', 'user_push_tokens');
     
     if (tableError) {
-      console.error('Error verificando la tabla user_push_tokens, intentando acceder directamente:', tableError);
+      console.error('Error verificando la tabla user_push_tokens:', tableError);
       
       // Intentamos acceso directo a un token para este usuario
       try {
         // Usar el nombre de columna 'token' por defecto
-        console.log('Intentando obtener token usando API directa...');
         const { data: directTokenData, error: directTokenError } = await supabase
           .from('user_push_tokens')
           .select('token, id')
@@ -83,12 +74,10 @@ export async function sendPushNotification(
           .maybeSingle(); // Usar maybeSingle en lugar de single para evitar errores si no existe
           
         if (!directTokenError && directTokenData && directTokenData.token) {
-          console.log(`Token encontrado mediante acceso directo con columna 'token': ${directTokenData.token.substring(0, 10)}...`);
           return await sendActualNotification(directTokenData.token, title, body, data);
         }
         
         // Si llegamos aquí, no encontramos token
-        console.log('No se encontró token mediante acceso directo a la tabla user_push_tokens');
         return false;
       } catch (directAccessError) {
         console.error('Error en acceso directo a tabla:', directAccessError);
@@ -100,8 +89,6 @@ export async function sendPushNotification(
       console.error('La tabla user_push_tokens no existe');
       return false;
     }
-    
-    console.log('Tabla user_push_tokens encontrada');
     
     // Intentar obtener las columnas de la tabla para saber qué campo de token usar
     const { data: columnsData, error: columnsError } = await supabase
@@ -117,10 +104,6 @@ export async function sendPushNotification(
     
     // Obtener los nombres de las columnas como un array e imprimir info detallada
     const columnNames = columnsData?.map(col => col.column_name.toLowerCase()) || [];
-    console.log('Estructura de la tabla user_push_tokens:');
-    columnsData?.forEach(col => {
-      console.log(`- ${col.column_name} (${col.data_type}${col.character_maximum_length ? `, max length: ${col.character_maximum_length}` : ''})`);
-    });
     
     // Determinar qué columna contiene el token - asumimos 'token' como valor por defecto
     // para la tabla configurada por el usuario
@@ -131,9 +114,6 @@ export async function sendPushNotification(
       console.error('No se encontró ninguna columna de token válida. Columnas disponibles:', columnNames);
       return false;
     }
-    
-    // Obtener el token del usuario usando el nombre de columna correcto
-    console.log(`Buscando token en columna: ${tokenColumnName}`);
     
     // Hacer un simple select para ver si hay registros
     const { data: records, error: countError } = await supabase
@@ -146,8 +126,6 @@ export async function sendPushNotification(
       return false;
     }
     
-    console.log(`Encontrados ${records?.length || 0} registros para el usuario ${receiverId}`);
-    
     // Obtener el token específico
     const { data: tokenData, error: tokenError } = await supabase
       .from('user_push_tokens')
@@ -156,19 +134,14 @@ export async function sendPushNotification(
       .single();
       
     if (tokenError || !tokenData) {
-      console.log('No se encontró token de notificación para el usuario:', receiverId);
-      console.error('Error:', tokenError);
       return false;
     }
     
     // Obtener el valor del token de la columna correcta
     const pushToken = tokenData[tokenColumnName];
     if (!pushToken) {
-      console.log('Token vacío para el usuario:', receiverId);
       return false;
     }
-    
-    console.log(`Token encontrado: ${pushToken.substring(0, 10)}...`);
     
     // Enviar la notificación
     return await sendActualNotification(pushToken, title, body, data);
@@ -198,8 +171,6 @@ async function sendActualNotification(
         },
         trigger: null,
       });
-      
-      console.log('Notificación local programada con éxito');
     }
     
     // Intentar enviar notificación push a través del servicio de Expo
@@ -210,8 +181,6 @@ async function sendActualNotification(
       body,
       data,
     };
-    
-    console.log('Enviando mensaje push a Expo:', JSON.stringify(message));
     
     // Enviar a la API de notificaciones de Expo
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -225,7 +194,6 @@ async function sendActualNotification(
     });
     
     const responseData = await response.json();
-    console.log('Respuesta de Expo Push Service:', JSON.stringify(responseData));
     
     if (responseData.data && responseData.data.status === 'error') {
       console.error('Error enviando push a través de Expo:', responseData.data.message);

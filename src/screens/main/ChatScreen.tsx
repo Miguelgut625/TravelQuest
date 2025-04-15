@@ -19,12 +19,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { getConversation, sendMessage, markMessagesAsRead, subscribeToMessages, Message, sendImageMessage } from '../../services/messageService';
+import { 
+  getConversation, 
+  sendMessage, 
+  markMessagesAsRead, 
+  subscribeToMessages, 
+  Message, 
+  sendImageMessage,
+  getGroupMessages,
+  sendGroupMessage,
+  subscribeToGroupMessages,
+  markGroupMessagesAsRead
+} from '../../services/messageService';
+import { getGroupById } from '../../services/groupService';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../services/cloudinaryService';
 import NotificationService from '../../services/NotificationService';
+import { getUserInfoById as getUserInfo } from '../../services/userService';
 
 const ChatScreen = () => {
   const route = useRoute();
@@ -49,10 +62,10 @@ const ChatScreen = () => {
 
   // Verificar si es un chat grupal
   useEffect(() => {
-    if (route.params?.isGroupChat) {
+    if (route.params?.isGroupChat || groupId) {
       setIsGroupChat(true);
     }
-  }, [route.params]);
+  }, [route.params, groupId]);
 
   // Cargar los datos iniciales
   useEffect(() => {
@@ -69,6 +82,7 @@ const ChatScreen = () => {
   const loadGroupChat = async () => {
     try {
       setLoading(true);
+      console.log('Cargando chat de grupo con ID:', groupId);
       
       // Obtener información del grupo
       const groupData = await getGroupById(groupId);
@@ -79,12 +93,26 @@ const ChatScreen = () => {
         const groupMessages = await getGroupMessages(groupId);
         if (groupMessages && groupMessages.length > 0) {
           setMessages(groupMessages);
+          messageCountRef.current = groupMessages.length;
+          
+          // Marcar todos los mensajes como leídos
+          if (user?.id) {
+            await markGroupMessagesAsRead(groupId, user.id);
+          }
+        } else {
+          console.log('No hay mensajes en este grupo');
+          setMessages([]);
+          messageCountRef.current = 0;
         }
+      } else {
+        console.log('No se pudo obtener información del grupo');
       }
     } catch (error) {
       console.error('Error cargando información del grupo:', error);
+      Alert.alert('Error', 'No se pudo cargar la información del grupo');
     } finally {
       setLoading(false);
+      initialLoadRef.current = false;
     }
   };
 
@@ -100,14 +128,12 @@ const ChatScreen = () => {
       }
       
       // Cargar mensajes con este amigo
-      const chatMessages = await getMessages(friendId);
-      if (chatMessages && chatMessages.length > 0) {
-        setMessages(chatMessages);
-      }
+      await loadMessages();
     } catch (error) {
       console.error('Error cargando información del amigo:', error);
     } finally {
       setLoading(false);
+      initialLoadRef.current = false;
     }
   };
 
@@ -115,41 +141,56 @@ const ChatScreen = () => {
   const handleNewMessage = React.useCallback((newMessage: Message) => {
     console.log('Mensaje recibido en handleNewMessage:', newMessage);
     
-    // Doble verificación para asegurarnos que el mensaje pertenece a esta conversación
-    if (
+    // Para chat grupal, verificar si pertenece a este grupo
+    if (isGroupChat && groupId) {
+      if (newMessage.group_id === groupId) {
+        setMessages(prevMessages => {
+          // Verificar si el mensaje ya existe para evitar duplicados
+          const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
+          if (messageExists) {
+            return prevMessages;
+          }
+          
+          // Actualizar contador de referencia
+          messageCountRef.current = prevMessages.length + 1;
+          return [...prevMessages, newMessage];
+        });
+        
+        // Marcar como leído si no somos el remitente
+        if (newMessage.sender_id !== user?.id) {
+          markGroupMessagesAsRead(groupId, user?.id);
+        }
+      }
+      return;
+    }
+    
+    // Para chat individual, verificar si pertenece a esta conversación
+    if (!isGroupChat && friendId && (
       (newMessage.sender_id === friendId && newMessage.receiver_id === user?.id) ||
       (newMessage.sender_id === user?.id && newMessage.receiver_id === friendId)
-    ) {
-      console.log('Mensaje corresponde a esta conversación, actualizando estado...');
-      
+    )) {
       setMessages(prevMessages => {
         // Verificar si el mensaje ya existe para evitar duplicados
         const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
         if (messageExists) {
-          console.log('Mensaje duplicado, ignorando:', newMessage.id);
           return prevMessages;
         }
-        console.log('Añadiendo nuevo mensaje a la conversación:', newMessage.id, 'Total ahora:', prevMessages.length + 1);
         
         // Actualizar contador de referencia
         messageCountRef.current = prevMessages.length + 1;
-        
         return [...prevMessages, newMessage];
       });
       
       // Marcar como leído si somos el receptor
       if (newMessage.receiver_id === user?.id) {
-        console.log('Marcando mensaje como leído');
         markMessagesAsRead(user.id, friendId);
       }
-    } else {
-      console.log('El mensaje no pertenece a esta conversación');
     }
-  }, [friendId, user?.id]);
+  }, [friendId, user?.id, isGroupChat, groupId]);
 
-  // Función para cargar mensajes
+  // Función para cargar mensajes (solo para chat individual)
   const loadMessages = React.useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || !friendId || isGroupChat) return;
     
     console.log('Cargando mensajes entre', user.id, 'y', friendId);
     setRefreshing(true);
@@ -174,38 +215,8 @@ const ChatScreen = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
-      initialLoadRef.current = false;
     }
-  }, [user?.id, friendId]);
-
-  // Configurar suscripción a mensajes - separado para mayor claridad
-  const setupMessageSubscription = React.useCallback(() => {
-    if (!user?.id || !friendId) return;
-    
-    console.log('Configurando suscripción a mensajes entre', user.id, 'y', friendId);
-
-    // Limpiar suscripción anterior si existe
-    if (subscriptionRef.current) {
-      console.log('Limpiando suscripción anterior');
-      subscriptionRef.current.unsubscribe();
-      // Asegurarse de que la referencia se limpie completamente
-      subscriptionRef.current = null;
-      
-      // Añadir un pequeño retraso para asegurar que la limpieza se complete
-      setTimeout(() => {
-        // Verificar que no se haya recreado la suscripción en el intervalo
-        if (!subscriptionRef.current) {
-          // Crear nueva suscripción
-          subscriptionRef.current = subscribeToMessages(user.id, handleNewMessage, friendId);
-          console.log('Nueva suscripción creada');
-        }
-      }, 300);
-    } else {
-      // Si no hay suscripción previa, crear una nueva inmediatamente
-      subscriptionRef.current = subscribeToMessages(user.id, handleNewMessage, friendId);
-      console.log('Nueva suscripción creada');
-    }
-  }, [user?.id, friendId, handleNewMessage]);
+  }, [user?.id, friendId, isGroupChat]);
 
   // Efecto para configurar la suscripción y limpiarla al desmontar
   React.useEffect(() => {
@@ -214,10 +225,34 @@ const ChatScreen = () => {
     return () => {
       if (subscriptionRef.current) {
         console.log('Limpiando suscripción al desmontar');
-        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current();
       }
     };
   }, [setupMessageSubscription]);
+
+  // Configurar suscripción a mensajes - separado para mayor claridad
+  const setupMessageSubscription = React.useCallback(() => {
+    if (!user?.id) return;
+    
+    // Limpiar suscripción anterior si existe
+    if (subscriptionRef.current) {
+      console.log('Limpiando suscripción anterior');
+      subscriptionRef.current();
+      subscriptionRef.current = null;
+    }
+    
+    // Configurar suscripción según el tipo de chat
+    if (isGroupChat && groupId) {
+      // Implementar suscripción a mensajes grupales
+      console.log('Configurando suscripción a mensajes de grupo:', groupId);
+      subscriptionRef.current = subscribeToGroupMessages(groupId, handleNewMessage);
+    } else if (friendId) {
+      // Suscripción a mensajes individuales
+      console.log('Configurando suscripción a mensajes entre', user.id, 'y', friendId);
+      subscriptionRef.current = subscribeToMessages(user.id, handleNewMessage, friendId);
+    } 
+    
+  }, [user?.id, friendId, handleNewMessage, isGroupChat, groupId]);
 
   // Verificar autenticación y cargar datos iniciales
   React.useEffect(() => {
@@ -225,21 +260,44 @@ const ChatScreen = () => {
     checkUserAuth();
     
     navigation.setOptions({
-      title: friendName || 'Chat',
+      title: isGroupChat ? groupName : friendName || 'Chat',
     });
 
     // Configurar un intervalo para actualizar los mensajes periódicamente
     const refreshInterval = setInterval(() => {
-      if (!initialLoadRef.current) {  // Solo si ya se completó la carga inicial
-        console.log('Actualizando mensajes periódicamente...');
-        loadMessages();
+      if (!initialLoadRef.current) {
+        if (isGroupChat && groupId) {
+          refreshGroupMessages();
+        } else if (friendId) {
+          loadMessages();
+        }
       }
-    }, 5000);  // Actualizar cada 5 segundos (más frecuente)
+    }, 5000);
 
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [navigation, friendName, loadMessages]);
+  }, [navigation, friendName, loadMessages, isGroupChat, groupId, groupName]);
+
+  // Función para refrescar mensajes de grupo
+  const refreshGroupMessages = async () => {
+    if (!groupId || !user?.id) return;
+    
+    try {
+      console.log('Refrescando mensajes del grupo:', groupId);
+      const groupMessages = await getGroupMessages(groupId);
+      
+      if (groupMessages && groupMessages.length !== messageCountRef.current) {
+        setMessages(groupMessages);
+        messageCountRef.current = groupMessages.length;
+        
+        // Marcar mensajes como leídos
+        await markGroupMessagesAsRead(groupId, user.id);
+      }
+    } catch (error) {
+      console.error('Error refrescando mensajes del grupo:', error);
+    }
+  };
 
   const checkUserAuth = async () => {
     if (!user) {
@@ -281,7 +339,10 @@ const ChatScreen = () => {
       return;
     }
 
-    loadMessages();
+    // Solo cargar mensajes para chat individual aquí
+    if (!isGroupChat && friendId) {
+      loadMessages();
+    }
   };
 
   // Desplazar al último mensaje cuando cambie la lista de mensajes
@@ -348,10 +409,20 @@ const ChatScreen = () => {
     setImagePreviewVisible(false);
     
     try {
-      const newMessage = await sendImageMessage(user.id, friendId, selectedImage);
-      if (newMessage) {
-        console.log('Mensaje con imagen enviado con éxito:', newMessage.id);
-        handleNewMessage(newMessage);
+      if (isGroupChat && groupId) {
+        // Subir imagen a Cloudinary
+        const imageUrl = await uploadImage(selectedImage);
+        if (imageUrl) {
+          const newMessage = await sendGroupMessage(groupId, '', imageUrl);
+          if (newMessage) {
+            handleNewMessage(newMessage);
+          }
+        }
+      } else if (friendId) {
+        const newMessage = await sendImageMessage(user.id, friendId, selectedImage);
+        if (newMessage) {
+          handleNewMessage(newMessage);
+        }
       }
       setSelectedImage(null);
     } catch (error) {
@@ -374,28 +445,76 @@ const ChatScreen = () => {
     }
 
     try {
-      let newMessage: Message = {
-        id: `temp-${Date.now()}`,
-        sender_id: user.id,
-        receiver_id: isGroupChat ? null : friendId,
-        group_id: isGroupChat ? groupId : null,
-        text: inputText.trim(),
-        created_at: new Date().toISOString(),
-        read: false,
-        sender_username: user.username,
-        image_url: null
-      };
-
-      // Si hay una imagen seleccionada, subirla primero
-      if (selectedImage) {
-        const imageUrl = await uploadImage(selectedImage);
-        if (imageUrl) {
-          newMessage.image_url = imageUrl;
+      // Distintos comportamientos para chats grupales e individuales
+      if (isGroupChat && groupId) {
+        // Mensaje para grupo
+        let imageUrl = null;
+        if (selectedImage) {
+          imageUrl = await uploadImage(selectedImage);
+        }
+        
+        // Preparar mensaje para mostrar inmediatamente en UI
+        const tempMessage = {
+          id: `temp-${Date.now()}`,
+          sender_id: user.id,
+          group_id: groupId,
+          text: imageUrl ? '' : inputText.trim(), // No mostrar texto si es una imagen
+          created_at: new Date().toISOString(),
+          read: false,
+          sender_username: user.username,
+          image_url: imageUrl
+        };
+        
+        // Agregar mensaje temporal a la UI
+        setMessages(prevMessages => [...prevMessages, tempMessage]);
+        
+        // Enviar mensaje al servidor
+        await sendGroupMessage(groupId, inputText.trim(), imageUrl);
+      } else if (friendId) {
+        // Para chat individual
+        let imageUrl = null;
+        
+        // Si hay una imagen seleccionada, subirla primero
+        if (selectedImage) {
+          try {
+            // Subir imagen directamente
+            const newImageMsg = await sendImageMessage(user.id, friendId, selectedImage);
+            
+            if (newImageMsg) {
+              // Agregar mensaje de imagen a la UI
+              setMessages(prevMessages => [...prevMessages, {
+                ...newImageMsg,
+                text: '', // Asegurar que no haya texto para mensajes de imagen
+                sender_username: user.username
+              }]);
+            }
+          } catch (imgError) {
+            console.error('Error enviando imagen:', imgError);
+            Alert.alert('Error', 'No se pudo enviar la imagen');
+          }
+        }
+        
+        // Si también hay texto, enviar como un mensaje separado
+        if (inputText.trim()) {
+          // Crear un mensaje temporal para la UI
+          const tempTextMessage = {
+            id: `temp-${Date.now()}`,
+            sender_id: user.id,
+            receiver_id: friendId,
+            content: inputText.trim(),
+            text: inputText.trim(),
+            created_at: new Date().toISOString(),
+            read: false,
+            sender_username: user.username
+          };
+          
+          // Agregar mensaje temporal a la UI
+          setMessages(prevMessages => [...prevMessages, tempTextMessage]);
+          
+          // Enviar mensaje de texto
+          await sendMessage(friendId, inputText.trim());
         }
       }
-
-      // Agregar el mensaje a la UI inmediatamente
-      setMessages(prevMessages => [...prevMessages, newMessage]);
       
       // Limpiar campos
       setInputText('');
@@ -406,16 +525,6 @@ const ChatScreen = () => {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd();
       }, 100);
-
-      // Guardar el mensaje en la base de datos
-      const savedMessage = isGroupChat
-        ? await sendGroupMessage(groupId, inputText.trim(), newMessage.image_url)
-        : await sendMessage(friendId, inputText.trim(), newMessage.image_url);
-        
-      if (!savedMessage) {
-        // Si falla, podríamos mostrar un error o reintentar
-        console.error('Error al enviar mensaje');
-      }
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
       Alert.alert('Error', 'No se pudo enviar el mensaje');
@@ -476,6 +585,23 @@ const ChatScreen = () => {
     
     // Para mensajes grupales, mostrar el nombre del remitente si no es propio
     const shouldShowSender = isGroupChat && !isOwnMessage;
+    
+    // Determinar si el mensaje es una imagen
+    const hasImage = item.image_url || 
+                    (item.content && 
+                     typeof item.content === 'string' && 
+                     item.content.startsWith('http') && 
+                     (item.content.includes('.jpg') || 
+                      item.content.includes('.jpeg') || 
+                      item.content.includes('.png') || 
+                      item.content.includes('.gif') || 
+                      item.content.includes('cloudinary')));
+    
+    // Obtener el contenido de texto del mensaje (solo si no es una imagen)
+    const messageText = !hasImage ? (item.text || item.content || null) : null;
+    
+    // Obtener la URL de la imagen si existe
+    const imageUrl = item.image_url || (hasImage ? item.content : null);
 
     return (
       <View style={[
@@ -486,18 +612,18 @@ const ChatScreen = () => {
           <Text style={styles.messageSender}>{item.sender_username}</Text>
         )}
         
-        {item.image_url && (
-          <TouchableOpacity onPress={() => viewFullImage(item.image_url)}>
+        {imageUrl && (
+          <TouchableOpacity onPress={() => viewFullImage(imageUrl)}>
             <Image 
-              source={{ uri: item.image_url }} 
+              source={{ uri: imageUrl }} 
               style={styles.messageImage} 
               resizeMode="cover"
             />
           </TouchableOpacity>
         )}
         
-        {item.text && (
-          <Text style={styles.messageText}>{item.text}</Text>
+        {messageText && (
+          <Text style={styles.messageText}>{messageText}</Text>
         )}
         
         <Text style={styles.messageTime}>{timeString}</Text>

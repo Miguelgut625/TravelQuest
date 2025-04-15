@@ -23,6 +23,7 @@ import { GlobeViewRef } from '../../components/GlobeView';
 import { shareJourney } from '../../services/shareService';
 import { supabase } from '../../services/supabase';
 import * as Notifications from 'expo-notifications';
+import NotificationService from '../../services/NotificationService';
 
 interface City {
   id: string;
@@ -64,11 +65,19 @@ const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep:
 const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   visible: boolean;
   onClose: () => void;
-  onSelect: (friend: Friend) => void;
+  onSelect: (friends: Friend[]) => void;
 }) => {
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const user = useSelector((state: RootState) => state.auth.user);
+
+  // Limpiar la selección cuando se abre el modal
+  useEffect(() => {
+    if (visible) {
+      setSelectedFriends([]);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -112,33 +121,138 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
     }
   }, [visible, user]);
 
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriends(current => {
+      if (current.includes(friendId)) {
+        return current.filter(id => id !== friendId);
+      } else {
+        return [...current, friendId];
+      }
+    });
+  };
+
+  const selectAllFriends = () => {
+    if (selectedFriends.length === friends.length) {
+      // Si todos están seleccionados, deseleccionar todos
+      setSelectedFriends([]);
+    } else {
+      // Seleccionar todos
+      setSelectedFriends(friends.map(friend => friend.user2Id));
+    }
+  };
+
+  const handleShareWithSelected = () => {
+    if (selectedFriends.length === 0) {
+      Alert.alert('Selección vacía', 'Por favor, selecciona al menos un amigo para compartir el viaje.');
+      return;
+    }
+
+    const selectedFriendsObjects = friends.filter(friend => 
+      selectedFriends.includes(friend.user2Id)
+    );
+    
+    onSelect(selectedFriendsObjects);
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
       <View style={styles.shareModalOverlay}>
         <View style={styles.shareModalContent}>
-          <Text style={styles.shareModalTitle}>¿Quieres compartir tu aventura?</Text>
-          <Text style={styles.shareModalSubtitle}>Selecciona un amigo para compartir este viaje</Text>
+          <View style={styles.modalHeader}>
+            <Text style={styles.shareModalTitle}>Compartir Aventura</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.shareModalSubtitle}>
+            Selecciona a los amigos con los que quieres compartir este viaje
+          </Text>
+          
+          {!loading && friends.length > 0 && (
+            <TouchableOpacity 
+              style={styles.selectAllButton} 
+              onPress={selectAllFriends}
+            >
+              <Text style={styles.selectAllText}>
+                {selectedFriends.length === friends.length 
+                  ? "Deseleccionar todos" 
+                  : "Seleccionar todos"}
+              </Text>
+              <Ionicons 
+                name={selectedFriends.length === friends.length 
+                  ? "checkmark-circle" 
+                  : "checkmark-circle-outline"} 
+                size={20} 
+                color="#005F9E" 
+              />
+            </TouchableOpacity>
+          )}
+          
           {loading ? (
-            <ActivityIndicator size="large" color="#005F9E" />
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#005F9E" />
+              <Text style={styles.loadingText}>Cargando amigos...</Text>
+            </View>
           ) : (
             <FlatList
               data={friends}
               keyExtractor={(item) => item.user2Id}
               renderItem={({ item }) => (
-                <TouchableOpacity style={styles.friendItem} onPress={() => onSelect(item)}>
-                  <Text style={styles.friendName}>{item.username}</Text>
-                  <Text style={styles.friendPoints}>Puntos: {item.points}</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.friendItem,
+                    selectedFriends.includes(item.user2Id) && styles.friendItemSelected
+                  ]} 
+                  onPress={() => toggleFriendSelection(item.user2Id)}
+                >
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{item.username}</Text>
+                    <Text style={styles.friendPoints}>Puntos: {item.points}</Text>
+                  </View>
+                  <Ionicons 
+                    name={selectedFriends.includes(item.user2Id) 
+                      ? "checkmark-circle" 
+                      : "ellipse-outline"} 
+                    size={24} 
+                    color={selectedFriends.includes(item.user2Id) ? "#005F9E" : "#ccc"} 
+                  />
                 </TouchableOpacity>
               )}
               ListEmptyComponent={
-                <Text style={styles.emptyText}>No tienes amigos agregados</Text>
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people" size={50} color="#ccc" />
+                  <Text style={styles.emptyText}>No tienes amigos agregados</Text>
+                  <Text style={styles.emptySubtext}>Agrega amigos para poder compartir tus viajes</Text>
+                </View>
               }
             />
           )}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>No compartir</Text>
-            </TouchableOpacity>
+          
+          <View style={styles.footerContainer}>
+            {selectedFriends.length > 0 && (
+              <Text style={styles.selectedCountText}>
+                {selectedFriends.length} {selectedFriends.length === 1 ? 'amigo seleccionado' : 'amigos seleccionados'}
+              </Text>
+            )}
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.shareButton, selectedFriends.length === 0 && styles.disabledButton]} 
+                onPress={handleShareWithSelected}
+                disabled={selectedFriends.length === 0}
+              >
+                <Text style={styles.shareButtonText}>
+                  {selectedFriends.length === 0 
+                    ? "Selecciona amigos" 
+                    : `Compartir (${selectedFriends.length})`}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -715,20 +829,172 @@ const MapScreen = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [generatedJourneyId, setGeneratedJourneyId] = useState<string | null>(null);
 
-  const handleShareJourney = async (friend: Friend) => {
+  const handleShareJourney = async (friends: Friend[]) => {
     if (!generatedJourneyId || !user?.id) return;
 
-    const success = await shareJourney(generatedJourneyId, user.id, friend);
+    setIsLoading(true);
+    setCurrentStep('Compartiendo viaje...');
 
-    if (success) {
+    try {
+      // Obtener información del viaje para crear un solo grupo
+      const { data: journeyData, error: journeyError } = await supabase
+        .from('journeys')
+        .select(`
+          id,
+          description,
+          start_date,
+          end_date,
+          cityId,
+          cities (
+            id,
+            name
+          )
+        `)
+        .eq('id', generatedJourneyId)
+        .single();
+
+      if (journeyError) throw journeyError;
+
+      // Preparar fechas y nombre de la ciudad
+      const startDate = new Date(journeyData.start_date);
+      const endDate = new Date(journeyData.end_date);
+      const cityName = journeyData.cities?.name || 'destino desconocido';
+
+      // Crear un solo grupo para todos los amigos
+      const groupName = `Viaje a ${cityName}`;
+      const description = `Viaje a ${cityName} del ${startDate.toLocaleDateString()} al ${endDate.toLocaleDateString()}`;
+      
+      // Crear el grupo
+      const { data: groupData, error: groupError } = await supabase
+        .from('groups')
+        .insert({
+          name: groupName,
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          journey_id: generatedJourneyId,
+          description
+        })
+        .select('*')
+        .single();
+        
+      if (groupError) throw groupError;
+      
+      // Agregar al creador como miembro y administrador automáticamente
+      const { error: ownerMemberError } = await supabase
+        .from('group_members')
+        .insert({
+          group_id: groupData.id,
+          user_id: user.id,
+          role: 'admin',
+          status: 'accepted',
+          joined_at: new Date().toISOString()
+        });
+
+      if (ownerMemberError) throw ownerMemberError;
+
+      // Añadir cada amigo al grupo y crear journeys_shared
+      const invitationPromises = friends.map(async (friend) => {
+        // Verificar si el viaje ya fue compartido con este amigo
+        const { data: existingShare, error: existingShareError } = await supabase
+          .from('journeys_shared')
+          .select('id, status')
+          .eq('journeyId', generatedJourneyId)
+          .eq('sharedWithUserId', friend.user2Id)
+          .single();
+
+        // Si ya existe y está aceptado, no hacemos nada
+        if (!existingShareError && existingShare && existingShare.status === 'accepted') {
+          return { success: true, message: `El viaje ya fue compartido con ${friend.username} anteriormente.` };
+        }
+
+        // Invitar al amigo al grupo creado
+        const { data: invitationData, error: invitationError } = await supabase
+          .from('group_members')
+          .insert({
+            group_id: groupData.id,
+            user_id: friend.user2Id,
+            role: 'member',
+            status: 'pending'
+          })
+          .select('id')
+          .single();
+
+        if (invitationError) throw invitationError;
+
+        // Guardar en journeys_shared con estado pendiente - sin usar la columna groupId
+        if (existingShareError || !existingShare) {
+          const { error } = await supabase
+            .from('journeys_shared')
+            .insert({
+              journeyId: generatedJourneyId,
+              ownerId: user.id,
+              sharedWithUserId: friend.user2Id,
+              status: 'pending'
+              // Eliminamos la referencia a groupId que no existe en la tabla
+            });
+
+          if (error) throw error;
+        } else {
+          // Actualizar el registro existente
+          const { error } = await supabase
+            .from('journeys_shared')
+            .update({
+              status: 'pending'
+              // Eliminamos la referencia a groupId que no existe en la tabla
+            })
+            .eq('id', existingShare.id);
+
+          if (error) throw error;
+        }
+
+        // Enviar notificación a cada amigo
+        const notificationService = NotificationService.getInstance();
+        await notificationService.notifyJourneyInvitation(
+          friend.user2Id,
+          journeyData.description,
+          user.username || 'Usuario',
+          cityName,
+          startDate,
+          endDate,
+          invitationData.id,
+          generatedJourneyId
+        );
+
+        return { success: true };
+      });
+
+      // Esperar a que se completen todas las invitaciones
+      const results = await Promise.all(invitationPromises);
+      
+      // Verificar si todas las invitaciones se enviaron correctamente
+      const allSuccessful = results.every(result => result.success === true);
+      
+      if (allSuccessful) {
+        Alert.alert(
+          'Éxito', 
+          `Viaje compartido con ${friends.length} ${friends.length === 1 ? 'amigo' : 'amigos'} en un grupo`
+        );
+      } else {
+        Alert.alert(
+          'Información', 
+          'Algunos amigos no pudieron ser invitados. Se han enviado las invitaciones posibles.'
+        );
+      }
+      
       navigation.navigate('Missions', {
         journeyId: generatedJourneyId,
         challenges: []
       });
+    } catch (error) {
+      console.error('Error compartiendo viaje:', error);
+      Alert.alert('Error', 'Hubo un problema al compartir el viaje');
+    } finally {
+      setIsLoading(false);
+      setCurrentStep('');
+      setShowShareModal(false);
+      setGeneratedJourneyId(null);
     }
-
-    setShowShareModal(false);
-    setGeneratedJourneyId(null);
   };
 
   const handleSearch = async () => {
@@ -740,28 +1006,35 @@ const MapScreen = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
 
+      let needsDateAdjustment = false;
+      let newStartDate = startDate;
+      let newEndDate = endDate;
+
       if (startDate && startDate < today) {
         // Si la fecha de inicio es pasada, ajustarla a hoy
         console.log('Ajustando fecha de inicio pasada a la fecha actual');
-        const newStartDate = new Date(today);
-        setStartDate(newStartDate);
+        newStartDate = new Date(today);
+        needsDateAdjustment = true;
         
         if (endDate && (endDate < today || endDate < newStartDate)) {
           // Si la fecha de fin también es inválida, avanzarla 3 días desde hoy
-          const newEndDate = new Date(today);
+          newEndDate = new Date(today);
           newEndDate.setDate(today.getDate() + 3);
-          setEndDate(newEndDate);
-          onDatesChange([newStartDate, newEndDate]);
-          
-          // Mostrar alerta informando al usuario
-          Alert.alert(
-            "Fechas ajustadas", 
-            "Las fechas seleccionadas eran pasadas y han sido ajustadas a fechas futuras.",
-            [{ text: "OK" }]
-          );
-        } else {
-          onDatesChange([newStartDate, endDate]);
         }
+      }
+
+      // Aplicar los cambios de fecha si es necesario
+      if (needsDateAdjustment) {
+        setStartDate(newStartDate);
+        setEndDate(newEndDate);
+        onDatesChange([newStartDate, newEndDate]);
+        
+        // Mostrar alerta informando al usuario
+        Alert.alert(
+          "Fechas ajustadas", 
+          "Las fechas seleccionadas eran pasadas y han sido ajustadas a fechas futuras.",
+          [{ text: "OK" }]
+        );
       }
       
       if (!user?.id) {
@@ -769,12 +1042,17 @@ const MapScreen = () => {
         return;
       }
 
-      if (!duration || duration <= 0) {
+      // Calcular duración actualizada por si acaba de cambiar
+      const updatedDuration = newStartDate && newEndDate 
+        ? calculateDuration(newStartDate, newEndDate) 
+        : duration;
+
+      if (!updatedDuration || updatedDuration <= 0) {
         setErrorMsg('Por favor, selecciona fechas válidas para crear un viaje');
         return;
       }
 
-      if (!startDate || !endDate) {
+      if (!newStartDate || !newEndDate) {
         setErrorMsg('Selecciona fechas de inicio y fin');
         return;
       }
@@ -806,11 +1084,11 @@ const MapScreen = () => {
         // Llamar a la API para generar las misiones con el nombre real de la ciudad
         const result = await generateMission(
           cityName,
-          duration,
+          updatedDuration, // Usar la duración actualizada
           missionCountNum,
           user.id,
-          startDate,
-          endDate,
+          newStartDate, // Usar las fechas ajustadas
+          newEndDate,
           selectedTags // Pasar los tags seleccionados
         );
         
@@ -1550,47 +1828,123 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   shareModalTitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    color: '#005F9E',
+    marginBottom: 5,
   },
   shareModalSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 20,
+    marginBottom: 15,
+  },
+  selectAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 10,
+    padding: 5,
+  },
+  selectAllText: {
+    fontSize: 14,
+    color: '#005F9E',
+    marginRight: 5,
   },
   friendItem: {
-    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  friendInfo: {
+    flex: 1,
+  },
   friendName: {
     fontSize: 16,
+    fontWeight: 'bold',
     color: '#333',
   },
   friendPoints: {
     fontSize: 14,
     color: '#666',
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+  friendItemSelected: {
+    backgroundColor: '#e6f2ff',
+    borderRadius: 5,
+  },
+  footerContainer: {
+    marginTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 15,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
   cancelButton: {
-    backgroundColor: '#005F9E',
-    padding: 10,
+    backgroundColor: '#f5f5f5',
+    padding: 12,
     borderRadius: 5,
+    flex: 1,
+    marginRight: 10,
+    alignItems: 'center',
   },
   cancelButtonText: {
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  shareButton: {
+    backgroundColor: '#005F9E',
+    padding: 12,
+    borderRadius: 5,
+    flex: 2,
+    alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  shareButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  selectedCountText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  closeButton: {
+    padding: 5,
   },
 });
 
