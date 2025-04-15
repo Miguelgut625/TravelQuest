@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { uploadImageToCloudinary } from './cloudinaryService';
-import { sendPushNotification } from './notificationService';
+import { sendPushNotification } from './NotificationService';
 
 export interface Message {
   id: string;
@@ -15,7 +15,7 @@ export interface Message {
 export const sendMessage = async (senderId: string, receiverId: string, content: string): Promise<Message | null> => {
   try {
     console.log(`Enviando mensaje: De ${senderId} a ${receiverId} - Contenido: ${content.substring(0, 20)}...`);
-    
+
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -34,7 +34,7 @@ export const sendMessage = async (senderId: string, receiverId: string, content:
     }
 
     console.log('Mensaje enviado con éxito:', data);
-    
+
     // Obtener información del remitente para la notificación
     try {
       const { data: senderData, error: userError } = await supabase
@@ -42,12 +42,12 @@ export const sendMessage = async (senderId: string, receiverId: string, content:
         .select('username')
         .eq('id', senderId)
         .single();
-        
+
       if (!userError && senderData) {
         // Enviar notificación push al destinatario
         sendNewMessageNotification(
-          receiverId, 
-          senderData.username || 'Usuario', 
+          receiverId,
+          senderData.username || 'Usuario',
           content,
           senderId
         ).catch(notifError => {
@@ -69,17 +69,17 @@ export const sendMessage = async (senderId: string, receiverId: string, content:
 export const sendImageMessage = async (senderId: string, receiverId: string, imageUri: string): Promise<Message | null> => {
   try {
     console.log(`Enviando mensaje con imagen: De ${senderId} a ${receiverId}`);
-    
+
     // Subir la imagen a Cloudinary
     const chatImageId = `chat_${senderId}_${receiverId}_${Date.now()}`;
     const imageUrl = await uploadImageToCloudinary(imageUri, chatImageId);
-    
+
     if (!imageUrl) {
       throw new Error('No se pudo subir la imagen');
     }
-    
+
     console.log('Imagen subida a Cloudinary:', imageUrl);
-    
+
     // Crear el mensaje usando la URL de la imagen directamente como el contenido
     const { data, error } = await supabase
       .from('messages')
@@ -97,7 +97,7 @@ export const sendImageMessage = async (senderId: string, receiverId: string, ima
       console.error('Error enviando mensaje con imagen:', error);
       throw error;
     }
-    
+
     // Obtener información del remitente para la notificación
     try {
       const { data: senderData, error: userError } = await supabase
@@ -105,12 +105,12 @@ export const sendImageMessage = async (senderId: string, receiverId: string, ima
         .select('username')
         .eq('id', senderId)
         .single();
-        
+
       if (!userError && senderData) {
         // Enviar notificación push al destinatario
         sendNewMessageNotification(
-          receiverId, 
-          senderData.username || 'Usuario', 
+          receiverId,
+          senderData.username || 'Usuario',
           '📷 Te ha enviado una imagen',
           senderId
         ).catch(notifError => {
@@ -133,7 +133,7 @@ export const sendImageMessage = async (senderId: string, receiverId: string, ima
 export const getConversation = async (userId1: string, userId2: string): Promise<Message[]> => {
   try {
     console.log(`Obteniendo conversación entre ${userId1} y ${userId2}`);
-    
+
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -146,11 +146,11 @@ export const getConversation = async (userId1: string, userId2: string): Promise
     }
 
     console.log(`Conversación entre ${userId1} y ${userId2} cargada: ${data?.length || 0} mensajes`);
-    
+
     if (data && data.length > 0) {
       console.log('Último mensaje:', data[data.length - 1]);
     }
-    
+
     return data || [];
   } catch (error) {
     console.error('Error inesperado obteniendo conversación:', error);
@@ -162,7 +162,7 @@ export const getConversation = async (userId1: string, userId2: string): Promise
 export const markMessagesAsRead = async (receiverId: string, senderId: string): Promise<void> => {
   try {
     console.log(`Marcando mensajes como leídos: De ${senderId} a ${receiverId}`);
-    
+
     const { error } = await supabase
       .from('messages')
       .update({ read: true })
@@ -174,7 +174,7 @@ export const markMessagesAsRead = async (receiverId: string, senderId: string): 
       console.error('Error marcando mensajes como leídos:', error);
       throw error;
     }
-    
+
     console.log(`Mensajes de ${senderId} a ${receiverId} marcados como leídos`);
   } catch (error) {
     console.error('Error inesperado marcando mensajes como leídos:', error);
@@ -194,7 +194,7 @@ export const subscribeToMessages = (
     const channelName = `messages_${sortedIds.join('_')}`;
 
     console.log(`Creando suscripción a canal: ${channelName}`);
-  
+
     // Definir el filtro de forma directa para evitar problemas con caracteres especiales
     const channel = supabase
       .channel(channelName)
@@ -210,15 +210,15 @@ export const subscribeToMessages = (
         (payload: { new: Message }) => {
           const message = payload.new;
           console.log('Mensaje recibido en canal:', message);
-          
+
           // Verificar si el mensaje pertenece a la conversación que nos interesa
           const isRelevantMessage = friendId
             ? (message.sender_id === userId && message.receiver_id === friendId) ||
-              (message.sender_id === friendId && message.receiver_id === userId)
+            (message.sender_id === friendId && message.receiver_id === userId)
             : message.sender_id === userId || message.receiver_id === userId;
-          
+
           console.log(`¿Mensaje relevante para ${userId}? ${isRelevantMessage}`);
-          
+
           if (isRelevantMessage) {
             onNewMessage(message);
           }
@@ -226,18 +226,18 @@ export const subscribeToMessages = (
       )
       .subscribe((status) => {
         console.log(`Estado de suscripción a canal ${channelName}:`, status);
-        
+
         if (status === 'SUBSCRIBED') {
           console.log(`✅ Canal ${channelName} suscrito correctamente`);
         }
-        
+
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           console.error(`❌ Error en canal ${channelName}, intentando reconectar...`);
           // Eliminamos el intento de reconexión automática ya que puede causar el error
           // "tried to subscribe multiple times"
         }
       });
-    
+
     return channel;
   } catch (error) {
     console.error('Error al configurar suscripción:', error);
@@ -287,23 +287,4 @@ export const countUnreadMessages = async (userId: string): Promise<number> => {
     console.error('Error inesperado contando mensajes no leídos:', error);
     throw error;
   }
-};
-
-// Función para enviar notificación de mensaje nuevo
-export async function sendNewMessageNotification(
-  receiverId: string, 
-  senderName: string, 
-  messagePreview: string,
-  senderId: string
-) {
-  return sendPushNotification(
-    receiverId,
-    `Mensaje de ${senderName}`,
-    messagePreview.length > 50 ? messagePreview.substring(0, 47) + '...' : messagePreview,
-    { 
-      type: 'new_message', 
-      senderId: senderId,
-      senderName: senderName 
-    }
-  );
-} 
+}; 

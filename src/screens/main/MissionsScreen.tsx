@@ -82,7 +82,7 @@ const getTimeRemaining = (endDate: string) => {
   const now = new Date();
   const end = new Date(endDate);
   const diff = end.getTime() - now.getTime();
-  
+
   if (diff <= 0) {
     return {
       isExpired: true,
@@ -112,8 +112,8 @@ const getTimeRemaining = (endDate: string) => {
   }
 };
 
-const MissionCard = ({ mission, onComplete, onShare }: { 
-  mission: JourneyMission; 
+const MissionCard = ({ mission, onComplete, onShare }: {
+  mission: JourneyMission;
   onComplete: (imageUrl?: string) => void;
   onShare: () => void;
 }) => {
@@ -184,8 +184,8 @@ const MissionCard = ({ mission, onComplete, onShare }: {
   );
 };
 
-const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress }: { 
-  cityName: string; 
+const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress }: {
+  cityName: string;
   totalMissions: number;
   completedMissions: number;
   expiredMissions?: number;
@@ -203,19 +203,19 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
       <Ionicons name="chevron-forward" size={24} color="#666" />
     </View>
     <View style={styles.progressBar}>
-      <View 
+      <View
         style={[
-          styles.progressFill, 
+          styles.progressFill,
           { width: `${(completedMissions / totalMissions) * 100}%` }
-        ]} 
+        ]}
       />
     </View>
   </TouchableOpacity>
 );
 
-const FriendSelectionModal = ({ visible, onClose, onSelect }: { 
-  visible: boolean; 
-  onClose: () => void; 
+const FriendSelectionModal = ({ visible, onClose, onSelect }: {
+  visible: boolean;
+  onClose: () => void;
   onSelect: (friend: Friend) => void;
 }) => {
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -375,7 +375,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     }
 
     try {
-      const { data: journeys, error: journeysError } = await supabase
+      // Obtener viajes propios
+      const { data: ownJourneys, error: ownJourneysError } = await supabase
         .from('journeys')
         .select(`
           id,
@@ -401,15 +402,54 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         .eq('userId', user.id)
         .order('created_at', { ascending: false });
 
-      if (journeysError) throw journeysError;
+      if (ownJourneysError) throw ownJourneysError;
 
-      if (!journeys || journeys.length === 0) {
+      // Obtener viajes compartidos
+      const { data: sharedJourneys, error: sharedJourneysError } = await supabase
+        .from('journeys_shared')
+        .select(`
+          journeyId,
+          journeys!inner (
+            id,
+            description,
+            created_at,
+            cities (
+              name
+            ),
+            journeys_missions!inner (
+              id,
+              completed,
+              challengeId,
+              end_date,
+              challenges!inner (
+                id,
+                title,
+                description,
+                difficulty,
+                points
+              )
+            )
+          )
+        `)
+        .eq('sharedWithUserId', user.id)
+        .eq('status', 'accepted')
+        .order('shared_at', { ascending: false });
+
+      if (sharedJourneysError) throw sharedJourneysError;
+
+      // Combinar viajes propios y compartidos
+      const allJourneys = [
+        ...(ownJourneys || []),
+        ...(sharedJourneys?.map(shared => shared.journeys) || [])
+      ];
+
+      if (allJourneys.length === 0) {
         setError('No hay viajes disponibles');
         setLoading(false);
         return;
       }
 
-      const allMissions = journeys.flatMap((journey: Journey) => 
+      const allMissions = allJourneys.flatMap((journey: Journey) =>
         journey.journeys_missions.map((jm) => ({
           id: jm.id,
           completed: jm.completed,
@@ -456,15 +496,15 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     if (!user?.id) return;
-    
+
     try {
       setCompletingMission(true);
-      
+
       // Encontrar la misión en el estado local
       let foundMissionTitle = '';
       let foundMissionPoints = 0;
       let foundCityName = '';
-      
+
       Object.keys(cityMissions).forEach((cityName) => {
         const pending = cityMissions[cityName].pending;
         const foundMission = pending.find((m) => m.id === missionId);
@@ -474,11 +514,11 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           foundCityName = cityName;
         }
       });
-      
+
       if (!foundMissionTitle || !foundCityName) {
         throw new Error('Misión no encontrada');
       }
-      
+
       // Guardar información básica de la misión antes de completarla
       setCompletedMissionInfo({
         title: foundMissionTitle,
@@ -491,8 +531,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       // Completar misión en la base de datos
       await completeMission(
-        missionId, 
-        user?.id || '', 
+        missionId,
+        user?.id || '',
         imageUrl
       );
 
@@ -501,10 +541,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       // Añadir experiencia y verificar si subió de nivel
       const experienceResult = await addExperienceToUser(user.id, foundMissionPoints);
-      
+
       // Actualizar la información de misión completada con datos de experiencia
       setCompletedMissionInfo(prev => ({
-        ...prev, 
+        ...prev,
         levelUp: experienceResult.leveledUp,
         newLevel: experienceResult.level,
         xpGained: foundMissionPoints,
@@ -529,27 +569,27 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       setCityMissions((prev) => {
         const updatedMissions = { ...prev };
         const city = updatedMissions[foundCityName];
-        
+
         // Encontrar el índice de la misión en las pendientes
         const index = city.pending.findIndex((m) => m.id === missionId);
-        
+
         if (index !== -1) {
           // Obtener la misión y marcarla como completada
           const mission = { ...city.pending[index], completed: true };
-          
+
           // Eliminar la misión de pendientes
           city.pending.splice(index, 1);
-          
+
           // Añadir la misión a completadas
           city.completed.push(mission);
         }
-        
+
         return updatedMissions;
       });
 
       // Actualizar la UI de puntos
       setUserPoints((prev) => prev + foundMissionPoints);
-      
+
       // Actualizar el estado global
       dispatch(dispatchCompleteMission(missionId));
       dispatch(setRefreshJournal(true));
@@ -573,7 +613,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         setMissionCompleted(false);
         navigation.navigate('Journal', { refresh: true });
       }, 3000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [missionCompleted, navigation]);
@@ -583,7 +623,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       Alert.alert('Error', 'No se pudo compartir el journey porque no se encontró el ID del viaje.');
       return;
     }
-    
+
     try {
       const { error } = await supabase
         .from('journeys_shared')
@@ -659,19 +699,20 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => setSelectedCity(null)}
+          activeOpacity={0.7}
         >
           {/* @ts-ignore */}
           <Ionicons name="arrow-back" size={24} color="#333" />
-          <Text style={styles.backButtonText}>Ciudades</Text>
+          <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
         <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
       </View>
-      
+
       <Text style={styles.cityTitle}>{selectedCity}</Text>
-      
+
       <ScrollView style={styles.missionsList}>
         {cityData.pending.length > 0 && (
           <>
@@ -698,7 +739,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               <MissionCard
                 key={mission.id}
                 mission={mission}
-                onComplete={() => {}}
+                onComplete={() => { }}
                 onShare={() => setIsShareModalVisible(true)}
               />
             ))}
@@ -716,7 +757,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               <MissionCard
                 key={mission.id}
                 mission={mission}
-                onComplete={() => {}}
+                onComplete={() => { }}
                 onShare={() => setIsShareModalVisible(true)}
               />
             ))}
@@ -733,14 +774,14 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           navigation.navigate('Journal', { refresh: true });
         }}
       />
-      
+
       {/* Modal de carga durante el proceso */}
       <CompletingMissionModal
         visible={completingMission && !missionCompleted}
       />
 
-      <FriendSelectionModal 
-        visible={isShareModalVisible} 
+      <FriendSelectionModal
+        visible={isShareModalVisible}
         onClose={() => setIsShareModalVisible(false)}
         onSelect={handleShareJourney}
       />
@@ -763,11 +804,18 @@ const styles = StyleSheet.create({
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 10,
+    marginRight: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    minWidth: 100,
+    justifyContent: 'center'
   },
   backButtonText: {
     fontSize: 16,
     marginLeft: 5,
     color: '#333',
+    fontWeight: '500'
   },
   cityTitle: {
     fontSize: 28,

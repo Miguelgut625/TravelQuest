@@ -25,7 +25,7 @@ export const getFriends = async (userId: string) => {
         }
 
         return {
-          user2_id: friend.user2Id,
+          user2Id: friend.user2Id,
           username: userData.username,
           points: userData.points
         };

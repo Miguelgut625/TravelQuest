@@ -18,7 +18,7 @@ import { countUnreadMessages } from '../../services/messageService';
 import { getFriends } from '../../services/friendService';
 
 interface Friend {
-  user2_id: string;
+  user2Id: string;
   username: string;
   points: number;
   unreadMessages?: number;
@@ -41,7 +41,7 @@ const FriendsScreen = () => {
     try {
       // Usar el servicio de amigos para obtener la lista
       const friendsList = await getFriends(user.id);
-      
+
       // Añadir conteo de mensajes no leídos para cada amigo
       const friendsWithUnread = await Promise.all(
         friendsList.map(async (friend) => {
@@ -88,9 +88,9 @@ const FriendsScreen = () => {
 
   // Renderizar cada item del amigo
   const renderFriendItem = ({ item }: { item: Friend }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.friendItem}
-      onPress={() => openChat(item.user2_id, item.username)}
+      onPress={() => openChat(item.user2Id, item.username)}
     >
       <View style={styles.friendInfo}>
         <Text style={styles.friendName}>{item.username}</Text>
@@ -102,7 +102,6 @@ const FriendsScreen = () => {
             <Text style={styles.badgeText}>{item.unreadMessages}</Text>
           </View>
         )}
-        {/* @ts-ignore */}
         <Ionicons name="chatbubble-outline" size={24} color="#005F9E" />
       </View>
     </TouchableOpacity>
@@ -120,7 +119,7 @@ const FriendsScreen = () => {
       ) : (
         <FlatList
           data={friends}
-          keyExtractor={(item) => item.user2_id.toString()}
+          keyExtractor={(item) => item.user2Id.toString()}
           renderItem={renderFriendItem}
           refreshControl={
             <RefreshControl
