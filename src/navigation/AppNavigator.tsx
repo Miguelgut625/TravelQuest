@@ -83,13 +83,13 @@ const MainFlow = () => {
 
   return (
     <Stack.Navigator>
-      <Stack.Screen 
-        name="TabNavigator" 
-        component={TabNavigator} 
+      <Stack.Screen
+        name="TabNavigator"
+        component={TabNavigator}
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="Chat" 
+      <Stack.Screen
+        name="Chat"
         component={ChatScreen}
         options={{
           headerShown: false,
@@ -107,7 +107,7 @@ const MainFlow = () => {
 // @ts-ignore
 const TabNavigator = () => {
   const theme = useTheme();
-  
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -129,7 +129,7 @@ const TabNavigator = () => {
           } else if (route.name === 'Conversations') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           }
-          
+
           // @ts-ignore
           return <Ionicons name={iconName} size={size || 24} color={color} />;
         },
@@ -138,10 +138,10 @@ const TabNavigator = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen 
-        name="Map" 
-        component={MapScreen} 
-        options={{ 
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{
           title: 'Map'
         }}
       />

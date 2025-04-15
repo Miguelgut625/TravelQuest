@@ -21,6 +21,8 @@ import { FontAwesome } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import FallbackView from '../../components/FallbackView';
 import { GlobeViewRef } from '../../components/GlobeView';
+import { shareJourney } from '../../services/shareService';
+import { getFriends } from '../../services/friendService';
 
 interface City {
   id: string;
@@ -66,10 +68,10 @@ const DateRangePickerMobile: React.FC<{
 
   useEffect(() => {
     if (startDateProp !== startDate) {
-    setStartDate(startDateProp);
+      setStartDate(startDateProp);
     }
     if (endDateProp !== endDate) {
-    setEndDate(endDateProp);
+      setEndDate(endDateProp);
     }
   }, [startDateProp, endDateProp]);
 
@@ -85,32 +87,32 @@ const DateRangePickerMobile: React.FC<{
 
   const updateMarkedDates = (start: Date | null, end: Date | null) => {
     if (!start) return;
-    
+
     const newMarkedDates: any = {};
-    
+
     // Marcar fecha de inicio
     const startDateStr = start.toISOString().split('T')[0];
     newMarkedDates[startDateStr] = {
-        startingDay: true, 
-        color: '#005F9E',
-        textColor: 'white'
-      };
-    
+      startingDay: true,
+      color: '#005F9E',
+      textColor: 'white'
+    };
+
     // Si hay fecha de fin, marcar días intermedios y fecha de fin
     if (end && start <= end) {
       let currentDate = new Date(start);
       currentDate.setDate(currentDate.getDate() + 1);
-      
+
       // Marcar días intermedios
       while (currentDate < end) {
         const dateStr = currentDate.toISOString().split('T')[0];
-        newMarkedDates[dateStr] = { 
+        newMarkedDates[dateStr] = {
           color: '#e6f2ff',
           textColor: '#005F9E'
         };
         currentDate.setDate(currentDate.getDate() + 1);
       }
-      
+
       // Marcar fecha de fin
       const endDateStr = end.toISOString().split('T')[0];
       newMarkedDates[endDateStr] = {
@@ -119,14 +121,14 @@ const DateRangePickerMobile: React.FC<{
         textColor: 'white'
       };
     }
-    
+
     setMarkedDates(newMarkedDates);
   };
 
   const handleDayPress = (day: any) => {
     const date = new Date(day.dateString);
     date.setHours(12, 0, 0, 0); // Mediodía para evitar problemas de zona horaria
-    
+
     if (!startDate || (startDate && endDate)) {
       // Si no hay fecha de inicio o ambas fechas están establecidas, empezar de nuevo
       setStartDate(date);
@@ -163,7 +165,7 @@ const DateRangePickerMobile: React.FC<{
     if (isFormCollapsed && setIsFormCollapsed) {
       setIsFormCollapsed(false);
     }
-    
+
     // Luego cambiar el estado del calendario
     setShowCalendar(!showCalendar);
   };
@@ -179,7 +181,7 @@ const DateRangePickerMobile: React.FC<{
           <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="white" />
         </View>
       </TouchableOpacity>
-      
+
       {showCalendar && (
         <Modal
           transparent={true}
@@ -195,28 +197,28 @@ const DateRangePickerMobile: React.FC<{
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              
-          <Calendar
+
+              <Calendar
                 markingType={'period'}
                 markedDates={markedDates}
-            onDayPress={handleDayPress}
+                onDayPress={handleDayPress}
                 monthFormat={'MMMM yyyy'}
                 hideExtraDays={true}
                 firstDay={1}
                 enableSwipeMonths={true}
-            theme={{
-              calendarBackground: '#ffffff',
-              textSectionTitleColor: '#b6c1cd',
-              selectedDayBackgroundColor: '#005F9E',
-              selectedDayTextColor: '#ffffff',
-              todayTextColor: '#005F9E',
-              dayTextColor: '#2d4150',
-              textDisabledColor: '#d9e1e8',
-              dotColor: '#005F9E',
-              selectedDotColor: '#ffffff',
-              arrowColor: '#005F9E',
-              monthTextColor: '#005F9E',
-              indicatorColor: '#005F9E',
+                theme={{
+                  calendarBackground: '#ffffff',
+                  textSectionTitleColor: '#b6c1cd',
+                  selectedDayBackgroundColor: '#005F9E',
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: '#005F9E',
+                  dayTextColor: '#2d4150',
+                  textDisabledColor: '#d9e1e8',
+                  dotColor: '#005F9E',
+                  selectedDotColor: '#ffffff',
+                  arrowColor: '#005F9E',
+                  monthTextColor: '#005F9E',
+                  indicatorColor: '#005F9E',
                   textDayFontWeight: '300',
                   textDayHeaderFontWeight: '300',
                   textDayFontSize: 14,
@@ -224,18 +226,18 @@ const DateRangePickerMobile: React.FC<{
                   textDayHeaderFontSize: 12
                 }}
               />
-            
+
               <View style={styles.durationContainer}>
                 <Text style={styles.durationText}>
                   Duración: {calculateDuration(startDate, endDate)} días
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.calendarCloseButton}
                   onPress={() => setShowCalendar(false)}
                 >
                   <Text style={styles.calendarCloseButtonText}>Aplicar</Text>
                 </TouchableOpacity>
-        </View>
+              </View>
             </View>
           </View>
         </Modal>
@@ -244,7 +246,6 @@ const DateRangePickerMobile: React.FC<{
   );
 };
 
-// En lugar de usar react-datepicker, crear un componente propio para web
 const DateRangePickerWeb: React.FC<{
   startDateProp: Date | null;
   endDateProp: Date | null;
@@ -255,35 +256,20 @@ const DateRangePickerWeb: React.FC<{
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
-  const calendarRef = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
     if (startDateProp !== startDate) {
-    setStartDate(startDateProp);
+      setStartDate(startDateProp);
     }
     if (endDateProp !== endDate) {
-    setEndDate(endDateProp);
+      setEndDate(endDateProp);
     }
   }, [startDateProp, endDateProp]);
-  
-  useEffect(() => {
-    // Cerrar el calendario al hacer clic fuera
-    const handleClickOutside = (event: MouseEvent) => {
-      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
-        setShowCalendar(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const calculateDuration = (start: Date | null, end: Date | null): number => {
     if (!start || !end) return 0;
     const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Incluir el día de inicio y fin
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
 
   const formatDate = (date: Date | null): string => {
@@ -296,26 +282,26 @@ const DateRangePickerWeb: React.FC<{
     if (!endDate) return `Desde ${formatDate(startDate)}`;
     return `${formatDate(startDate)} - ${formatDate(endDate)}`;
   };
-  
+
   const handleDateClick = (date: Date) => {
     if (!startDate || (startDate && endDate)) {
-      // Si no hay fecha de inicio o ambas fechas están establecidas, empezar de nuevo
       setStartDate(date);
       setEndDate(null);
       onDatesChange([date, null]);
     } else {
-      // Si ya hay fecha de inicio pero no de fin
       if (date < startDate) {
-        // Si la fecha seleccionada es anterior a la fecha de inicio, invertir
         setEndDate(startDate);
         setStartDate(date);
         onDatesChange([date, startDate]);
       } else {
-        // Establecer fecha de fin normalmente
         setEndDate(date);
         onDatesChange([startDate, date]);
       }
     }
+  };
+
+  const changeMonth = (delta: number) => {
+    setCurrentMonth(prevMonth => addMonths(prevMonth, delta));
   };
 
   return (
@@ -329,51 +315,187 @@ const DateRangePickerWeb: React.FC<{
           <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="white" />
         </View>
       </TouchableOpacity>
-      
+
       {showCalendar && (
-        <View style={styles.calendarOverlay}>
-          <View 
-            style={styles.calendarContainer}
-            ref={calendarRef as any}
+        <Modal
+          transparent={true}
+          visible={showCalendar}
+          animationType="fade"
+          onRequestClose={() => setShowCalendar(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowCalendar(false)}
           >
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Selecciona fechas</Text>
-              <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.calendarSubtitle}>
-              {format(currentMonth, 'MMMM yyyy', { locale: es })}
-            </Text>
-            
-            <View style={styles.calendarControls}>
-              <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.calendarArrow}>
-                <Ionicons name="chevron-back" size={24} color="#005F9E" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => changeMonth(1)} style={styles.calendarArrow}>
-                <Ionicons name="chevron-forward" size={24} color="#005F9E" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.calendar}>
-              {/* Código del calendario */}
-            </View>
-            
-            <Text style={styles.durationText}>
-              Duración: {calculateDuration(startDate, endDate)} días
-            </Text>
-            
-            <TouchableOpacity 
-              style={styles.calendarCloseButton}
-              onPress={() => setShowCalendar(false)}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={e => e.stopPropagation()}
+              style={styles.calendarContainer}
             >
-              <Text style={styles.calendarCloseButtonText}>Aplicar</Text>
+              <View style={styles.calendarHeader}>
+                <Text style={styles.calendarTitle}>Selecciona fechas</Text>
+                <TouchableOpacity onPress={() => setShowCalendar(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.calendarSubtitle}>
+                {format(currentMonth, 'MMMM yyyy', { locale: es })}
+              </Text>
+
+              <View style={styles.calendarControls}>
+                <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.calendarArrow}>
+                  <Ionicons name="chevron-back" size={24} color="#005F9E" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => changeMonth(1)} style={styles.calendarArrow}>
+                  <Ionicons name="chevron-forward" size={24} color="#005F9E" />
+                </TouchableOpacity>
+              </View>
+
+              <Calendar
+                current={currentMonth.toISOString()}
+                onDayPress={(day) => handleDateClick(new Date(day.timestamp))}
+                markedDates={{
+                  [startDate?.toISOString().split('T')[0] || '']: { selected: true, startingDay: true },
+                  [endDate?.toISOString().split('T')[0] || '']: { selected: true, endingDay: true }
+                }}
+                markingType={'period'}
+                theme={{
+                  calendarBackground: '#ffffff',
+                  selectedDayBackgroundColor: '#005F9E',
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: '#005F9E',
+                  dayTextColor: '#2d4150',
+                  textDisabledColor: '#d9e1e8',
+                  arrowColor: '#005F9E',
+                }}
+              />
+
+              <Text style={styles.durationText}>
+                Duración: {calculateDuration(startDate, endDate)} días
+              </Text>
+
+              <TouchableOpacity
+                style={styles.calendarCloseButton}
+                onPress={() => setShowCalendar(false)}
+              >
+                <Text style={styles.calendarCloseButtonText}>Aplicar</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      )}
+    </View>
+  );
+};
+
+interface Friend {
+  user2Id: string;
+  username: string;
+  points: number;
+}
+
+const FriendSelectionModal = ({ visible, onClose, onSelect }: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (friend: Friend) => void;
+}) => {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  useEffect(() => {
+    if (visible) {
+      const fetchFriends = async () => {
+        if (!user) {
+          setLoading(false);
+          setError('Debes iniciar sesión para compartir viajes');
+          return;
+        }
+        try {
+          setLoading(true);
+          setError(null);
+
+          const friendsList = await getFriends(user.id);
+
+          if (!friendsList || friendsList.length === 0) {
+            setError('No tienes amigos agregados para compartir');
+            setFriends([]);
+            return;
+          }
+
+          setFriends(friendsList);
+        } catch (error) {
+          console.error('Error fetching friends:', error);
+          setError('Error al cargar la lista de amigos');
+          setFriends([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchFriends();
+    }
+  }, [visible, user]);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      transparent
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>¿Quieres compartir tu aventura?</Text>
+          <Text style={styles.modalSubtitle}>Selecciona un amigo para compartir este viaje</Text>
+
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#4CAF50" />
+              <Text style={styles.loadingText}>Cargando amigos...</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.friendsList}>
+              {friends.map((friend) => (
+                <TouchableOpacity
+                  key={friend.user2Id}
+                  style={styles.friendItem}
+                  onPress={() => onSelect(friend)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{friend.username}</Text>
+                    <Text style={styles.friendPoints}>Puntos: {friend.points}</Text>
+                  </View>
+                  <Ionicons name="arrow-forward" size={20} color="#005F9E" />
+                </TouchableOpacity>
+              ))}
+              {friends.length === 0 && (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people-outline" size={40} color="#666" />
+                  <Text style={styles.emptyText}>No tienes amigos agregados</Text>
+                </View>
+              )}
+            </ScrollView>
+          )}
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={onClose}
+            >
+              <Text style={styles.cancelButtonText}>No compartir</Text>
             </TouchableOpacity>
           </View>
         </View>
-      )}
-    </View>
+      </View>
+    </Modal>
   );
 };
 
@@ -412,7 +534,7 @@ const MapScreen = () => {
   });
   // Estado para los tags
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  
+
   // Estado para indicar carga durante cambio de vista
   const [changingView, setChangingView] = useState(false);
   // Nuevo estado para controlar si el formulario está colapsado
@@ -435,7 +557,7 @@ const MapScreen = () => {
 
   // Función para seleccionar o deseleccionar un tag
   const toggleTag = (tagId: string) => {
-    setSelectedTags(prevTags => 
+    setSelectedTags(prevTags =>
       prevTags.includes(tagId)
         ? prevTags.filter(id => id !== tagId)
         : [...prevTags, tagId]
@@ -445,10 +567,10 @@ const MapScreen = () => {
   // Función para cargar el globo terráqueo de Cesium
   const loadCesiumGlobe = () => {
     console.log("Cargando globo terráqueo de Cesium...");
-    
+
     // Indicar que estamos cargando
     setChangingView(true);
-    
+
     // Recargar el componente forzando una re-renderización
     // Esto es más efectivo que simplemente esperar
     if (webViewRef.current) {
@@ -462,7 +584,7 @@ const MapScreen = () => {
         console.error("Error al recargar WebView:", error);
       }
     }
-    
+
     // Como respaldo, establecer un timeout para quitar el indicador de carga
     setTimeout(() => {
       setChangingView(false);
@@ -479,7 +601,7 @@ const MapScreen = () => {
       console.log('Solicitando permisos de ubicación en segundo plano...');
       let { status } = await Location.requestForegroundPermissionsAsync();
       console.log('Estado de permisos de ubicación:', status);
-      
+
       if (status !== 'granted') {
         console.warn('Permiso de ubicación denegado');
         setErrorLocationMsg('Permiso de ubicación denegado. Usando ubicación por defecto.');
@@ -487,7 +609,7 @@ const MapScreen = () => {
       }
 
       console.log('Permisos concedidos, obteniendo ubicación actual...');
-      
+
       // Configurar opciones para obtener la ubicación
       const options = Platform.OS === 'android' ? {
         accuracy: Location.Accuracy.Balanced,
@@ -497,20 +619,20 @@ const MapScreen = () => {
       } : {
         accuracy: Location.Accuracy.Balanced
       };
-      
+
       console.log('Usando opciones de ubicación:', JSON.stringify(options));
-      
+
       try {
         console.log('Intentando obtener ubicación...');
         let location = await Location.getCurrentPositionAsync(options);
         console.log('Ubicación obtenida:', JSON.stringify(location.coords));
-        
+
         // Actualizar estado con la ubicación obtenida
         setUserLocation({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
         });
-        
+
         // Actualizar el estado de la región del mapa
         setRegion({
           latitude: location.coords.latitude,
@@ -520,7 +642,7 @@ const MapScreen = () => {
         });
       } catch (locationError: any) {
         console.error('Error específico al obtener ubicación:', locationError);
-        
+
         // Intentar con el método getLastKnownPositionAsync como fallback
         console.log('Intentando obtener última ubicación conocida...');
         try {
@@ -531,7 +653,7 @@ const MapScreen = () => {
               latitude: lastLocation.coords.latitude,
               longitude: lastLocation.coords.longitude,
             });
-            
+
             setRegion({
               latitude: lastLocation.coords.latitude,
               longitude: lastLocation.coords.longitude,
@@ -543,7 +665,7 @@ const MapScreen = () => {
         } catch (lastLocError) {
           console.error('Error al obtener última ubicación conocida:', lastLocError);
         }
-        
+
         // No lanzamos error, simplemente dejamos la ubicación por defecto
         setErrorLocationMsg(`No se pudo obtener tu ubicación. Usando ubicación por defecto.`);
       }
@@ -563,7 +685,7 @@ const MapScreen = () => {
   const handleCitySearch = async (text: string) => {
     const upperText = text.toUpperCase();
     setSearchCity(upperText);
-    
+
     if (text.length > 2) {
       try {
         const cities = await searchCities(upperText);
@@ -588,6 +710,32 @@ const MapScreen = () => {
       latitudeDelta: 0.0922,
       longitudeDelta: 0.0421,
     });
+  };
+
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [generatedJourneyId, setGeneratedJourneyId] = useState<string | null>(null);
+
+  const handleShareJourney = async (friend: Friend) => {
+    if (!generatedJourneyId || !user?.id) {
+      Alert.alert('Error', 'No se pudo compartir el viaje');
+      return;
+    }
+
+    try {
+      const success = await shareJourney(generatedJourneyId, user.id, friend);
+      if (success) {
+        navigation.navigate('Missions', {
+          journeyId: generatedJourneyId,
+          challenges: []
+        });
+      }
+    } catch (error) {
+      console.error('Error al compartir viaje:', error);
+      Alert.alert('Error', 'No se pudo compartir el viaje');
+    } finally {
+      setShowShareModal(false);
+      setGeneratedJourneyId(null);
+    }
   };
 
   const handleSearch = async () => {
@@ -636,13 +784,13 @@ const MapScreen = () => {
 
       // Paso 3: Creando misiones
       setCurrentStep(`Creando ${missionCountNum} misiones emocionantes...`);
-      
+
       // Obtener la ciudad seleccionada del filtro de ciudades
       let selectedCity = filteredCities.find(city => city.name.toUpperCase() === searchCity);
-      
+
       // Si no se encuentra una coincidencia exacta, usar la ciudad escrita por el usuario
       const cityName = selectedCity ? selectedCity.name : searchCity;
-      
+
       // Llamar a la API para generar las misiones con el nombre real de la ciudad
       const result = await generateMission(
         cityName,
@@ -653,7 +801,7 @@ const MapScreen = () => {
         validEndDate,
         selectedTags // Pasar los tags seleccionados
       );
-      
+
       if (!result.journeyId) {
         throw new Error('No se recibió el ID del journey');
       }
@@ -662,11 +810,12 @@ const MapScreen = () => {
       setCurrentStep('¡Aventura generada con éxito!');
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Navegar a la pantalla de misiones
-      navigation.navigate('Missions', {
-        journeyId: result.journeyId,
-        challenges: result.challenges || []
-      });
+      // Guardar el ID del journey generado
+      setGeneratedJourneyId(result.journeyId);
+
+      // Mostrar el modal de compartir
+      setShowShareModal(true);
+
     } catch (error) {
       console.error('Error generando misiones:', error);
       setErrorMsg('Error al generar las misiones. Por favor, intenta de nuevo.');
@@ -678,12 +827,12 @@ const MapScreen = () => {
 
   const onDatesChange = (dates: [Date | null, Date | null]) => {
     const [start, end] = dates;
-    
+
     console.log('MapScreen - Fechas seleccionadas:', { start, end });
-    
+
     setStartDate(start);
     setEndDate(end);
-    
+
     if (start && end) {
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const newDuration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Incluir el día de inicio y fin
@@ -740,7 +889,7 @@ const MapScreen = () => {
             </Text>
           </View>
         )}
-        
+
         {isLoadingLocation ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#005F9E" />
@@ -756,7 +905,7 @@ const MapScreen = () => {
         ) : (
           <>
             {/* Globo terráqueo */}
-            <GlobeView 
+            <GlobeView
               ref={globeRef}
               region={region}
               onRegionChange={(reg) => {
@@ -771,14 +920,14 @@ const MapScreen = () => {
               }}
               onError={handleGlobeError}
             />
-            
+
             {/* Botón flotante para recargar el globo */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.floatingButton}
               onPress={retryLoadGlobe}
             >
-              <Ionicons name="refresh" size={20} color="white" style={{marginRight: 5}} />
-              <Text style={{color: 'white', fontWeight: 'bold'}}>Recargar Globo 3D</Text>
+              <Ionicons name="refresh" size={20} color="white" style={{ marginRight: 5 }} />
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>Recargar Globo 3D</Text>
             </TouchableOpacity>
           </>
         )}
@@ -786,7 +935,7 @@ const MapScreen = () => {
 
       {/* Contenedor del formulario, que puede estar colapsado - colocado al final para que se muestre encima */}
       {!isFormCollapsed && (
-        <ScrollView 
+        <ScrollView
           style={[
             styles.searchContainer,
             isSmallScreen && styles.searchContainerSmall
@@ -800,17 +949,17 @@ const MapScreen = () => {
             onChangeText={handleCitySearch}
           />
           {showSuggestions && filteredCities.length > 0 && (
-          <View style={styles.suggestionsList}>
-            {filteredCities.map((city) => (
+            <View style={styles.suggestionsList}>
+              {filteredCities.map((city) => (
                 <TouchableOpacity
-                key={city.id}
+                  key={city.id}
                   style={styles.suggestionItem}
-                onPress={() => handleCitySelect(city)}
+                  onPress={() => handleCitySelect(city)}
                 >
-                <Text style={styles.suggestionText}>{city.name}</Text>
+                  <Text style={styles.suggestionText}>{city.name}</Text>
                 </TouchableOpacity>
-            ))}
-          </View>
+              ))}
+            </View>
           )}
 
           <View style={styles.formRow}>
@@ -821,7 +970,7 @@ const MapScreen = () => {
               onChangeText={setMissionCount}
               keyboardType="numeric"
             />
-            
+
             <DateRangePicker
               startDateProp={startDate}
               endDateProp={endDate}
@@ -830,7 +979,7 @@ const MapScreen = () => {
               setIsFormCollapsed={setIsFormCollapsed}
             />
           </View>
-          
+
           <View style={styles.tagsContainer}>
             {availableTags.map(tag => (
               <TouchableOpacity
@@ -841,7 +990,7 @@ const MapScreen = () => {
                 ]}
                 onPress={() => toggleTag(tag.id)}
               >
-                <Text 
+                <Text
                   style={[
                     styles.tagText,
                     selectedTags.includes(tag.id) && styles.tagTextSelected
@@ -853,7 +1002,7 @@ const MapScreen = () => {
             ))}
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.button,
               (!searchCity || !startDate || !endDate) && styles.buttonDisabled
@@ -879,6 +1028,22 @@ const MapScreen = () => {
           <Text style={styles.loadingText}>Cargando vista...</Text>
         </View>
       )}
+
+      <FriendSelectionModal
+        visible={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          // Si el usuario no quiere compartir, navegar directamente a misiones
+          if (generatedJourneyId) {
+            navigation.navigate('Missions', {
+              journeyId: generatedJourneyId,
+              challenges: []
+            });
+            setGeneratedJourneyId(null);
+          }
+        }}
+        onSelect={handleShareJourney}
+      />
     </View>
   );
 };
@@ -983,6 +1148,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 10,
+    width: '100%',
   },
   buttonDisabled: {
     backgroundColor: '#78909C',
@@ -990,6 +1156,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   errorText: {
     color: '#D32F2F',
@@ -1072,7 +1239,7 @@ const styles = StyleSheet.create({
   calendarOverlay: {
     position: 'absolute',
     top: '100%',
-    left: 0, 
+    left: 0,
     right: 0,
     zIndex: 9999,
     shadowColor: '#000',
@@ -1316,17 +1483,16 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 10,
+    alignItems: 'center'
   },
   modalContent: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
     width: '90%',
     maxWidth: 400,
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
     maxHeight: '80%',
     shadowColor: '#000',
     shadowOffset: {
@@ -1336,6 +1502,66 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+    color: '#005F9E'
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    marginBottom: 8
+  },
+  friendInfo: {
+    flex: 1
+  },
+  friendName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333'
+  },
+  friendPoints: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4
+  },
+  buttonContainer: {
+    marginTop: 20,
+    flexDirection: 'row',
+    justifyContent: 'center'
+  },
+  cancelButton: {
+    backgroundColor: '#f44336'
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 20
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 10,
+    fontSize: 16
   },
 });
 

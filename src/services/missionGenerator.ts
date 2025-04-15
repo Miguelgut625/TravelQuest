@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Accede a tu clave de API como una variable de entorno
 const genAI = new GoogleGenerativeAI("AIzaSyB4PuDOYXgbH9egme1UCO0CiRcOV4kVfMM");
@@ -152,9 +152,9 @@ const getExistingChallenges = async (cityId: string, count: number, userId: stri
 };
 
 export const generateMission = async (
-  cityName: string, 
-  duration: number, 
-  missionCount: number, 
+  cityName: string,
+  duration: number,
+  missionCount: number,
   userId: string,
   startDate: Date | null,
   endDate: Date | null,
@@ -166,26 +166,26 @@ export const generateMission = async (
       endDate,
       duration
     });
-    
+
     console.log('Tags seleccionados:', tags);
-    
+
     // Crear fechas por defecto si no se proporcionan
     const validStartDate = startDate instanceof Date ? startDate : new Date();
     const validEndDate = endDate instanceof Date ? endDate : new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
-    
+
     // Convertir a ISO string para la base de datos
     const startIsoString = validStartDate.toISOString();
     const endIsoString = validEndDate.toISOString();
-    
+
     console.log('Fechas validadas para misiones:', {
       startIsoString,
       endIsoString
     });
-    
-    console.log('Iniciando generación de misión:', { 
-      cityName, 
-      duration, 
-      missionCount, 
+
+    console.log('Iniciando generación de misión:', {
+      cityName,
+      duration,
+      missionCount,
       userId,
       startDate,
       endDate,
@@ -197,16 +197,16 @@ export const generateMission = async (
 
     // Primero, usar Gemini para corregir el nombre de la ciudad
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
+
     const cityCorrectionPrompt = `Corrige el nombre de la ciudad "${cityName}" al nombre oficial y correcto. 
     Devuelve SOLO el nombre corregido, sin explicaciones ni formato adicional. 
     Por ejemplo, si el usuario escribe "akilante", debes devolver "Alicante".`;
-    
+
     console.log('Prompt de corrección de ciudad:', cityCorrectionPrompt);
     const cityCorrectionResult = await model.generateContent(cityCorrectionPrompt);
     const cityCorrectionResponse = await cityCorrectionResult.response;
     const correctedCityName = cityCorrectionResponse.text().trim();
-    
+
     console.log('Nombre de ciudad corregido:', correctedCityName);
 
     // Obtener o crear la ciudad con el nombre corregido
@@ -246,13 +246,13 @@ export const generateMission = async (
     } else {
       // Solo generar nuevos desafíos si no hay suficientes existentes
       console.log('Generando nuevos desafíos');
-      
+
       // Preparar la parte de preferencias para el prompt
       let preferencesText = '';
       if (tags && tags.length > 0) {
         preferencesText = `Las misiones deben basarse en las siguientes preferencias del usuario: ${tags.join(', ')}.`;
       }
-      
+
       // Generar nuevos desafíos
       const missionPrompt = `Genera ${missionCount} misiones en ${correctedCityName} que se puedan completar en ${duration} días. ${preferencesText}
       
@@ -268,7 +268,7 @@ Devuelve un objeto JSON con la siguiente estructura exacta:
   ]
 }
 Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No incluyas explicaciones adicionales, solo el JSON.`;
-      
+
       console.log('Prompt de misiones:', missionPrompt);
       const result = await model.generateContent(missionPrompt);
       const response = await result.response;
