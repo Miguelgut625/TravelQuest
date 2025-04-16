@@ -676,6 +676,68 @@ class NotificationService {
       return false;
     }
   }
+
+  // Método para notificar una solicitud de amistad
+  public async notifyFriendRequest(
+    userId: string,
+    requesterId: string,
+    requesterName: string
+  ) {
+    const title = '¡Nueva solicitud de amistad!';
+    const body = `${requesterName} quiere conectar contigo en TravelQuest`;
+
+    try {
+      // Guardar en base de datos
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          userid: userId,
+          title,
+          message: body,
+          type: 'friend_request',
+          read: false,
+          sender_id: requesterId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error al guardar notificación de solicitud de amistad:', error);
+        return false;
+      }
+
+      // Para plataformas móviles
+      if (Platform.OS !== 'web') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            data: { 
+              type: 'friend_request',
+              requesterId,
+              requesterName 
+            },
+            sound: 'default',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null, // Mostrar inmediatamente
+        });
+      }
+
+      // También enviar notificación push
+      await sendPushNotification(
+        userId,
+        title,
+        body,
+        { type: 'friend_request', requesterId, requesterName }
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Error al enviar notificación de solicitud de amistad:', error);
+      return false;
+    }
+  }
 }
 
 export default NotificationService; 
