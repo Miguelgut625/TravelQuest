@@ -1,6 +1,10 @@
-// @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+/**
+ * JournalScreen.tsx
+ * Corrección del ancho de columnas del diario para móviles y web
+ */
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions, Platform } from 'react-native';
+import Animated from 'react-native/Libraries/Animated/Animated';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
@@ -9,38 +13,59 @@ import { setRefreshJournal } from '../../features/journalSlice';
 import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
+import { styles } from './styles';
 
 interface JournalScreenProps {
   route: RouteProp<TabParamList, 'Journal'>;
 }
 
+interface JournalEntryFromDB {
+  id: string;
+  userid: string;
+  title: string;
+  content: string;
+  created_at: string;
+  photos?: string[];
+  tags?: string[];
+  cityid: string;
+  cities?: {
+    name: string;
+  };
+}
+
 const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
-  <TouchableOpacity style={styles.card}>
-    <Text style={styles.cardTitle}>{entry.title}</Text>
-    <Text style={styles.cardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
-    <Text style={styles.cardContent} numberOfLines={3}>
+  <TouchableOpacity style={styles.journalCard}>
+    <Text style={styles.journalCardTitle}>{entry.title}</Text>
+    <Text style={styles.journalCardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+    {entry.missionId && (
+      <View style={styles.journalMissionBadge}>
+        <Ionicons name="trophy" size={16} color="#4CAF50" />
+        <Text style={styles.journalMissionBadgeText}>Misión Completada</Text>
+      </View>
+    )}
+    <Text style={styles.journalCardContent} numberOfLines={3}>
       {entry.content}
     </Text>
     {entry.photos && entry.photos.length > 0 && (
-      <View style={styles.photoGrid}>
+      <View style={styles.journalPhotoGrid}>
         {entry.photos.slice(0, 3).map((photo, index) => (
           <Image
             key={index}
             source={{ uri: photo }}
-            style={styles.thumbnail}
+            style={styles.journalThumbnail}
             resizeMode="cover"
           />
         ))}
         {entry.photos.length > 3 && (
-          <View style={styles.morePhotos}>
-            <Text style={styles.morePhotosText}>+{entry.photos.length - 3}</Text>
+          <View style={styles.journalMorePhotos}>
+            <Text style={styles.journalMorePhotosText}>+{entry.photos.length - 3}</Text>
           </View>
         )}
       </View>
     )}
-    <View style={styles.tags}>
+    <View style={styles.journalTags}>
       {entry.tags && entry.tags.map((tag, index) => (
-        <Text key={index} style={styles.tag}>
+        <Text key={index} style={styles.journalTag}>
           #{tag}
         </Text>
       ))}
@@ -49,24 +74,165 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
 );
 
 const EmptyState = ({ message }: { message: string }) => (
-  <View style={styles.emptyContainer}>
-    {/* @ts-ignore */}
+  <View style={styles.journalEmptyContainer}>
     <Ionicons name="journal-outline" size={64} color="#ccc" />
-    <Text style={styles.emptyText}>{message}</Text>
+    <Text style={styles.journalEmptyText}>{message}</Text>
   </View>
 );
+
+const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJournalEntry[]; onPress: () => void }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [nextImageIndex, setNextImageIndex] = useState(1);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  
+  // Recopilar todas las fotos de las entradas de la ciudad
+  const allPhotos = entries.reduce<string[]>((photos, entry) => {
+    if (entry.photos && entry.photos.length > 0) {
+      return [...photos, ...entry.photos];
+    }
+    return photos;
+  }, []);
+
+  // Función para animar el deslizamiento
+  const animateSlide = () => {
+    // Reset la animación
+    slideAnim.setValue(0);
+    
+    // Animar hacia la izquierda
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentImageIndex(nextImageIndex);
+      setNextImageIndex((nextImageIndex + 1) % allPhotos.length);
+      slideAnim.setValue(0);
+    });
+  };
+
+  // Efecto para el carrusel automático
+  useEffect(() => {
+    if (allPhotos.length <= 1) return;
+
+    const interval = setInterval(() => {
+      animateSlide();
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [allPhotos.length, nextImageIndex]);
+
+  return (
+    <TouchableOpacity style={styles.journalCityCard} onPress={onPress}>
+      {allPhotos.length > 0 ? (
+        <>
+          <View style={styles.journalCarouselContainer}>
+            <Animated.View
+              style={[
+                styles.journalImageContainer,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -Dimensions.get('window').width]
+                    })
+                  }]
+                }
+              ]}
+            >
+              <Image
+                source={{ uri: allPhotos[currentImageIndex] }}
+                style={styles.journalCityCardBackground}
+                resizeMode="cover"
+              />
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.journalImageContainer,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [Dimensions.get('window').width, 0]
+                    })
+                  }]
+                }
+              ]}
+            >
+              <Image
+                source={{ uri: allPhotos[nextImageIndex] }}
+                style={styles.journalCityCardBackground}
+                resizeMode="cover"
+              />
+            </Animated.View>
+          </View>
+          {allPhotos.length > 1 && (
+            <View style={styles.journalCarouselDots}>
+              {allPhotos.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.journalDot,
+                    index === currentImageIndex && styles.journalActiveDot
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </>
+      ) : (
+        <View style={styles.journalNoImageBackground}>
+          <Ionicons name="image-outline" size={32} color="#666" />
+        </View>
+      )}
+      <View style={styles.journalCityCardOverlay} />
+      <View style={styles.journalCityCardContent}>
+        <View style={styles.journalTextContainer}>
+          <Ionicons name="location" size={32} color="#fff" />
+          <Text style={styles.journalCityName}>{city}</Text>
+          <Text style={styles.journalViewMissionsText}>Ver misiones ({entries.length})</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const transformEntryToCityJournalEntry = (entry: JournalEntryFromDB): CityJournalEntry => {
+  return {
+    id: entry.id,
+    userId: entry.userid,
+    cityId: entry.cityid,
+    title: entry.title,
+    content: entry.content,
+    photos: entry.photos || [],
+    location: null,
+    created_at: entry.created_at,
+    tags: entry.tags || [],
+    city_name: entry.cities?.name || 'Sin ciudad'
+  };
+};
+
+const fetchWithRetry = async (fn: () => Promise<any>, maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
 
 const JournalScreen = ({ route }: JournalScreenProps) => {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cities' | 'entries'>('cities');
   
   const { user } = useSelector((state: RootState) => state.auth);
   const { shouldRefresh } = useSelector((state: RootState) => state.journal);
   const dispatch = useDispatch();
-  // @ts-ignore
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   
   useEffect(() => {
     fetchJournalEntries();
@@ -75,13 +241,12 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
     const journalSubscription = supabase
       .channel('journal_changes')
       .on('postgres_changes', { 
-        event: 'INSERT', 
+        event: '*', // Escuchar todos los eventos (INSERT, UPDATE, DELETE)
         schema: 'public', 
         table: 'journal_entries',
         filter: `userid=eq.${user?.id}`
       }, (payload: any) => {
-        console.log('Nueva entrada de diario detectada:', payload);
-        // Actualizar los datos
+        console.log('Cambio detectado en el diario:', payload);
         fetchJournalEntries();
       })
       .subscribe();
@@ -121,14 +286,101 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 
     try {
       setLoading(true);
-      const entries = await getUserJournalEntries(user.id);
-      setEntriesByCity(entries);
       
-      // Si hay entradas, seleccionar la primera ciudad por defecto
-      const cities = Object.keys(entries);
-      if (cities.length > 0 && !selectedCity) {
-        setSelectedCity(cities[0]);
+      // Primero, intentar obtener la estructura de la tabla
+      const { data: tableInfo, error: tableError } = await supabase
+        .from('journal_entries')
+        .select('*')
+        .limit(1);
+
+      if (tableError) {
+        console.error('Error al verificar la estructura de la tabla:', tableError);
+        throw tableError;
       }
+
+      // Intentar diferentes variaciones de la consulta
+      let data;
+      let error;
+
+      // Intento 1: Consulta con relación cities
+      const { data: data1, error: error1 } = await supabase
+        .from('journal_entries')
+        .select(`
+          *,
+          cities (
+            name
+          )
+        `)
+        .eq('userid', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error1) {
+        data = data1;
+      } else {
+        console.log('Primer intento fallido, probando alternativa:', error1);
+        
+        // Intento 2: Consulta básica sin relación
+        const { data: data2, error: error2 } = await supabase
+          .from('journal_entries')
+          .select('*')
+          .eq('userid', user.id)
+          .order('created_at', { ascending: false });
+
+        if (!error2) {
+          data = data2;
+        } else {
+          console.log('Segundo intento fallido:', error2);
+          error = error2;
+        }
+      }
+
+      if (error) throw error;
+      if (!data) throw new Error('No se pudieron obtener los datos');
+
+      // Organizar entradas por ciudad
+      const entriesByCityMap: { [key: string]: CityJournalEntry[] } = {};
+      
+      for (const entry of data) {
+        let cityName = 'Sin ciudad';
+        
+        // Intentar obtener el nombre de la ciudad de diferentes maneras
+        if (entry.cities?.name) {
+          cityName = entry.cities.name;
+        } else if (entry.city_name) {
+          cityName = entry.city_name;
+        } else if (entry.cityName) {
+          cityName = entry.cityName;
+        } else if (entry.cityid) {
+          // Si tenemos cityid pero no el nombre, intentar obtenerlo
+          try {
+            const { data: cityData } = await supabase
+              .from('cities')
+              .select('name')
+              .eq('id', entry.cityid)
+              .single();
+            
+            if (cityData?.name) {
+              cityName = cityData.name;
+            }
+          } catch (e) {
+            console.warn('No se pudo obtener el nombre de la ciudad:', e);
+          }
+        }
+
+        if (!entriesByCityMap[cityName]) {
+          entriesByCityMap[cityName] = [];
+        }
+
+        // Transformar la entrada
+        const transformedEntry = transformEntryToCityJournalEntry({
+          ...entry,
+          cities: { name: cityName }
+        });
+
+        entriesByCityMap[cityName].push(transformedEntry);
+      }
+
+      setEntriesByCity(entriesByCityMap);
     } catch (error) {
       console.error('Error al cargar entradas del diario:', error);
       setError('No se pudieron cargar las entradas del diario');
@@ -137,210 +389,95 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size={40} color="#005F9E" />
-        <Text style={styles.loadingText}>Cargando diario de viaje...</Text>
-      </View>
-    );
-  }
+  const handleCityPress = (city: string) => {
+    setSelectedCity(city);
+    setViewMode('entries');
+  };
 
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchJournalEntries}>
-          <Text style={styles.retryButtonText}>Reintentar</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const handleBackPress = () => {
+    setSelectedCity(null);
+    setViewMode('cities');
+  };
 
-  const cities = Object.keys(entriesByCity);
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.journalLoadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.journalLoadingText}>Cargando diario...</Text>
+        </View>
+      );
+    }
 
-  if (cities.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Diario de Viaje</Text>
-        <EmptyState message="Aún no tienes entradas en tu diario. Completa misiones para añadir fotos a tu diario de viaje." />
-      </View>
-    );
-  }
+    if (error) {
+      return (
+        <View style={styles.journalErrorContainer}>
+          <Text style={styles.journalErrorText}>{error}</Text>
+          <TouchableOpacity style={styles.journalRetryButton} onPress={fetchJournalEntries}>
+            <Text style={styles.journalRetryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Diario de Viaje</Text>
-      <View style={styles.cityTabs}>
-        <FlatList
-          horizontal
-          data={cities}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.cityTab, selectedCity === item && styles.selectedCityTab]}
-              onPress={() => setSelectedCity(item)}
-            >
-              <Text style={[styles.cityTabText, selectedCity === item && styles.selectedCityTabText]}>
-                {item}
-              </Text>
+    const cities = Object.keys(entriesByCity);
+
+    if (viewMode === 'entries' && selectedCity) {
+      return (
+        <View style={styles.journalContainer}>
+          <View style={styles.journalHeader}>
+            <TouchableOpacity onPress={handleBackPress} style={styles.journalBackButton}>
+              <Ionicons name="arrow-back" size={24} color="#333" />
             </TouchableOpacity>
+            <Text style={styles.journalTitle}>{selectedCity}</Text>
+          </View>
+          
+          {entriesByCity[selectedCity].length === 0 ? (
+            <EmptyState message={`No hay entradas de diario para ${selectedCity}`} />
+          ) : (
+            <FlatList
+              key="entries"
+              data={entriesByCity[selectedCity]}
+              renderItem={({ item }) => <JournalEntryCard entry={item} />}
+              keyExtractor={(item) => item.id}
+              style={styles.journalEntriesList}
+            />
           )}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
-      
-      {selectedCity ? (
-        entriesByCity[selectedCity].length > 0 ? (
-          <FlatList
-            data={entriesByCity[selectedCity]}
-            renderItem={({ item }) => <JournalEntryCard entry={item} />}
-            keyExtractor={(item) => item.id}
-            style={styles.entriesList}
-          />
-        ) : (
-          <EmptyState message={`No hay entradas de diario para ${selectedCity}`} />
-        )
-      ) : null}
-    </View>
-  );
-};
+        </View>
+      );
+    }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: '#f5f5f5',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#005F9E',
-  },
-  cityTabs: {
-    marginBottom: 10,
-  },
-  cityTab: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 10,
-    backgroundColor: '#f0f0f0',
-  },
-  selectedCityTab: {
-    backgroundColor: '#005F9E',
-  },
-  cityTabText: {
-    color: '#666',
-  },
-  selectedCityTabText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  entriesList: {
-    flex: 1,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  cardDate: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 10,
-  },
-  cardContent: {
-    color: '#333',
-    marginBottom: 10,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 5,
-    marginRight: 5,
-  },
-  morePhotos: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  morePhotosText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  tag: {
-    color: '#005F9E',
-    marginRight: 10,
-    fontSize: 12,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#005F9E',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: '#D32F2F',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#005F9E',
-    padding: 10,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#666',
-    marginTop: 10,
-    textAlign: 'center',
-    fontSize: 16,
-  },
-});
+    return (
+      <View style={styles.journalContainer}>
+        <Text style={styles.journalTitle}>Ciudades Disponibles</Text>
+        {cities.length === 0 ? (
+          <View style={styles.journalEmptyContainer}>
+            <Ionicons name="map-outline" size={64} color="#ccc" />
+            <Text style={styles.journalEmptyText}>
+              No hay ciudades disponibles todavía.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            key="cities"
+            data={cities}
+            renderItem={({ item }) => (
+              <CityCard
+                city={item}
+                entries={entriesByCity[item]}
+                onPress={() => handleCityPress(item)}
+              />
+            )}
+            keyExtractor={(item) => item}
+            numColumns={Platform.OS === 'web' ? 4 : 1}
+            contentContainerStyle={styles.journalCityGrid}
+          />
+        )}
+      </View>
+    );
+  };
+
+  return renderContent();
+};
 
 export default JournalScreen; 

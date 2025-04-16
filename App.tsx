@@ -14,6 +14,7 @@ import * as Notifications from 'expo-notifications';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import NotificationService from './src/services/NotificationService';
 
+
 // Configurar el comportamiento de las notificaciones
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
