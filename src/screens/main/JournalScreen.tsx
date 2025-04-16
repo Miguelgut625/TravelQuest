@@ -440,7 +440,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
               data={entriesByCity[selectedCity]}
               renderItem={({ item }) => <JournalEntryCard entry={item} />}
               keyExtractor={(item) => item.id}
-              style={styles.journalEntriesList}
+              contentContainerStyle={styles.journalEntriesList}
             />
           )}
         </View>
