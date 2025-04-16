@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, Image } from 'react-na
 import { Badge } from '../services/badgeService';
 import { Ionicons } from '@expo/vector-icons';
 
+// Importar la imagen local
+const MisionesCobre = require('../../assets/MisionesCobre.png');
+
 interface BadgeDetailModalProps {
   visible: boolean;
   badge: Badge | null;
@@ -53,9 +56,9 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
             <View style={styles.badgeIconContainer}>
               {badge.icon ? (
                 <Image 
-                  source={{ uri: badge.icon }} 
+                  source={MisionesCobre} 
                   style={styles.badgeIcon} 
-                  resizeMode="contain"
+                  resizeMode="cover"
                 />
               ) : (
                 <Ionicons 
@@ -91,10 +94,10 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
             </Text>
           </View>
           
-          <TouchableOpacity style={styles.shareButton}>
+{/*           <TouchableOpacity style={styles.shareButton}>
             <Ionicons name="share-social" size={20} color="white" />
             <Text style={styles.shareText}>Compartir Logro</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
     </Modal>
@@ -134,10 +137,18 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     backgroundColor: '#f5f5f5',
     marginBottom: 15,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   badgeIcon: {
-    width: 100,
-    height: 100,
+    width: 114,
+    height: 114,
   },
   badgeName: {
     fontSize: 24,
