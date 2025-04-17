@@ -69,7 +69,14 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.title}>Mis Insignias</Text>
+        <View style={styles.rightPlaceholder} />
       </View>
       
       <ScrollView style={styles.content}>
@@ -124,7 +131,12 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   backButton: {
-    padding: 5,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  rightPlaceholder: {
+    width: 40,
   },
   title: {
     fontSize: 24,

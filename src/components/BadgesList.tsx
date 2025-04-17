@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Surface } from 'react-native-paper';
 
 // Importar la imagen local
-const MisionesCobre = require('../../assets/MisionesCobre.png');
 
 interface BadgesListProps {
   userBadges: UserBadge[];
@@ -81,9 +80,15 @@ const BadgesList = ({ userBadges, loading, onBadgePress }: BadgesListProps) => {
         <Surface style={styles.badgeSurface}>
           <View style={styles.badgeContent}>
             <View style={styles.badgeIconContainer}>
-              {badge.icon ? (
+              {typeof badge.icon === 'string' ? (
                 <Image 
-                  source={MisionesCobre} 
+                  source={{ uri: badge.icon }} 
+                  style={styles.badgeIcon} 
+                  resizeMode="cover"
+                />
+              ) : typeof badge.icon === 'number' || (typeof badge.icon === 'object' && badge.icon !== null) ? (
+                <Image 
+                  source={badge.icon} 
                   style={styles.badgeIcon} 
                   resizeMode="cover"
                 />

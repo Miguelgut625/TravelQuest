@@ -400,11 +400,12 @@ const ProfileScreen = () => {
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error('No se ha encontrado ese usuario');
 
       alert('Solicitud enviada con éxito!');
     } catch (error: any) {
       console.error('Error al enviar la solicitud:', error.message);
-      alert('Hubo un error al enviar la solicitud: ' + error.message);
+      alert('Error al enviar la solicitud: ' + error.message);
     }
   };
 
@@ -579,8 +580,11 @@ const ProfileScreen = () => {
           value={username}
           onChangeText={setUsername}
         />
-        <Button title="Enviar Solicitud" onPress={handleSendRequest} />
+        <TouchableOpacity style={styles.sendRequestButton} onPress={handleSendRequest}>
+          <Text style={styles.sendRequestButtonText}>Enviar Solicitud</Text>
+        </TouchableOpacity>
       </View>
+
 
       <TouchableOpacity
         style={[styles.logoutButton, loading && styles.disabledButton]}
@@ -1013,6 +1017,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 10,
+  },
+  sendRequestButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    marginTop: 5,
+    width: '100%',
+  },
+  sendRequestButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

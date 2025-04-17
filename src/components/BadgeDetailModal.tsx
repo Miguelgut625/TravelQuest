@@ -4,7 +4,6 @@ import { Badge } from '../services/badgeService';
 import { Ionicons } from '@expo/vector-icons';
 
 // Importar la imagen local
-const MisionesCobre = require('../../assets/MisionesCobre.png');
 
 interface BadgeDetailModalProps {
   visible: boolean;
@@ -56,8 +55,8 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
             <View style={styles.badgeIconContainer}>
               {badge.icon ? (
                 <Image 
-                  source={MisionesCobre} 
-                  style={styles.badgeIcon} 
+                source={{ uri: badge.icon }} 
+                style={styles.badgeIcon} 
                   resizeMode="cover"
                 />
               ) : (

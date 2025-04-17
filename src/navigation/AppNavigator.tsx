@@ -45,7 +45,6 @@ export type TabParamList = {
     friendId: string;
     friendName: string;
   };
-  BadgesScreen: undefined;
 };
 
 type RootStackParamList = {
@@ -54,6 +53,7 @@ type RootStackParamList = {
     friendId: string;
     friendName: string;
   };
+  BadgesScreen: undefined;
 };
 
 type AuthStackParamList = {
@@ -101,6 +101,13 @@ const MainFlow = () => {
           headerTintColor: 'white',
         }}
       />
+      <Stack.Screen
+        name="BadgesScreen"
+        component={BadgesScreen}
+        options={{
+          headerShown: false
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -130,8 +137,6 @@ const TabNavigator = () => {
             iconName = focused ? 'person' : 'person-outline';
           } else if (route.name === 'Conversations') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'BadgesScreen') {
-            iconName = focused ? 'medal' : 'medal-outline';
           }
 
           // @ts-ignore
@@ -161,13 +166,6 @@ const TabNavigator = () => {
       />
       <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen 
-        name="BadgesScreen" 
-        component={BadgesScreen}
-        options={{
-          title: 'Insignias'
-        }}
-      />
     </Tab.Navigator>
   );
 };
