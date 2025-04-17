@@ -75,11 +75,11 @@ export const getFriendRequests = async (userId: string) => {
 export const sendFriendRequest = async (senderId: string, receiverId: string) => {
   try {
     const { data, error } = await supabase
-      .from('friend_requests')
+      .from('friendship_invitations')
       .insert({
-        sender_id: senderId,
-        receiver_id: receiverId,
-        status: 'pending'
+        senderId: senderId,
+        receiverId: receiverId,
+        status: 'Pending'
       });
 
     if (error) throw error;
