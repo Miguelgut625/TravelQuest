@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import NotificationService from './NotificationService';
 
 // Función para obtener todos los amigos de un usuario
 export const getFriends = async (userId: string) => {
@@ -83,6 +84,24 @@ export const sendFriendRequest = async (senderId: string, receiverId: string) =>
       });
 
     if (error) throw error;
+    
+    // Obtener el nombre del usuario que envía la solicitud para la notificación
+    const { data: senderData, error: senderError } = await supabase
+      .from('users')
+      .select('username')
+      .eq('id', senderId)
+      .single();
+      
+    if (!senderError && senderData) {
+      // Enviar notificación al receptor
+      const notificationService = NotificationService.getInstance();
+      await notificationService.notifyFriendRequest(
+        receiverId,
+        senderId,
+        senderData.username
+      );
+    }
+    
     return { success: true, data };
   } catch (error) {
     console.error('Error sending friend request:', error);

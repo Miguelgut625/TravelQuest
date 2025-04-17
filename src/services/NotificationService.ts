@@ -115,119 +115,97 @@ export async function registerForPushNotificationsAsync() {
 // Función para guardar el token de notificaciones push del usuario
 export async function saveUserPushToken(userId: string, pushToken: string) {
   try {
-    // Intentar obtener las columnas de la tabla para confirmar su estructura
-    const { data: columnsData, error: columnsError } = await supabase
-      .from('information_schema.columns')
-      .select('column_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'user_push_tokens');
-    
-    if (columnsError) {
-      console.error('Error verificando columnas de la tabla:', columnsError);
+    // Intentar verificar si el token ya existe (enfoque directo)
+    try {
+      // Probar primero con la columna 'token'
+      const { data: existingToken, error: tokenError } = await supabase
+        .from('user_push_tokens')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('token', pushToken)
+        .maybeSingle();
+        
+      if (!tokenError && existingToken) {
+        console.log('Token ya registrado en columna "token"');
+        return true;
+      }
       
-      // Si tenemos un error con information_schema, intentar una solución alternativa
-      // simplemente intentar guardar el token directamente con la columna 'token'
-      
-      // Primero comprobar si ya existe el token (lo cual es válido)
-      try {
-        const { data: existingToken, error: checkError } = await supabase
+      // Si la primera consulta da error de columna inexistente, probar con push_token
+      if (tokenError && tokenError.message && tokenError.message.includes("column") && tokenError.message.includes("token")) {
+        const { data: existingPushToken, error: pushTokenError } = await supabase
           .from('user_push_tokens')
           .select('id')
           .eq('user_id', userId)
-          .eq('token', pushToken)
-          .single();
+          .eq('push_token', pushToken)
+          .maybeSingle();
           
-        if (!checkError && existingToken) {
+        if (!pushTokenError && existingPushToken) {
+          console.log('Token ya registrado en columna "push_token"');
           return true;
         }
-      } catch (checkTokenError) {
-        // Continuamos con la inserción
       }
+    } catch (checkError) {
+      console.log('Error al verificar token existente:', checkError);
+      // Continuar con inserción
+    }
 
-      const tokenData = {
+    // Intentar insertar primero con la estructura más común (columna 'token')
+    const tokenData = {
+      user_id: userId,
+      token: pushToken,
+      updated_at: new Date().toISOString(),
+      platform: Platform.OS,
+      device_id: `${Platform.OS}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
+    };
+    
+    const { error: insertError } = await supabase
+      .from('user_push_tokens')
+      .upsert(tokenData);
+      
+    // Si no hay error, inserción exitosa
+    if (!insertError) {
+      console.log('Token guardado correctamente con columna "token"');
+      return true;
+    }
+    
+    // Si el error es por clave duplicada, es un éxito (token ya registrado)
+    if (insertError.code === '23505' && insertError.message.includes('user_push_tokens_user_id_token_key')) {
+      console.log('Token ya existe (detectado por error de duplicado)');
+      return true;
+    }
+    
+    // Si el error es por columna no encontrada, intentar con columna 'push_token'
+    if (insertError.message && insertError.message.includes("column") && insertError.message.includes("token")) {
+      const pushTokenData = {
         user_id: userId,
-        token: pushToken,
+        push_token: pushToken,
         updated_at: new Date().toISOString(),
         platform: Platform.OS,
         device_id: `${Platform.OS}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
       };
       
-      // Realizar la operación upsert usando la estructura conocida
-      const { error } = await supabase
+      const { error: pushInsertError } = await supabase
         .from('user_push_tokens')
-        .upsert(tokenData);
+        .upsert(pushTokenData);
         
-      if (error) {
-        // Si el error es por clave duplicada, esto es técnicamente un éxito
-        // ya que significa que el token ya está registrado
-        if (error.code === '23505' && error.message.includes('user_push_tokens_user_id_token_key')) {
-          return true;
-        }
-        
-        console.error('Error al guardar token de notificaciones (modo alternativo):', error);
-        return false;
-      }
-      
-      return true;
-    }
-    
-    // Obtener los nombres de las columnas como un array
-    const columnNames = columnsData?.map(col => col.column_name.toLowerCase()) || [];
-    
-    // Construir el objeto de datos basado en las columnas disponibles
-    const tokenData: Record<string, any> = {
-      user_id: userId
-    };
-    
-    // Usar el nombre correcto de la columna para el token
-    if (columnNames.includes('push_token')) {
-      tokenData.push_token = pushToken;
-    } else if (columnNames.includes('token')) {
-      tokenData.token = pushToken;
-    } else {
-      console.error('No se encontró columna para el token en la tabla user_push_tokens');
-      return false;
-    }
-    
-    // Agregar campos adicionales si existen en la tabla
-    if (columnNames.includes('updated_at')) {
-      tokenData.updated_at = new Date().toISOString();
-    }
-    
-    if (columnNames.includes('platform')) {
-      tokenData.platform = Platform.OS;
-    }
-    
-    if (columnNames.includes('device_id')) {
-      // Intentar obtener un ID de dispositivo
-      try {
-        // Usar propiedades disponibles en expo-device para generar un ID único
-        const deviceType = await Device.getDeviceTypeAsync();
-        const deviceId = `${Platform.OS}_${Device.modelName || 'unknown'}_${deviceType}_${Date.now()}`;
-        tokenData.device_id = deviceId;
-      } catch (deviceIdError) {
-        // Generar un ID aleatorio como fallback
-        tokenData.device_id = `${Platform.OS}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-      }
-    }
-    
-    // Realizar la operación upsert
-    const { error } = await supabase
-      .from('user_push_tokens')
-      .upsert(tokenData);
-      
-    // Si hay un error, el token podría existir
-    if (error) {
-      if (error.code === '23505') {
-        // Error de duplicado, lo cual es técnicamente correcto ya que el token ya existe
+      // Si no hay error, inserción exitosa con columna push_token
+      if (!pushInsertError) {
+        console.log('Token guardado correctamente con columna "push_token"');
         return true;
       }
       
-      console.error('Error al guardar token de notificaciones:', error);
+      // Si el error es por clave duplicada, es un éxito (token ya registrado)
+      if (pushInsertError.code === '23505') {
+        console.log('Token ya existe en columna push_token (detectado por error de duplicado)');
+        return true;
+      }
+      
+      console.error('Error al guardar token de notificaciones (columna push_token):', pushInsertError);
       return false;
     }
     
-    return true;
+    console.error('Error al guardar token de notificaciones:', insertError);
+    return false;
   } catch (error) {
     console.error('Error general al guardar token:', error);
     return false;
@@ -242,8 +220,45 @@ export async function sendPushNotification(
   data: Record<string, any> = {}
 ) {
   try {
-    // Usar la implementación actualizada
-    return await sendPushNotificationToExpo(receiverId, title, body, data);
+    // Implementación más directa: intentar obtener el token sin consultar metadatos
+    
+    // Método 1: Intentar directamente con columna 'token'
+    try {
+      const { data: tokenData, error: tokenError } = await supabase
+        .from('user_push_tokens')
+        .select('token')
+        .eq('user_id', receiverId)
+        .maybeSingle();
+        
+      if (!tokenError && tokenData && tokenData.token) {
+        console.log('Token encontrado en columna "token"');
+        return await sendPushNotificationToExpo(tokenData.token, title, body, data);
+      }
+      
+      // Si hay error de columna inexistente, probar con otra columna
+      if (tokenError && tokenError.message && (
+          tokenError.message.includes("column") || 
+          tokenError.message.includes("does not exist")
+      )) {
+        // Método 2: Intentar con columna 'push_token'
+        const { data: pushTokenData, error: pushTokenError } = await supabase
+          .from('user_push_tokens')
+          .select('push_token')
+          .eq('user_id', receiverId)
+          .maybeSingle();
+          
+        if (!pushTokenError && pushTokenData && pushTokenData.push_token) {
+          console.log('Token encontrado en columna "push_token"');
+          return await sendPushNotificationToExpo(pushTokenData.push_token, title, body, data);
+        }
+      }
+    } catch (directError) {
+      console.log('Error al intentar enviar notificación con método directo:', directError);
+    }
+    
+    // Si llegamos aquí, no hemos podido obtener el token o enviar la notificación
+    console.error('No se encontró un token válido para el usuario', receiverId);
+    return false;
   } catch (error) {
     console.error('Error enviando notificación push:', error);
     return false;
@@ -294,11 +309,11 @@ export async function scheduleMissionExpirationReminder(
           message: message,
           type: 'mission_expiration_soon',
           read: false,
-          data: JSON.stringify({ 
+          data: { 
             missionId, 
             hoursLeft,
             expirationDate: expirationDate.toISOString()
-          }),
+          },
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
@@ -336,41 +351,45 @@ export async function createScheduledNotificationsTable() {
   try {
     console.log('Verificando si existe la tabla scheduled_notifications...');
     
-    // Verificar si la tabla existe
-    const { data: tableExists, error: tableError } = await supabase
-      .from('information_schema.tables')
-      .select('*')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'scheduled_notifications')
-      .single();
+    // Enfoque más directo: intentar consultar un elemento de la tabla
+    // Si la tabla no existe, esto generará un error específico
+    const { data, error } = await supabase
+      .from('scheduled_notifications')
+      .select('id')
+      .limit(1);
 
-    // Si la tabla ya existe, no hacer nada
-    if (!tableError && tableExists) {
+    // Si no hay error, la tabla existe
+    if (!error) {
       console.log('La tabla scheduled_notifications ya existe');
       return true;
     }
     
-    console.log('La tabla scheduled_notifications no existe. No se puede crear automáticamente.');
-    console.log('Para habilitar esta funcionalidad, crea manualmente la tabla en la interfaz de Supabase.');
-    console.log('Instrucciones de SQL para crear la tabla:');
-    console.log(`
-    CREATE TABLE IF NOT EXISTS scheduled_notifications (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL,
-      mission_id UUID NOT NULL,
-      mission_title TEXT NOT NULL,
-      scheduled_at TIMESTAMPTZ NOT NULL,
-      type TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at TIMESTAMPTZ,
-      sent_at TIMESTAMPTZ
-    );
-    
-    CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_user_id ON scheduled_notifications(user_id);
-    CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_mission_id ON scheduled_notifications(mission_id);
-    CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_status ON scheduled_notifications(status);
-    `);
+    // Comprobar si el error es por tabla inexistente
+    if (error && error.code === '42P01') {
+      console.log('La tabla scheduled_notifications no existe. No se puede crear automáticamente.');
+      console.log('Para habilitar esta funcionalidad, crea manualmente la tabla en la interfaz de Supabase.');
+      console.log('Instrucciones de SQL para crear la tabla:');
+      console.log(`
+      CREATE TABLE IF NOT EXISTS scheduled_notifications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        mission_id UUID NOT NULL,
+        mission_title TEXT NOT NULL,
+        scheduled_at TIMESTAMPTZ NOT NULL,
+        type TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ,
+        sent_at TIMESTAMPTZ
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_user_id ON scheduled_notifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_mission_id ON scheduled_notifications(mission_id);
+      CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_status ON scheduled_notifications(status);
+      `);
+    } else {
+      console.error('Error al verificar la tabla scheduled_notifications:', error);
+    }
     
     // No podemos crear la tabla en tiempo de ejecución sin función RPC
     return false;
@@ -383,22 +402,27 @@ export async function createScheduledNotificationsTable() {
 // Función para verificar si tenemos acceso de administrador en Supabase
 export async function checkAdminAccess(): Promise<boolean> {
   try {
-    // Intentamos una operación simple que requeriría acceso admin
-    const { data, error } = await supabase.rpc('check_admin_access', {});
+    // Primero intentamos una consulta simple a pg_class (catálogo de sistema) para comprobar permisos
+    const { data, error } = await supabase.rpc('exec_sql', {
+      sql: "SELECT 1 as result"
+    });
     
-    // Si hay un error, probablemente no tenemos permisos admin
-    if (error) {
-      console.log('No hay acceso admin en Supabase:', error.message);
+    // Si podemos ejecutar SQL directamente, tenemos acceso admin
+    if (!error && data) {
+      return true;
+    }
+    
+    // Si exec_sql no existe o no tenemos permisos, intentamos la función check_admin_access
+    const { data: adminCheck, error: adminError } = await supabase.rpc('check_admin_access', {});
+    
+    // Si hay un error, probablemente no tenemos permisos admin o la función no existe
+    if (adminError) {
+      console.log('No hay acceso admin en Supabase:', adminError.message);
       
       // Si el error es específico de función no existente, crear la función
-      if (error.message.includes('function') && error.message.includes('does not exist')) {
-        // Intentar crear la función check_admin_access
-        const createFunctionResult = await createCheckAdminFunction();
-        if (createFunctionResult) {
-          // Intentar nuevamente
-          const { data: retryData, error: retryError } = await supabase.rpc('check_admin_access', {});
-          return !retryError && !!retryData;
-        }
+      if (adminError.message.includes('function') && adminError.message.includes('does not exist')) {
+        // No podemos crear la función si no tenemos permisos para ejecutar SQL
+        console.log('La función check_admin_access no existe y no podemos crearla sin permisos.');
       }
       return false;
     }
@@ -406,39 +430,6 @@ export async function checkAdminAccess(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Error al verificar acceso admin:', error);
-    return false;
-  }
-}
-
-// Función para crear la función check_admin_access en Supabase
-async function createCheckAdminFunction(): Promise<boolean> {
-  try {
-    const { error } = await supabase.rpc('exec_sql', {
-      sql: `
-      CREATE OR REPLACE FUNCTION check_admin_access()
-      RETURNS boolean AS $$
-      BEGIN
-        -- Intentar realizar una operación que requiere acceso admin
-        -- Esta es una verificación simple que fallará si no hay permisos
-        RETURN true;
-      EXCEPTION
-        WHEN insufficient_privilege THEN
-          RETURN false;
-        WHEN OTHERS THEN
-          RETURN false;
-      END;
-      $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `
-    });
-    
-    if (error) {
-      console.error('Error al crear función check_admin_access:', error);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error al crear función check_admin_access:', error);
     return false;
   }
 }
@@ -555,7 +546,8 @@ class NotificationService {
   public async notifyJourneyShared(
     userId: string,
     journeyName: string,
-    sharedBy: string
+    sharedBy: string,
+    journeyId?: string
   ) {
     const title = '¡Nuevo viaje compartido!';
     const body = `${sharedBy} ha compartido el viaje "${journeyName}" contigo`;
@@ -570,6 +562,11 @@ class NotificationService {
           message: body,
           type: 'journey_shared',
           read: false,
+          data: {
+            journeyId,
+            journeyName,
+            sharedBy
+          },
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
@@ -585,6 +582,11 @@ class NotificationService {
           content: {
             title,
             body,
+            data: {
+              type: 'journey_shared',
+              journeyId,
+              sharedBy
+            },
             sound: 'default',
             priority: Notifications.AndroidNotificationPriority.HIGH,
           },
@@ -596,19 +598,18 @@ class NotificationService {
     }
   }
 
-  // Método para notificar una invitación a un viaje
+  // Método para notificar invitaciones a viajes
   public async notifyJourneyInvitation(
     userId: string,
     journeyName: string,
-    sharedBy: string,
-    cityName: string,
-    startDate: Date,
-    endDate: Date,
-    groupInvitationId: string,
-    journeyId: string
+    journeyId: string,
+    invitedBy: string,
+    city: string,
+    startDate: string,
+    endDate: string
   ) {
     const title = '¡Nueva invitación de viaje!';
-    const body = `${sharedBy} te invita a viajar a ${cityName} del ${startDate.toLocaleDateString()} al ${endDate.toLocaleDateString()}`;
+    const body = `${invitedBy} te ha invitado a unirte al viaje "${journeyName}" a ${city}`;
 
     try {
       // Guardar en base de datos
@@ -620,22 +621,21 @@ class NotificationService {
           message: body,
           type: 'journey_invitation',
           read: false,
-          related_id: journeyId,
-          metadata: JSON.stringify({
-            groupInvitationId,
+          data: {
             journeyId,
-            sharedBy,
-            cityName,
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString()
-          }),
+            journeyName,
+            invitedBy,
+            city,
+            startDate,
+            endDate
+          },
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
 
       if (error) {
-        console.error('Error al guardar notificación de invitación a viaje:', error);
-        return false;
+        console.error('Error al guardar notificación de invitación:', error);
+        return;
       }
 
       // Para plataformas móviles
@@ -646,34 +646,17 @@ class NotificationService {
             body,
             data: {
               type: 'journey_invitation',
-              groupInvitationId,
               journeyId,
-              sharedBy
+              invitedBy
             },
             sound: 'default',
             priority: Notifications.AndroidNotificationPriority.HIGH,
           },
-          trigger: null, // Mostrar inmediatamente
+          trigger: null,
         });
       }
-
-      // También enviar notificación push
-      await sendPushNotification(
-        userId,
-        title,
-        body,
-        {
-          type: 'journey_invitation',
-          groupInvitationId,
-          journeyId,
-          sharedBy
-        }
-      );
-
-      return true;
     } catch (error) {
-      console.error('Error al enviar notificación de invitación a viaje:', error);
-      return false;
+      console.error('Error al enviar notificación de invitación:', error);
     }
   }
 
@@ -696,7 +679,10 @@ class NotificationService {
           message: body,
           type: 'friend_request',
           read: false,
-          sender_id: requesterId,
+          data: { 
+            requesterId,
+            requesterName
+          },
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });

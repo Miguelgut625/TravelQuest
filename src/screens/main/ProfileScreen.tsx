@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { calculateNextLevelXP } from '../../services/experienceService';
+import { sendFriendRequest } from '../../services/friendService';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -352,13 +353,21 @@ const ProfileScreen = () => {
   // Función para enviar una solicitud de amistad
   const handleSendRequest = async () => {
     try {
+      if (!username.trim()) {
+        alert('Por favor ingresa un nombre de usuario');
+        return;
+      }
+
       const { data: receiver, error: userError } = await supabase
         .from('users')
         .select('id')
         .eq('username', username)
         .single();
 
-      if (userError) throw userError;
+      if (userError) {
+        alert('Usuario no encontrado');
+        return;
+      }
 
       const receiverId = receiver.id;
 
@@ -390,14 +399,15 @@ const ProfileScreen = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('friendship_invitations')
-        .insert([{ senderId: user?.id, receiverId }])
-        .single();
+      // Usar el servicio de amigos para enviar la solicitud y la notificación
+      const result = await sendFriendRequest(user?.id, receiverId);
 
-      if (error) throw error;
-
-      alert('Solicitud enviada con éxito!');
+      if (result.success) {
+        alert('Solicitud enviada con éxito!');
+        setUsername(''); // Limpiar el campo después de enviar
+      } else {
+        throw new Error('Error al enviar la solicitud');
+      }
     } catch (error: any) {
       console.error('Error al enviar la solicitud:', error.message);
       alert('Hubo un error al enviar la solicitud: ' + error.message);
