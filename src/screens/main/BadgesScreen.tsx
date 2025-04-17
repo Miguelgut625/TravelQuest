@@ -21,13 +21,13 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 
   const fetchBadges = async () => {
     if (!user?.id) return;
-
+    
     try {
       setLoading(true);
-
+      
       // Verificar y otorgar nuevas insignias si corresponde
       await checkAllBadges(user.id);
-
+      
       // Obtener las insignias actualizadas del usuario
       const badges = await getUserBadges(user.id);
       setUserBadges(badges);
@@ -69,9 +69,16 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.title}>Mis Insignias</Text>
+        <View style={styles.rightPlaceholder} />
       </View>
-
+      
       <ScrollView style={styles.content}>
         <View style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
@@ -125,6 +132,11 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 5,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  rightPlaceholder: {
+    width: 40,
   },
   title: {
     fontSize: 24,

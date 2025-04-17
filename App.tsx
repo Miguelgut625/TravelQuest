@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PersistGate } from 'redux-persist/integration/react';
 import { Provider } from 'react-redux';
 import { store, persistor } from './src/features/store';
@@ -41,19 +41,17 @@ const theme = {
 const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const notificationListener = useRef<any>();
-  const responseListener = useRef<any>();
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
         console.log(`Iniciando la aplicación en plataforma: ${Platform.OS}`);
-        
+
         // Comprobar si hay alguna incompatibilidad específica de la plataforma
         if (Platform.OS === 'web') {
           console.log('Ejecutando en modo web');
         }
-        
+
         // Verificar sesión actual
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -133,13 +131,11 @@ const App = () => {
           store.dispatch(setAuthState('unauthenticated'));
         }
 
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error inicializando la app:', error);
-        // Mensaje de error más descriptivo
         setError(`Error al inicializar la aplicación: ${error.message || 'Error desconocido'}`);
         store.dispatch(setAuthState('unauthenticated'));
       } finally {
-        // Añadir un pequeño retraso para asegurar que todos los componentes se inicialicen correctamente
         setTimeout(() => {
           setIsLoading(false);
         }, 500);
@@ -165,18 +161,17 @@ const App = () => {
     const handleError = (error: Error) => {
       console.error('Error no capturado:', error);
     };
-    
+
     // Configurar listeners globales de error
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.addEventListener('error', (event) => {
         handleError(event.error);
       });
-      
+
       window.addEventListener('unhandledrejection', (event) => {
         handleError(event.reason);
       });
-      
-      // Limpiar listeners al desmontar
+
       return () => {
         window.removeEventListener('error', (event) => {
           handleError(event.error);
@@ -184,18 +179,8 @@ const App = () => {
         window.removeEventListener('unhandledrejection', (event) => {
           handleError(event.reason);
         });
-        
-        // Limpia los escuchadores de notificaciones
-        Notifications.removeNotificationSubscription(notificationListener.current);
-        Notifications.removeNotificationSubscription(responseListener.current);
       };
     }
-    
-    // Si no estamos en web, solo limpiar los escuchadores de notificaciones
-    return () => {
-      Notifications.removeNotificationSubscription(notificationListener.current);
-      Notifications.removeNotificationSubscription(responseListener.current);
-    };
   }, []);
 
   if (isLoading) {

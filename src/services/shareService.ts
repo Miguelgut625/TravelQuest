@@ -124,9 +124,9 @@ export const shareJourney = async (
 
         Alert.alert('Éxito', `Se ha enviado una invitación de viaje a ${friend.username}. Se le notificará cuando acepte.`);
         return true;
-    } catch (err) {
-        console.error(err);
-        Alert.alert('Error', 'No se pudo compartir el journey');
+    } catch (error) {
+        console.error('Error al compartir viaje:', error);
+        Alert.alert('Error', 'Ocurrió un error al compartir el viaje');
         return false;
     }
 };

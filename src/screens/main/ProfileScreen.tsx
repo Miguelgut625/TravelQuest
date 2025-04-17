@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList, Button } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList } from 'react-native';
+import { Button } from 'react-native-paper';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -28,6 +29,9 @@ interface JourneyMission {
 interface FriendshipRequest {
   id: string;
   sender: {
+    username: string;
+  };
+  users: {
     username: string;
   };
 }
@@ -402,15 +406,13 @@ const ProfileScreen = () => {
       // Usar el servicio de amigos para enviar la solicitud y la notificación
       const result = await sendFriendRequest(user?.id, receiverId);
 
-      if (result.success) {
-        alert('Solicitud enviada con éxito!');
-        setUsername(''); // Limpiar el campo después de enviar
-      } else {
-        throw new Error('Error al enviar la solicitud');
-      }
+      if (error) throw error;
+      if (!data) throw new Error('No se ha encontrado ese usuario');
+
+      alert('Solicitud enviada con éxito!');
     } catch (error: any) {
       console.error('Error al enviar la solicitud:', error.message);
-      alert('Hubo un error al enviar la solicitud: ' + error.message);
+      alert('Error al enviar la solicitud: ' + error.message);
     }
   };
 
@@ -491,7 +493,24 @@ const ProfileScreen = () => {
           </>
         )}
       </View>
-
+      {/* Sección para Insignias */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Logros</Text>
+        <View style={styles.badgesContainer}>
+          <TouchableOpacity
+            style={styles.badgesButton}
+            onPress={() => {
+              navigation.navigate('BadgesScreen');
+            }}
+          >
+            <View style={styles.badgesButtonContent}>
+              <Ionicons name="medal" size={24} color="white" />
+              <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
+              <Ionicons name="chevron-forward" size={20} color="white" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Social</Text>
         <View style={styles.socialContainer}>
@@ -568,8 +587,11 @@ const ProfileScreen = () => {
           value={username}
           onChangeText={setUsername}
         />
-        <Button title="Enviar Solicitud" onPress={handleSendRequest} />
+        <TouchableOpacity style={styles.sendRequestButton} onPress={handleSendRequest}>
+          <Text style={styles.sendRequestButtonText}>Enviar Solicitud</Text>
+        </TouchableOpacity>
       </View>
+
 
       <TouchableOpacity
         style={[styles.logoutButton, loading && styles.disabledButton]}
@@ -980,6 +1002,41 @@ const styles = StyleSheet.create({
   xpText: {
     color: '#fff',
     fontSize: 12,
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgesButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  badgesButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badgesButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  sendRequestButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    marginTop: 5,
+    width: '100%',
+  },
+  sendRequestButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

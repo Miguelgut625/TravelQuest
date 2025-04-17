@@ -56,6 +56,7 @@ type RootStackParamList = {
     friendId: string;
     friendName: string;
   };
+  BadgesScreen: undefined;
 };
 
 type AuthStackParamList = {
@@ -87,13 +88,13 @@ const MainFlow = () => {
 
   return (
     <Stack.Navigator>
-      <Stack.Screen 
-        name="TabNavigator" 
-        component={TabNavigator} 
+      <Stack.Screen
+        name="TabNavigator"
+        component={TabNavigator}
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="Chat" 
+      <Stack.Screen
+        name="Chat"
         component={ChatScreen}
         options={{
           headerShown: false,
@@ -101,6 +102,13 @@ const MainFlow = () => {
             backgroundColor: theme.colors.primary,
           },
           headerTintColor: 'white',
+        }}
+      />
+      <Stack.Screen
+        name="BadgesScreen"
+        component={BadgesScreen}
+        options={{
+          headerShown: false
         }}
       />
     </Stack.Navigator>
@@ -111,7 +119,7 @@ const MainFlow = () => {
 // @ts-ignore
 const TabNavigator = () => {
   const theme = useTheme();
-  
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -135,7 +143,7 @@ const TabNavigator = () => {
           } else if (route.name === 'Badges') {
             iconName = focused ? 'medal' : 'medal-outline';
           }
-          
+
           // @ts-ignore
           return <Ionicons name={iconName} size={size || 24} color={color} />;
         },
@@ -144,10 +152,10 @@ const TabNavigator = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen 
-        name="Map" 
-        component={MapScreen} 
-        options={{ 
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{
           title: 'Map'
         }}
       />

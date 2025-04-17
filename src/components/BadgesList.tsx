@@ -4,6 +4,8 @@ import { Badge, UserBadge } from '../services/badgeService';
 import { Ionicons } from '@expo/vector-icons';
 import { Surface } from 'react-native-paper';
 
+// Importar la imagen local
+
 interface BadgesListProps {
   userBadges: UserBadge[];
   loading: boolean;
@@ -71,32 +73,40 @@ const BadgesList = ({ userBadges, loading, onBadgePress }: BadgesListProps) => {
     if (!badge) return null;
 
     return (
-      <TouchableOpacity
+      <TouchableOpacity 
         style={styles.badgeContainer}
         onPress={() => onBadgePress && onBadgePress(badge)}
       >
         <Surface style={styles.badgeSurface}>
-          <View style={styles.badgeIconContainer}>
-            {badge.icon ? (
-              <Image
-                source={{ uri: badge.icon }}
-                style={styles.badgeIcon}
-                resizeMode="contain"
-              />
-            ) : (
-              <Ionicons
-                name={getBadgeIconByCategory(badge.category)}
-                size={40}
-                color="#4CAF50"
-              />
-            )}
-          </View>
-          <View style={styles.badgeInfo}>
-            <Text style={styles.badgeName}>{badge.name}</Text>
-            <Text style={styles.badgeDescription}>{badge.description}</Text>
-            <Text style={styles.unlockDate}>
-              Desbloqueada: {new Date(userBadge.unlocked_at).toLocaleDateString()}
-            </Text>
+          <View style={styles.badgeContent}>
+            <View style={styles.badgeIconContainer}>
+              {typeof badge.icon === 'string' ? (
+                <Image 
+                  source={{ uri: badge.icon }} 
+                  style={styles.badgeIcon} 
+                  resizeMode="cover"
+                />
+              ) : typeof badge.icon === 'number' || (typeof badge.icon === 'object' && badge.icon !== null) ? (
+                <Image 
+                  source={badge.icon} 
+                  style={styles.badgeIcon} 
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons 
+                  name={getBadgeIconByCategory(badge.category)} 
+                  size={40} 
+                  color="#4CAF50" 
+                />
+              )}
+            </View>
+            <View style={styles.badgeInfo}>
+              <Text style={styles.badgeName}>{badge.name}</Text>
+              <Text style={styles.badgeDescription}>{badge.description}</Text>
+              <Text style={styles.unlockDate}>
+                Desbloqueada: {new Date(userBadge.unlocked_at).toLocaleDateString()}
+              </Text>
+            </View>
           </View>
         </Surface>
       </TouchableOpacity>
@@ -182,8 +192,11 @@ const styles = StyleSheet.create({
   badgeSurface: {
     padding: 15,
     borderRadius: 10,
-    flexDirection: 'row',
     elevation: 2,
+  },
+  badgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   badgeIconContainer: {
     width: 60,
@@ -195,10 +208,16 @@ const styles = StyleSheet.create({
   badgeIcon: {
     width: 50,
     height: 50,
+    borderRadius: 30,
+    backgroundColor: '#f5f5f5',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
   },
   badgeInfo: {
     flex: 1,
     justifyContent: 'center',
+    paddingVertical: 3,
   },
   badgeName: {
     fontSize: 16,
@@ -210,6 +229,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
+    lineHeight: 18,
   },
   unlockDate: {
     fontSize: 12,

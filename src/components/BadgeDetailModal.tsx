@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, Image } from 'react-na
 import { Badge } from '../services/badgeService';
 import { Ionicons } from '@expo/vector-icons';
 
+// Importar la imagen local
+
 interface BadgeDetailModalProps {
   visible: boolean;
   badge: Badge | null;
@@ -11,7 +13,6 @@ interface BadgeDetailModalProps {
 
 const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) => {
   if (!badge) return null;
-  
   // Obtener un icono predeterminado basado en la categoría
   const getBadgeIconByCategory = (category?: string): string => {
     switch (category) {
@@ -48,36 +49,36 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
-
+          
           <View style={styles.badgeHeader}>
             <View style={styles.badgeIconContainer}>
               {badge.icon ? (
-                <Image
-                  source={{ uri: badge.icon }}
-                  style={styles.badgeIcon}
-                  resizeMode="contain"
+                <Image 
+                source={{ uri: badge.icon }} 
+                style={styles.badgeIcon} 
+                  resizeMode="cover"
                 />
               ) : (
-                <Ionicons
-                  name={getBadgeIconByCategory(badge.category)}
-                  size={80}
-                  color="#4CAF50"
+                <Ionicons 
+                  name={getBadgeIconByCategory(badge.category)} 
+                  size={80} 
+                  color="#4CAF50" 
                 />
               )}
             </View>
             <Text style={styles.badgeName}>{badge.name}</Text>
           </View>
-
+          
           <View style={styles.categoryContainer}>
             <Text style={styles.categoryLabel}>Categoría:</Text>
             <Text style={styles.categoryValue}>{getCategoryName(badge.category)}</Text>
           </View>
-
+          
           <View style={styles.descriptionContainer}>
             <Text style={styles.descriptionLabel}>Descripción:</Text>
             <Text style={styles.descriptionText}>{badge.description}</Text>
           </View>
-
+          
           <View style={styles.thresholdContainer}>
             <Text style={styles.thresholdLabel}>Cómo se desbloquea:</Text>
             <Text style={styles.thresholdText}>
@@ -138,6 +139,14 @@ const styles = StyleSheet.create({
   badgeIcon: {
     width: 100,
     height: 100,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   badgeName: {
     fontSize: 24,
