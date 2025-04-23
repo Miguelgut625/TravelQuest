@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "TravelQuest",
+    "scheme": "deep",
     "slug": "TravelQuest",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +17,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.travelquest.app",
+      "bundleIdentifier": "com.Travelquest.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
         "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
@@ -38,7 +39,7 @@
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "package": "com.travelquest.app",
+      "package": "com.Travelquest.app",
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
