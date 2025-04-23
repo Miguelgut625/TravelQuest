@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList, Platform } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { logout, setAuthState } from '../../features/authSlice';
+import { logout, setAuthState, updateUser, setUser } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { calculateNextLevelXP } from '../../services/experienceService';
 import { sendFriendRequest } from '../../services/friendService';
+import * as ImagePicker from 'expo-image-picker';
+import { updateProfilePicture, getProfilePictureUrl } from '../../services/profileService';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -60,9 +63,29 @@ const ProfileScreen = () => {
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(100);
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Manejador global de errores no capturados para este componente
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      console.error('Error no capturado en ProfileScreen:', event.error);
+      // No mostramos un Alert aquí para evitar bloquear la UI
+      // Simplemente registramos el error para depuración
+    };
+
+    // Agregar el listener solo en navegadores web
+    if (Platform.OS === 'web') {
+      window.addEventListener('error', handleGlobalError);
+      return () => {
+        window.removeEventListener('error', handleGlobalError);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     fetchUserStats();
+    fetchProfilePicture();
   }, [user?.id]);
 
   const fetchUserStats = async () => {
@@ -137,6 +160,134 @@ const ProfileScreen = () => {
     } finally {
       setLoadingStats(false);
     }
+  };
+
+  const fetchProfilePicture = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const picUrl = await getProfilePictureUrl(user.id);
+      setProfilePicUrl(picUrl);
+    } catch (error) {
+      console.error('Error al obtener la foto de perfil:', error);
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      // Solicitar permisos
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Se requieren permisos', 'Se necesita acceso a la galería para seleccionar una imagen');
+        return;
+      }
+      
+      // Lanzar el selector de imágenes
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await handleImageUpload(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error al seleccionar imagen:', error);
+      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      // Solicitar permisos de cámara
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Se requieren permisos', 'Se necesita acceso a la cámara para tomar una foto');
+        return;
+      }
+      
+      // Lanzar la cámara
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await handleImageUpload(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error al tomar foto:', error);
+      Alert.alert('Error', 'No se pudo tomar la foto');
+    }
+  };
+
+  const handleImageUpload = async (imageUri: string) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Debes iniciar sesión para cambiar tu foto de perfil');
+      return;
+    }
+    
+    try {
+      setUploadingImage(true);
+      
+      // Subir la imagen a Cloudinary y actualizar en la base de datos
+      const cloudinaryUrl = await updateProfilePicture(user.id, imageUri);
+      
+      // Actualizar el estado local
+      setProfilePicUrl(cloudinaryUrl);
+      
+      // Actualizar el estado de Redux si es necesario
+      // Asegurarse de que user y sus propiedades existan antes de actualizar
+      if (user) {
+        try {
+          // Usar setUser en lugar de updateUser para actualizar el perfil
+          dispatch(setUser({
+            ...user,
+            profilePicUrl: cloudinaryUrl
+          }));
+        } catch (reduxError) {
+          console.error('Error al actualizar el estado Redux:', reduxError);
+          // Continuar con el flujo aunque falle la actualización de Redux
+        }
+      }
+      
+      // Mostrar un mensaje de éxito más discreto
+      console.log('Foto de perfil actualizada correctamente');
+      // Mostrar un Alert sólo si todo funciona correctamente
+      Alert.alert('Éxito', 'Foto de perfil actualizada correctamente');
+    } catch (error: any) {
+      console.error('Error al subir la imagen:', error);
+      Alert.alert('Error', `No se pudo actualizar la foto de perfil: ${error.message}`);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const showImageOptions = () => {
+    Alert.alert(
+      'Cambiar foto de perfil',
+      'Selecciona una opción',
+      [
+        {
+          text: 'Tomar foto',
+          onPress: takePhoto
+        },
+        {
+          text: 'Elegir de la galería',
+          onPress: pickImage
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        }
+      ]
+    );
   };
 
   const handleLogout = async () => {
@@ -357,46 +508,38 @@ const ProfileScreen = () => {
   // Función para enviar una solicitud de amistad
   const handleSendRequest = async () => {
     try {
-      if (!username.trim()) {
-        alert('Por favor ingresa un nombre de usuario');
+      if (!username || !user?.id) {
+        alert('Por favor, introduzca un nombre de usuario');
         return;
       }
 
-      const { data: receiver, error: userError } = await supabase
+      // Buscar usuario por nombre de usuario
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id')
-        .eq('username', username)
+        .eq('username', username.trim())
         .single();
 
-      if (userError) {
-        alert('Usuario no encontrado');
-        return;
-      }
+      if (userError) throw userError;
+      if (!userData) throw new Error('No se ha encontrado ese usuario');
 
-      const receiverId = receiver.id;
+      const receiverId = userData.id;
 
-      if (user?.id === receiverId) {
+      // Verificar que no sea el mismo usuario
+      if (receiverId === user.id) {
         alert('No puedes enviarte una solicitud a ti mismo');
         return;
       }
 
-      const { data: friends, error: friendsError } = await supabase
-        .from('friends')
-        .select('*')
-        .or(`and(user1Id.eq.${user?.id},user2Id.eq.${receiverId}),and(user1Id.eq.${receiverId},user2Id.eq.${user?.id})`)
-        .single();
-
-      if (friends) {
-        alert('Ya son amigos');
-        return;
-      }
-
+      // Verificar si ya existe una solicitud pendiente
       const { data: existingRequest, error: requestError } = await supabase
         .from('friendship_invitations')
-        .select('*')
-        .or(`and(senderId.eq.${user?.id},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${user?.id})`)
+        .select()
+        .or(`and(senderId.eq.${user.id},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${user.id})`)
         .eq('status', 'Pending')
-        .single();
+        .maybeSingle();
+
+      if (requestError) throw requestError;
 
       if (existingRequest) {
         alert('Ya existe una solicitud pendiente entre estos usuarios');
@@ -405,9 +548,6 @@ const ProfileScreen = () => {
 
       // Usar el servicio de amigos para enviar la solicitud y la notificación
       const result = await sendFriendRequest(user?.id, receiverId);
-
-      if (error) throw error;
-      if (!data) throw new Error('No se ha encontrado ese usuario');
 
       alert('Solicitud enviada con éxito!');
     } catch (error: any) {
@@ -451,234 +591,248 @@ const ProfileScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.headerBackground}>
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
-            <Text style={styles.email}>{user?.email}</Text>
-            <View style={styles.levelContainer}>
-              <Text style={styles.levelText}>Nivel {level}</Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progress, { width: `${(xp / xpNext) * 100}%` }]} />
-              </View>
-              <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.stats}>
-        {loadingStats ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size={40} color="#005F9E" />
-          </View>
-        ) : (
-          <>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalPoints}</Text>
-              <Text style={styles.statLabel}>Puntos</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.completedMissions}</Text>
-              <Text style={styles.statLabel}>Misiones</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.visitedCities}</Text>
-              <Text style={styles.statLabel}>Ciudades</Text>
-            </View>
-          </>
-        )}
-      </View>
-      {/* Sección para Insignias */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Logros</Text>
-        <View style={styles.badgesContainer}>
-          <TouchableOpacity
-            style={styles.badgesButton}
-            onPress={() => {
-              navigation.navigate('BadgesScreen');
-            }}
-          >
-            <View style={styles.badgesButtonContent}>
-              <Ionicons name="medal" size={24} color="white" />
-              <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
-              <Ionicons name="chevron-forward" size={20} color="white" />
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Social</Text>
-        <View style={styles.socialContainer}>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => navigation.navigate('Friends')}
-          >
-            <Ionicons name="people" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Amigos</Text>
-          </TouchableOpacity>
-          <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => navigation.navigate('Leaderboard')}
-          >
-            <Ionicons name="trophy" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Leaderboard</Text>
-          </TouchableOpacity>
-          <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Seguridad</Text>
-        <View style={styles.privacyContainer}>
-          <TouchableOpacity
-            style={styles.privacyButton}
-            onPress={() => setIsChangePasswordVisible(true)}
-          >
-            <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
-          </TouchableOpacity>
-          <Text style={styles.privacyDescription}>
-            Actualiza tu contraseña para mantener tu cuenta segura
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.requestsContainer}>
-        <TouchableOpacity onPress={handleFetchPendingRequests}>
-          <Text style={styles.requestsTitle}>
-            {isRequestsVisible ? 'Ocultar Solicitudes' : 'Ver Solicitudes'}
-          </Text>
-        </TouchableOpacity>
-
-        {isRequestsVisible && (
-          friendshipRequests.length === 0 ? (
-            <Text style={styles.noRequestsText}>No hay solicitudes pendientes</Text>
-          ) : (
-            <FlatList
-              data={friendshipRequests}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.requestItem}>
-                  <Text style={styles.requestText}>
-                    {item.users.username || 'Usuario desconocido'} te ha enviado una solicitud.
-                  </Text>
-                  <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
-                    <Text style={styles.acceptButtonText}>Aceptar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
-                    <Text style={styles.rejectButtonText}>Rechazar</Text>
-                  </TouchableOpacity>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView>
+        <View style={styles.headerBackground}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.avatarContainer} onPress={showImageOptions}>
+              {uploadingImage ? (
+                <View style={styles.avatar}>
+                  <ActivityIndicator size="large" color="white" />
+                </View>
+              ) : profilePicUrl ? (
+                <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
                 </View>
               )}
-            />
-          )
-        )}
-      </View>
-
-      <View style={styles.sendRequestContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre de usuario"
-          value={username}
-          onChangeText={setUsername}
-        />
-        <TouchableOpacity style={styles.sendRequestButton} onPress={handleSendRequest}>
-          <Text style={styles.sendRequestButtonText}>Enviar Solicitud</Text>
-        </TouchableOpacity>
-      </View>
-
-
-      <TouchableOpacity
-        style={[styles.logoutButton, loading && styles.disabledButton]}
-        onPress={handleLogout}
-        disabled={loading}
-      >
-        <Text style={styles.logoutButtonText}>
-          {loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
-        </Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={isChangePasswordVisible}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
-
-            {message.text ? (
-              <Text style={[styles.messageText, message.type === 'error' ? styles.errorMessage : styles.successMessage]}>
-                {message.text}
-              </Text>
-            ) : null}
-
-            <TextInput
-              style={styles.input}
-              placeholder="Contraseña actual"
-              secureTextEntry
-              value={currentPassword}
-              onChangeText={(text) => {
-                setCurrentPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Nueva contraseña"
-              secureTextEntry
-              value={newPassword}
-              onChangeText={(text) => {
-                setNewPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Confirmar nueva contraseña"
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setIsChangePasswordVisible(false);
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                  setMessage({ type: '', text: '' });
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton, loading && styles.disabledButton]}
-                onPress={handleChangePassword}
-                disabled={loading}
-              >
-                <Text style={styles.modalButtonText}>
-                  {loading ? 'Guardando...' : 'Guardar'}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.cameraIconContainer}>
+                <Ionicons name="camera" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.userInfo}>
+              <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
+              <Text style={styles.email}>{user?.email}</Text>
+              <View style={styles.levelContainer}>
+                <Text style={styles.levelText}>Nivel {level}</Text>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progress, { width: `${(xp / xpNext) * 100}%` }]} />
+                </View>
+                <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
+              </View>
             </View>
           </View>
         </View>
-      </Modal>
-    </ScrollView>
+
+        <View style={styles.stats}>
+          {loadingStats ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size={40} color="#005F9E" />
+            </View>
+          ) : (
+            <>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.totalPoints}</Text>
+                <Text style={styles.statLabel}>Puntos</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.completedMissions}</Text>
+                <Text style={styles.statLabel}>Misiones</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.visitedCities}</Text>
+                <Text style={styles.statLabel}>Ciudades</Text>
+              </View>
+            </>
+          )}
+        </View>
+        {/* Sección para Insignias */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Logros</Text>
+          <View style={styles.badgesContainer}>
+            <TouchableOpacity
+              style={styles.badgesButton}
+              onPress={() => {
+                navigation.navigate('BadgesScreen');
+              }}
+            >
+              <View style={styles.badgesButtonContent}>
+                <Ionicons name="medal" size={24} color="white" />
+                <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
+                <Ionicons name="chevron-forward" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Social</Text>
+          <View style={styles.socialContainer}>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => navigation.navigate('Friends')}
+            >
+              <Ionicons name="people" size={24} color="white" />
+              <Text style={styles.socialButtonText}>Amigos</Text>
+            </TouchableOpacity>
+            <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => navigation.navigate('Leaderboard')}
+            >
+              <Ionicons name="trophy" size={24} color="white" />
+              <Text style={styles.socialButtonText}>Leaderboard</Text>
+            </TouchableOpacity>
+            <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Seguridad</Text>
+          <View style={styles.privacyContainer}>
+            <TouchableOpacity
+              style={styles.privacyButton}
+              onPress={() => setIsChangePasswordVisible(true)}
+            >
+              <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
+            </TouchableOpacity>
+            <Text style={styles.privacyDescription}>
+              Actualiza tu contraseña para mantener tu cuenta segura
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.requestsContainer}>
+          <TouchableOpacity onPress={handleFetchPendingRequests}>
+            <Text style={styles.requestsTitle}>
+              {isRequestsVisible ? 'Ocultar Solicitudes' : 'Ver Solicitudes'}
+            </Text>
+          </TouchableOpacity>
+
+          {isRequestsVisible && (
+            friendshipRequests.length === 0 ? (
+              <Text style={styles.noRequestsText}>No hay solicitudes pendientes</Text>
+            ) : (
+              <FlatList
+                data={friendshipRequests}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={styles.requestItem}>
+                    <Text style={styles.requestText}>
+                      {item.users.username || 'Usuario desconocido'} te ha enviado una solicitud.
+                    </Text>
+                    <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
+                      <Text style={styles.acceptButtonText}>Aceptar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
+                      <Text style={styles.rejectButtonText}>Rechazar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+            )
+          )}
+        </View>
+
+        <View style={styles.sendRequestContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Nombre de usuario"
+            value={username}
+            onChangeText={setUsername}
+          />
+          <TouchableOpacity style={styles.sendRequestButton} onPress={handleSendRequest}>
+            <Text style={styles.sendRequestButtonText}>Enviar Solicitud</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.logoutButton, loading && styles.disabledButton]}
+          onPress={handleLogout}
+          disabled={loading}
+        >
+          <Text style={styles.logoutButtonText}>
+            {loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
+          </Text>
+        </TouchableOpacity>
+
+        <Modal
+          visible={isChangePasswordVisible}
+          transparent={true}
+          animationType="slide"
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
+
+              {message.text ? (
+                <Text style={[styles.messageText, message.type === 'error' ? styles.errorMessage : styles.successMessage]}>
+                  {message.text}
+                </Text>
+              ) : null}
+
+              <TextInput
+                style={styles.input}
+                placeholder="Contraseña actual"
+                secureTextEntry
+                value={currentPassword}
+                onChangeText={(text) => {
+                  setCurrentPassword(text);
+                  setMessage({ type: '', text: '' });
+                }}
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Nueva contraseña"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={(text) => {
+                  setNewPassword(text);
+                  setMessage({ type: '', text: '' });
+                }}
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Confirmar nueva contraseña"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  setMessage({ type: '', text: '' });
+                }}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setIsChangePasswordVisible(false);
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setMessage({ type: '', text: '' });
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton, loading && styles.disabledButton]}
+                  onPress={handleChangePassword}
+                  disabled={loading}
+                >
+                  <Text style={styles.modalButtonText}>
+                    {loading ? 'Guardando...' : 'Guardar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -688,20 +842,52 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   headerBackground: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     padding: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#4CAF50',
+  avatarContainer: {
+    position: 'relative',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 15,
+    backgroundColor: '#005F9E',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#005F9E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#005F9E',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
   },
   avatarText: {
     fontSize: 40,
@@ -750,7 +936,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#005F9E',
   },
   statLabel: {
     fontSize: 14,
@@ -781,7 +967,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   socialButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -893,7 +1079,7 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   privacyButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -1009,7 +1195,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgesButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -1026,7 +1212,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   sendRequestButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',

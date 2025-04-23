@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -12,6 +12,9 @@ import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
 import { addExperienceToUser } from '../../services/experienceService';
 import { awardSpecificBadges } from '../../services/badgeService';
+import { useTheme } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-context';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -400,7 +403,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         .eq('userId', user.id)
         .order('created_at', { ascending: false });
 
-      if (ownJourneysError) throw ownJourneysError;
+      if (journeysError) throw journeysError;
 
       // Obtener viajes compartidos
       const { data: sharedJourneys, error: sharedJourneysError } = await supabase
@@ -437,7 +440,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       // Combinar viajes propios y compartidos
       const allJourneys = [
-        ...(ownJourneys || []),
+        ...(journeys || []),
         ...(sharedJourneys?.map(shared => shared.journeys) || [])
       ];
 
@@ -704,7 +707,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   if (!selectedCity) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.title}>Tus Ciudades</Text>
           <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
@@ -730,14 +733,14 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             />
           ))}
         </ScrollView>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const cityData = cityMissions[selectedCity];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -825,7 +828,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         onClose={() => setIsShareModalVisible(false)}
         onSelect={handleShareJourney}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

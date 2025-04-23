@@ -1,10 +1,13 @@
-/**
- * JournalScreen.tsx
- * Corrección del ancho de columnas del diario para móviles y web
- */
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions, Platform } from 'react-native';
-import Animated from 'react-native/Libraries/Animated/Animated';
+import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions, Platform, SafeAreaView, ScrollView } from 'react-native';
+import { FlatList as GestureFlatList } from 'react-native-gesture-handler';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming,
+  withSpring,
+  interpolate
+} from 'react-native-reanimated';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
@@ -14,6 +17,7 @@ import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import { styles } from './styles';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface JournalScreenProps {
   route: RouteProp<TabParamList, 'Journal'>;
@@ -83,7 +87,10 @@ const EmptyState = ({ message }: { message: string }) => (
 const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJournalEntry[]; onPress: () => void }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [nextImageIndex, setNextImageIndex] = useState(1);
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useSharedValue(0);
+  
+  // Guardar el ancho de la ventana en una variable
+  const windowWidth = Dimensions.get('window').width;
   
   // Recopilar todas las fotos de las entradas de la ciudad
   const allPhotos = entries.reduce<string[]>((photos, entry) => {
@@ -96,19 +103,43 @@ const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJourn
   // Función para animar el deslizamiento
   const animateSlide = () => {
     // Reset la animación
-    slideAnim.setValue(0);
+    slideAnim.value = 0;
     
     // Animar hacia la izquierda
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start(() => {
+    slideAnim.value = withTiming(1, { duration: 800 });
+    
+    // Actualizar índices al completar la animación
+    setTimeout(() => {
       setCurrentImageIndex(nextImageIndex);
       setNextImageIndex((nextImageIndex + 1) % allPhotos.length);
-      slideAnim.setValue(0);
-    });
+      slideAnim.value = 0;
+    }, 800);
   };
+
+  // Estilos animados
+  const firstImageAnimStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{
+        translateX: interpolate(
+          slideAnim.value,
+          [0, 1],
+          [0, -windowWidth]
+        )
+      }]
+    };
+  });
+
+  const secondImageAnimStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{
+        translateX: interpolate(
+          slideAnim.value,
+          [0, 1],
+          [windowWidth, 0]
+        )
+      }]
+    };
+  });
 
   // Efecto para el carrusel automático
   useEffect(() => {
@@ -129,14 +160,7 @@ const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJourn
             <Animated.View
               style={[
                 styles.journalImageContainer,
-                {
-                  transform: [{
-                    translateX: slideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -Dimensions.get('window').width]
-                    })
-                  }]
-                }
+                firstImageAnimStyle
               ]}
             >
               <Image
@@ -148,14 +172,7 @@ const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJourn
             <Animated.View
               style={[
                 styles.journalImageContainer,
-                {
-                  transform: [{
-                    translateX: slideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [Dimensions.get('window').width, 0]
-                    })
-                  }]
-                }
+                secondImageAnimStyle
               ]}
             >
               <Image
@@ -432,16 +449,17 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
             <Text style={styles.journalTitle}>{selectedCity}</Text>
           </View>
           
-          {entriesByCity[selectedCity].length === 0 ? (
+          {!entriesByCity[selectedCity] || entriesByCity[selectedCity].length === 0 ? (
             <EmptyState message={`No hay entradas de diario para ${selectedCity}`} />
           ) : (
-            <FlatList
-              key="entries"
-              data={entriesByCity[selectedCity]}
-              renderItem={({ item }) => <JournalEntryCard entry={item} />}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.journalEntriesList}
-            />
+            <View style={styles.journalEntriesList}>
+              <FlatList
+                key="entries"
+                data={entriesByCity[selectedCity]}
+                renderItem={({ item }) => <JournalEntryCard entry={item} />}
+                keyExtractor={(item) => item.id}
+              />
+            </View>
           )}
         </View>
       );
@@ -458,26 +476,31 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
             </Text>
           </View>
         ) : (
-          <FlatList
-            key="cities"
-            data={cities}
-            renderItem={({ item }) => (
-              <CityCard
-                city={item}
-                entries={entriesByCity[item]}
-                onPress={() => handleCityPress(item)}
-              />
-            )}
-            keyExtractor={(item) => item}
-            numColumns={Platform.OS === 'web' ? 4 : 1}
-            contentContainerStyle={styles.journalCityGrid}
-          />
+          <View style={styles.journalCityGrid}>
+            <FlatList
+              key="cities"
+              data={cities}
+              renderItem={({ item }) => (
+                <CityCard 
+                  city={item} 
+                  entries={entriesByCity[item] || []} 
+                  onPress={() => handleCityPress(item)} 
+                />
+              )}
+              keyExtractor={(item) => item}
+              numColumns={Platform.OS === 'web' ? 4 : 1}
+            />
+          </View>
         )}
       </View>
     );
   };
 
-  return renderContent();
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {renderContent()}
+    </SafeAreaView>
+  );
 };
 
 export default JournalScreen; 

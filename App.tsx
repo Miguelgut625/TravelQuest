@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { PersistGate } from 'redux-persist/integration/react';
 import { Provider } from 'react-redux';
 import { store, persistor } from './src/features/store';
@@ -41,6 +41,8 @@ const theme = {
 const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const notificationListener = useRef<any>();
+  const responseListener = useRef<any>();
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -210,7 +212,7 @@ const App = () => {
       <Provider store={store}>
         <PersistGate loading={null} persistor={persistor}>
           <PaperProvider theme={theme}>
-            <SafeAreaProvider style={{ paddingTop: 30, backgroundColor: 'white' }}>
+            <SafeAreaProvider>
               <AppNavigator />
             </SafeAreaProvider>
           </PaperProvider>

@@ -372,8 +372,31 @@ export const checkSocialBadges = async (userId: string): Promise<string[]> => {
 // Verificar y otorgar insignias especiales
 export const checkSpecialBadges = async (userId: string): Promise<string[]> => {
   try {
-    // Implementación pendiente para insignias especiales
-    return [];
+    if (!userId) return [];
+    
+    const unlockedBadges: string[] = [];
+    
+    // Verificar cada insignia especial
+    const photographerResult = await checkPhotographerBadge(userId);
+    const marathonResult = await checkMarathonBadge(userId);
+    const nightExplorerResult = await checkNightExplorerBadge(userId);
+    const allTerrainResult = await checkAllTerrainBadge(userId);
+    
+    // Obtener nombres de las insignias desbloqueadas
+    if (photographerResult || marathonResult || nightExplorerResult || allTerrainResult) {
+      const badgeNames = ['Fotógrafo Viajero', 'Maratonista de Viajes', 'Explorador Nocturno', 'Viajero Todo Terreno'];
+      
+      const { data: badgesData } = await supabase
+        .from('badges')
+        .select('name')
+        .in('name', badgeNames);
+      
+      badgesData?.forEach((badge: { name: string }) => {
+        unlockedBadges.push(badge.name);
+      });
+    }
+    
+    return unlockedBadges;
   } catch (error) {
     console.error('Error al verificar insignias especiales:', error);
     return [];
@@ -858,39 +881,5 @@ export const checkAllTerrainBadge = async (userId: string): Promise<boolean> => 
   } catch (error) {
     console.error('Error al verificar insignia todo terreno:', error);
     return false;
-  }
-};
-
-// Función para verificar todos los logros especiales
-export const checkSpecialBadges = async (userId: string): Promise<string[]> => {
-  try {
-    if (!userId) return [];
-    
-    const unlockedBadges: string[] = [];
-    
-    // Verificar cada insignia especial
-    const photographerResult = await checkPhotographerBadge(userId);
-    const marathonResult = await checkMarathonBadge(userId);
-    const nightExplorerResult = await checkNightExplorerBadge(userId);
-    const allTerrainResult = await checkAllTerrainBadge(userId);
-    
-    // Obtener nombres de las insignias desbloqueadas
-    if (photographerResult || marathonResult || nightExplorerResult || allTerrainResult) {
-      const badgeNames = ['Fotógrafo Viajero', 'Maratonista de Viajes', 'Explorador Nocturno', 'Viajero Todo Terreno'];
-      
-      const { data: badgesData } = await supabase
-        .from('badges')
-        .select('name')
-        .in('name', badgeNames);
-      
-      badgesData?.forEach((badge: { name: string }) => {
-        unlockedBadges.push(badge.name);
-      });
-    }
-    
-    return unlockedBadges;
-  } catch (error) {
-    console.error('Error al verificar insignias especiales:', error);
-    return [];
   }
 }; 

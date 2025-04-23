@@ -23,10 +23,11 @@ import GroupsScreen from '../screens/main/GroupsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator, Text, Platform, StatusBar } from 'react-native';
 import ChatScreen from '../screens/main/ChatScreen';
 import ConversationsScreen from '../screens/main/ConversationsScreen';
 import { linking } from './linking';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Define los parámetros para las pestañas principales
 export type TabParamList = {
@@ -132,16 +133,10 @@ const TabNavigator = () => {
             iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Journal') {
             iconName = focused ? 'book' : 'book-outline';
-          } else if (route.name === 'Friends') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Leaderboard') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else if (route.name === 'Conversations') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'Badges') {
-            iconName = focused ? 'medal' : 'medal-outline';
           }
 
           // @ts-ignore
@@ -150,18 +145,43 @@ const TabNavigator = () => {
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: 'gray',
         headerShown: false,
+        tabBarStyle: {
+          height: Platform.OS === 'ios' ? 80 : 56,
+          paddingBottom: Platform.OS === 'ios' ? 25 : 7,
+          paddingTop: 7,
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#e5e5e5',
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+        },
       })}
     >
       <Tab.Screen
         name="Map"
         component={MapScreen}
         options={{
-          title: 'Map'
+          title: 'Mapa'
         }}
       />
-      <Tab.Screen name="Missions" component={MissionsScreen} />
-      <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} />
-      <Tab.Screen name="Friends" component={FriendsScreen} />
+      <Tab.Screen 
+        name="Missions" 
+        component={MissionsScreen}
+        options={{
+          title: 'Misiones'
+        }}
+      />
+      <Tab.Screen 
+        name="Journal" 
+        component={JournalScreen} 
+        initialParams={{ refresh: false }}
+        options={{
+          title: 'Diario'
+        }}
+      />
       <Tab.Screen
         name="Conversations"
         component={ConversationsScreen}
@@ -169,9 +189,13 @@ const TabNavigator = () => {
           title: 'Mensajes'
         }}
       />
-      <Tab.Screen name="Badges" component={BadgesScreen} options={{ title: 'Insignias' }} />
-      <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{
+          title: 'Perfil'
+        }}
+      />
     </Tab.Navigator>
   );
 };
@@ -183,31 +207,40 @@ const AppNavigator = () => {
   // Si el estado de autenticación es 'loading', mostrar un indicador de carga
   if (authState === 'loading') {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size={24} color={theme.colors.primary} />
-      </View>
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size={24} color={theme.colors.primary} />
+        </View>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <NavigationContainer linking={linking}>
-      {authState === 'authenticated' ? (
-        <MainFlow />
-      ) : (
-        <AuthStack.Navigator
-          screenOptions={{
-            headerShown: false,
-          }}
-        >
-          <AuthStack.Screen name="Login" component={LoginScreen} />
-          <AuthStack.Screen name="Register" component={RegisterScreen} />
-          <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-          <AuthStack.Screen name="VerifyCode" component={VerifyCodeScreen} />
-          <AuthStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-          <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-        </AuthStack.Navigator>
-      )}
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="#005F9E"
+        translucent={true}
+      />
+      <NavigationContainer linking={linking}>
+        {authState === 'authenticated' ? (
+          <MainFlow />
+        ) : (
+          <AuthStack.Navigator
+            screenOptions={{
+              headerShown: false,
+            }}
+          >
+            <AuthStack.Screen name="Login" component={LoginScreen} />
+            <AuthStack.Screen name="Register" component={RegisterScreen} />
+            <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <AuthStack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+            <AuthStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+            <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          </AuthStack.Navigator>
+        )}
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 };
 

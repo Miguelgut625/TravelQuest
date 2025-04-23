@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -126,7 +127,7 @@ const ConversationsScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size={40} color="#4CAF50" />
+        <ActivityIndicator size={40} color="#005F9E" />
       </View>
     );
   }
@@ -201,7 +202,7 @@ const ConversationsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.title}>Mensajes</Text>
       
       {conversations.length === 0 ? (
@@ -223,13 +224,13 @@ const ConversationsScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#4CAF50']}
+              colors={['#005F9E']}
             />
           }
           contentContainerStyle={{ paddingVertical: 10 }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   userAvatar: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
   },
   groupAvatar: {
     backgroundColor: '#005F9E',
@@ -325,7 +326,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   badgeContainer: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#005F9E',
     borderRadius: 12,
     minWidth: 24,
     height: 24,

@@ -5,7 +5,6 @@ import WebView from 'react-native-webview';
 import * as Location from 'expo-location';
 import { Region } from '../types/map';
 import { FAB, Button } from 'react-native-paper';
-import FallbackView from './FallbackView';
 import MapView, { Marker } from 'react-native-maps';
 
 // Token de Cesium
@@ -510,7 +509,6 @@ export interface Props {
   initialRegion?: Region;
   showsUserLocation?: boolean;
   followsUserLocation?: boolean;
-  useFallbackGlobe?: boolean;
   onRegionChange?: (region: Region) => void;
   onRegionChangeComplete?: (region: Region) => void;
   onLoadingChange?: (loading: boolean) => void;
@@ -893,6 +891,22 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
     }
   }, [hasError, retryCount]);
 
+  // Componente local de respaldo para errores
+  const ErrorView = ({ error, onRetry }: { error: string, onRetry: () => void }) => (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorText}>{error}</Text>
+      {onRetry && (
+        <Button 
+          mode="contained" 
+          onPress={onRetry}
+          style={styles.retryButton}
+        >
+          Reintentar
+        </Button>
+      )}
+    </View>
+  );
+
   // Renderización del componente
   return (
     <View style={styles.container}>
@@ -907,9 +921,9 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         </View>
       )}
 
-      {/* Usar fallback o mostrar error incorregible */}
-      {(hasError && retryCount >= 3) || (props.useFallbackGlobe === true) ? (
-        <FallbackView 
+      {/* Usar respaldo o mostrar error incorregible */}
+      {(hasError && retryCount >= 3) ? (
+        <ErrorView 
           error={errorMessage || "No se pudo cargar el Globo 3D"}
           onRetry={() => {
             setRetryCount(0);
