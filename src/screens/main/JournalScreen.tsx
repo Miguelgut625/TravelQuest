@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert, Animated, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
@@ -56,27 +56,124 @@ const EmptyState = ({ message }: { message: string }) => (
   </View>
 );
 
+const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJournalEntry[]; onPress: () => void }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [nextImageIndex, setNextImageIndex] = useState(1);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const allPhotos = entries.reduce<string[]>((photos, entry) => {
+    if (entry.photos && entry.photos.length > 0) {
+      return [...photos, ...entry.photos];
+    }
+    return photos;
+  }, []);
+
+  const animateSlide = () => {
+    slideAnim.setValue(0);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentImageIndex(nextImageIndex);
+      setNextImageIndex((nextImageIndex + 1) % allPhotos.length);
+      slideAnim.setValue(0);
+    });
+  };
+
+  useEffect(() => {
+    if (allPhotos.length <= 1) return;
+
+    const interval = setInterval(() => {
+      animateSlide();
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [allPhotos.length, nextImageIndex]);
+
+  return (
+    <TouchableOpacity style={styles.cityCard} onPress={onPress}>
+      {allPhotos.length > 0 ? (
+        <View style={styles.carouselContainer}>
+          <Animated.View
+            style={[
+              styles.imageContainer,
+              {
+                transform: [{
+                  translateX: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -Dimensions.get('window').width]
+                  })
+                }]
+              }
+            ]}
+          >
+            <Image
+              source={{ uri: allPhotos[currentImageIndex] }}
+              style={styles.cityCardBackground}
+              resizeMode="cover"
+            />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.imageContainer,
+              {
+                transform: [{
+                  translateX: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [Dimensions.get('window').width, 0]
+                  })
+                }]
+              }
+            ]}
+          >
+            <Image
+              source={{ uri: allPhotos[nextImageIndex] }}
+              style={styles.cityCardBackground}
+              resizeMode="cover"
+            />
+          </Animated.View>
+          <View style={styles.cityCardOverlay} />
+        </View>
+      ) : (
+        <View style={styles.noImageBackground}>
+          <Ionicons name="image-outline" size={32} color="#666" />
+        </View>
+      )}
+      <View style={styles.textContainer}>
+        <Ionicons name="location" size={32} color="#fff" />
+        <Text style={styles.cityName}>{city}</Text>
+        <Text style={styles.viewMissionsText}>Ver misiones ({entries.length})</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 const JournalScreen = ({ route }: JournalScreenProps) => {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [currentCityIndex, setCurrentCityIndex] = useState(0);
+
   const { user } = useSelector((state: RootState) => state.auth);
   const { shouldRefresh } = useSelector((state: RootState) => state.journal);
   const dispatch = useDispatch();
-  // @ts-ignore
-  const navigation = useNavigation();
-  
+  const navigation = useNavigation<any>();
+  const flatListRef = useRef<FlatList>(null);
+
+  const windowWidth = Dimensions.get('window').width;
+  const CARD_WIDTH = windowWidth - 60; // Reducimos el margen total (30px a cada lado)
+
   useEffect(() => {
     fetchJournalEntries();
-    
+
     // Suscribirse a cambios en la tabla journal_entries
     const journalSubscription = supabase
       .channel('journal_changes')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'journal_entries',
         filter: `userid=eq.${user?.id}`
       }, (payload: any) => {
@@ -85,13 +182,13 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
         fetchJournalEntries();
       })
       .subscribe();
-      
+
     // Limpiar suscripción
     return () => {
       supabase.removeChannel(journalSubscription);
     };
   }, []);
-  
+
   useEffect(() => {
     if (shouldRefresh) {
       console.log('Actualizando entradas del diario debido a nueva misión completada');
@@ -123,7 +220,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
       setLoading(true);
       const entries = await getUserJournalEntries(user.id);
       setEntriesByCity(entries);
-      
+
       // Si hay entradas, seleccionar la primera ciudad por defecto
       const cities = Object.keys(entries);
       if (cities.length > 0 && !selectedCity) {
@@ -134,6 +231,31 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
       setError('No se pudieron cargar las entradas del diario');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleNextCity = () => {
+    const cities = Object.keys(entriesByCity);
+    if (currentCityIndex < cities.length - 1) {
+      const nextIndex = currentCityIndex + 1;
+      setCurrentCityIndex(nextIndex);
+      setSelectedCity(cities[nextIndex]);
+      flatListRef.current?.scrollToOffset({
+        offset: nextIndex * windowWidth,
+        animated: true
+      });
+    }
+  };
+
+  const handlePrevCity = () => {
+    if (currentCityIndex > 0) {
+      const prevIndex = currentCityIndex - 1;
+      setCurrentCityIndex(prevIndex);
+      setSelectedCity(Object.keys(entriesByCity)[prevIndex]);
+      flatListRef.current?.scrollToOffset({
+        offset: prevIndex * windowWidth,
+        animated: true
+      });
     }
   };
 
@@ -168,28 +290,74 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
     );
   }
 
+  const renderCityCard = ({ item }: { item: string }) => (
+    <View style={[styles.cityCardContainer, { width: windowWidth }]}>
+      <View style={styles.cityCardContent}>
+        <CityCard
+          city={item}
+          entries={entriesByCity[item]}
+          onPress={() => {
+            const index = cities.indexOf(item);
+            setSelectedCity(item);
+            setCurrentCityIndex(index);
+            flatListRef.current?.scrollToOffset({
+              offset: index * windowWidth,
+              animated: true
+            });
+          }}
+        />
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Diario de Viaje</Text>
-      <View style={styles.cityTabs}>
+      <View style={styles.cityCarouselContainer}>
+        <TouchableOpacity
+          style={[styles.navButton, styles.navButtonLeft]}
+          onPress={handlePrevCity}
+          disabled={currentCityIndex === 0}
+        >
+          <Ionicons
+            name="chevron-back"
+            size={30}
+            color={currentCityIndex === 0 ? '#ccc' : '#005F9E'}
+          />
+        </TouchableOpacity>
+
         <FlatList
+          ref={flatListRef}
           horizontal
           data={cities}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.cityTab, selectedCity === item && styles.selectedCityTab]}
-              onPress={() => setSelectedCity(item)}
-            >
-              <Text style={[styles.cityTabText, selectedCity === item && styles.selectedCityTabText]}>
-                {item}
-              </Text>
-            </TouchableOpacity>
-          )}
+          renderItem={renderCityCard}
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
+          pagingEnabled
+          snapToInterval={windowWidth}
+          decelerationRate="fast"
+          snapToAlignment="center"
+          onMomentumScrollEnd={(event) => {
+            const offset = event.nativeEvent.contentOffset.x;
+            const index = Math.round(offset / windowWidth);
+            setCurrentCityIndex(index);
+            setSelectedCity(cities[index]);
+          }}
         />
+
+        <TouchableOpacity
+          style={[styles.navButton, styles.navButtonRight]}
+          onPress={handleNextCity}
+          disabled={currentCityIndex === cities.length - 1}
+        >
+          <Ionicons
+            name="chevron-forward"
+            size={30}
+            color={currentCityIndex === cities.length - 1 ? '#ccc' : '#005F9E'}
+          />
+        </TouchableOpacity>
       </View>
-      
+
       {selectedCity ? (
         entriesByCity[selectedCity].length > 0 ? (
           <FlatList
@@ -209,34 +377,35 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
     backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginVertical: 15,
+    marginHorizontal: 15,
     color: '#005F9E',
   },
-  cityTabs: {
-    marginBottom: 10,
+  cityCarouselContainer: {
+    height: 220,
+    position: 'relative',
+    marginBottom: 15,
   },
-  cityTab: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 10,
+  cityCardContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cityCardContent: {
+    width: Dimensions.get('window').width - 60,
+    paddingHorizontal: 0,
+  },
+  cityCard: {
+    width: '100%',
+    height: 200,
+    borderRadius: 15,
+    overflow: 'hidden',
     backgroundColor: '#f0f0f0',
-  },
-  selectedCityTab: {
-    backgroundColor: '#005F9E',
-  },
-  cityTabText: {
-    color: '#666',
-  },
-  selectedCityTabText: {
-    color: 'white',
-    fontWeight: 'bold',
   },
   entriesList: {
     flex: 1,
@@ -340,6 +509,76 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     fontSize: 16,
+  },
+  carouselContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 15,
+  },
+  imageContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  cityCardBackground: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  cityCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  textContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  cityName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  viewMissionsText: {
+    color: '#fff',
+    marginTop: 8,
+    fontSize: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  navButton: {
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -25 }],
+    zIndex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 25,
+    padding: 10,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  navButtonLeft: {
+    left: 15,
+  },
+  navButtonRight: {
+    right: 15,
   },
 });
 

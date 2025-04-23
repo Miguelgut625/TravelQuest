@@ -412,13 +412,13 @@ const ProfileScreen = () => {
   const fetchPendingRequests = async () => {
     try {
       const { data, error } = await supabase
-      .from('friendship_invitations')
-      .select(`
+        .from('friendship_invitations')
+        .select(`
         id, senderId, created_at, receiverId, status,
         users:senderId (username)
       `)
-      .eq('receiverId', user?.id)
-      .eq('status', 'Pending');
+        .eq('receiverId', user?.id)
+        .eq('status', 'Pending');
 
       if (error) throw error;
       console.log('Solicitudes pendientes obtenidas:', user?.id);
@@ -451,7 +451,7 @@ const ProfileScreen = () => {
             <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
+            <Text style={styles.name}>{user?.username || user?.email?.split('@')[0] || 'Usuario'}</Text>
             <Text style={styles.email}>{user?.email}</Text>
             <View style={styles.levelContainer}>
               <Text style={styles.levelText}>Nivel {level}</Text>
