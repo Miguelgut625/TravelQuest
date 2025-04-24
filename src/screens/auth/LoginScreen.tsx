@@ -9,7 +9,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
-import * as Google from 'expo-google-app-auth';
+import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { WebView } from 'react-native-webview';
 
 // Asegurar que la redirección de autenticación en web se maneje correctamente
@@ -44,61 +45,64 @@ const LoginScreen = () => {
     checkAndSetSession();
   }, []);
 
-  // Función para iniciar sesión con Google
-  const signUpGoogle = async () => {
+  // Configurar petición de Google Auth usando AuthSession
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    androidClientId: '867203082977-v6lt7u50bc1geniog48vcv4mt51obo0g.apps.googleusercontent.com', // Android OAuth Client ID
+    iosClientId: '867203082977-v6lt7u50bc1geniog48vcv4mt51obo0g.apps.googleusercontent.com', // opcional para iOS
+    redirectUri: makeRedirectUri({ scheme: 'com.travelquest.app' }), // custom scheme nativo
+  });
+
+  // Escuchar la respuesta de Google
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      if (id_token) {
+        handleGoogleToken(id_token);
+      } else {
+        dispatch(setError('No se recibió ID token de Google'));
+      }
+    }
+  }, [response]);
+
+  // Función para lanzar la petición de login
+  const signInWithGoogle = () => {
+    promptAsync();
+  };
+
+  // Función para manejar el token y autenticar con Supabase
+  const handleGoogleToken = async (idToken) => {
     try {
       setLoading(true);
-      dispatch(setError(null));
+      console.log('ID Token de Google obtenido, autenticando con Supabase...');
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken,
+      });
       
-      console.log('Iniciando autenticación con Google...');
+      if (error) {
+        console.error('Error al autenticar con Supabase:', error);
+        dispatch(setError('Error al autenticar con Google: ' + error.message));
+        return;
+      }
       
-      // Configuración de Google Auth
-      const config = {
-        androidClientId: '867203082977-v6lt7u50bc1geniog48vcv4mt51obo0g.apps.googleusercontent.com',
-        scopes: ['profile', 'email']
-      };
-      
-      // Realizar la autenticación con Google
-      const { type, accessToken, idToken, user } = await Google.logInAsync(config);
-      
-      if (type === 'success') {
-        console.log('Login exitoso con Google:', user.email);
+      if (data?.user) {
+        console.log('Autenticación exitosa con Supabase:', data.user.email);
         
-        // Autenticar con Supabase usando el token obtenido
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'google',
-          token: idToken,
-        });
+        // Actualizar el estado con los datos del usuario
+        dispatch(setUser({
+          email: data.user.email || '',
+          id: data.user.id,
+          username: data.user.user_metadata?.name || data.user.email?.split('@')[0]
+        }));
         
-        if (error) {
-          console.error('Error al autenticar con Supabase:', error);
-          dispatch(setError('Error al autenticar con Google: ' + error.message));
-          return;
-        }
-        
-        if (data?.user) {
-          console.log('Autenticación exitosa con Supabase:', data.user.email);
-          
-          // Actualizar el estado con los datos del usuario
-          dispatch(setUser({
-            email: data.user.email || '',
-            id: data.user.id,
-            username: data.user.user_metadata?.name || data.user.email?.split('@')[0]
-          }));
-          
-          dispatch(setAuthState('authenticated'));
-          navigation.navigate('Main');
-        } else {
-          console.log('No se pudo obtener los datos del usuario');
-          dispatch(setError('No se pudo completar la autenticación'));
-        }
+        dispatch(setAuthState('authenticated'));
+        navigation.navigate('Main');
       } else {
-        // El usuario canceló o hubo un error
-        console.log('Login cancelado o error');
-        dispatch(setError('Inicio de sesión con Google cancelado'));
+        console.log('No se pudo obtener los datos del usuario');
+        dispatch(setError('No se pudo completar la autenticación'));
       }
     } catch (error) {
-      console.error('Error en autenticación con Google:', error);
+      console.error('Error al autenticar con Google:', error);
       dispatch(setError('Error al conectar con Google: ' + (error.message || 'Intente nuevamente')));
     } finally {
       setLoading(false);
@@ -336,19 +340,12 @@ const LoginScreen = () => {
           <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.googleButton}
-          onPress={signUpGoogle}
-          disabled={loading}
+          onPress={signInWithGoogle}
+          disabled={!request || loading}
         >
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="white" />
-              <Text style={styles.loadingText}>Conectando con Google...</Text>
-            </View>
-          ) : (
-            <Text style={styles.googleButtonText}>Iniciar sesión con Google</Text>
-          )}
+          <Text style={styles.googleButtonText}>Iniciar sesión con Google</Text>
         </TouchableOpacity>
 
         {loading && (
