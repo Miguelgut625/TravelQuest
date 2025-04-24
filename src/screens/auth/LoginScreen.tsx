@@ -8,9 +8,8 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
+import * as Google from 'expo-google-app-auth';
 import { WebView } from 'react-native-webview';
 
 // Asegurar que la redirección de autenticación en web se maneje correctamente
@@ -36,70 +35,71 @@ const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [authUrl, setAuthUrl] = useState('');
-  const [showWebView, setShowWebView] = useState(false);
-  const webViewRef = useRef(null);
   const dispatch = useDispatch();
   const navigation = useNavigation<NavigationProp>();
   const error = useSelector((state: any) => state.auth.error);
 
-  // Configurar Google Auth nativo con Expo
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: '867203082977-v6lt7u50bc1geniog48vcv4mt51obo0g.apps.googleusercontent.com',
-    // Puedes añadir también estos si los necesitas:
-    // iosClientId: 'TU_ID_PARA_IOS.apps.googleusercontent.com',
-    // webClientId: 'TU_ID_PARA_WEB.apps.googleusercontent.com',
-    // expoClientId: 'TU_ID_PARA_EXPO.apps.googleusercontent.com',
-  });
-
-  // Procesar respuesta de Google Auth
+  // Verificar si hay una sesión activa cuando la pantalla se carga
   useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      
-      if (authentication?.accessToken) {
-        handleGoogleToken(authentication.accessToken);
-      }
-    }
-  }, [response]);
+    checkAndSetSession();
+  }, []);
 
-  // Función para manejar el token de Google y autenticar con Supabase
-  const handleGoogleToken = async (accessToken) => {
+  // Función para iniciar sesión con Google
+  const signUpGoogle = async () => {
     try {
       setLoading(true);
-      console.log('Token de Google obtenido, autenticando con Supabase...');
+      dispatch(setError(null));
       
-      // Autenticar con Supabase usando el token de Google
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: accessToken,
-      });
+      console.log('Iniciando autenticación con Google...');
       
-      if (error) {
-        console.error('Error al autenticar con Supabase:', error);
-        dispatch(setError('Error al autenticar con Google: ' + error.message));
-        return;
-      }
+      // Configuración de Google Auth
+      const config = {
+        androidClientId: '867203082977-v6lt7u50bc1geniog48vcv4mt51obo0g.apps.googleusercontent.com',
+        scopes: ['profile', 'email']
+      };
       
-      if (data?.user) {
-        console.log('Autenticación exitosa:', data.user.email);
+      // Realizar la autenticación con Google
+      const { type, accessToken, idToken, user } = await Google.logInAsync(config);
+      
+      if (type === 'success') {
+        console.log('Login exitoso con Google:', user.email);
         
-        // Actualizar el estado con los datos del usuario
-        dispatch(setUser({
-          email: data.user.email || '',
-          id: data.user.id,
-          username: data.user.user_metadata?.name || data.user.email?.split('@')[0]
-        }));
+        // Autenticar con Supabase usando el token obtenido
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: idToken,
+        });
         
-        dispatch(setAuthState('authenticated'));
-        navigation.navigate('Main');
+        if (error) {
+          console.error('Error al autenticar con Supabase:', error);
+          dispatch(setError('Error al autenticar con Google: ' + error.message));
+          return;
+        }
+        
+        if (data?.user) {
+          console.log('Autenticación exitosa con Supabase:', data.user.email);
+          
+          // Actualizar el estado con los datos del usuario
+          dispatch(setUser({
+            email: data.user.email || '',
+            id: data.user.id,
+            username: data.user.user_metadata?.name || data.user.email?.split('@')[0]
+          }));
+          
+          dispatch(setAuthState('authenticated'));
+          navigation.navigate('Main');
+        } else {
+          console.log('No se pudo obtener los datos del usuario');
+          dispatch(setError('No se pudo completar la autenticación'));
+        }
       } else {
-        console.log('No se pudo obtener los datos del usuario');
-        dispatch(setError('No se pudo completar la autenticación'));
+        // El usuario canceló o hubo un error
+        console.log('Login cancelado o error');
+        dispatch(setError('Inicio de sesión con Google cancelado'));
       }
     } catch (error) {
-      console.error('Error inesperado en autenticación con Google:', error);
-      dispatch(setError('Ocurrió un error al conectar con Google'));
+      console.error('Error en autenticación con Google:', error);
+      dispatch(setError('Error al conectar con Google: ' + (error.message || 'Intente nuevamente')));
     } finally {
       setLoading(false);
     }
@@ -181,38 +181,6 @@ const LoginScreen = () => {
     navigation.navigate('ForgotPassword');
   };
 
-  // Añadir un listener para Deep Linking
-  useEffect(() => {
-    // Función para manejar deep links
-    const handleDeepLink = async (event) => {
-      const url = event?.url || '';
-      console.log('Deep link recibido:', url);
-      
-      if (url.startsWith('deep://auth-callback')) {
-        console.log('Deep link de autenticación detectado');
-        
-        // Verificar sesión inmediatamente
-        checkAndSetSession();
-      }
-    };
-
-    // Registrar listener para cuando la app está en primer plano
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-    
-    // Verificar si la app fue abierta con un deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        console.log('App abierta con URL inicial:', url);
-        handleDeepLink({ url });
-      }
-    });
-
-    // Limpiar listener al desmontar
-    return () => {
-      subscription.remove();
-    };
-  }, [dispatch, navigation]);
-
   // Función centralizada para verificar y establecer la sesión
   const checkAndSetSession = async (retryCount = 0, maxRetries = 5) => {
     try {
@@ -253,11 +221,6 @@ const LoginScreen = () => {
       return false;
     }
   };
-
-  // Verificar si hay una sesión activa cuando la pantalla se carga
-  useEffect(() => {
-    checkAndSetSession();
-  }, []);
 
   // Añadir un listener para eventos de autenticación con reintentos
   useEffect(() => {
@@ -325,64 +288,6 @@ const LoginScreen = () => {
     };
   }, []);
 
-  // Implementación para iniciar sesión con Google usando Auth API nativa
-  const signUpGoogle = async () => {
-    try {
-      setLoading(true);
-      dispatch(setError(null));
-      
-      console.log('Iniciando autenticación con Google nativo...');
-      
-      if (!request) {
-        console.log('Esperando la configuración de Google Auth...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Usar el mecanismo nativo de Google Auth
-      await promptAsync();
-      
-    } catch (error) {
-      console.error('Error al iniciar autenticación con Google:', error);
-      dispatch(setError('Error al conectar con Google: ' + (error.message || 'Intente nuevamente')));
-      setLoading(false);
-    }
-  };
-
-  // Manejar la navegación dentro del WebView con mejor detección
-  const handleWebViewNavigation = (navState) => {
-    console.log('WebView navegando a:', navState.url);
-    
-    // Verificar si la URL contiene signos de autenticación exitosa o error
-    const url = navState.url || '';
-    
-    // Lista expandida de patrones para detectar finalización
-    if (url.includes('access_token=') || 
-        url.includes('id_token=') ||
-        url.includes('deep://auth-callback') || 
-        url.includes('supabase.co/auth/v1/callback') || 
-        url.includes('localhost:3000') ||
-        url.includes('callback') ||
-        url.includes('google') && url.includes('error')) {
-      
-      console.log('Detectada URL de finalización en WebView:', url);
-      
-      // Cerrar WebView después de una autenticación exitosa o fallida
-      setShowWebView(false);
-      setLoading(false);
-      
-      // Verificar la sesión varias veces para asegurar detección
-      checkAndSetSession(0, 10);
-    }
-  };
-
-  // Manejar errores en el WebView
-  const handleWebViewError = (error) => {
-    console.error('Error en WebView:', error);
-    setShowWebView(false);
-    setLoading(false);
-    dispatch(setError('Error al cargar la página de autenticación'));
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
@@ -436,7 +341,7 @@ const LoginScreen = () => {
           onPress={signUpGoogle}
           disabled={loading}
         >
-          {loading && !showWebView ? (
+          {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator color="white" />
               <Text style={styles.loadingText}>Conectando con Google...</Text>
@@ -446,7 +351,7 @@ const LoginScreen = () => {
           )}
         </TouchableOpacity>
 
-        {loading && !showWebView && (
+        {loading && (
           <TouchableOpacity 
             style={styles.cancelButton}
             onPress={() => setLoading(false)}
@@ -459,55 +364,6 @@ const LoginScreen = () => {
           <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
         </TouchableOpacity>
       </View>
-
-      {/* WebView para autenticación integrada con soporte mejorado */}
-      <Modal
-        visible={showWebView}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => {
-          setShowWebView(false);
-          setLoading(false);
-        }}
-      >
-        <View style={styles.webViewContainer}>
-          <View style={styles.webViewHeader}>
-            <Text style={styles.webViewTitle}>Iniciar sesión con Google</Text>
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={() => {
-                setShowWebView(false);
-                setLoading(false);
-              }}
-            >
-              <Text style={styles.closeButtonText}>Cerrar</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <WebView
-            ref={webViewRef}
-            source={{ uri: authUrl }}
-            onNavigationStateChange={handleWebViewNavigation}
-            onLoadProgress={(event) => {
-              // Registro adicional para depuración
-              if (event.nativeEvent.progress > 0.9) {
-                console.log('WebView casi completó la carga');
-              }
-            }}
-            onError={handleWebViewError}
-            startInLoadingState={true}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            userAgent="Mozilla/5.0 (Linux; Android 10; Android SDK built for x86) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36"
-            renderLoading={() => (
-              <View style={styles.webViewLoading}>
-                <ActivityIndicator size="large" color="#005F9E" />
-                <Text style={styles.webViewLoadingText}>Cargando...</Text>
-              </View>
-            )}
-          />
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -607,45 +463,6 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     textAlign: 'center',
     fontWeight: 'bold',
-  },
-  webViewContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  webViewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: '#005F9E',
-  },
-  webViewTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  closeButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  webViewLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-  },
-  webViewLoadingText: {
-    marginTop: 10,
-    color: '#005F9E',
-    fontSize: 16,
   },
 });
 

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "TravelQuest",
-    "scheme": "deep",
+    "scheme": "com.travelquest.app",
     "slug": "TravelQuest",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.Travelquest.app",
+      "bundleIdentifier": "com.travelquest.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
         "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
@@ -37,9 +37,10 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.Travelquest.app",
+      "package": "com.travelquest.app",
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
@@ -76,13 +77,15 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#005F9E",
-          "sounds": ["./assets/notification-sound.wav"]
+          "sounds": [
+            "./assets/notification-sound.wav"
+          ]
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "0429d65c-b7a7-4d60-98aa-8db998569729"
       }
     },
     "newArchEnabled": false
