@@ -6,7 +6,7 @@ import { getJourneysMissions,
      deleteJourneysMissions, 
      getJourneysMissionsByUserId, 
      completeJourneysMissions,
-     getJourneysMissionsByJourneyId } from '../controllers/journeyMissionsController.js';
+     getJourneysMissionsByJourneyId } from '../controllers/journeyMissionsController';
 
 const router = Router();
 

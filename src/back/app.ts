@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import cityRoutes from './routes/cityRoutes.js';
-import authRoutes from './routes/authRoutes.js';
-import journeyRoutes from './routes/journeyRoutes.js';
-import challengeRoutes from './routes/challengesRoutes.js';
-import journeyMissionsRoutes from './routes/journeyMissionsRoutes.js';
-import friendRoutes from './routes/friendRoutes.js';
+import cityRoutes from './routes/cityRoutes';
+import authRoutes from './routes/authRoutes';
+import journeyRoutes from './routes/journeyRoutes';
+import challengeRoutes from './routes/challengesRoutes';
+import journeyMissionsRoutes from './routes/journeyMissionsRoutes';
+import friendRoutes from './routes/friendRoutes';
 const router = Router();
 
 // Rutas

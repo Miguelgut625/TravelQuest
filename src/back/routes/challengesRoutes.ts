@@ -5,7 +5,7 @@ import { getChallenges,
      updateChallenge, 
      deleteChallenge, 
      getChallengesPoints,
-      } from '../controllers/challengesController.js';
+      } from '../controllers/challengesController';
 
 const router = Router();
 

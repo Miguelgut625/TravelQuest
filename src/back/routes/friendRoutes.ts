@@ -1,6 +1,6 @@
 // friendRoutes.js
 import { Router } from 'express';
-import { obtenerSolicitudesPendientes, aceptarSolicitud, rechazarSolicitud, enviarSolicitud } from '../controllers/friendControlles.js';
+import { obtenerSolicitudesPendientes, aceptarSolicitud, rechazarSolicitud, enviarSolicitud } from '../controllers/friendControlles';
 
 const router = Router();
 

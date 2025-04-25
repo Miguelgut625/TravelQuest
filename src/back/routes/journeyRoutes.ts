@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getJourneys, getJourneyById, createJourney, updateJourney, deleteJourney, getJourneysByUserId } from '../controllers/journeysController.js';
+import { getJourneys, getJourneyById, createJourney, updateJourney, deleteJourney, getJourneysByUserId } from '../controllers/journeysController';
 
 const router = Router();
 

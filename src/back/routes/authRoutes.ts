@@ -5,7 +5,7 @@ import { getUsers,
        updateUser,
         deleteUser,
          obtenerPuntuacion, 
-     obtenerSolicitudesPendientes} from '../controllers/authController.js';
+     obtenerSolicitudesPendientes} from '../controllers/authController';
 
 const router = Router();
 
