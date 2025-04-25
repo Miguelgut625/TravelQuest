@@ -5,6 +5,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
 import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
+import { completeMission } from '../../services/pointsService';
 import ImageUploadModal from '../../components/ImageUploadModal';
 import { setRefreshJournal } from '../../features/journalSlice';
 import { createJournalEntry } from '../../services/journalService';
@@ -176,6 +177,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
         visible={showUploadModal}
         missionId={mission.id}
         missionTitle={mission.challenge.title}
+        missionDescription={mission.challenge.description}
         onClose={() => setShowUploadModal(false)}
         onSuccess={handleUploadSuccess}
       />
