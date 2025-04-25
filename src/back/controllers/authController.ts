@@ -1,7 +1,7 @@
-import e from 'express';
-import { supabase } from '../../services/supabase';
+import { Request, Response } from 'express';
+import { supabase } from '../../services/supabase.server.js';
 // Obtener todas los usuarios
- const getUsers = async (req, res) => {
+const getUsers = async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -10,13 +10,13 @@ import { supabase } from '../../services/supabase';
     if (error) throw error;
 
     res.status(200).json(data);
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
 
 // Obtener un usuario por ID
- const getUserById = async (req,res) => {
+const getUserById = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
@@ -29,17 +29,23 @@ import { supabase } from '../../services/supabase';
     if (error) throw error;
 
     res.status(200).json(data);
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
 
-const createUser = async (req, res) => {
-  const { email, password, username } = req.body;
+interface CreateUserRequest {
+  email: string;
+  password: string;
+  username: string;
+}
+
+const createUser = async (req: Request, res: Response) => {
+  const { email, password, username } = req.body as CreateUserRequest;
 
   try {
     // Crear un nuevo usuario en Supabase
-    const { user, error: signupError } = await supabase.auth.signUp({
+    const { data: user, error: signupError } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -55,17 +61,22 @@ const createUser = async (req, res) => {
 
     res.status(201).json({
       message: 'Usuario creado exitosamente',
-      user: { id: user?.id, email: user?.email, username, password },
+      user: { id: user?.user?.id, email: user?.user?.email, username, password },
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
 
-// Actualizar un usuario****
- const updateUser = async (req, res) => {
+interface UpdateUserRequest {
+  name?: string;
+  description?: string;
+}
+
+// Actualizar un usuario
+const updateUser = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, description } = req.body;
+  const { name, description } = req.body as UpdateUserRequest;
 
   try {
     const { data, error } = await supabase
@@ -76,12 +87,13 @@ const createUser = async (req, res) => {
     if (error) throw error;
 
     res.status(200).json(data);
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
+
 // Eliminar un usuario
- const deleteUser = async (req, res) => {
+const deleteUser = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
@@ -93,58 +105,57 @@ const createUser = async (req, res) => {
     if (error) throw error;
 
     res.status(204).send(); // No content
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
+
 // Obtener la puntuación de un usuario
-const obtenerPuntuacion = async (req, res) => {
+const obtenerPuntuacion = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('points')
+      .eq('id', id);
+  
+    if (error) throw error;
+  
+    res.status(200).json(data);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+const obtenerSolicitudesPendientes = async (req: Request, res: Response) => {
+  try {
     const { id } = req.params;
-  
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('points')
-        .eq('id', id);
-  
-      if (error) throw error;
-  
-      res.status(200).json(data);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-  };
-  const obtenerSolicitudesPendientes = async (req, res) => {
-    try {
-      const { id } = req.params;
 
-      // Realiza la consulta para obtener todas las invitaciones pendientes
-      const { data, error } = await supabase
-        .from('friendship_invitations')
-        .select('*') // Selecciona todas las columnas de la tabla
-        .eq('receiverId', id)
-        .eq('status','Pending');
+    // Realiza la consulta para obtener todas las invitaciones pendientes
+    const { data, error } = await supabase
+      .from('friendship_invitations')
+      .select('*') // Selecciona todas las columnas de la tabla
+      .eq('receiverId', id)
+      .eq('status','Pending');
   
-      // Si hay un error, lanza una excepción
-      if (error) throw error;
+    // Si hay un error, lanza una excepción
+    if (error) throw error;
   
-      // Envía la respuesta con los datos obtenidos
-      res.status(200).json(data);
-    } catch (error) {
-      // Maneja el error y responde con el mensaje de error
-      res.status(400).json({ error: error.message });
-    }
-  };
+    // Envía la respuesta con los datos obtenidos
+    res.status(200).json(data);
+  } catch (error: any) {
+    // Maneja el error y responde con el mensaje de error
+    res.status(400).json({ error: error.message });
+  }
+};
 
-  
-  
-
-
-
-export { getUsers,
-   getUserById,
-    createUser,
-     updateUser,
-      deleteUser,
-       obtenerPuntuacion,
-       obtenerSolicitudesPendientes };
+export { 
+  getUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  obtenerPuntuacion,
+  obtenerSolicitudesPendientes 
+};

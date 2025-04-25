@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "server": "node --experimental-specifier-resolution=node --loader ts-node/esm src/back/server.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
@@ -83,6 +84,7 @@
     "copy-webpack-plugin": "^13.0.0",
     "expo-module-scripts": "^4.0.5",
     "metro-react-native-babel-transformer": "^0.77.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
   },
   "private": true,

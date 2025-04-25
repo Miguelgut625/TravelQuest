@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+      "target": "ES2020",           // O el target que prefieras
+      "module": "CommonJS",         // Asegúrate de que uses CommonJS, no ES6/ESNext
+      "moduleResolution": "node",
+      "esModuleInterop": true,      // Esto asegura compatibilidad con módulos comunes de Node
+      "skipLibCheck": true,         // Puede ayudar a evitar problemas con las bibliotecas
+      "strict": true                // Esto es opcional, pero puede ayudar a encontrar problemas en el código
+    }
+  }
+  

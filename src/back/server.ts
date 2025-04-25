@@ -11,6 +11,9 @@ app.use(express.json()); // Middleware para parsear JSON
 // Usa las rutas
 app.use('/api', appRoutes);
 
-app.listen("192.168.56.1",() => {
+// La dirección IP debe ser también un tipo de dato string
+app.listen(PORT, "192.168.56.1", () => {
   console.log(`Servidor corriendo en http://192.168.56.1:${PORT}`);
 });
+/* 
+http://192.168.56.1:5000/api/users */

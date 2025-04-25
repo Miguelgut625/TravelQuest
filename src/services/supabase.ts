@@ -1,20 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-url-polyfill/auto';
 import { LOGGING_CONFIG } from '../config/logging';
+
+// Detectar entorno (Node.js o React Native)
+const isNodeJS = typeof window === 'undefined' || !window.localStorage;
+
+// Importación condicional para AsyncStorage
+let AsyncStorage: any;
+if (!isNodeJS) {
+  // Solo importar AsyncStorage en entorno de React Native
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+}
 
 const supabaseUrl = 'https://ynyxyzzpbyzyejgkfncm.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlueXh5enpwYnl6eWVqZ2tmbmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE3ODI4NDMsImV4cCI6MjA1NzM1ODg0M30.ntEnr5gFT5tllc0Z037LJPkPq60SM_RBLa6hct72xXs';
 
+// Configuración de autenticación basada en el entorno
+const authConfig = isNodeJS
+  ? {
+      autoRefreshToken: true,
+      persistSession: false,
+    }
+  : {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+      flowType: 'implicit',
+      debug: LOGGING_CONFIG?.CATEGORIES?.AUTH || false
+    };
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-    flowType: 'implicit',
-    debug: LOGGING_CONFIG.CATEGORIES.AUTH
-  }
+  auth: authConfig
 });
 
 // Agregar un listener para errores de autenticación

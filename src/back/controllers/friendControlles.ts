@@ -1,9 +1,15 @@
-// friendControlles.js
-import { supabase } from '../../services/supabase';
+// friendControlles.ts
+import { Request, Response } from 'express';
+import { supabase } from '../../services/supabase.server.js';
 
-const enviarSolicitud = async (req, res) => {
+interface SolicitudRequest {
+  senderId: string;
+  username: string;
+}
+
+const enviarSolicitud = async (req: Request, res: Response) => {
   try {
-    const { senderId, username } = req.body;
+    const { senderId, username } = req.body as SolicitudRequest;
 
     // Obtener el receiverId a partir del username
     const { data: user, error: userError } = await supabase
@@ -54,14 +60,12 @@ const enviarSolicitud = async (req, res) => {
     if (error) throw error;
 
     res.status(200).json(data);
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };  
 
-
-
-const obtenerSolicitudesPendientes = async (req, res) => {
+const obtenerSolicitudesPendientes = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -82,13 +86,13 @@ const obtenerSolicitudesPendientes = async (req, res) => {
 
     // Envía la respuesta con los datos obtenidos
     res.status(200).json(data);
-  } catch (error) {
+  } catch (error: any) {
     // Maneja el error y responde con el mensaje de error
     res.status(400).json({ error: error.message });
   }
 };
 
-const aceptarSolicitud = async (req, res) => {
+const aceptarSolicitud = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -121,12 +125,12 @@ const aceptarSolicitud = async (req, res) => {
     if (insertError) throw insertError;
 
     res.status(200).json({ updatedInvitation, newFriendship });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
 
-const rechazarSolicitud = async (req, res) => {
+const rechazarSolicitud = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     // Actualizar el estado a "Rejected"
@@ -139,11 +143,10 @@ const rechazarSolicitud = async (req, res) => {
     if (updateError) throw updateError;
 
     res.status(200).json({ updatedInvitation });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 };
-
 
 export {
   obtenerSolicitudesPendientes,
