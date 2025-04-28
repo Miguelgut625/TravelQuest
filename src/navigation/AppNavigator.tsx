@@ -58,6 +58,8 @@ type RootStackParamList = {
     friendName: string;
   };
   BadgesScreen: undefined;
+  Friends: undefined;
+  Leaderboard: undefined;
 };
 
 type AuthStackParamList = {
@@ -108,6 +110,20 @@ const MainFlow = () => {
       <Stack.Screen
         name="BadgesScreen"
         component={BadgesScreen}
+        options={{
+          headerShown: false
+        }}
+      />
+      <Stack.Screen
+        name="Friends"
+        component={FriendsScreen}
+        options={{
+          headerShown: false
+        }}
+      />
+      <Stack.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
         options={{
           headerShown: false
         }}
