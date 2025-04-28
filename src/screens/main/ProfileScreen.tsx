@@ -559,13 +559,13 @@ const ProfileScreen = () => {
   const fetchPendingRequests = async () => {
     try {
       const { data, error } = await supabase
-      .from('friendship_invitations')
-      .select(`
+        .from('friendship_invitations')
+        .select(`
         id, senderId, created_at, receiverId, status,
         users:senderId (username)
       `)
-      .eq('receiverId', user?.id)
-      .eq('status', 'Pending');
+        .eq('receiverId', user?.id)
+        .eq('status', 'Pending');
 
       if (error) throw error;
       console.log('Solicitudes pendientes obtenidas:', user?.id);
