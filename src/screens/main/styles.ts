@@ -706,7 +706,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   journalCard: {
-    backgroundColor: 'white',
+    backgroundColor: colors.white,
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
@@ -723,14 +723,15 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 5,
+    color: colors.text,
   },
   journalCardDate: {
-    color: '#666',
+    color: colors.darkGray,
     fontSize: 12,
     marginBottom: 10,
   },
   journalCardContent: {
-    color: '#333',
+    color: colors.text,
     marginBottom: 10,
   },
   journalPhotoGrid: {
@@ -746,12 +747,13 @@ export const styles = StyleSheet.create({
   journalMorePhotos: {
     width: 80,
     height: 80,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   journalMorePhotosText: {
-    color: 'white',
+    color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -760,7 +762,7 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   journalTag: {
-    color: '#4CAF50',
+    color: colors.primary,
     marginRight: 10,
     fontSize: 12,
   },
@@ -768,31 +770,29 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   journalLoadingText: {
     marginTop: 10,
-    color: '#666',
+    color: colors.primary,
   },
   journalErrorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   journalErrorText: {
-    color: 'red',
-    textAlign: 'center',
+    color: colors.danger,
     marginBottom: 20,
+    textAlign: 'center',
   },
   journalRetryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     padding: 10,
     borderRadius: 5,
   },
   journalRetryButtonText: {
-    color: 'white',
-    textAlign: 'center',
+    color: colors.white,
     fontWeight: 'bold',
   },
   journalEmptyContainer: {
@@ -801,7 +801,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   journalEmptyText: {
-    color: '#666',
+    color: colors.darkGray,
     marginTop: 10,
     textAlign: 'center',
     fontSize: 16,
@@ -948,7 +948,7 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   journalMissionBadgeText: {
-    color: '#4CAF50',
+    color: '#2E7D32',
     fontSize: 12,
     fontWeight: '600',
     marginLeft: 4,

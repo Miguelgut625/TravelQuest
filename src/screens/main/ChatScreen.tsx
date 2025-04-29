@@ -52,6 +52,7 @@ const ChatScreen = () => {
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const [fullImageViewVisible, setFullImageViewVisible] = useState(false);
   const [currentFullImage, setCurrentFullImage] = useState('');
+  const [friendProfile, setFriendProfile] = useState<any>(null);
   const user = useSelector((state: RootState) => state.auth.user);
   const flatListRef = useRef<FlatList>(null);
   const subscriptionRef = useRef(null);
@@ -125,6 +126,7 @@ const ChatScreen = () => {
       const friendData = await getUserInfo(friendId);
       if (friendData) {
         setGroupInfo(friendData);
+        setFriendProfile(friendData);
       }
       
       // Cargar mensajes con este amigo
@@ -552,12 +554,26 @@ const ChatScreen = () => {
             </View>
           ) : (
             <View style={styles.headerUserInfo}>
-              <Text style={styles.headerName}>{friendName}</Text>
-              {groupInfo?.status && (
-                <Text style={styles.headerSubtitle}>
-                  {groupInfo.status}
-                </Text>
+              {friendProfile?.profile_picture ? (
+                <Image 
+                  source={{ uri: friendProfile.profile_picture }} 
+                  style={styles.headerProfilePicture}
+                />
+              ) : (
+                <View style={styles.headerProfilePicturePlaceholder}>
+                  <Text style={styles.headerProfilePictureText}>
+                    {friendName?.charAt(0).toUpperCase() || '?'}
+                  </Text>
+                </View>
               )}
+              <View style={styles.headerUserTextInfo}>
+                <Text style={styles.headerName}>{friendName}</Text>
+                {groupInfo?.status && (
+                  <Text style={styles.headerSubtitle}>
+                    {groupInfo.status}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
         </View>
@@ -567,7 +583,7 @@ const ChatScreen = () => {
       },
       headerTintColor: 'white',
     });
-  }, [navigation, friendName, isGroupChat, groupName, groupInfo]);
+  }, [navigation, friendName, isGroupChat, groupName, groupInfo, friendProfile]);
 
   if (loading && !refreshing) {
     return (
@@ -897,6 +913,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginLeft: 10,
   },
   headerGroupInfo: {
@@ -920,6 +938,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#0084FF',
     marginBottom: 2,
+  },
+  headerProfilePicture: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  headerProfilePicturePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  headerProfilePictureText: {
+    color: '#005F9E',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerUserTextInfo: {
+    flex: 1,
   },
 });
 

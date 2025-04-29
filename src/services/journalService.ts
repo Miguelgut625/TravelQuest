@@ -14,6 +14,7 @@ export interface JournalEntryDB {
   } | null;
   created_at: string;
   tags: string[];
+  points?: number;
 }
 
 export interface CityJournalEntry extends JournalEntryDB {

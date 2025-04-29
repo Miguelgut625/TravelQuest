@@ -78,6 +78,12 @@ const FriendsScreen = () => {
     navigation.navigate('Chat', { friendId, friendName });
   };
 
+  // Abrir el perfil del amigo
+  const openProfile = (friendId: string, friendName: string) => {
+    // @ts-ignore - Ignoramos el error de tipado ya que estamos usando 'as never'
+    navigation.navigate('FriendProfile', { friendId, friendName });
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -90,19 +96,24 @@ const FriendsScreen = () => {
   const renderFriendItem = ({ item }: { item: Friend }) => (
     <TouchableOpacity
       style={styles.friendItem}
-      onPress={() => openChat(item.user2Id, item.username)}
+      onPress={() => openProfile(item.user2Id, item.username)}
     >
       <View style={styles.friendInfo}>
         <Text style={styles.friendName}>{item.username}</Text>
         <Text style={styles.friendPoints}>Puntos: {item.points}</Text>
       </View>
-      <View style={styles.chatIconContainer}>
-        {(item.unreadMessages || 0) > 0 && (
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>{item.unreadMessages}</Text>
-          </View>
-        )}
-        <Ionicons name="chatbubble-outline" size={24} color="#005F9E" />
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => openChat(item.user2Id, item.username)}
+        >
+          {(item.unreadMessages || 0) > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{item.unreadMessages}</Text>
+            </View>
+          )}
+          <Ionicons name="chatbubble-outline" size={24} color="#005F9E" />
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -181,6 +192,14 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   badgeContainer: {
     position: 'absolute',
