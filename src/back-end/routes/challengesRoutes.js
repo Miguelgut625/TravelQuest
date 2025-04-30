@@ -1,11 +1,11 @@
-import { Router } from 'express';
-import { getChallenges,
+const { Router } = require('express');
+const { getChallenges,
      getChallengeById, 
      createChallenge, 
      updateChallenge, 
      deleteChallenge, 
      getChallengesPoints,
-      } from '../controllers/challengesController';
+      } = require('../controllers/challengesController.js');
 
 const router = Router();
 
@@ -17,4 +17,4 @@ router.put('/:id', updateChallenge); // Actualizar una misión ✘
 router.delete('/:id', deleteChallenge); // Eliminar una misión ✘
 router.get('/:id/points', getChallengesPoints); // Obtener puntuacion de la misión ✓
 
-export default router;
+module.exports = router;

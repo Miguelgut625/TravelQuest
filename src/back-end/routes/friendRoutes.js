@@ -1,6 +1,6 @@
 // friendRoutes.js
-import { Router } from 'express';
-import { obtenerSolicitudesPendientes, aceptarSolicitud, rechazarSolicitud, enviarSolicitud } from '../controllers/friendControlles';
+const { Router } = require('express');
+const { obtenerSolicitudesPendientes, aceptarSolicitud, rechazarSolicitud, enviarSolicitud } = require('../controllers/friendControlles.js');
 
 const router = Router();
 
@@ -10,4 +10,4 @@ router.get('/accept-requests/:id', aceptarSolicitud);
 router.get('/reject-requests/:id', rechazarSolicitud);
 router.post('/send-request', enviarSolicitud);
 
-export default router;
+module.exports = router;

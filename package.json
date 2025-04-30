@@ -106,6 +106,5 @@
     "@expo/image-utils": "^0.3.22",
     "fbjs": "^2.0.0",
     "recompose": "^0.30.0"
-  },
-  "type": "module"
+  }
 }

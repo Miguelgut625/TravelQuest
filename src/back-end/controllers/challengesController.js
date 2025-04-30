@@ -1,8 +1,7 @@
-import { Request, Response } from 'express';
-import { supabase } from '../../services/supabase.server.js';
+const { supabase } = require('../../services/supabase.server.js');
 
 // Obtener todas las misiones
-const getChallenges = async (req: Request, res: Response): Promise<void> => {
+ const getChallenges = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('challenges')
@@ -12,12 +11,12 @@ const getChallenges = async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json(data);
   } catch (error) {
-    res.status(400).json({ error: "Error" });
+    res.status(400).json({ error: error.message });
   }
 };
 
-// Obtener puntuación de la misión
-const getChallengesPoints = async (req: Request, res: Response): Promise<void> => {
+// Obtener puntuacion de la mision
+const getChallengesPoints = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -26,16 +25,16 @@ const getChallengesPoints = async (req: Request, res: Response): Promise<void> =
       .select('points')
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) throw error; 
 
     res.status(200).json(data);
   } catch (error) {
-    res.status(400).json({ error: "Error" });
+    res.status(400).json({ error: error.message });
   }
 };
 
 // Obtener una misión por ID
-const getChallengeById = async (req: Request, res: Response): Promise<void> => {
+ const getChallengeById = async (req,res) => {
   const { id } = req.params;
 
   try {
@@ -49,12 +48,12 @@ const getChallengeById = async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json(data);
   } catch (error) {
-    res.status(400).json({ error: "Error" });
+    res.status(400).json({ error: error.message });
   }
 };
 
-// Crear una nueva misión
-const createChallenge = async (req: Request, res: Response): Promise<void> => {
+// Crear una nueva misión****
+ const createChallenge = async (req,res) => {
   const { name, description } = req.body;
 
   try {
@@ -66,12 +65,12 @@ const createChallenge = async (req: Request, res: Response): Promise<void> => {
 
     res.status(201).json(data);
   } catch (error) {
-    res.status(400).json({ error: "Error" });
+    res.status(400).json({ error: error.message });
   }
 };
 
-// Actualizar una misión
-const updateChallenge = async (req: Request, res: Response): Promise<void> => {
+// Actualizar una misión****
+ const updateChallenge = async (req, res) => {
   const { id } = req.params;
   const { name, description } = req.body;
 
@@ -85,12 +84,12 @@ const updateChallenge = async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json(data);
   } catch (error) {
-    res.status(400).json({ error: "Error" });
+    res.status(400).json({ error: error.message });
   }
 };
 
 // Eliminar una misión
-const deleteChallenge = async (req: Request, res: Response): Promise<void> => {
+ const deleteChallenge = async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -103,8 +102,15 @@ const deleteChallenge = async (req: Request, res: Response): Promise<void> => {
 
     res.status(204).send(); // No content
   } catch (error) {
-    res.status(400).json({ error: "Error" });
+    res.status(400).json({ error: error.message });
   }
 };
 
-export { getChallenges, getChallengeById, createChallenge, updateChallenge, deleteChallenge, getChallengesPoints };
+module.exports = { 
+  getChallenges,
+  getChallengeById, 
+  createChallenge, 
+  updateChallenge, 
+  deleteChallenge, 
+  getChallengesPoints 
+};

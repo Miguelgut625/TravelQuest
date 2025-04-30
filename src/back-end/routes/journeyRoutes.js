@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { getJourneys, getJourneyById, createJourney, updateJourney, deleteJourney, getJourneysByUserId } from '../controllers/journeysController';
+const { Router } = require('express');
+const { getJourneys, getJourneyById, createJourney, updateJourney, deleteJourney, getJourneysByUserId } = require('../controllers/journeysController.js');
 
 const router = Router();
 
@@ -11,4 +11,4 @@ router.put('/:id', updateJourney); // Actualizar un viaje ✘
 router.delete('/:id', deleteJourney); // Eliminar un viaje ✘
 router.get('/user/:id', getJourneysByUserId); // Obtener viajes por userId ✓
 
-export default router
+module.exports = router

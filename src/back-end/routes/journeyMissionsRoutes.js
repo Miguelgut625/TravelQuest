@@ -1,12 +1,12 @@
-import { Router } from 'express';
-import { getJourneysMissions,
+const { Router } = require('express');
+const { getJourneysMissions,
      getJourneysMissionsById, 
      createJourneysMissions, 
      updateJourneysMissions, 
      deleteJourneysMissions, 
      getJourneysMissionsByUserId, 
      completeJourneysMissions,
-     getJourneysMissionsByJourneyId } from '../controllers/journeyMissionsController';
+     getJourneysMissionsByJourneyId } = require('../controllers/journeyMissionsController.js');
 
 const router = Router();
 
@@ -20,4 +20,4 @@ router.get('/user/:id', getJourneysMissionsByUserId); // Obtener viajes por user
 router.put('/:id/complete', completeJourneysMissions); // Completar una mision ✓ 
 router.get('/journey/:id', getJourneysMissionsByJourneyId); // Obtener misiones de un viaje ✓
 
-export default router
+module.exports = router

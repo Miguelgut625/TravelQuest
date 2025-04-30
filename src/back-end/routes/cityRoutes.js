@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { getCities, getCityById, createCity, updateCity, deleteCity } from '../controllers/cityController';
+const { Router } = require('express');
+const { getCities, getCityById, createCity, updateCity, deleteCity } = require('../controllers/cityController.js');
 
 const router = Router();
 
@@ -10,4 +10,4 @@ router.post('/', createCity); // Crear una nueva ciudad ✘
 router.put('/:id', updateCity); // Actualizar una ciudad ✘
 router.delete('/:id', deleteCity); // Eliminar una ciudad ✘
 
-export default router;
+module.exports = router;
