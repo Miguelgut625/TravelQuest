@@ -29,6 +29,7 @@
     "@supabase/supabase-js": "^2.49.4",
     "@types/google-maps": "^3.2.6",
     "@types/react-datepicker": "^4.19.5",
+    "axios": "^1.9.0",
     "cesium": "^1.110.0",
     "cors": "^2.8.5",
     "expo": "~52.0.8",

@@ -8,10 +8,13 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import axios from 'axios';
+
+// URL base de la API
+const API_URL = 'http://192.168.56.1:5000/api';
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -29,23 +32,33 @@ export const ForgotPasswordScreen = () => {
         setLoading(true);
 
         try {
-            const { error } = await supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    shouldCreateUser: false
-                }
-            });
+            // Llamada a la API para solicitar recuperación de contraseña
+            const response = await axios.post(`${API_URL}/users/forgot-password`, { email });
 
-            if (error) {
-                Alert.alert('Error', error.message);
-                return;
-            }
-
-            // Si el envío fue exitoso, navegamos a VerifyCode con el email
-            navigation.navigate('VerifyCode', { email });
+            // Si llegamos aquí, el envío fue exitoso
+            Alert.alert(
+                'Código enviado',
+                'Se ha enviado un código de recuperación a tu correo electrónico',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('VerifyCode', { email })
+                    }
+                ]
+            );
         } catch (error) {
             console.error('Error al enviar código de recuperación:', error);
-            Alert.alert('Error', 'Ocurrió un error al enviar el código de recuperación');
+            
+            if (error.response) {
+                // Error de respuesta del servidor
+                Alert.alert('Error', error.response.data.error || 'Ocurrió un error al enviar el código de recuperación');
+            } else if (error.request) {
+                // Error de red o servidor no disponible
+                Alert.alert('Error', 'No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+            } else {
+                // Error inesperado
+                Alert.alert('Error', 'Ocurrió un error inesperado');
+            }
         } finally {
             setLoading(false);
         }

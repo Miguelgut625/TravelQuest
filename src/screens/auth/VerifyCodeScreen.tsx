@@ -8,10 +8,13 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { supabase } from '../../services/supabase';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import axios from 'axios';
+
+// URL base de la API
+const API_URL = 'http://192.168.56.1:5000/api';
 
 type VerifyCodeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -35,22 +38,36 @@ export const VerifyCodeScreen = () => {
         setLoading(true);
 
         try {
-            const { error } = await supabase.auth.verifyOtp({
+            // Llamada a la API para verificar el código
+            const response = await axios.post(`${API_URL}/users/verify-code`, {
                 email,
-                token: code,
-                type: 'email'
+                token: code
             });
 
-            if (error) {
-                Alert.alert('Error', error.message);
-                return;
-            }
-
-            // Si el código es correcto, navegamos a la pantalla de cambio de contraseña
-            navigation.navigate('ResetPassword');
+            // Si llegamos aquí, el código es correcto
+            Alert.alert(
+                'Verificación exitosa',
+                'Código verificado correctamente',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('ResetPassword')
+                    }
+                ]
+            );
         } catch (error) {
             console.error('Error al verificar código:', error);
-            Alert.alert('Error', 'Ocurrió un error al verificar el código');
+            
+            if (error.response) {
+                // Error de respuesta del servidor
+                Alert.alert('Error', error.response.data.error || 'Código de verificación inválido');
+            } else if (error.request) {
+                // Error de red o servidor no disponible
+                Alert.alert('Error', 'No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+            } else {
+                // Error inesperado
+                Alert.alert('Error', 'Ocurrió un error inesperado');
+            }
         } finally {
             setLoading(false);
         }
@@ -60,22 +77,23 @@ export const VerifyCodeScreen = () => {
         setLoading(true);
 
         try {
-            const { error } = await supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    shouldCreateUser: false
-                }
-            });
-
-            if (error) {
-                Alert.alert('Error', error.message);
-                return;
-            }
+            // Llamada a la API para reenviar el código
+            const response = await axios.post(`${API_URL}/users/forgot-password`, { email });
 
             Alert.alert('Éxito', 'Se ha enviado un nuevo código a tu correo electrónico');
         } catch (error) {
             console.error('Error al reenviar código:', error);
-            Alert.alert('Error', 'Ocurrió un error al reenviar el código');
+            
+            if (error.response) {
+                // Error de respuesta del servidor
+                Alert.alert('Error', error.response.data.error || 'Ocurrió un error al reenviar el código');
+            } else if (error.request) {
+                // Error de red o servidor no disponible
+                Alert.alert('Error', 'No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+            } else {
+                // Error inesperado
+                Alert.alert('Error', 'Ocurrió un error inesperado');
+            }
         } finally {
             setLoading(false);
         }

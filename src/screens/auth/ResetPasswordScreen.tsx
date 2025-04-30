@@ -8,10 +8,13 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import axios from 'axios';
+
+// URL base de la API
+const API_URL = 'http://192.168.56.1:5000/api';
 
 type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -40,35 +43,48 @@ export const ResetPasswordScreen = () => {
         setLoading(true);
 
         try {
-            // Verificar la sesión actual
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-            if (sessionError) {
-                Alert.alert('Error', 'Error al verificar la sesión');
-                return;
-            }
-
-            if (!session) {
-                Alert.alert('Error', 'Tu sesión ha expirado. Por favor, vuelve a iniciar sesión');
-                navigation.navigate('Login');
-                return;
-            }
-
-            // Actualizar la contraseña
-            const { error } = await supabase.auth.updateUser({
-                password: newPassword
+            // Llamada a la API para cambiar la contraseña
+            const response = await axios.post(`${API_URL}/users/reset-password`, {
+                newPassword
             });
 
-            if (error) {
-                Alert.alert('Error', error.message);
-                return;
-            }
-
-            Alert.alert('Éxito', 'Tu contraseña ha sido actualizada correctamente');
-            navigation.navigate('Login');
+            // Si llegamos aquí, la contraseña se cambió correctamente
+            Alert.alert(
+                'Éxito', 
+                'Tu contraseña ha sido actualizada correctamente',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('Login')
+                    }
+                ]
+            );
         } catch (error) {
             console.error('Error al cambiar contraseña:', error);
-            Alert.alert('Error', 'Ocurrió un error al cambiar la contraseña');
+            
+            if (error.response) {
+                // Error de respuesta del servidor
+                if (error.response.status === 401) {
+                    Alert.alert(
+                        'Error',
+                        'Tu sesión ha expirado. Por favor, vuelve a iniciar el proceso de recuperación de contraseña',
+                        [
+                            {
+                                text: 'OK',
+                                onPress: () => navigation.navigate('Login')
+                            }
+                        ]
+                    );
+                } else {
+                    Alert.alert('Error', error.response.data.error || 'Ocurrió un error al cambiar la contraseña');
+                }
+            } else if (error.request) {
+                // Error de red o servidor no disponible
+                Alert.alert('Error', 'No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+            } else {
+                // Error inesperado
+                Alert.alert('Error', 'Ocurrió un error inesperado');
+            }
         } finally {
             setLoading(false);
         }

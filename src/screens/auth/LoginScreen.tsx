@@ -12,6 +12,10 @@ import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import { WebView } from 'react-native-webview';
+import axios from 'axios';
+
+// URL base de la API
+const API_URL = 'http://192.168.56.1:5000/api';
 
 // Asegurar que la redirección de autenticación en web se maneje correctamente
 WebBrowser.maybeCompleteAuthSession();
@@ -122,59 +126,46 @@ const LoginScreen = () => {
 
       console.log('Iniciando sesión para:', email);
 
-      // Intentar iniciar sesión directamente
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Llamada a la API para iniciar sesión
+      const response = await axios.post(`${API_URL}/users/login`, {
         email: email.trim(),
         password: password.trim()
       });
 
-      if (error) {
-        console.error('Error de autenticación:', error);
-        if (error.message.includes('Invalid login credentials')) {
+      // Si llegamos aquí, la autenticación fue exitosa
+      console.log('Login exitoso:', response.data);
+
+      // Actualizar el estado con los datos del usuario
+      dispatch(setUser({
+        email: response.data.user.email || '',
+        id: response.data.user.id,
+        username: response.data.user.username
+      }));
+      
+      dispatch(setAuthState('authenticated'));
+      navigation.navigate('Main');
+
+    } catch (error) {
+      console.error('Error durante el login:', error);
+      
+      // Manejar errores específicos según la respuesta del servidor
+      if (error.response) {
+        const { status, data } = error.response;
+        
+        if (status === 401) {
           dispatch(setError('Email o contraseña incorrectos.'));
-        } else if (error.message.includes('User not allowed') || error.message.includes('Email not confirmed')) {
+        } else if (status === 403 && data.needsVerification) {
           dispatch(setError('Necesitas verificar tu correo electrónico antes de iniciar sesión'));
           // Redirigir a la pantalla de verificación
           navigation.navigate('VerifyEmail', { email: email.trim() });
           return;
         } else {
-          dispatch(setError('Error al iniciar sesión: ' + error.message));
+          dispatch(setError('Error al iniciar sesión: ' + (data.error || 'Intente nuevamente')));
         }
-        dispatch(setAuthState('unauthenticated'));
-        return;
+      } else {
+        dispatch(setError('Ocurrió un error inesperado'));
       }
-
-      if (!data.user) {
-        dispatch(setError('No se encontró el usuario'));
-        dispatch(setAuthState('unauthenticated'));
-        return;
-      }
-
-      console.log('Login exitoso:', data.user.email);
-
-      // Obtener datos adicionales del usuario
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('username')
-        .eq('id', data.user.id)
-        .single();
-
-      if (userError) {
-        console.error('Error obteniendo datos del usuario:', userError);
-      }
-
-      // Actualizar el estado con los datos del usuario
-      dispatch(setUser({
-        email: data.user.email || '',
-        id: data.user.id,
-        username: userData?.username
-      }));
-      dispatch(setAuthState('authenticated'));
-      navigation.navigate('Main');
-
-    } catch (error) {
-      console.error('Error inesperado durante el login:', error);
-      dispatch(setError('Ocurrió un error inesperado'));
+      
       dispatch(setAuthState('unauthenticated'));
     } finally {
       setLoading(false);

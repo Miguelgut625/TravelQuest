@@ -17,3 +17,4 @@ app.listen(PORT, "192.168.56.1", () => {
 });
 /* 
 http://192.168.56.1:5000/api/users */
+/* npm run server */

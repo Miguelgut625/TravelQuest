@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
+import axios from 'axios';
+
+// URL base de la API
+const API_URL = 'http://192.168.56.1:5000/api';
 
 const VerifyEmailScreen = ({ route }: any) => {
   const { email } = route.params || {};
@@ -17,21 +20,26 @@ const VerifyEmailScreen = ({ route }: any) => {
     try {
       setLoading(true);
       
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email
-      });
-
-      if (error) {
-        throw error;
-      }
+      // Llamada a la API para reenviar el correo de verificación
+      const response = await axios.post(`${API_URL}/users/resend-verification`, { email });
 
       Alert.alert(
         'Correo enviado',
         'Se ha enviado un nuevo correo de verificación. Por favor, revisa tu bandeja de entrada.'
       );
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo enviar el correo de verificación');
+    } catch (error) {
+      console.error('Error al reenviar correo:', error);
+      
+      if (error.response) {
+        // Error de respuesta del servidor
+        Alert.alert('Error', error.response.data.error || 'No se pudo enviar el correo de verificación');
+      } else if (error.request) {
+        // Error de red o servidor no disponible
+        Alert.alert('Error', 'No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+      } else {
+        // Error inesperado
+        Alert.alert('Error', 'Ocurrió un error inesperado');
+      }
     } finally {
       setLoading(false);
     }
@@ -46,7 +54,7 @@ const VerifyEmailScreen = ({ route }: any) => {
       </Text>
 
       <Text style={styles.note}>
-        Nota: Según la configuración actual de Supabase, los usuarios deben verificar su correo
+        Nota: Según la configuración actual, los usuarios deben verificar su correo
         electrónico antes de poder iniciar sesión.
       </Text>
 
