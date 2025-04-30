@@ -60,7 +60,6 @@ type RootStackParamList = {
   };
   BadgesScreen: undefined;
   Friends: undefined;
-  Leaderboard: undefined;
   FriendProfile: {
     friendId: string;
     friendName: string;
@@ -122,13 +121,6 @@ const MainFlow = () => {
       <Stack.Screen
         name="Friends"
         component={FriendsScreen}
-        options={{
-          headerShown: false
-        }}
-      />
-      <Stack.Screen
-        name="Leaderboard"
-        component={LeaderboardScreen}
         options={{
           headerShown: false
         }}
@@ -229,13 +221,17 @@ const TabNavigator = () => {
 };
 
 const AppNavigator = () => {
-  const { isAuthenticated, isLoading } = useSelector((state: RootState) => state.auth);
+  const { authState } = useSelector((state: RootState) => state.auth);
+  const theme = useTheme();
 
-  if (isLoading) {
+  // Si el estado de autenticación es 'loading', mostrar un indicador de carga
+  if (authState === 'loading') {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#005F9E" />
-      </View>
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size={24} color={theme.colors.primary} />
+        </View>
+      </SafeAreaProvider>
     );
   }
 
@@ -247,20 +243,22 @@ const AppNavigator = () => {
         translucent={true}
       />
       <NavigationContainer linking={linking}>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!isAuthenticated ? (
-            <Stack.Screen name="Auth" component={AuthNavigator} />
-          ) : (
-            <>
-              <Stack.Screen name="TabNavigator" component={TabNavigator} />
-              <Stack.Screen name="Chat" component={ChatScreen} />
-              <Stack.Screen name="BadgesScreen" component={BadgesScreen} />
-              <Stack.Screen name="Friends" component={FriendsScreen} />
-              <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
-              <Stack.Screen name="FriendProfile" component={FriendProfileScreen} />
-            </>
-          )}
-        </Stack.Navigator>
+        {authState === 'authenticated' ? (
+          <MainFlow />
+        ) : (
+          <AuthStack.Navigator
+            screenOptions={{
+              headerShown: false,
+            }}
+          >
+            <AuthStack.Screen name="Login" component={LoginScreen} />
+            <AuthStack.Screen name="Register" component={RegisterScreen} />
+            <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <AuthStack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+            <AuthStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+            <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          </AuthStack.Navigator>
+        )}
       </NavigationContainer>
     </SafeAreaProvider>
   );

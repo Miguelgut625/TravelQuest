@@ -177,4 +177,31 @@ export const rejectFriendRequest = async (requestId: string) => {
     console.error('Error rejecting friend request:', error);
     return { success: false, error };
   }
+};
+
+// Función para eliminar una relación de amistad
+export const deleteFriendship = async (userId1: string, userId2: string) => {
+  try {
+    // Eliminar la relación en ambas direcciones
+    const { error: error1 } = await supabase
+      .from('friends')
+      .delete()
+      .eq('user1Id', userId1)
+      .eq('user2Id', userId2);
+
+    if (error1) throw error1;
+
+    const { error: error2 } = await supabase
+      .from('friends')
+      .delete()
+      .eq('user1Id', userId2)
+      .eq('user2Id', userId1);
+
+    if (error2) throw error2;
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error al eliminar la amistad:', error);
+    return { success: false, error };
+  }
 }; 

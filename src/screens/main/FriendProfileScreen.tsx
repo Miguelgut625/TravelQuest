@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator, ScrollView, Platform, Dimensions, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Image, ActivityIndicator, ScrollView, Platform, Dimensions, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -9,6 +9,7 @@ import { getProfilePictureUrl } from '../../services/profileService';
 import { CLOUDINARY_CONFIG } from '../../config/cloudinary';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
+import { deleteFriendship } from '../../services/friendService';
 
 interface JourneyMission {
   id: string;
@@ -115,9 +116,12 @@ const FriendProfileScreen = () => {
   const [xpNext, setXpNext] = useState(50);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [friendshipDate, setFriendshipDate] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFriendData();
+    fetchFriendshipDate();
   }, [friendId]);
 
   const fetchFriendData = async () => {
@@ -198,6 +202,53 @@ const FriendProfileScreen = () => {
     }
   };
 
+  const fetchFriendshipDate = async () => {
+    if (!user || !friendId) return;
+    try {
+      const { data, error } = await supabase
+        .from('friends')
+        .select('created_at')
+        .or(`and(user1Id.eq.${user.id},user2Id.eq.${friendId}),and(user1Id.eq.${friendId},user2Id.eq.${user.id})`)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      if (!error && data && data.length > 0) {
+        setFriendshipDate(data[0].created_at);
+      } else {
+        setFriendshipDate(null);
+      }
+    } catch (e) {
+      setFriendshipDate(null);
+    }
+  };
+
+  const handleDeleteFriendship = async () => {
+    if (!user) return;
+    Alert.alert(
+      'Eliminar amistad',
+      '¿Estás seguro de que quieres eliminar esta amistad?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { success, error } = await deleteFriendship(user.id, friendId);
+              if (success) {
+                Alert.alert('Éxito', 'Amistad eliminada correctamente');
+                navigation.goBack();
+              } else {
+                throw error;
+              }
+            } catch (error) {
+              Alert.alert('Error', 'No se pudo eliminar la amistad');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -215,13 +266,19 @@ const FriendProfileScreen = () => {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Ionicons name="arrow-back" size={24} color="#005F9E" />
+              <Ionicons name="arrow-back" size={24} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.title}>Perfil de {friendName}</Text>
           </View>
         </View>
 
         <View style={styles.profileSection}>
+          <TouchableOpacity
+            style={styles.deleteIconProfile}
+            onPress={handleDeleteFriendship}
+          >
+            <Ionicons name="trash" size={22} color="#ff4444" />
+          </TouchableOpacity>
           {profilePicUrl ? (
             <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
           ) : (
@@ -243,6 +300,15 @@ const FriendProfileScreen = () => {
             <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
           </View>
           <Text style={styles.points}>Puntos: {stats.totalPoints}</Text>
+          {friendshipDate && (
+            <Text style={styles.friendshipDate}>
+              Amigos desde: {new Date(friendshipDate).toLocaleDateString('es-ES', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              })}
+            </Text>
+          )}
         </View>
 
         <View style={styles.statsSection}>
@@ -265,20 +331,11 @@ const FriendProfileScreen = () => {
               <View key={index} style={styles.journeyItem}>
                 <View style={styles.journeyImagesContainer}>
                   {cityEntries.length > 0 && cityEntries[0].photos && cityEntries[0].photos.length > 0 ? (
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.photosScrollView}
-                    >
-                      {cityEntries.map((entry, entryIndex) => (
-                        <Image 
-                          key={`${index}-${entryIndex}`}
-                          source={{ uri: entry.photos[0] }} 
-                          style={styles.journeyImage}
-                          resizeMode="cover"
-                        />
-                      ))}
-                    </ScrollView>
+                    <Image
+                      source={{ uri: cityEntries[0].photos[0] }}
+                      style={styles.journeyImage}
+                      resizeMode="cover"
+                    />
                   ) : (
                     <View style={[styles.journeyImage, styles.noImageContainer]}>
                       <Ionicons name="image-outline" size={40} color="#666" />
@@ -286,7 +343,7 @@ const FriendProfileScreen = () => {
                   )}
                 </View>
                 <View style={styles.journeyContent}>
-                  <Text style={styles.journeyCity}>{selectedCity || 'Ciudad Desconocida'}</Text>
+                  <Text style={styles.journeyCity}>{cityEntries[0]?.city_name || 'Ciudad Desconocida'}</Text>
                   <Text style={styles.journeyDescription} numberOfLines={2}>
                     {cityEntries.length > 0 ? cityEntries[0].content : 'Sin descripción'}
                   </Text>
@@ -298,10 +355,6 @@ const FriendProfileScreen = () => {
                         year: 'numeric'
                       }) : 'Fecha desconocida'}
                     </Text>
-                    <View style={styles.pointsContainer}>
-                      <Text style={styles.pointsText}>{cityEntries.length > 0 ? cityEntries[0].points || 0 : '0'}</Text>
-                      <Text style={styles.pointsLabel}>puntos</Text>
-                    </View>
                   </View>
                 </View>
               </View>
@@ -338,12 +391,28 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
+    marginRight: 6,
   },
   profileSection: {
     alignItems: 'center',
     padding: 20,
     backgroundColor: 'white',
     marginBottom: 10,
+    position: 'relative',
+  },
+  deleteIconProfile: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
   avatar: {
     width: 100,
@@ -451,13 +520,11 @@ const styles = StyleSheet.create({
     height: 200,
     width: '100%',
   },
-  photosScrollView: {
-    flex: 1,
-  },
   journeyImage: {
-    width: JOURNEY_IMAGE_WIDTH,
+    width: '100%',
     height: 200,
-    marginRight: 10,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
   },
   noImageContainer: {
     justifyContent: 'center',
@@ -579,6 +646,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 20,
+  },
+  friendshipDate: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 4,
   },
 });
 
