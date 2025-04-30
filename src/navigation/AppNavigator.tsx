@@ -132,6 +132,13 @@ const MainFlow = () => {
           headerShown: false
         }}
       />
+      <Stack.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
+        options={{
+          headerShown: false
+        }}
+      />
     </Stack.Navigator>
   );
 };
