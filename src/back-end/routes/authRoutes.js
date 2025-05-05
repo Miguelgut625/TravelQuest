@@ -7,7 +7,10 @@ const { getUsers,
          obtenerPuntuacion, 
      obtenerSolicitudesPendientes,
      login,
-     resendVerification} = require('../controllers/authController.js');
+     resendVerification,
+     forgotPassword,
+     verifyCode,
+     resetPassword} = require('../controllers/authController.js');
 
 const router = Router();
 
@@ -20,5 +23,8 @@ router.delete('/:id', deleteUser); // Eliminar un usuario
 router.get('/:id/points', obtenerPuntuacion); // Obtener la puntuación de un usuario
 router.post('/login', login); // Iniciar sesión
 router.post('/resend-verification', resendVerification); // Reenviar correo de verificación
+router.post('/forgot-password', forgotPassword); // Solicitar recuperación de contraseña
+router.post('/verify-code', verifyCode); // Verificar código OTP
+router.post('/reset-password', resetPassword); // Restablecer contraseña
 
 module.exports = router;

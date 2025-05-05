@@ -5,7 +5,7 @@ import { setUser, setToken } from '../../features/authSlice';
 import axios from 'axios';
 
 // URL base de la API
-const API_URL = 'http://192.168.56.1:5000/api';
+const API_URL = 'http://192.168.1.5:5000/api';
 
 const RegisterScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');

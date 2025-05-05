@@ -38,14 +38,49 @@ const getUserById = async (req, res) => {
 const createUser = async (req, res) => {
   const { email, password, username } = req.body;
 
+  if (!email || !password || !username) {
+    return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+  }
+
+  // Validar formato de email básico
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'El formato del correo electrónico no es válido' });
+  }
+
   try {
+    console.log('Intentando registrar usuario:', { email, username });
+    
     // Primero, registrar al usuario con Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
+      email: email.trim(),
+      password: password,
+      options: {
+        data: {
+          username: username
+        }
+      }
     });
 
-    if (authError) throw authError;
+    if (authError) {
+      console.error('Error al registrar en Supabase Auth:', authError);
+      
+      // Manejar errores específicos
+      if (authError.message.includes('invalid')) {
+        return res.status(400).json({ error: 'El correo electrónico no es válido o está en un dominio no permitido' });
+      } else if (authError.message.includes('already')) {
+        return res.status(400).json({ error: 'Este correo electrónico ya está registrado' });
+      }
+      
+      throw authError;
+    }
+
+    if (!authData.user) {
+      console.error('No se recibió usuario de Supabase Auth');
+      throw new Error('No se pudo crear el usuario');
+    }
+
+    console.log('Usuario registrado en Auth con éxito, ID:', authData.user.id);
 
     // Luego, guardar información adicional en la tabla 'users'
     const { data, error } = await supabase
@@ -55,14 +90,30 @@ const createUser = async (req, res) => {
           id: authData.user.id,
           email,
           username,
+          password,
           points: 0 // Iniciar con 0 puntos
         }
-      ]);
+      ])
+      .select();  // Añadir select para obtener el objeto insertado
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error al insertar en tabla users:', error);
+      throw error;
+    }
 
-    res.status(201).json({ message: 'Usuario creado con éxito', user: data });
+    const userData = data && data.length > 0 ? data[0] : null;
+    console.log('Usuario insertado en tabla users:', userData);
+
+    res.status(201).json({ 
+      message: 'Usuario creado con éxito', 
+      user: {
+        id: authData.user.id,
+        email: email,
+        username: username
+      } 
+    });
   } catch (error) {
+    console.error('Error completo al crear usuario:', error);
     res.status(400).json({ error: error.message });
   }
 };
@@ -243,6 +294,92 @@ const resendVerification = async (req, res) => {
   }
 };
 
+// Solicitar recuperación de contraseña
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Se requiere el correo electrónico' });
+  }
+
+  try {
+    // Usar Supabase OTP para enviar un código de verificación
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        shouldCreateUser: false
+      }
+    });
+
+    if (error) {
+      console.error('Error al enviar código de recuperación:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: 'Código de recuperación enviado con éxito' });
+  } catch (error) {
+    console.error('Error inesperado al enviar código de recuperación:', error);
+    res.status(500).json({ error: 'Ocurrió un error inesperado' });
+  }
+};
+
+// Verificar código OTP
+const verifyCode = async (req, res) => {
+  const { email, token } = req.body;
+
+  if (!email || !token) {
+    return res.status(400).json({ error: 'Se requiere email y código de verificación' });
+  }
+
+  try {
+    // Verificar el código OTP con Supabase
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: token.trim(),
+      type: 'email'
+    });
+
+    if (error) {
+      console.error('Error al verificar código:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.status(200).json({ 
+      message: 'Código verificado con éxito',
+      session: data.session
+    });
+  } catch (error) {
+    console.error('Error inesperado al verificar código:', error);
+    res.status(500).json({ error: 'Ocurrió un error inesperado' });
+  }
+};
+
+// Restablecer contraseña
+const resetPassword = async (req, res) => {
+  const { newPassword } = req.body;
+
+  if (!newPassword) {
+    return res.status(400).json({ error: 'Se requiere la nueva contraseña' });
+  }
+
+  try {
+    // Actualizar la contraseña del usuario autenticado
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      console.error('Error al actualizar contraseña:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+  } catch (error) {
+    console.error('Error inesperado al actualizar contraseña:', error);
+    res.status(500).json({ error: 'Ocurrió un error inesperado' });
+  }
+};
+
 module.exports = { 
   getUsers, 
   getUserById, 
@@ -252,5 +389,8 @@ module.exports = {
   obtenerPuntuacion, 
   obtenerSolicitudesPendientes,
   login,
-  resendVerification
+  resendVerification,
+  forgotPassword,
+  verifyCode,
+  resetPassword
 };

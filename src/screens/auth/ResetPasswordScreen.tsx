@@ -8,21 +8,27 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import axios from 'axios';
 
 // URL base de la API
-const API_URL = 'http://192.168.56.1:5000/api';
+const API_URL = 'http://192.168.1.5:5000/api';
 
 type ResetPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+type RouteParams = {
+    session?: any;
+};
 
 export const ResetPasswordScreen = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
+    const route = useRoute();
+    const { session } = route.params as RouteParams || {};
 
     const handleResetPassword = async () => {
         if (!newPassword || !confirmPassword) {
@@ -43,10 +49,17 @@ export const ResetPasswordScreen = () => {
         setLoading(true);
 
         try {
+            // Configurar el token de autenticación si está disponible desde la sesión
+            const headers = {};
+            if (session && session.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+            
             // Llamada a la API para cambiar la contraseña
-            const response = await axios.post(`${API_URL}/users/reset-password`, {
-                newPassword
-            });
+            const response = await axios.post(`${API_URL}/users/reset-password`, 
+                { newPassword },
+                { headers }
+            );
 
             // Si llegamos aquí, la contraseña se cambió correctamente
             Alert.alert(

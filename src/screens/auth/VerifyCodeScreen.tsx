@@ -14,7 +14,7 @@ import { RootStackParamList } from '../../navigation/types';
 import axios from 'axios';
 
 // URL base de la API
-const API_URL = 'http://192.168.56.1:5000/api';
+const API_URL = 'http://192.168.1.5:5000/api';
 
 type VerifyCodeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -51,7 +51,7 @@ export const VerifyCodeScreen = () => {
                 [
                     {
                         text: 'OK',
-                        onPress: () => navigation.navigate('ResetPassword')
+                        onPress: () => navigation.navigate('ResetPassword', { session: response.data.session })
                     }
                 ]
             );
