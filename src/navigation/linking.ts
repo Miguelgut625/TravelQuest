@@ -1,3 +1,4 @@
+// @ts-ignore - importación con problemas de tipos
 import { Linking } from 'react-native';
 
 export const linking = {
@@ -20,6 +21,7 @@ export const linking = {
                     Missions: 'missions',
                     Journal: 'journal',
                     Profile: 'profile',
+                    Groups: 'groups',
                 },
             },
         },

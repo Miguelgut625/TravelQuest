@@ -1154,12 +1154,6 @@ const MapScreen = () => {
     setErrorLocationMsg(`Error al cargar el Globo Terráqueo: ${error}`);
   };
 
-  // Función para reintentar cargar el globo terráqueo
-  const retryLoadGlobe = () => {
-    setErrorLocationMsg(null);
-    loadCesiumGlobe();
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Barra superior con botón para expandir/colapsar */}
@@ -1340,15 +1334,6 @@ const MapScreen = () => {
               }}
               onError={handleGlobeError}
             />
-
-            {/* Botón flotante para recargar el globo */}
-            <TouchableOpacity
-              style={styles.floatingButton}
-              onPress={retryLoadGlobe}
-            >
-              <Ionicons name="refresh" size={20} color="white" style={{ marginRight: 5 }} />
-              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>Recargar Globo 3D</Text>
-            </TouchableOpacity>
           </>
         )}
       </View>

@@ -60,6 +60,10 @@ type RootStackParamList = {
   BadgesScreen: undefined;
   Friends: undefined;
   Leaderboard: undefined;
+  Groups: {
+    showInviteModal?: boolean;
+    groupId?: string;
+  };
 };
 
 type AuthStackParamList = {
@@ -124,6 +128,13 @@ const MainFlow = () => {
       <Stack.Screen
         name="Leaderboard"
         component={LeaderboardScreen}
+        options={{
+          headerShown: false
+        }}
+      />
+      <Stack.Screen
+        name="Groups"
+        component={GroupsScreen}
         options={{
           headerShown: false
         }}

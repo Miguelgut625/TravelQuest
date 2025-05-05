@@ -11,12 +11,13 @@ import {
   Alert,
   Modal,
   Image,
-  TextInput
+  TextInput,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { 
   getUserGroups, 
   getPendingGroupInvitations, 
@@ -24,7 +25,12 @@ import {
   rejectGroupInvitation,
   renameGroup,
   GroupWithMembers,
-  deleteGroup
+  deleteGroup,
+  inviteUserToGroup,
+  removeUserFromGroup,
+  leaveGroup,
+  getUsersNotInGroup,
+  makeGroupAdmin
 } from '../../services/groupService';
 import { 
   acceptJourneyInvitation, 
@@ -40,9 +46,15 @@ const GroupsScreen = () => {
   const [selectedGroup, setSelectedGroup] = useState<GroupWithMembers | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  const [membersModalVisible, setMembersModalVisible] = useState(false);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [availableFriends, setAvailableFriends] = useState([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [shouldCheckNavParams, setShouldCheckNavParams] = useState(true);
   
   const user = useSelector((state: RootState) => state.auth.user);
   const navigation = useNavigation();
+  const route = useRoute();
 
   // Cargar grupos e invitaciones
   const loadData = useCallback(async () => {
@@ -69,10 +81,25 @@ const GroupsScreen = () => {
     }
   }, [user?.id]);
 
+  // Verificar parámetros de navegación después de cargar los grupos
+  useEffect(() => {
+    // Solo verificar parámetros si hay grupos cargados y shouldCheckNavParams es true
+    if (groups.length > 0 && shouldCheckNavParams && route?.params?.showInviteModal && route?.params?.groupId) {
+      const targetGroup = groups.find(g => g.id === route.params.groupId);
+      if (targetGroup) {
+        setSelectedGroup(targetGroup);
+        openInviteModal(route.params.groupId);
+        setShouldCheckNavParams(false); // Evitar que se ejecute nuevamente
+      }
+    }
+  }, [groups, route?.params, shouldCheckNavParams]);
+
   // Cargar datos cuando la pantalla obtiene el foco
   useFocusEffect(
     useCallback(() => {
       loadData();
+      // Resetear la bandera para verificar parámetros
+      setShouldCheckNavParams(true);
     }, [loadData])
   );
 
@@ -121,7 +148,38 @@ const GroupsScreen = () => {
   // Mostrar opciones para el grupo
   const showGroupOptions = (group: GroupWithMembers) => {
     setSelectedGroup(group);
-    setOptionsModalVisible(true);
+    
+    // Verificar si el usuario es administrador del grupo
+    const isAdmin = group.members.some(m => 
+      m.userId === user?.id && m.role === 'admin'
+    );
+    
+    // Si no es administrador, solo mostrar opciones limitadas
+    if (!isAdmin) {
+      // Mostrar opciones limitadas para usuarios normales
+      Alert.alert(
+        "Opciones del grupo",
+        "¿Qué deseas hacer?",
+        [
+          {
+            text: "Cancelar",
+            style: "cancel"
+          },
+          {
+            text: "Ver miembros",
+            onPress: openMembersModal
+          },
+          {
+            text: "Salir del grupo",
+            style: "destructive",
+            onPress: handleLeaveGroup
+          }
+        ]
+      );
+    } else {
+      // Mostrar todas las opciones para administradores
+      setOptionsModalVisible(true);
+    }
   };
 
   // Abrir modal para renombrar grupo
@@ -130,6 +188,190 @@ const GroupsScreen = () => {
     setOptionsModalVisible(false);
     setNewGroupName(selectedGroup.name);
     setRenameModalVisible(true);
+  };
+
+  // Abrir modal para gestionar miembros
+  const openMembersModal = () => {
+    if (!selectedGroup) return;
+    setOptionsModalVisible(false);
+    setMembersModalVisible(true);
+  };
+
+  // Abrir modal para invitar amigos
+  const openInviteModal = async (targetGroupId = null) => {
+    // Usar el grupo seleccionado o el proporcionado por parámetro
+    const groupId = targetGroupId || (selectedGroup ? selectedGroup.id : null);
+    
+    if (!groupId || !user?.id) return;
+    
+    setOptionsModalVisible(false);
+    setInviteLoading(true);
+    setInviteModalVisible(true);
+    
+    try {
+      // Cargar amigos disponibles para invitar
+      const friends = await getUsersNotInGroup(groupId, user.id);
+      setAvailableFriends(friends);
+    } catch (error) {
+      console.error('Error cargando amigos disponibles:', error);
+      Alert.alert('Error', 'No se pudieron cargar los amigos disponibles');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // Manejar la invitación de un usuario
+  const handleInviteUser = async (friendId) => {
+    if (!selectedGroup || !user?.id) return;
+    
+    try {
+      setInviteLoading(true);
+      const success = await inviteUserToGroup(
+        selectedGroup.id,
+        friendId,
+        user.id
+      );
+      
+      if (success) {
+        Alert.alert('Éxito', 'Invitación enviada correctamente');
+        // Actualizar la lista de amigos disponibles
+        const updatedFriends = availableFriends.filter(f => f.id !== friendId);
+        setAvailableFriends(updatedFriends);
+      } else {
+        Alert.alert('Error', 'No se pudo enviar la invitación');
+      }
+    } catch (error) {
+      console.error('Error invitando usuario:', error);
+      Alert.alert('Error', 'No se pudo enviar la invitación');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // Manejar la expulsión de un miembro
+  const handleRemoveMember = async (memberId) => {
+    if (!selectedGroup) return;
+    
+    Alert.alert(
+      "Eliminar Miembro",
+      "¿Estás seguro de que deseas eliminar a este miembro del grupo?",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const success = await removeUserFromGroup(selectedGroup.id, memberId);
+              
+              if (success) {
+                // Actualizar el grupo seleccionado para reflejar el cambio
+                const updatedGroup = {...selectedGroup};
+                updatedGroup.members = updatedGroup.members.filter(m => m.userId !== memberId);
+                setSelectedGroup(updatedGroup);
+                
+                Alert.alert('Éxito', 'Miembro eliminado correctamente');
+              } else {
+                Alert.alert('Error', 'No se pudo eliminar al miembro');
+              }
+            } catch (error) {
+              console.error('Error al eliminar miembro:', error);
+              Alert.alert('Error', 'No se pudo eliminar al miembro');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Manejar el cambio de rol a administrador
+  const handleMakeAdmin = async (memberId) => {
+    if (!selectedGroup) return;
+    
+    Alert.alert(
+      "Hacer Administrador",
+      "¿Estás seguro de que deseas hacer administrador a este miembro?",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        {
+          text: "Confirmar",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const success = await makeGroupAdmin(selectedGroup.id, memberId);
+              
+              if (success) {
+                // Actualizar el grupo seleccionado para reflejar el cambio
+                const updatedGroup = {...selectedGroup};
+                const memberIndex = updatedGroup.members.findIndex(m => m.userId === memberId);
+                if (memberIndex !== -1) {
+                  updatedGroup.members[memberIndex].role = 'admin';
+                  setSelectedGroup(updatedGroup);
+                }
+                
+                Alert.alert('Éxito', 'El miembro ahora es administrador');
+              } else {
+                Alert.alert('Error', 'No se pudo cambiar el rol del miembro');
+              }
+            } catch (error) {
+              console.error('Error al hacer administrador:', error);
+              Alert.alert('Error', 'No se pudo cambiar el rol del miembro');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Manejar salir del grupo
+  const handleLeaveGroup = async () => {
+    if (!selectedGroup || !user?.id) return;
+    
+    setOptionsModalVisible(false);
+    
+    Alert.alert(
+      "Salir del Grupo",
+      "¿Estás seguro de que deseas salir de este grupo?",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        {
+          text: "Salir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const success = await leaveGroup(selectedGroup.id, user.id);
+              
+              if (success) {
+                Alert.alert('Éxito', 'Has salido del grupo correctamente');
+                loadData();
+              } else {
+                Alert.alert('Error', 'No se pudo salir del grupo. Si eres el único administrador, debes transferir la administración a otro miembro primero.');
+              }
+            } catch (error) {
+              console.error('Error al salir del grupo:', error);
+              Alert.alert('Error', 'No se pudo salir del grupo');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Manejar la eliminación de un grupo
@@ -232,17 +474,17 @@ const GroupsScreen = () => {
         <View style={styles.groupInfo}>
           <View style={styles.groupHeader}>
             <Text style={styles.groupName} numberOfLines={1}>{item.name}</Text>
-            {isAdmin && (
-              <TouchableOpacity 
-                style={styles.editButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  showGroupOptions(item);
-                }}
-              >
-                <Ionicons name="ellipsis-vertical" size={18} color="#777" />
-              </TouchableOpacity>
-            )}
+            
+            <TouchableOpacity 
+              onPress={(e) => {
+                e.stopPropagation();
+                showGroupOptions(item);
+              }}
+              style={styles.settingsButton}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color="#005F9E" />
+            </TouchableOpacity>
           </View>
           
           <Text style={styles.lastMessage} numberOfLines={1}>
@@ -337,7 +579,7 @@ const GroupsScreen = () => {
         )}
       </View>
 
-      {/* Modal para opciones del grupo */}
+      {/* Modal para opciones del grupo - solo para administradores */}
       <Modal
         visible={optionsModalVisible}
         transparent={true}
@@ -356,6 +598,30 @@ const GroupsScreen = () => {
             >
               <Ionicons name="create-outline" size={22} color="#005F9E" />
               <Text style={styles.optionText}>Renombrar grupo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={openMembersModal}
+            >
+              <Ionicons name="people-outline" size={22} color="#005F9E" />
+              <Text style={styles.optionText}>Gestionar miembros</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={openInviteModal}
+            >
+              <Ionicons name="person-add-outline" size={22} color="#005F9E" />
+              <Text style={styles.optionText}>Invitar amigos</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={handleLeaveGroup}
+            >
+              <Ionicons name="exit-outline" size={22} color="#ff9800" />
+              <Text style={[styles.optionText, { color: '#ff9800' }]}>Salir del grupo</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -390,15 +656,137 @@ const GroupsScreen = () => {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setRenameModalVisible(false)}
               >
-                <Text style={styles.buttonText}>Cancelar</Text>
+                <Text style={{ color: 'white' }}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.confirmButton]}
                 onPress={handleRenameGroup}
               >
-                <Text style={styles.buttonText}>Guardar</Text>
+                <Text style={{ color: 'white' }}>Guardar</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para gestionar miembros */}
+      <Modal
+        visible={membersModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setMembersModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Miembros del Grupo</Text>
+              <TouchableOpacity onPress={() => setMembersModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            {selectedGroup && (
+              <>
+                {/* Mostrar mensaje informativo para usuarios que no son administradores */}
+                {!selectedGroup.members.some(m => m.userId === user?.id && m.role === 'admin') && (
+                  <View style={styles.infoMessage}>
+                    <Ionicons name="information-circle" size={20} color="#005F9E" />
+                    <Text style={styles.infoMessageText}>
+                      Solo puedes ver los miembros. Para gestionar el grupo debes ser administrador.
+                    </Text>
+                  </View>
+                )}
+                
+                <ScrollView style={{ width: '100%' }}>
+                  {selectedGroup.members.map((member) => {
+                    // Determinar si el usuario actual es admin
+                    const isCurrentUserAdmin = selectedGroup.members.some(
+                      m => m.userId === user?.id && m.role === 'admin'
+                    );
+                    
+                    // No mostrar opciones para el usuario actual
+                    const isCurrentUser = member.userId === user?.id;
+                    
+                    return (
+                      <View key={member.userId} style={styles.memberItem}>
+                        <View style={styles.memberInfo}>
+                          <Text style={styles.memberName}>{member.username}</Text>
+                          {member.role === 'admin' && (
+                            <View style={styles.adminBadge}>
+                              <Text style={styles.adminBadgeText}>Admin</Text>
+                            </View>
+                          )}
+                        </View>
+                        
+                        {isCurrentUserAdmin && !isCurrentUser && (
+                          <View style={styles.memberActions}>
+                            {member.role !== 'admin' && (
+                              <TouchableOpacity 
+                                style={styles.memberAction}
+                                onPress={() => handleMakeAdmin(member.userId)}
+                              >
+                                <Ionicons name="shield-outline" size={18} color="#005F9E" />
+                              </TouchableOpacity>
+                            )}
+                            
+                            <TouchableOpacity 
+                              style={styles.memberAction}
+                              onPress={() => handleRemoveMember(member.userId)}
+                            >
+                              <Ionicons name="remove-circle-outline" size={18} color="#f44336" />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para invitar amigos */}
+      <Modal
+        visible={inviteModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setInviteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Invitar Amigos</Text>
+              <TouchableOpacity onPress={() => setInviteModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            {inviteLoading ? (
+              <ActivityIndicator size={24} color="#005F9E" style={{ padding: 20 }} />
+            ) : availableFriends.length > 0 ? (
+              <ScrollView style={{ width: '100%' }}>
+                {availableFriends.map((friend) => (
+                  <View key={friend.id} style={styles.friendItem}>
+                    <Text style={styles.friendName}>{friend.username}</Text>
+                    <TouchableOpacity 
+                      style={styles.inviteButton}
+                      onPress={() => handleInviteUser(friend.id)}
+                    >
+                      <Text style={styles.inviteButtonText}>Invitar</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyFriends}>
+                <Ionicons name="people-outline" size={50} color="#ccc" />
+                <Text style={styles.emptyFriendsText}>
+                  No hay amigos disponibles para invitar. Todos tus amigos ya están en el grupo o han sido invitados.
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -478,11 +866,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  groupNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    backgroundColor: '#f0f7ff',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 15,
+  },
   groupName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
+  },
+  settingsButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 18,
+    backgroundColor: '#e6f7ff',
+    borderWidth: 1,
+    borderColor: '#c1e0ff',
+    marginLeft: 8,
   },
   lastMessage: {
     fontSize: 14,
@@ -627,6 +1035,99 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: '#005F9E',
+  },
+  // Nuevos estilos
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  memberItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    width: '100%',
+  },
+  memberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  memberName: {
+    fontSize: 16,
+    color: '#333',
+  },
+  adminBadge: {
+    backgroundColor: '#005F9E',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 10,
+  },
+  adminBadgeText: {
+    color: 'white',
+    fontSize: 12,
+  },
+  memberActions: {
+    flexDirection: 'row',
+  },
+  memberAction: {
+    padding: 8,
+    marginLeft: 5,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    width: '100%',
+  },
+  friendName: {
+    fontSize: 16,
+    color: '#333',
+  },
+  inviteButton: {
+    backgroundColor: '#005F9E',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  inviteButtonText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  emptyFriends: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyFriendsText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 10,
+  },
+  infoMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e6f7ff',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    width: '100%',
+  },
+  infoMessageText: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
   },
 });
 

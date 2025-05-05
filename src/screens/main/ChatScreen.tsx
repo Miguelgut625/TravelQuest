@@ -1,5 +1,5 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,9 @@ import {
   Alert,
   Image,
   Modal,
-  SafeAreaView
+  SafeAreaView,
+  ScrollView,
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -31,7 +33,17 @@ import {
   subscribeToGroupMessages,
   markGroupMessagesAsRead
 } from '../../services/messageService';
-import { getGroupById } from '../../services/groupService';
+import { 
+  getGroupById, 
+  renameGroup, 
+  deleteGroup, 
+  leaveGroup,
+  getUsersNotInGroup,
+  inviteUserToGroup,
+  removeGroupAdmin,
+  makeGroupAdmin,
+  removeUserFromGroup
+} from '../../services/groupService';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
@@ -59,13 +71,33 @@ const ChatScreen = () => {
   const messageCountRef = useRef(0);
   const [isGroupChat, setIsGroupChat] = useState(false);
   const [groupInfo, setGroupInfo] = useState<any>(null);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [menuState, setMenuState] = useState({
+    isVisible: false,
+    isProcessing: false,
+    lastPressTime: 0
+  });
+  // Estados para gestión de miembros y invitaciones
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [membersModalVisible, setMembersModalVisible] = useState(false);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [availableFriends, setAvailableFriends] = useState([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  // Estado para modal de información del grupo
+  const [groupInfoModalVisible, setGroupInfoModalVisible] = useState(false);
 
   // Verificar si es un chat grupal
   useEffect(() => {
     if (route.params?.isGroupChat || groupId) {
       setIsGroupChat(true);
     }
-  }, [route.params, groupId]);
+
+    // Ocultar la barra de navegación nativa ya que usamos nuestra propia cabecera
+    navigation.setOptions({
+      headerShown: false
+    });
+  }, [route.params, groupId, navigation]);
 
   // Cargar los datos iniciales
   useEffect(() => {
@@ -259,10 +291,6 @@ const ChatScreen = () => {
     console.log('Efecto de inicialización del chat');
     checkUserAuth();
     
-    navigation.setOptions({
-      title: isGroupChat ? groupName : friendName || 'Chat',
-    });
-
     // Configurar un intervalo para actualizar los mensajes periódicamente
     const refreshInterval = setInterval(() => {
       if (!initialLoadRef.current) {
@@ -531,43 +559,485 @@ const ChatScreen = () => {
     }
   };
 
-  // Personalizar el encabezado de navegación
-  useEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      headerTitle: () => (
-        <View style={styles.headerTitle}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
+  // Manejar el menú de opciones de grupo
+  const handleMenuPress = React.useCallback(() => {
+    // Evitar múltiples clics rápidos
+    const now = Date.now();
+    const timeSinceLastPress = now - menuState.lastPressTime;
+
+    // Prevenir múltiples aperturas en menos de 500ms
+    if (timeSinceLastPress < 500 || menuState.isProcessing) {
+      return;
+    }
+    
+    setMenuState(prev => ({
+      ...prev,
+      isProcessing: true,
+      lastPressTime: now
+    }));
+    
+    // Verificar si el usuario es administrador del grupo
+    if (!groupInfo || !isGroupChat || !groupId) {
+      setMenuState(prev => ({ ...prev, isProcessing: false }));
+      return;
+    }
+
+    const isAdmin = groupInfo.members.some(m => 
+      m.userId === user?.id && m.role === 'admin'
+    );
+    
+    const showMenu = () => {
+      if (isAdmin) {
+        Alert.alert(
+          "Opciones del grupo",
+          "¿Qué deseas hacer?",
+          [
+            { text: "Cancelar", style: "cancel", onPress: () => {
+              setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+            }},
+            { 
+              text: "Renombrar grupo", 
+              onPress: () => {
+                setNewGroupName(groupName);
+                setRenameModalVisible(true);
+                setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+              }
+            },
+            { 
+              text: "Gestionar miembros", 
+              onPress: async () => {
+                try {
+                  if (!groupId) return;
+                  
+                  // Obtener la información actualizada del grupo
+                  const groupData = await getGroupById(groupId);
+                  
+                  if (groupData) {
+                    setSelectedGroup(groupData);
+                    setMembersModalVisible(true);
+                  } else {
+                    Alert.alert('Error', 'No se pudo obtener la información del grupo');
+                  }
+                } catch (error) {
+                  console.error('Error al abrir el modal de miembros:', error);
+                  Alert.alert('Error', 'No se pudo cargar la información de los miembros');
+                } finally {
+                  setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+                }
+              }
+            },
+            { 
+              text: "Invitar amigos", 
+              onPress: async () => {
+                try {
+                  if (!groupId || !user?.id) return;
+                  
+                  setInviteLoading(true);
+                  setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+                  setSelectedGroup(groupInfo);
+                  setInviteModalVisible(true);
+                  
+                  // Cargar amigos disponibles para invitar
+                  const friends = await getUsersNotInGroup(groupId, user.id);
+                  setAvailableFriends(friends);
+                } catch (error) {
+                  console.error('Error cargando amigos disponibles:', error);
+                  Alert.alert('Error', 'No se pudieron cargar los amigos disponibles');
+                } finally {
+                  setInviteLoading(false);
+                }
+              }
+            },
+            { 
+              text: "Eliminar grupo", 
+              style: "destructive",
+              onPress: async () => {
+                Alert.alert(
+                  "Eliminar Grupo",
+                  "¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.",
+                  [
+                    { text: "Cancelar", style: "cancel", onPress: () => {
+                      setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+                    }},
+                    { 
+                      text: "Eliminar", 
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          const success = await deleteGroup(groupId, user.id);
+                          
+                          if (success) {
+                            Alert.alert('Éxito', 'Grupo eliminado correctamente');
+                            navigation.goBack();
+                          } else {
+                            Alert.alert('Error', 'No se pudo eliminar el grupo');
+                          }
+                        } catch (error) {
+                          console.error('Error al eliminar grupo:', error);
+                          Alert.alert('Error', 'No se pudo eliminar el grupo');
+                        } finally {
+                          setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+                        }
+                      }
+                    }
+                  ]
+                );
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Opciones del grupo",
+          "¿Qué deseas hacer?",
+          [
+            { text: "Cancelar", style: "cancel", onPress: () => {
+              setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+            }},
+            { 
+              text: "Ver miembros", 
+              onPress: async () => {
+                try {
+                  if (!groupId) return;
+                  
+                  // Obtener la información actualizada del grupo
+                  const groupData = await getGroupById(groupId);
+                  
+                  if (groupData) {
+                    setSelectedGroup(groupData);
+                    setMembersModalVisible(true);
+                  } else {
+                    Alert.alert('Error', 'No se pudo obtener la información del grupo');
+                  }
+                } catch (error) {
+                  console.error('Error al abrir el modal de miembros:', error);
+                  Alert.alert('Error', 'No se pudo cargar la información de los miembros');
+                } finally {
+                  setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+                }
+              }
+            },
+            { 
+              text: "Salir del grupo", 
+              style: "destructive",
+              onPress: async () => {
+                Alert.alert(
+                  "Salir del Grupo",
+                  "¿Estás seguro de que deseas salir de este grupo?",
+                  [
+                    { text: "Cancelar", style: "cancel", onPress: () => {
+                      setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+                    }},
+                    { 
+                      text: "Salir", 
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          const success = await leaveGroup(groupId, user.id);
+                          
+                          if (success) {
+                            Alert.alert('Éxito', 'Has salido del grupo correctamente');
+                            navigation.goBack();
+                          } else {
+                            Alert.alert('Error', 'No se pudo salir del grupo');
+                          }
+                        } catch (error) {
+                          console.error('Error al salir del grupo:', error);
+                          Alert.alert('Error', 'No se pudo salir del grupo');
+                        } finally {
+                          setMenuState(prev => ({ ...prev, isVisible: false, isProcessing: false }));
+                        }
+                      }
+                    }
+                  ]
+                );
+              }
+            }
+          ]
+        );
+      }
+    };
+
+    // Usar setTimeout para asegurar que el estado se actualice antes de mostrar el menú
+    setTimeout(showMenu, 0);
+  }, [groupInfo, user?.id, groupId, groupName, navigation, menuState.lastPressTime]);
+
+  // Manejar el renombrar un grupo
+  const handleRenameGroup = async () => {
+    if (!newGroupName.trim() || !groupId) return;
+    
+    try {
+      const success = await renameGroup(groupId, newGroupName.trim());
+      
+      if (success) {
+        // Actualizar el nombre en la navegación
+        navigation.setParams({ groupName: newGroupName.trim() });
+        Alert.alert('Éxito', 'Grupo renombrado correctamente');
+      } else {
+        Alert.alert('Error', 'No se pudo renombrar el grupo');
+      }
+    } catch (error) {
+      console.error('Error al renombrar grupo:', error);
+      Alert.alert('Error', 'No se pudo renombrar el grupo');
+    } finally {
+      setRenameModalVisible(false);
+    }
+  };
+
+  // Función para abrir el modal de gestión de miembros
+  const openGroupMembers = async () => {
+    try {
+      if (!groupId) return;
+      
+      // Obtener la información actualizada del grupo
+      const groupData = await getGroupById(groupId);
+      
+      if (groupData) {
+        setSelectedGroup(groupData);
+        setMembersModalVisible(true);
+      } else {
+        Alert.alert('Error', 'No se pudo obtener la información del grupo');
+      }
+    } catch (error) {
+      console.error('Error al abrir el modal de miembros:', error);
+      Alert.alert('Error', 'No se pudo cargar la información de los miembros');
+    }
+  };
+
+  // Manejar la invitación de un usuario
+  const handleInviteUser = async (friendId) => {
+    if (!selectedGroup || !user?.id) return;
+    
+    try {
+      setInviteLoading(true);
+      const success = await inviteUserToGroup(
+        selectedGroup.id,
+        friendId,
+        user.id
+      );
+      
+      if (success) {
+        Alert.alert('Éxito', 'Invitación enviada correctamente');
+        // Actualizar la lista de amigos disponibles
+        const updatedFriends = availableFriends.filter(f => f.id !== friendId);
+        setAvailableFriends(updatedFriends);
+      } else {
+        Alert.alert('Error', 'No se pudo enviar la invitación');
+      }
+    } catch (error) {
+      console.error('Error invitando usuario:', error);
+      Alert.alert('Error', 'No se pudo enviar la invitación');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // Función para cambiar el rol de un miembro
+  const handleChangeRole = async (memberId, currentRole) => {
+    if (!selectedGroup || !user?.id) return;
+    
+    const newRole = currentRole === 'admin' ? 'member' : 'admin';
+    const action = currentRole === 'admin' ? 'quitar administración' : 'hacer administrador';
+    const actionFunction = currentRole === 'admin' ? removeGroupAdmin : makeGroupAdmin;
+    
+    Alert.alert(
+      currentRole === 'admin' ? "Quitar Administración" : "Hacer Administrador",
+      `¿Estás seguro de que deseas ${action} a este miembro?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Confirmar", 
+          onPress: async () => {
+            try {
+              const success = await actionFunction(selectedGroup.id, memberId);
+              
+              if (success) {
+                // Actualizar el estado local
+                const updatedGroup = {...selectedGroup};
+                const memberIndex = updatedGroup.members.findIndex(m => m.userId === memberId);
+                if (memberIndex !== -1) {
+                  updatedGroup.members[memberIndex].role = newRole;
+                  setSelectedGroup(updatedGroup);
+                }
+                
+                Alert.alert('Éxito', `Se ha cambiado el rol del miembro correctamente`);
+                
+                // Refrescar la información del grupo
+                if (groupId) {
+                  const groupData = await getGroupById(groupId);
+                  if (groupData) {
+                    setGroupInfo(groupData);
+                  }
+                }
+              } else {
+                const errorMsg = currentRole === 'admin' 
+                  ? 'No se puede quitar el rol al único administrador del grupo' 
+                  : 'No se pudo cambiar el rol del miembro';
+                Alert.alert('Error', errorMsg);
+              }
+            } catch (error) {
+              console.error(`Error al ${action}:`, error);
+              Alert.alert('Error', `No se pudo ${action}`);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Función para eliminar un miembro del grupo
+  const handleRemoveMember = async (memberId) => {
+    if (!selectedGroup || !user?.id) return;
+    
+    Alert.alert(
+      "Eliminar Miembro",
+      "¿Estás seguro de que deseas eliminar a este miembro del grupo?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Eliminar", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const success = await removeUserFromGroup(selectedGroup.id, memberId);
+              
+              if (success) {
+                // Actualizar el estado local
+                const updatedGroup = {...selectedGroup};
+                updatedGroup.members = updatedGroup.members.filter(m => m.userId !== memberId);
+                setSelectedGroup(updatedGroup);
+                
+                Alert.alert('Éxito', 'Miembro eliminado correctamente');
+                
+                // Refrescar la información del grupo
+                if (groupId) {
+                  const groupData = await getGroupById(groupId);
+                  if (groupData) {
+                    setGroupInfo(groupData);
+                  }
+                }
+              } else {
+                Alert.alert('Error', 'No se pudo eliminar al miembro del grupo');
+              }
+            } catch (error) {
+              console.error('Error al eliminar miembro:', error);
+              Alert.alert('Error', 'No se pudo eliminar al miembro del grupo');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Función para mostrar la información del grupo
+  const showGroupInfo = () => {
+    if (isGroupChat && groupInfo) {
+      setGroupInfoModalVisible(true);
+    }
+  };
+
+  // Función para mostrar el modal de invitación
+  const handleShowInviteModal = async () => {
+    try {
+      if (!groupId || !user?.id) return;
+      
+      setInviteLoading(true);
+      // Obtener información actualizada del grupo
+      const groupData = await getGroupById(groupId);
+      
+      if (groupData) {
+        setSelectedGroup(groupData);
+        
+        // Cargar amigos disponibles para invitar
+        const friends = await getUsersNotInGroup(groupId, user.id);
+        setAvailableFriends(friends);
+        setInviteModalVisible(true);
+      } else {
+        Alert.alert('Error', 'No se pudo obtener la información del grupo');
+      }
+    } catch (error) {
+      console.error('Error cargando amigos disponibles:', error);
+      Alert.alert('Error', 'No se pudieron cargar los amigos disponibles');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // Función para cargar más mensajes antiguos
+  const loadMoreMessages = () => {
+    // Esta función ahora debería cargar mensajes más antiguos (al inicio de la lista)
+    console.log('Cargar mensajes más antiguos');
+    // Implementar paginación hacia atrás si es necesario
+  };
+
+  const renderMessageItem = ({ item }: { item: Message }) => {
+    const isOwnMessage = item.sender_id === user?.id;
+    
+    // Formatear la fecha
+    const messageDate = new Date(item.created_at);
+    const formattedTime = messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    // Determinar si es un mensaje propio o de otro usuario
+    const messageContainerStyle = [
+      styles.messageContainer,
+      isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
+    ];
+    
+    // Estilos específicos para texto de mensajes de otros usuarios
+    const messageTextStyle = [
+      styles.messageText,
+      !isOwnMessage && styles.otherMessageText
+    ];
+    
+    // Estilos específicos para el timestamp de mensajes de otros usuarios
+    const timeStyle = [
+      styles.messageTime,
+      !isOwnMessage && styles.otherMessageTime
+    ];
+    
+    return (
+      <View style={messageContainerStyle}>
+        {/* Si es grupo y no es un mensaje propio, mostrar el nombre */}
+        {isGroupChat && !isOwnMessage && (
+          <Text style={{ 
+            fontSize: 13, 
+            fontWeight: 'bold', 
+            color: '#007AFF',
+            marginBottom: 2
+          }}>
+            {item.sender_username || 'Usuario'}
+          </Text>
+        )}
+        
+        {/* Contenido del mensaje (imagen o texto) */}
+        {item.image_url ? (
+          <TouchableOpacity onPress={() => viewFullImage(item.image_url)}>
+            <Image
+              source={{ uri: item.image_url }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
           </TouchableOpacity>
-          {isGroupChat ? (
-            <View style={styles.headerGroupInfo}>
-              <Text style={styles.headerName}>{groupName || 'Grupo'}</Text>
-              <Text style={styles.headerSubtitle}>
-                {groupInfo?.members?.length || 0} miembros
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.headerUserInfo}>
-              <Text style={styles.headerName}>{friendName}</Text>
-              {groupInfo?.status && (
-                <Text style={styles.headerSubtitle}>
-                  {groupInfo.status}
-                </Text>
-              )}
-            </View>
-          )}
-        </View>
-      ),
-      headerStyle: {
-        backgroundColor: '#005F9E',
-      },
-      headerTintColor: 'white',
-    });
-  }, [navigation, friendName, isGroupChat, groupName, groupInfo]);
+        ) : (
+          <Text style={messageTextStyle}>
+            {item.text || item.content}
+          </Text>
+        )}
+        
+        {/* Hora del mensaje */}
+        <Text style={timeStyle}>{formattedTime}</Text>
+      </View>
+    );
+  };
+
+  // Actualizar la función para desplazarse al final cuando hay mensajes nuevos
+  React.useEffect(() => {
+    if (messages.length > 0 && !loading) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 200);
+    }
+  }, [messages, loading]);
 
   if (loading && !refreshing) {
     return (
@@ -577,181 +1047,483 @@ const ChatScreen = () => {
     );
   }
 
-  // Renderizar un mensaje individual
-  const renderMessageItem = ({ item }: { item: Message }) => {
-    const isOwnMessage = item.sender_id === user?.id;
-    const messageDate = new Date(item.created_at);
-    const timeString = messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    // Para mensajes grupales, mostrar el nombre del remitente si no es propio
-    const shouldShowSender = isGroupChat && !isOwnMessage;
-    
-    // Determinar si el mensaje es una imagen
-    const hasImage = item.image_url || 
-                    (item.content && 
-                     typeof item.content === 'string' && 
-                     item.content.startsWith('http') && 
-                     (item.content.includes('.jpg') || 
-                      item.content.includes('.jpeg') || 
-                      item.content.includes('.png') || 
-                      item.content.includes('.gif') || 
-                      item.content.includes('cloudinary')));
-    
-    // Obtener el contenido de texto del mensaje (solo si no es una imagen)
-    const messageText = !hasImage ? (item.text || item.content || null) : null;
-    
-    // Obtener la URL de la imagen si existe
-    const imageUrl = item.image_url || (hasImage ? item.content : null);
+  return (
+    <View style={{ flex: 1 }}>
+      <StatusBar backgroundColor="#005F9E" barStyle="light-content" />
+      
+      {/* Espacio para la barra de estado */}
+      <View style={{ 
+        height: Platform.OS === 'ios' ? 47 : 24, 
+        backgroundColor: '#005F9E' 
+      }} />
+      
+      {/* Header personalizado */}
+      <View style={styles.header}>
+        <View style={styles.headerLeftSection}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
 
-    return (
-      <View style={[
-        styles.messageContainer,
-        isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
-      ]}>
-        {shouldShowSender && (
-          <Text style={styles.messageSender}>{item.sender_username}</Text>
-        )}
-        
-        {imageUrl && (
-          <TouchableOpacity onPress={() => viewFullImage(imageUrl)}>
-            <Image 
-              source={{ uri: imageUrl }} 
-              style={styles.messageImage} 
-              resizeMode="cover"
-            />
+          <TouchableOpacity
+            style={styles.headerInfo}
+            onPress={showGroupInfo}
+            activeOpacity={isGroupChat ? 0.7 : 1}
+          >
+            <View style={styles.headerAvatar}>
+              {isGroupChat ? (
+                <Ionicons name="people" size={18} color="white" />
+              ) : (
+                <Text style={styles.headerAvatarText}>
+                  {friendName ? friendName.charAt(0).toUpperCase() : '?'}
+                </Text>
+              )}
+            </View>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {isGroupChat ? groupName : friendName}
+              </Text>
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {isGroupChat 
+                  ? `${groupInfo?.members?.length || 0} miembros` 
+                  : 'En línea'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {isGroupChat && (
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleMenuPress}
+          >
+            <Ionicons name="ellipsis-vertical" size={24} color="white" />
           </TouchableOpacity>
         )}
-        
-        {messageText && (
-          <Text style={styles.messageText}>{messageText}</Text>
-        )}
-        
-        <Text style={styles.messageTime}>{timeString}</Text>
       </View>
-    );
-  };
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessageItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messagesContainer}
-        onRefresh={loadMessages}
-        refreshing={refreshing}
-      />
-      
-      <View style={styles.inputContainer}>
-        <TouchableOpacity 
-          style={styles.attachButton}
-          onPress={pickImage}
-        >
-          {/* @ts-ignore */}
-          <Ionicons name="image-outline" size={24} color="#005F9E" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.attachButton}
-          onPress={takePhoto}
-        >
-          {/* @ts-ignore */}
-          <Ionicons name="camera-outline" size={24} color="#005F9E" />
-        </TouchableOpacity>
-        
-        <TextInput
-          style={styles.input}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Escribe un mensaje..."
-          multiline
-        />
-        <TouchableOpacity 
-          style={[
-            styles.sendButton,
-            (!inputText.trim() || sending) ? styles.sendButtonDisabled : null
-          ]}
-          onPress={handleSendMessage}
-          disabled={!inputText.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            // @ts-ignore
-            <Ionicons name="send" size={24} color="white" />
-          )}
-        </TouchableOpacity>
-      </View>
-      
-      {/* Modal de vista previa de imagen */}
-      <Modal
-        visible={imagePreviewVisible}
-        transparent={true}
-        animationType="slide"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.imagePreviewContainer}>
-            <Text style={styles.previewTitle}>Vista Previa</Text>
-            {selectedImage && (
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#005F9E" />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessageItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.messagesContainer}
+            onEndReached={loadMoreMessages}
+            onEndReachedThreshold={0.5}
+          />
+        )}
+
+        <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={() => {
+              Alert.alert(
+                'Añadir contenido',
+                'Selecciona una opción',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { text: 'Tomar foto', onPress: takePhoto },
+                  { text: 'Seleccionar imagen', onPress: pickImage }
+                ]
+              )
+            }}
+          >
+            <Ionicons name="add-circle-outline" size={28} color="#005F9E" />
+          </TouchableOpacity>
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Escribe un mensaje..."
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+          />
+          
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!inputText.trim() && !selectedImage) && styles.sendButtonDisabled
+            ]}
+            onPress={handleSendMessage}
+            disabled={(!inputText.trim() && !selectedImage) || sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons name="send" size={20} color="white" />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal de vista previa de imagen seleccionada */}
+        <Modal
+          visible={imagePreviewVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setImagePreviewVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.imagePreviewContainer}>
+              <Text style={styles.previewTitle}>Enviar imagen</Text>
+              {selectedImage && (
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                />
+              )}
+              <View style={styles.previewButtons}>
+                <TouchableOpacity
+                  style={[styles.previewButton, styles.cancelButton]}
+                  onPress={() => {
+                    setSelectedImage(null);
+                    setImagePreviewVisible(false);
+                  }}
+                >
+                  <Text style={styles.previewButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.previewButton, { backgroundColor: '#005F9E' }]}
+                  onPress={sendSelectedImage}
+                >
+                  <Text style={styles.previewButtonText}>Enviar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal para mostrar imagen a pantalla completa */}
+        <Modal
+          visible={fullImageViewVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setFullImageViewVisible(false)}
+        >
+          <View style={styles.fullImageContainer}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setFullImageViewVisible(false)}
+            >
+              <Ionicons name="close-circle" size={36} color="white" />
+            </TouchableOpacity>
+            {currentFullImage && (
               <Image
-                source={{ uri: selectedImage }}
-                style={styles.previewImage}
+                source={{ uri: currentFullImage }}
+                style={styles.fullImage}
                 resizeMode="contain"
               />
             )}
-            <View style={styles.previewButtons}>
-              <TouchableOpacity
-                style={[styles.previewButton, styles.cancelButton]}
-                onPress={() => {
-                  setImagePreviewVisible(false);
-                  setSelectedImage(null);
-                }}
-              >
-                <Text style={styles.previewButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.previewButton, styles.sendButton]}
-                onPress={sendSelectedImage}
-                disabled={sending}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.previewButtonText}>Enviar</Text>
-                )}
-              </TouchableOpacity>
+          </View>
+        </Modal>
+
+        {/* Modal para renombrar grupo */}
+        <Modal
+          visible={renameModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setRenameModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Renombrar Grupo</Text>
+                <TouchableOpacity onPress={() => setRenameModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.modalInput}
+                value={newGroupName}
+                onChangeText={setNewGroupName}
+                placeholder="Nombre del grupo"
+                autoFocus
+              />
+              <View style={styles.modalButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.cancelModalButton]}
+                  onPress={() => setRenameModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.confirmModalButton]}
+                  onPress={handleRenameGroup}
+                >
+                  <Text style={styles.modalButtonText}>Guardar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-      
-      {/* Modal para ver imagen completa */}
-      <Modal
-        visible={fullImageViewVisible}
-        transparent={true}
-        animationType="fade"
-      >
-        <View style={styles.fullImageContainer}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setFullImageViewVisible(false)}
-          >
-            {/* @ts-ignore */}
-            <Ionicons name="close" size={30} color="white" />
-          </TouchableOpacity>
-          <Image
-            source={{ uri: currentFullImage }}
-            style={styles.fullImage}
-            resizeMode="contain"
-          />
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Modal de información del grupo */}
+        <Modal
+          visible={groupInfoModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setGroupInfoModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.groupInfoModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Información del Grupo</Text>
+                <TouchableOpacity onPress={() => setGroupInfoModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.groupInfoScrollView}>
+                <View style={styles.groupInfoSection}>
+                  <View style={styles.groupAvatarLarge}>
+                    <Ionicons name="people" size={40} color="white" />
+                  </View>
+                  <Text style={styles.groupInfoName}>{groupName}</Text>
+                  <Text style={styles.groupInfoMembers}>
+                    {groupInfo?.members?.length || 0} miembros
+                  </Text>
+                </View>
+
+                {groupInfo?.description && (
+                  <View style={styles.descriptionSection}>
+                    <Text style={styles.sectionTitle}>Descripción</Text>
+                    <Text style={styles.descriptionText}>
+                      {groupInfo.description}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.membersSection}>
+                  <Text style={styles.sectionTitle}>Miembros</Text>
+                  {groupInfo?.members?.map(member => (
+                    <View key={member.userId} style={styles.memberRow}>
+                      <View style={styles.memberAvatar}>
+                        <Text style={styles.memberAvatarText}>
+                          {member.username.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.memberInfo}>
+                        <Text style={styles.memberName}>{member.username}</Text>
+                        <Text style={styles.memberRole}>
+                          {member.role === 'admin' ? 'Administrador' : 'Miembro'}
+                        </Text>
+                      </View>
+                      {member.userId === user?.id && (
+                        <Text style={styles.youLabel}>Tú</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+
+              <View style={styles.groupInfoActions}>
+                {groupInfo?.members?.some(m => m.userId === user?.id && m.role === 'admin') ? (
+                  <TouchableOpacity 
+                    style={styles.groupInfoActionButton}
+                    onPress={() => {
+                      setGroupInfoModalVisible(false);
+                      // Retrasar para evitar conflictos de modales
+                      setTimeout(() => handleShowInviteModal(), 300);
+                    }}
+                  >
+                    <Ionicons name="person-add" size={20} color="#005F9E" />
+                    <Text style={styles.groupInfoActionText}>Invitar</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={[styles.groupInfoActionButton, styles.leaveButton]}
+                    onPress={() => {
+                      setGroupInfoModalVisible(false);
+                      // Retrasar para evitar conflictos de modales
+                      setTimeout(() => {
+                        Alert.alert(
+                          "Salir del Grupo",
+                          "¿Estás seguro de que deseas salir de este grupo?",
+                          [
+                            { text: "Cancelar", style: "cancel" },
+                            { 
+                              text: "Salir", 
+                              style: "destructive",
+                              onPress: async () => {
+                                try {
+                                  const success = await leaveGroup(groupId, user.id);
+                                  if (success) {
+                                    Alert.alert('Éxito', 'Has salido del grupo correctamente');
+                                    navigation.goBack();
+                                  } else {
+                                    Alert.alert('Error', 'No se pudo salir del grupo');
+                                  }
+                                } catch (error) {
+                                  console.error('Error al salir del grupo:', error);
+                                  Alert.alert('Error', 'No se pudo salir del grupo');
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }, 300);
+                    }}
+                  >
+                    <Ionicons name="exit-outline" size={20} color="#FF3B30" />
+                    <Text style={styles.leaveGroupText}>Salir del grupo</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal para gestionar miembros */}
+        <Modal
+          visible={membersModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setMembersModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Miembros del Grupo</Text>
+                <TouchableOpacity onPress={() => setMembersModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              
+              {selectedGroup && (
+                <>
+                  {/* Mostrar mensaje informativo para usuarios que no son administradores */}
+                  {!selectedGroup.members.some(m => m.userId === user?.id && m.role === 'admin') && (
+                    <View style={styles.infoMessage}>
+                      <Ionicons name="information-circle" size={20} color="#005F9E" />
+                      <Text style={styles.infoMessageText}>
+                        Solo puedes ver los miembros. Para gestionar el grupo debes ser administrador.
+                      </Text>
+                    </View>
+                  )}
+                  
+                  <FlatList
+                    data={selectedGroup.members}
+                    keyExtractor={(item) => item.userId.toString()}
+                    renderItem={({ item }) => (
+                      <View style={styles.memberItem}>
+                        <View style={styles.memberInfo}>
+                          <View style={styles.memberAvatar}>
+                            <Text style={styles.memberAvatarText}>
+                              {item.username.substring(0, 2).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View>
+                            <Text style={styles.memberName}>{item.username}</Text>
+                            <Text style={styles.memberRole}>
+                              {item.role === 'admin' ? 'Administrador' : 'Miembro'}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        {/* Solo mostrar opciones de gestión si el usuario actual es admin */}
+                        {selectedGroup.members.some(m => m.userId === user?.id && m.role === 'admin') && 
+                         item.userId !== user?.id && (
+                          <TouchableOpacity 
+                            style={styles.memberAction}
+                            onPress={() => {
+                              Alert.alert(
+                                "Opciones",
+                                `¿Qué deseas hacer con ${item.username}?`,
+                                [
+                                  { text: "Cancelar", style: "cancel" },
+                                  { 
+                                    text: item.role === 'admin' ? "Quitar administración" : "Hacer administrador", 
+                                    onPress: () => {
+                                      handleChangeRole(item.userId, item.role);
+                                    }
+                                  },
+                                  { 
+                                    text: "Eliminar del grupo", 
+                                    style: "destructive",
+                                    onPress: () => {
+                                      handleRemoveMember(item.userId);
+                                    }
+                                  }
+                                ]
+                              );
+                            }}
+                          >
+                            <Ionicons name="ellipsis-vertical" size={24} color="#666" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  />
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal para invitar amigos */}
+        <Modal
+          visible={inviteModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setInviteModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Invitar Amigos</Text>
+                <TouchableOpacity onPress={() => setInviteModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              
+              {inviteLoading ? (
+                <ActivityIndicator size="large" color="#005F9E" style={{ margin: 20 }} />
+              ) : availableFriends.length > 0 ? (
+                <FlatList
+                  data={availableFriends}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <View style={styles.friendItem}>
+                      <View style={styles.friendInfo}>
+                        <View style={styles.friendAvatar}>
+                          <Text style={styles.friendAvatarText}>
+                            {item.username.substring(0, 2).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={styles.friendName}>{item.username}</Text>
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.inviteButton}
+                        onPress={() => handleInviteUser(item.id)}
+                      >
+                        <Text style={styles.inviteButtonText}>Invitar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people" size={50} color="#cccccc" />
+                  <Text style={styles.emptyText}>No tienes más amigos para invitar a este grupo</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -759,6 +1531,63 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  header: {
+    backgroundColor: '#005F9E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    height: 100, // Altura fija
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  headerLeftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    padding: 5,
+    marginRight: 5,
+  },
+  headerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  headerAvatarText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  headerName: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
+  },
+  headerButton: {
+    padding: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -773,24 +1602,29 @@ const styles = StyleSheet.create({
     maxWidth: '80%',
     padding: 10,
     marginVertical: 5,
-    borderRadius: 10,
+    borderRadius: 20,
   },
   ownMessageContainer: {
     alignSelf: 'flex-end',
     backgroundColor: '#005F9E',
+    borderTopRightRadius: 4,
   },
   otherMessageContainer: {
     alignSelf: 'flex-start',
-    backgroundColor: '#000000',
+    backgroundColor: '#E5E5EA',
+    borderTopLeftRadius: 4,
   },
   messageText: {
     fontSize: 16,
     color: 'white',
   },
+  otherMessageText: {
+    color: '#333',
+  },
   messageImage: {
     width: 200,
     height: 200,
-    borderRadius: 5,
+    borderRadius: 10,
     marginBottom: 5,
   },
   messageTime: {
@@ -799,15 +1633,20 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'right',
   },
+  otherMessageTime: {
+    color: 'rgba(0, 0, 0, 0.5)',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   attachButton: {
-    padding: 8,
+    padding: 6,
     marginRight: 5,
   },
   input: {
@@ -816,9 +1655,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     borderRadius: 20,
     maxHeight: 100,
+    marginHorizontal: 5,
   },
   sendButton: {
-    marginLeft: 10,
+    marginLeft: 5,
     backgroundColor: '#005F9E',
     width: 40,
     height: 40,
@@ -891,36 +1731,182 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 10,
   },
-  // Estilos para el encabezado
-  headerTitle: {
-    flexDirection: 'row',
+  // Estilos para modales
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  headerUserInfo: {
-    marginLeft: 10,
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
   },
-  headerGroupInfo: {
-    marginLeft: 10,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  headerName: {
-    color: 'white',
+  modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
-  headerSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 12,
+    marginBottom: 20,
+    fontSize: 16,
   },
-  backButton: {
-    padding: 5,
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  // Estilos para mensajes grupales
-  messageSender: {
-    fontSize: 13,
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelModalButton: {
+    backgroundColor: '#ccc',
+  },
+  confirmModalButton: {
+    backgroundColor: '#005F9E',
+  },
+  modalButtonText: {
+    color: 'white',
     fontWeight: 'bold',
-    color: '#0084FF',
-    marginBottom: 2,
   },
+  // Estilos para modal de información del grupo
+  groupInfoModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '90%',
+    overflow: 'hidden',
+  },
+  groupInfoScrollView: {
+    maxHeight: 500,
+  },
+  groupInfoSection: {
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  groupAvatarLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#005F9E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  groupInfoName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  groupInfoMembers: {
+    fontSize: 16,
+    color: '#666',
+  },
+  descriptionSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  descriptionText: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 22,
+  },
+  membersSection: {
+    padding: 20,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  memberAvatar: {
+    width: 45,
+    height: 45,
+    borderRadius: 25,
+    backgroundColor: '#005F9E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  memberAvatarText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  memberRole: {
+    fontSize: 14,
+    color: '#666',
+  },
+  youLabel: {
+    fontSize: 14,
+    color: '#005F9E',
+    fontWeight: 'bold',
+    marginLeft: 5,
+  },
+  groupInfoActions: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    padding: 15,
+  },
+  groupInfoActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#E5F1FF',
+  },
+  leaveButton: {
+    backgroundColor: '#FFE5E5',
+  },
+  groupInfoActionText: {
+    color: '#005F9E',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  leaveGroupText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  // ... resto de los estilos existentes ...
 });
 
-export default ChatScreen; 
+export default ChatScreen;

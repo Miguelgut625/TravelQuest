@@ -37,6 +37,15 @@ const isBase64Image = (uri: string): boolean => {
 };
 
 /**
+ * Sube una imagen a Cloudinary (versión simplificada para ChatScreen)
+ * @param imageUri URI de la imagen local
+ * @returns URL de la imagen subida a Cloudinary
+ */
+export const uploadImage = async (imageUri: string): Promise<string> => {
+  return await uploadImageToCloudinary(imageUri, `chat_${Date.now()}`);
+};
+
+/**
  * Sube una imagen a Cloudinary
  * @param uri URI de la imagen local
  * @param missionId ID de la misión asociada a la imagen

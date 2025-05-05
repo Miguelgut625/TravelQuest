@@ -442,6 +442,42 @@ export const makeGroupAdmin = async (groupId: string, userId: string): Promise<b
   }
 };
 
+// Función para quitar permisos de administrador a un miembro
+export const removeGroupAdmin = async (groupId: string, userId: string): Promise<boolean> => {
+  try {
+    // Verificar que no sea el único administrador
+    const groupData = await getGroupById(groupId);
+    
+    if (!groupData) {
+      console.error('Error al obtener datos del grupo');
+      return false;
+    }
+    
+    // Encontrar administradores del grupo
+    const admins = groupData.members.filter(m => m.role === 'admin');
+    
+    // No permitir quitar permisos si es el único administrador
+    if (admins.length === 1 && admins[0].userId === userId) {
+      console.error('Error: No se puede quitar el rol de administrador al único administrador del grupo');
+      return false;
+    }
+    
+    const { error } = await supabase
+      .from('group_members')
+      .update({
+        role: 'member'
+      })
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error al quitar permisos de administrador:', error);
+    return false;
+  }
+};
+
 /**
  * Elimina un grupo
  * @param groupId El ID del grupo a eliminar
@@ -505,5 +541,107 @@ export const deleteGroup = async (groupId: string, userId: string): Promise<bool
   } catch (error) {
     console.error('Error al eliminar grupo:', error);
     return false;
+  }
+}; 
+
+// Función para que un usuario salga de un grupo
+export const leaveGroup = async (groupId: string, userId: string): Promise<boolean> => {
+  try {
+    // Verificar si el usuario es el único administrador del grupo
+    const groupData = await getGroupById(groupId);
+    
+    if (!groupData) {
+      console.error('Error al obtener datos del grupo');
+      return false;
+    }
+    
+    // Encontrar administradores del grupo
+    const admins = groupData.members.filter(m => m.role === 'admin');
+    
+    // Si el usuario es el único admin, no permitir salir sin transferir la administración
+    if (admins.length === 1 && admins[0].userId === userId) {
+      console.error('Error: No puedes salir del grupo siendo el único administrador.');
+      return false;
+    }
+    
+    // Eliminar al usuario del grupo (reutilizamos la función existente)
+    const success = await removeUserFromGroup(groupId, userId);
+    
+    return success;
+  } catch (error) {
+    console.error('Error al salir del grupo:', error);
+    return false;
+  }
+};
+
+// Función para obtener miembros que no están en el grupo para invitación
+export const getUsersNotInGroup = async (groupId: string, userId: string): Promise<any[]> => {
+  try {
+    // Primero obtener todos los usuarios del grupo
+    const groupData = await getGroupById(groupId);
+    
+    if (!groupData) {
+      console.error('Error al obtener datos del grupo');
+      return [];
+    }
+    
+    // Extraer IDs de usuarios ya en el grupo o con invitaciones pendientes
+    const existingMemberIds = groupData.members.map(m => m.userId);
+    
+    // Obtener lista de amigos del usuario actual
+    // Usando la estructura correcta de la tabla friends con user1Id y user2Id
+    const { data: friends1, error: error1 } = await supabase
+      .from('friends')
+      .select('user2Id, users:user2Id(id, username)')
+      .eq('user1Id', userId);
+    
+    if (error1) {
+      console.error('Error al obtener amigos (user1Id):', error1);
+      return [];
+    }
+    
+    const { data: friends2, error: error2 } = await supabase
+      .from('friends')
+      .select('user1Id, users:user1Id(id, username)')
+      .eq('user2Id', userId);
+    
+    if (error2) {
+      console.error('Error al obtener amigos (user2Id):', error2);
+      return [];
+    }
+    
+    // Crear un map para eliminar duplicados basado en el ID
+    const friendsMap = new Map();
+    
+    // Agregar amigos del primer conjunto
+    friends1.forEach(f => {
+      if (f.user2Id && !friendsMap.has(f.user2Id)) {
+        friendsMap.set(f.user2Id, {
+          id: f.user2Id,
+          username: f.users?.username || 'Usuario'
+        });
+      }
+    });
+    
+    // Agregar amigos del segundo conjunto (solo si no existen ya)
+    friends2.forEach(f => {
+      if (f.user1Id && !friendsMap.has(f.user1Id)) {
+        friendsMap.set(f.user1Id, {
+          id: f.user1Id,
+          username: f.users?.username || 'Usuario'
+        });
+      }
+    });
+    
+    // Convertir el mapa a array
+    const allFriends = Array.from(friendsMap.values());
+    
+    // Filtrar amigos que no están en el grupo
+    const availableFriends = allFriends.filter(f => !existingMemberIds.includes(f.id));
+    
+    return availableFriends;
+  } catch (error) {
+    console.error('Error al obtener usuarios disponibles:', error);
+    return [];
   }
 }; 
