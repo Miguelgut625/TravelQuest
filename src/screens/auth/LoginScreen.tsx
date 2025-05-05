@@ -15,7 +15,7 @@ import { WebView } from 'react-native-webview';
 import axios from 'axios';
 
 // URL base de la API
-const API_URL = 'http://192.168.56.1:5000/api';
+const API_URL = 'http://192.168.1.5:5000/api';
 
 // Asegurar que la redirección de autenticación en web se maneje correctamente
 WebBrowser.maybeCompleteAuthSession();
@@ -68,51 +68,7 @@ const LoginScreen = () => {
     }
   }, [response]);
 
-  // Función para lanzar la petición de login
-  const signInWithGoogle = () => {
-    promptAsync();
-  };
-
-  // Función para manejar el token y autenticar con Supabase
-  const handleGoogleToken = async (idToken) => {
-    try {
-      setLoading(true);
-      console.log('ID Token de Google obtenido, autenticando con Supabase...');
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: idToken,
-      });
-      
-      if (error) {
-        console.error('Error al autenticar con Supabase:', error);
-        dispatch(setError('Error al autenticar con Google: ' + error.message));
-        return;
-      }
-      
-      if (data?.user) {
-        console.log('Autenticación exitosa con Supabase:', data.user.email);
-        
-        // Actualizar el estado con los datos del usuario
-        dispatch(setUser({
-          email: data.user.email || '',
-          id: data.user.id,
-          username: data.user.user_metadata?.name || data.user.email?.split('@')[0]
-        }));
-        
-        dispatch(setAuthState('authenticated'));
-        navigation.navigate('Main');
-      } else {
-        console.log('No se pudo obtener los datos del usuario');
-        dispatch(setError('No se pudo completar la autenticación'));
-      }
-    } catch (error) {
-      console.error('Error al autenticar con Google:', error);
-      dispatch(setError('Error al conectar con Google: ' + (error.message || 'Intente nuevamente')));
-    } finally {
-      setLoading(false);
-    }
-  };
-
+ 
   const handleLogin = async () => {
     if (!email || !password) {
       dispatch(setError('Por favor ingresa email y contraseña'));
@@ -125,6 +81,13 @@ const LoginScreen = () => {
       dispatch(setError(null));
 
       console.log('Iniciando sesión para:', email);
+      
+      // Mostrar los datos que se enviarán al servidor
+      console.log('Datos a enviar:', {
+        email: email.trim(),
+        password: password.trim()
+      });
+      console.log('URL completa:', `${API_URL}/users/login`);
 
       // Llamada a la API para iniciar sesión
       const response = await axios.post(`${API_URL}/users/login`, {
@@ -163,7 +126,9 @@ const LoginScreen = () => {
           dispatch(setError('Error al iniciar sesión: ' + (data.error || 'Intente nuevamente')));
         }
       } else {
-        dispatch(setError('Ocurrió un error inesperado'));
+        // Error de red o conexión
+        dispatch(setError('No se pudo conectar con el servidor. Verifica tu conexión a internet.'));
+        console.log('API URL utilizada:', `${API_URL}/users/login`);
       }
       
       dispatch(setAuthState('unauthenticated'));
@@ -331,13 +296,6 @@ const LoginScreen = () => {
           <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.googleButton}
-          onPress={signInWithGoogle}
-          disabled={!request || loading}
-        >
-          <Text style={styles.googleButtonText}>Iniciar sesión con Google</Text>
-        </TouchableOpacity>
 
         {loading && (
           <TouchableOpacity 

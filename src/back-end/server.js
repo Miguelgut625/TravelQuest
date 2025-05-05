@@ -11,6 +11,6 @@ app.use(express.json()); // Middleware para parsear JSON
 // Usa las rutas
 app.use('/api', appRoutes);
 
-app.listen(PORT, "192.168.56.1",() => {
-  console.log(`Servidor corriendo en http://192.168.56.1:${PORT}`);
+app.listen(PORT, "192.168.1.5",() => {
+  console.log(`Servidor corriendo en http://192.168.1.5:${PORT}`);
 });

@@ -5,7 +5,9 @@ const { getUsers,
        updateUser,
         deleteUser,
          obtenerPuntuacion, 
-     obtenerSolicitudesPendientes} = require('../controllers/authController.js');
+     obtenerSolicitudesPendientes,
+     login,
+     resendVerification} = require('../controllers/authController.js');
 
 const router = Router();
 
@@ -16,6 +18,7 @@ router.post('/', createUser); // Crear un nuevo usuario
 router.put('/:id', updateUser); // Actualizar un usuario
 router.delete('/:id', deleteUser); // Eliminar un usuario
 router.get('/:id/points', obtenerPuntuacion); // Obtener la puntuación de un usuario
-
+router.post('/login', login); // Iniciar sesión
+router.post('/resend-verification', resendVerification); // Reenviar correo de verificación
 
 module.exports = router;
