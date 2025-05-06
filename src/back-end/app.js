@@ -5,6 +5,7 @@ const journeyRoutes = require('./routes/journeyRoutes.js');
 const challengeRoutes = require('./routes/challengesRoutes.js');
 const journeyMissionsRoutes = require('./routes/journeyMissionsRoutes.js');
 const friendRoutes = require('./routes/friendRoutes.js');
+const badgeRoutes = require('./routes/badgeRoutes.js');
 const router = Router();
 
 // Rutas
@@ -15,5 +16,6 @@ router.use('/journeys', journeyRoutes);
 router.use('/users', authRoutes);
 router.use('/journeysMissions', journeyMissionsRoutes);
 router.use('/friends', friendRoutes);
+router.use('/badges', badgeRoutes);
 
 module.exports = router;

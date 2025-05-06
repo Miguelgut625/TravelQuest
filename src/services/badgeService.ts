@@ -1,4 +1,7 @@
-import { supabase } from './supabase';
+import axios from 'axios';
+
+// URL base de la API
+const API_URL = 'http://192.168.1.5:5000/api';
 
 // Tipos de datos para insignias
 export interface Badge {
@@ -24,13 +27,8 @@ export interface UserBadge {
 // Obtener todas las insignias disponibles
 export const getAllBadges = async (): Promise<Badge[]> => {
   try {
-    const { data, error } = await supabase
-      .from('badges')
-      .select('*')
-      .order('category', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
+    const response = await axios.get(`${API_URL}/badges`);
+    return response.data || [];
   } catch (error) {
     console.error('Error al obtener insignias:', error);
     return [];
@@ -40,17 +38,13 @@ export const getAllBadges = async (): Promise<Badge[]> => {
 // Obtener las insignias de un usuario
 export const getUserBadges = async (userId: string): Promise<UserBadge[]> => {
   try {
-    const { data, error } = await supabase
-      .from('user_badges')
-      .select(`
-        *,
-        badges (*)
-      `)
-      .eq('userId', userId)
-      .order('unlocked_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
+    if (!userId) {
+      console.error('getUserBadges: No se proporcionó userId');
+      return [];
+    }
+    
+    const response = await axios.get(`${API_URL}/badges/user/${userId}`);
+    return response.data || [];
   } catch (error) {
     console.error('Error al obtener insignias del usuario:', error);
     return [];
@@ -60,77 +54,25 @@ export const getUserBadges = async (userId: string): Promise<UserBadge[]> => {
 // Desbloquear una insignia para un usuario
 export const unlockBadge = async (userId: string, badgeId: string): Promise<boolean> => {
   try {
-    console.log(`Iniciando desbloqueo de insignia: ID=${badgeId} para usuario: ID=${userId}`);
+    console.log(`Intentando desbloquear insignia: ID=${badgeId} para usuario: ID=${userId}`);
     
     if (!userId || !badgeId) {
       console.error('Parámetros insuficientes para unlockBadge', { userId, badgeId });
       return false;
     }
     
-    // Verificar si existe la insignia en la tabla badges
-    console.log(`Verificando si la insignia ${badgeId} existe...`);
-    const { data: badgeExists, error: badgeError } = await supabase
-      .from('badges')
-      .select('id, name')
-      .eq('id', badgeId)
-      .single();
-      
-    if (badgeError) {
-      console.error(`Error al verificar si la insignia ${badgeId} existe:`, badgeError);
-      return false;
-    }
+    const response = await axios.post(`${API_URL}/badges/unlock`, {
+      userId,
+      badgeId
+    });
     
-    if (!badgeExists) {
-      console.error(`La insignia con ID ${badgeId} no existe en la tabla badges`);
-      return false;
-    }
-    
-    console.log(`Insignia encontrada: ${badgeExists.name} (${badgeId})`);
-    
-    // Verificar si el usuario ya tiene esta insignia
-    console.log(`Verificando si el usuario ${userId} ya tiene la insignia ${badgeId}...`);
-    const { data: existingBadge, error: checkError } = await supabase
-      .from('user_badges')
-      .select('id')
-      .eq('userId', userId)
-      .eq('badgeId', badgeId)
-      .single();
-
-    if (checkError) {
-      if (checkError.code === 'PGRST116') {
-        // PGRST116 es el código de "no se encontró registro", que es lo que esperamos
-        console.log(`Confirmado: El usuario ${userId} no tiene la insignia ${badgeId} todavía`);
-      } else {
-        console.error(`Error al verificar si el usuario ya tiene la insignia:`, checkError);
-        throw checkError;
-      }
-    } else {
-      // Si ya tiene la insignia, no hacer nada
-      console.log(`El usuario ${userId} ya tiene la insignia ${badgeId} - No se realizarán cambios`);
+    if (response.data.success) {
+      console.log(`Respuesta de API: ${response.data.message}`);
       return true;
+    } else {
+      console.error(`Error al desbloquear insignia:`, response.data.error);
+      return false;
     }
-
-    console.log(`Insertando nueva insignia para usuario ${userId}: ${badgeId}`);
-    
-    // Añadir la insignia al usuario
-    const { data: insertData, error: insertError } = await supabase
-      .from('user_badges')
-      .insert([
-        {
-          userId,
-          badgeId,
-          unlocked_at: new Date().toISOString()
-        }
-      ])
-      .select();
-
-    if (insertError) {
-      console.error(`Error al insertar insignia en user_badges:`, insertError);
-      throw insertError;
-    }
-    
-    console.log(`¡Insignia otorgada exitosamente! Datos insertados:`, insertData);
-    return true;
   } catch (error) {
     console.error('Error al desbloquear insignia:', error);
     return false;
@@ -140,39 +82,8 @@ export const unlockBadge = async (userId: string, badgeId: string): Promise<bool
 // Verificar y otorgar insignias basadas en misiones completadas
 export const checkMissionBadges = async (userId: string): Promise<string[]> => {
   try {
-    // Obtener el número de misiones completadas por el usuario
-    const { data: missionStats, error: statsError } = await supabase
-      .from('journeys_missions')
-      .select('id, completed')
-      .eq('journeys.userId', userId)
-      .eq('completed', true)
-      .count();
-
-    if (statsError) throw statsError;
-
-    const completedMissions = missionStats?.count || 0;
-
-    // Obtener las insignias de misiones
-    const { data: missionBadges, error: badgesError } = await supabase
-      .from('badges')
-      .select('*')
-      .eq('category', 'missions');
-
-    if (badgesError) throw badgesError;
-    
-    const unlockedBadges: string[] = [];
-
-    // Comprobar cada insignia
-    await Promise.all(
-      (missionBadges || []).map(async (badge: Badge) => {
-        if (completedMissions >= badge.threshold) {
-          const unlocked = await unlockBadge(userId, badge.id);
-          if (unlocked) unlockedBadges.push(badge.name);
-        }
-      })
-    );
-
-    return unlockedBadges;
+    // Ahora usaremos la API para verificar todas las insignias
+    return await checkAllBadges(userId);
   } catch (error) {
     console.error('Error al verificar insignias de misiones:', error);
     return [];
@@ -182,38 +93,8 @@ export const checkMissionBadges = async (userId: string): Promise<string[]> => {
 // Verificar y otorgar insignias basadas en nivel
 export const checkLevelBadges = async (userId: string): Promise<string[]> => {
   try {
-    // Obtener el nivel actual del usuario
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('level')
-      .eq('id', userId)
-      .single();
-
-    if (userError) throw userError;
-
-    const userLevel = userData?.level || 0;
-
-    // Obtener las insignias de nivel
-    const { data: levelBadges, error: badgesError } = await supabase
-      .from('badges')
-      .select('*')
-      .eq('category', 'level');
-
-    if (badgesError) throw badgesError;
-    
-    const unlockedBadges: string[] = [];
-
-    // Comprobar cada insignia
-    await Promise.all(
-      (levelBadges || []).map(async (badge: Badge) => {
-        if (userLevel >= badge.threshold) {
-          const unlocked = await unlockBadge(userId, badge.id);
-          if (unlocked) unlockedBadges.push(badge.name);
-        }
-      })
-    );
-
-    return unlockedBadges;
+    // Ahora está incluido en checkAllBadges
+    return [];
   } catch (error) {
     console.error('Error al verificar insignias de nivel:', error);
     return [];
@@ -223,39 +104,8 @@ export const checkLevelBadges = async (userId: string): Promise<string[]> => {
 // Verificar y otorgar insignias basadas en ciudades visitadas
 export const checkCityBadges = async (userId: string): Promise<string[]> => {
   try {
-    // Obtener las ciudades visitadas por el usuario
-    const { data: journeys, error: journeysError } = await supabase
-      .from('journeys')
-      .select('cityId')
-      .eq('userId', userId);
-
-    if (journeysError) throw journeysError;
-
-    // Contar ciudades únicas
-    const uniqueCities = new Set(journeys?.map((journey: any) => journey.cityId));
-    const citiesCount = uniqueCities.size;
-
-    // Obtener las insignias de ciudades
-    const { data: cityBadges, error: badgesError } = await supabase
-      .from('badges')
-      .select('*')
-      .eq('category', 'cities');
-
-    if (badgesError) throw badgesError;
-    
-    const unlockedBadges: string[] = [];
-
-    // Comprobar cada insignia
-    await Promise.all(
-      (cityBadges || []).map(async (badge: Badge) => {
-        if (citiesCount >= badge.threshold) {
-          const unlocked = await unlockBadge(userId, badge.id);
-          if (unlocked) unlockedBadges.push(badge.name);
-        }
-      })
-    );
-
-    return unlockedBadges;
+    // Ahora está incluido en checkAllBadges
+    return [];
   } catch (error) {
     console.error('Error al verificar insignias de ciudades:', error);
     return [];
@@ -265,46 +115,8 @@ export const checkCityBadges = async (userId: string): Promise<string[]> => {
 // Verificar y otorgar insignias basadas en conexiones sociales
 export const checkSocialBadges = async (userId: string): Promise<string[]> => {
   try {
-    if (!userId) return [];
-    
-    // Obtener el número de amigos del usuario
-    const { data: connections, error: connectionsError, count } = await supabase
-      .from('user_connections') // Ajustar al nombre real de la tabla de conexiones
-      .select('id', { count: 'exact' })
-      .eq('userId', userId)
-      .eq('status', 'accepted'); // Solo contar conexiones aceptadas
-    
-    if (connectionsError) {
-      console.error('Error al contar conexiones sociales:', connectionsError);
-      return [];
-    }
-    
-    const friendsCount = count || 0;
-    
-    // Obtener las insignias sociales
-    const { data: socialBadges, error: badgesError } = await supabase
-      .from('badges')
-      .select('*')
-      .eq('category', 'social');
-    
-    if (badgesError) {
-      console.error('Error al obtener insignias sociales:', badgesError);
-      return [];
-    }
-    
-    const unlockedBadges: string[] = [];
-    
-    // Comprobar cada insignia
-    await Promise.all(
-      (socialBadges || []).map(async (badge: Badge) => {
-        if (friendsCount >= badge.threshold) {
-          const unlocked = await unlockBadge(userId, badge.id);
-          if (unlocked) unlockedBadges.push(badge.name);
-        }
-      })
-    );
-    
-    return unlockedBadges;
+    // Ahora está incluido en checkAllBadges
+    return [];
   } catch (error) {
     console.error('Error al verificar insignias sociales:', error);
     return [];
@@ -314,19 +126,19 @@ export const checkSocialBadges = async (userId: string): Promise<string[]> => {
 // Verificar todas las posibles insignias para un usuario
 export const checkAllBadges = async (userId: string): Promise<string[]> => {
   try {
-    const missionBadges = await checkMissionBadges(userId);
-    const levelBadges = await checkLevelBadges(userId);
-    const cityBadges = await checkCityBadges(userId);
-    const socialBadges = await checkSocialBadges(userId);
-    const specialBadges = await checkSpecialBadges(userId);
+    if (!userId) {
+      console.error('checkAllBadges: No se proporcionó userId');
+      return [];
+    }
     
-    return [
-      ...missionBadges,
-      ...levelBadges,
-      ...cityBadges,
-      ...socialBadges,
-      ...specialBadges
-    ];
+    const response = await axios.get(`${API_URL}/badges/check/${userId}`);
+    
+    if (response.data.success) {
+      return response.data.unlockedBadges || [];
+    } else {
+      console.error('Error en respuesta de checkAllBadges:', response.data.error);
+      return [];
+    }
   } catch (error) {
     console.error('Error al verificar todas las insignias:', error);
     return [];
@@ -349,36 +161,6 @@ export const awardFirstMissionBadge = async (userId: string): Promise<boolean> =
   }
 };
 
-// Mapeo de eventos a IDs de insignias específicas
-const specificBadgesMap: Record<string, string[]> = {
-  'completeMission': [
-    'dc8272f5-d661-402f-a9a3-46bf86289bd3', // Insignia por completar misión
-    // Aquí se pueden añadir más IDs de insignias relacionadas
-  ],
-  'visitNewCity': [
-    'e733a802-553b-4a69-ae09-9b772dd7f8f1', // Insignia por visitar una nueva ciudad
-  ],
-  'uploadPhotos': [
-    // ID para la insignia de Fotógrafo Viajero - implementar cuando se tenga el ID
-  ],
-  'completeMissionsInDay': [
-    // ID para la insignia de Maratonista de Viajes - implementar cuando se tenga el ID
-  ],
-  'completeNightMissions': [
-    // ID para la insignia de Explorador Nocturno - implementar cuando se tenga el ID
-  ],
-  'completeVariedMissions': [
-    // ID para la insignia de Viajero Todo Terreno - implementar cuando se tenga el ID
-  ],
-  'visitCity': [
-    // IDs de insignias por visitar ciudades específicas
-  ],
-  'achieveLevel': [
-    // IDs de insignias por alcanzar niveles específicos
-  ],
-  // Agregar más eventos según sea necesario
-};
-
 // Función genérica para otorgar insignias específicas según el evento
 export const awardSpecificBadges = async (userId: string, eventType: string): Promise<string[]> => {
   try {
@@ -389,7 +171,7 @@ export const awardSpecificBadges = async (userId: string, eventType: string): Pr
     
     console.log(`awardSpecificBadges: Procesando evento "${eventType}" para usuario ${userId}`);
     
-    // Obtener los IDs de insignias correspondientes al evento
+    // Para mantener la compatibilidad, usamos el mapeo local y llamamos a la API para cada insignia
     const badgeIds = specificBadgesMap[eventType] || [];
     
     if (badgeIds.length === 0) {
@@ -401,50 +183,25 @@ export const awardSpecificBadges = async (userId: string, eventType: string): Pr
     
     const awardedBadges: string[] = [];
     
-    // Desbloquear cada insignia
-    await Promise.all(
-      badgeIds.map(async (badgeId) => {
-        console.log(`Intentando desbloquear insignia ${badgeId} para usuario ${userId}`);
+    // Desbloquear cada insignia usando la API
+    for (const badgeId of badgeIds) {
+      try {
+        const success = await unlockBadge(userId, badgeId);
         
-        // Verificar que la insignia existe
-        const { data: badgeExists, error: badgeCheckError } = await supabase
-          .from('badges')
-          .select('id, name')
-          .eq('id', badgeId)
-          .single();
+        if (success) {
+          // Obtener los detalles de la insignia
+          const allBadges = await getAllBadges();
+          const badge = allBadges.find(b => b.id === badgeId);
           
-        if (badgeCheckError) {
-          console.error(`Error al verificar si existe la insignia ${badgeId}:`, badgeCheckError);
-          return;
-        }
-        
-        if (!badgeExists) {
-          console.error(`La insignia con ID ${badgeId} no existe en la base de datos`);
-          return;
-        }
-        
-        console.log(`Confirmado: La insignia ${badgeId} (${badgeExists.name}) existe`);
-        
-        const result = await unlockBadge(userId, badgeId);
-        if (result) {
-          // Obtener el nombre de la insignia para retornarlo
-          const { data } = await supabase
-            .from('badges')
-            .select('name')
-            .eq('id', badgeId)
-            .single();
-            
-          if (data?.name) {
-            console.log(`Insignia "${data.name}" otorgada con éxito`);
-            awardedBadges.push(data.name);
+          if (badge) {
+            awardedBadges.push(badge.name);
           }
-        } else {
-          console.log(`No se pudo desbloquear la insignia ${badgeId} (posiblemente ya la tenía)`);
         }
-      })
-    );
+      } catch (error) {
+        console.error(`Error al desbloquear insignia ${badgeId}:`, error);
+      }
+    }
     
-    console.log(`Total de insignias otorgadas: ${awardedBadges.length}`);
     return awardedBadges;
   } catch (error) {
     console.error(`Error al otorgar insignias específicas para ${eventType}:`, error);
@@ -452,377 +209,75 @@ export const awardSpecificBadges = async (userId: string, eventType: string): Pr
   }
 };
 
-// Función para verificar si el usuario ya tiene la insignia de nueva ciudad
-// y otorgarle 500 puntos extra si es así
+// Mapeo de eventos a IDs de insignias específicas
+const specificBadgesMap: Record<string, string[]> = {
+  'completeMission': [
+    'dc8272f5-d661-402f-a9a3-46bf86289bd3', // Insignia por completar misión
+  ],
+  'visitNewCity': [
+    'e733a802-553b-4a69-ae09-9b772dd7f8f1', // Insignia por visitar una nueva ciudad
+  ],
+  'uploadPhotos': [],
+  'completeMissionsInDay': [],
+  'completeNightMissions': [],
+  'completeVariedMissions': [],
+  'visitCity': [],
+  'achieveLevel': [],
+};
+
+// Las siguientes funciones mantienen solo una versión simplificada para compatibilidad
 export const checkNewCityBadgeAndAwardPoints = async (userId: string): Promise<{
   alreadyHasBadge: boolean;
   pointsAwarded: number;
   badgeName?: string;
 }> => {
   try {
-    if (!userId) {
-      console.log('checkNewCityBadgeAndAwardPoints: userId no proporcionado');
-      return { alreadyHasBadge: false, pointsAwarded: 0 };
-    }
-    
-    console.log(`checkNewCityBadgeAndAwardPoints: Verificando insignia para usuario ${userId}`);
-    
     // ID de la insignia de nueva ciudad
-    const newCityBadgeId = 'e733a802-553b-4a69-ae09-9b772dd7f8f1';
-    console.log(`ID de insignia a verificar: ${newCityBadgeId}`);
+    const badgeId = 'e733a802-553b-4a69-ae09-9b772dd7f8f1';
+    const badgeName = 'Explorador de Nuevas Ciudades';
     
-    // Obtener el nombre de la insignia
-    const { data: badgeData, error: badgeError } = await supabase
-      .from('badges')
-      .select('name')
-      .eq('id', newCityBadgeId)
-      .single();
-      
-    if (badgeError) {
-      console.error('Error al obtener datos de la insignia:', badgeError);
+    // Obtener insignias del usuario
+    const userBadges = await getUserBadges(userId);
+    
+    // Verificar si ya tiene la insignia
+    const hasNewCityBadge = userBadges.some(ub => ub.badgeId === badgeId);
+    
+    if (hasNewCityBadge) {
+      // Si ya tiene la insignia, otorgar puntos extra (esto requeriría otra API)
+      return { alreadyHasBadge: true, pointsAwarded: 0, badgeName };
     }
     
-    const badgeName = badgeData?.name || 'Explorador de Nuevas Ciudades';
-    console.log(`Nombre de la insignia: ${badgeName}`);
+    // Si no tiene la insignia, intentar desbloquearla
+    const success = await unlockBadge(userId, badgeId);
     
-    // Verificar si el usuario ya tiene la insignia
-    console.log(`Verificando si el usuario ${userId} ya tiene la insignia ${newCityBadgeId}`);
-    const { data, error } = await supabase
-      .from('user_badges')
-      .select('id')
-      .eq('userId', userId)
-      .eq('badgeId', newCityBadgeId)
-      .single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        console.log('El usuario no tiene la insignia (error PGRST116)');
-      } else {
-        console.error('Error al verificar insignia:', error);
-        return { alreadyHasBadge: false, pointsAwarded: 0 };
-      }
-    }
-    
-    // Si el usuario ya tiene la insignia, otorgar puntos extra
-    if (data) {
-      console.log(`Usuario ${userId} ya tiene la insignia ${newCityBadgeId}`);
-      
-      // Actualizar los puntos del usuario
-      console.log('Obteniendo puntos actuales del usuario');
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('points')
-        .eq('id', userId)
-        .single();
-      
-      if (userError) {
-        console.error('Error al obtener puntos del usuario:', userError);
-        return { alreadyHasBadge: true, pointsAwarded: 0, badgeName };
-      }
-      
-      const currentPoints = userData?.points || 0;
-      const newPoints = currentPoints + 500;
-      console.log(`Puntos actuales: ${currentPoints}, Nuevos puntos: ${newPoints}`);
-      
-      console.log(`Actualizando puntos del usuario ${userId} a ${newPoints}`);
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ points: newPoints })
-        .eq('id', userId);
-      
-      if (updateError) {
-        console.error('Error al actualizar puntos:', updateError);
-        return { alreadyHasBadge: true, pointsAwarded: 0, badgeName };
-      }
-      
-      console.log(`Se otorgaron 500 puntos extra al usuario ${userId}`);
-      
-      // Crear notificación para los puntos extra
-      /* 
-      try {
-        await supabase
-          .from('notifications')
-          .insert([{
-            userId: userId,
-            title: '¡500 puntos extra!',
-            message: `Has recibido 500 puntos extra por descubrir una nueva ciudad teniendo ya el logro de "${badgeName}".`,
-            type: 'points',
-            read: false,
-            created_at: new Date().toISOString()
-          }]);
-      } catch (notifyError) {
-        console.error('Error al crear notificación de puntos:', notifyError);
-      }
-      */
-      
-      return { alreadyHasBadge: true, pointsAwarded: 500, badgeName };
-    }
-    
-    // Si el usuario no tiene la insignia, otorgarla directamente
-    try {
-      console.log(`Otorgando insignia de Descubridor (ID: ${newCityBadgeId}) al usuario ${userId}`);
-      const unlocked = await unlockBadge(userId, newCityBadgeId);
-      
-      if (unlocked) {
-        console.log(`Insignia otorgada correctamente: ${badgeName}`);
-        
-        // Crear notificación para el usuario
-        /*
-        try {
-          await supabase
-            .from('notifications')
-            .insert([{
-              userId: userId,
-              title: '¡Nuevo logro desbloqueado!',
-              message: `Has desbloqueado el logro "${badgeName}" por descubrir una nueva ciudad.`,
-              type: 'achievement',
-              read: false,
-              created_at: new Date().toISOString()
-            }]);
-        } catch (notifyError) {
-          console.error('Error al crear notificación:', notifyError);
-        }
-        */
-        
-        return { alreadyHasBadge: false, pointsAwarded: 0, badgeName };
-      } else {
-        console.error('Error al desbloquear insignia de nueva ciudad');
-        return { alreadyHasBadge: false, pointsAwarded: 0 };
-      }
-    } catch (unlockError) {
-      console.error('Error en proceso de desbloqueo de insignia:', unlockError);
-      return { alreadyHasBadge: false, pointsAwarded: 0 };
-    }
+    return { 
+      alreadyHasBadge: false, 
+      pointsAwarded: 0,
+      badgeName: success ? badgeName : undefined
+    };
   } catch (error) {
     console.error('Error en checkNewCityBadgeAndAwardPoints:', error);
     return { alreadyHasBadge: false, pointsAwarded: 0 };
   }
 };
 
-// Función para verificar y otorgar la insignia de Fotógrafo Viajero
 export const checkPhotographerBadge = async (userId: string): Promise<boolean> => {
-  try {
-    if (!userId) return false;
-    
-    // Contar fotos subidas por el usuario
-    const { data, error, count } = await supabase
-      .from('user_photos') // Ajustar al nombre real de la tabla
-      .select('id', { count: 'exact' })
-      .eq('userId', userId);
-      
-    if (error) {
-      console.error('Error al contar fotos del usuario:', error);
-      return false;
-    }
-    
-    const photoCount = count || 0;
-    
-    // Si el usuario ha subido al menos 50 fotos
-    if (photoCount >= 50) {
-      // Buscar la insignia correspondiente
-      const { data: badgeData } = await supabase
-        .from('badges')
-        .select('id')
-        .eq('name', 'Fotógrafo Viajero')
-        .single();
-      
-      if (badgeData?.id) {
-        // Otorgar la insignia
-        return await unlockBadge(userId, badgeData.id);
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error al verificar insignia de fotógrafo:', error);
-    return false;
-  }
+  // Estas funciones específicas estarían mejor integradas en el backend
+  return false;
 };
 
-// Función para verificar y otorgar la insignia de Maratonista de Viajes
 export const checkMarathonBadge = async (userId: string): Promise<boolean> => {
-  try {
-    if (!userId) return false;
-    
-    // Obtener la fecha actual y establecer el inicio del día
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
-    
-    // Contar misiones completadas hoy
-    const { data, error, count } = await supabase
-      .from('journeys_missions')
-      .select('id', { count: 'exact' })
-      .eq('journeys.userId', userId)
-      .eq('completed', true)
-      .gte('completed_at', startOfDay)
-      .lte('completed_at', endOfDay);
-      
-    if (error) {
-      console.error('Error al contar misiones diarias:', error);
-      return false;
-    }
-    
-    const missionCount = count || 0;
-    
-    // Si el usuario ha completado al menos 10 misiones hoy
-    if (missionCount >= 10) {
-      // Buscar la insignia correspondiente
-      const { data: badgeData } = await supabase
-        .from('badges')
-        .select('id')
-        .eq('name', 'Maratonista de Viajes')
-        .single();
-      
-      if (badgeData?.id) {
-        // Otorgar la insignia
-        return await unlockBadge(userId, badgeData.id);
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error al verificar insignia de maratonista:', error);
-    return false;
-  }
+  return false;
 };
 
-// Función para verificar y otorgar la insignia de Explorador Nocturno
 export const checkNightExplorerBadge = async (userId: string): Promise<boolean> => {
-  try {
-    if (!userId) return false;
-    
-    // Contar misiones completadas durante la noche (entre 8 PM y 6 AM)
-    const { data, error, count } = await supabase
-      .from('journeys_missions')
-      .select('id, completed_at', { count: 'exact' })
-      .eq('journeys.userId', userId)
-      .eq('completed', true)
-      .not('completed_at', 'is', null);
-      
-    if (error) {
-      console.error('Error al contar misiones nocturnas:', error);
-      return false;
-    }
-    
-    // Filtrar para contar solo misiones nocturnas
-    let nightMissions = 0;
-    if (data) {
-      nightMissions = data.filter((mission: { completed_at: string | null }) => {
-        if (!mission.completed_at) return false;
-        
-        const completionTime = new Date(mission.completed_at);
-        const hour = completionTime.getHours();
-        
-        // Entre 8 PM (20) y 6 AM (6)
-        return hour >= 20 || hour < 6;
-      }).length;
-    }
-    
-    // Si el usuario ha completado al menos 20 misiones nocturnas
-    if (nightMissions >= 20) {
-      // Buscar la insignia correspondiente
-      const { data: badgeData } = await supabase
-        .from('badges')
-        .select('id')
-        .eq('name', 'Explorador Nocturno')
-        .single();
-      
-      if (badgeData?.id) {
-        // Otorgar la insignia
-        return await unlockBadge(userId, badgeData.id);
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error al verificar insignia de explorador nocturno:', error);
-    return false;
-  }
+  return false;
 };
 
-// Función para verificar y otorgar la insignia de Viajero Todo Terreno
 export const checkAllTerrainBadge = async (userId: string): Promise<boolean> => {
-  try {
-    if (!userId) return false;
-    
-    // Obtener tipos de lugares donde el usuario ha completado misiones
-    const { data, error } = await supabase
-      .from('journeys_missions')
-      .select(`
-        id,
-        missions!inner(
-          type
-        )
-      `)
-      .eq('journeys.userId', userId)
-      .eq('completed', true);
-      
-    if (error) {
-      console.error('Error al obtener tipos de misiones:', error);
-      return false;
-    }
-    
-    // Extraer tipos únicos de lugares
-    const placeTypes = new Set<string>();
-    data?.forEach((item: { missions?: { type?: string } }) => {
-      if (item.missions?.type) {
-        placeTypes.add(item.missions.type);
-      }
-    });
-    
-    // Si el usuario ha completado misiones en al menos 5 tipos diferentes de lugares
-    if (placeTypes.size >= 5) {
-      // Buscar la insignia correspondiente
-      const { data: badgeData } = await supabase
-        .from('badges')
-        .select('id')
-        .eq('name', 'Viajero Todo Terreno')
-        .single();
-      
-      if (badgeData?.id) {
-        // Otorgar la insignia
-        return await unlockBadge(userId, badgeData.id);
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error al verificar insignia todo terreno:', error);
-    return false;
-  }
+  return false;
 };
 
-// Función para verificar todos los logros especiales
 export const checkSpecialBadges = async (userId: string): Promise<string[]> => {
-  try {
-    if (!userId) return [];
-    
-    const unlockedBadges: string[] = [];
-    
-    // Verificar cada insignia especial
-    const photographerResult = await checkPhotographerBadge(userId);
-    const marathonResult = await checkMarathonBadge(userId);
-    const nightExplorerResult = await checkNightExplorerBadge(userId);
-    const allTerrainResult = await checkAllTerrainBadge(userId);
-    
-    // Obtener nombres de las insignias desbloqueadas
-    if (photographerResult || marathonResult || nightExplorerResult || allTerrainResult) {
-      const badgeNames = ['Fotógrafo Viajero', 'Maratonista de Viajes', 'Explorador Nocturno', 'Viajero Todo Terreno'];
-      
-      const { data: badgesData } = await supabase
-        .from('badges')
-        .select('name')
-        .in('name', badgeNames);
-      
-      badgesData?.forEach((badge: { name: string }) => {
-        unlockedBadges.push(badge.name);
-      });
-    }
-    
-    return unlockedBadges;
-  } catch (error) {
-    console.error('Error al verificar insignias especiales:', error);
-    return [];
-  }
+  return [];
 }; 
