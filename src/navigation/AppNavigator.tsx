@@ -91,6 +91,26 @@ const MainFlow = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Friends"
+        component={FriendsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="BadgesScreen"
+        component={BadgesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Conversations"
+        component={ConversationsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="Chat"
         component={ChatScreen}
         options={{
@@ -99,13 +119,6 @@ const MainFlow = () => {
             backgroundColor: theme.colors.primary,
           },
           headerTintColor: 'white',
-        }}
-      />
-      <Stack.Screen
-        name="BadgesScreen"
-        component={BadgesScreen}
-        options={{
-          headerShown: false
         }}
       />
     </Stack.Navigator>
@@ -129,14 +142,10 @@ const TabNavigator = () => {
             iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Journal') {
             iconName = focused ? 'book' : 'book-outline';
-          } else if (route.name === 'Friends') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Leaderboard') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'Conversations') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          } else if (route.name === 'Leaderboard') {
+            iconName = focused ? 'trophy' : 'trophy-outline';
           }
 
           // @ts-ignore
@@ -147,24 +156,9 @@ const TabNavigator = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen
-        name="Map"
-        component={MapScreen}
-        options={{
-          title: 'Map'
-        }}
-      />
+      <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Missions" component={MissionsScreen} />
-      <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} />
-      <Tab.Screen name="Friends" component={FriendsScreen} />
-      <Tab.Screen
-        name="Conversations"
-        component={ConversationsScreen}
-        options={{
-          title: 'Mensajes'
-        }}
-      />
-      <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
+      <Tab.Screen name="Journal" component={JournalScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

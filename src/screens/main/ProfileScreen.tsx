@@ -523,6 +523,14 @@ const ProfileScreen = () => {
             <Text style={styles.socialButtonText}>Leaderboard</Text>
           </TouchableOpacity>
           <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('Conversations')}
+          >
+            <Ionicons name="chatbubbles" size={24} color="white" />
+            <Text style={styles.socialButtonText}>Conversaciones</Text>
+          </TouchableOpacity>
+          <Text style={styles.socialDescription}>Chatea con tus amigos</Text>
         </View>
       </View>
 
