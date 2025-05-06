@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -16,6 +16,7 @@ import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
 import { addExperienceToUser } from '../../services/experienceService';
 import { awardSpecificBadges } from '../../services/badgeService';
+import { SafeAreaView as SafeAreaViewSafeAreaContext } from 'react-native-safe-area-context';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -664,12 +665,15 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   if (!selectedCity) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Tus Ciudades</Text>
           <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
         </View>
-        <ScrollView style={styles.citiesList}>
+        <ScrollView
+          style={styles.citiesList}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
           {Object.entries(cityMissions).map(([cityName, missions]) => (
             <CityCard
               key={cityName}
@@ -690,14 +694,14 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             />
           ))}
         </ScrollView>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const cityData = cityMissions[selectedCity];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -785,15 +789,15 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         onClose={() => setIsShareModalVisible(false)}
         onSelect={handleShareJourney}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
+    paddingHorizontal: 6,
   },
   header: {
     flexDirection: 'row',
@@ -806,7 +810,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     marginRight: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#232634',
     borderRadius: 8,
     minWidth: 100,
     justifyContent: 'center'
@@ -814,61 +818,63 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     marginLeft: 5,
-    color: '#333',
-    fontWeight: '500'
+    color: '#F5D90A',
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   cityTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5D90A',
     marginBottom: 20,
+    letterSpacing: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
   },
   loadingText: {
     marginTop: 10,
-    color: '#666',
+    color: '#FFF',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
   },
   errorText: {
-    color: 'red',
+    color: '#F5D90A',
     textAlign: 'center',
     padding: 20,
+    fontWeight: 'bold',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5D90A',
+    letterSpacing: 1,
+    marginTop: 30,
   },
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: '#2CB67D',
   },
   citiesList: {
     flex: 1,
   },
   cityCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
     elevation: 3,
   },
   cityCardContent: {
@@ -883,22 +889,23 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#FFF',
     marginBottom: 5,
+    letterSpacing: 1,
   },
   missionCount: {
     fontSize: 14,
-    color: '#666',
+    color: '#A1A1AA',
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#393552',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#005F9E',
+    backgroundColor: '#7F5AF0',
   },
   missionsList: {
     flex: 1,
@@ -906,8 +913,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#7F5AF0',
     marginBottom: 15,
+    letterSpacing: 1,
   },
   completedDivider: {
     flexDirection: 'row',
@@ -917,26 +925,24 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#005F9E',
+    backgroundColor: '#393552',
   },
   completedText: {
-    color: '#005F9E',
+    color: '#2CB67D',
     fontWeight: 'bold',
     marginHorizontal: 10,
     fontSize: 16,
+    letterSpacing: 1,
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 15,
     marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
     elevation: 5,
   },
   completedCard: {
@@ -952,6 +958,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     flex: 1,
+    color: '#F5D90A',
+    letterSpacing: 1,
   },
   badge: {
     paddingHorizontal: 10,
@@ -960,13 +968,15 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+    backgroundColor: '#7F5AF0',
+    overflow: 'hidden',
   },
   badgeContainer: {
     flexDirection: 'column',
     alignItems: 'flex-end',
   },
   cardDescription: {
-    color: '#666',
+    color: '#FFF',
     marginBottom: 10,
   },
   cardFooter: {
@@ -975,15 +985,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   difficulty: {
-    color: '#666',
+    color: '#A1A1AA',
     fontSize: 12,
   },
   points: {
-    color: '#005F9E',
+    color: '#2CB67D',
     fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: '#005F9E',
+    backgroundColor: '#7F5AF0',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
@@ -999,7 +1009,7 @@ const styles = StyleSheet.create({
   },
   timeRemaining: {
     fontSize: 12,
-    color: '#666',
+    color: '#A1A1AA',
     marginTop: 4,
   },
   expiredTime: {
@@ -1027,7 +1037,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '80%',
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 20,
     maxHeight: '80%'
@@ -1035,19 +1045,21 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10
+    marginBottom: 10,
+    color: '#F5D90A',
   },
   friendItem: {
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc'
+    borderBottomColor: '#393552'
   },
   friendName: {
-    fontSize: 16
+    fontSize: 16,
+    color: '#FFF',
   },
   friendPoints: {
     fontSize: 14,
-    color: '#666'
+    color: '#2CB67D',
   },
   cancelButton: {
     marginTop: 10,
@@ -1062,21 +1074,25 @@ const styles = StyleSheet.create({
   },
   levelUpContainer: {
     marginTop: 15,
-    backgroundColor: '#FFD700',
+    backgroundColor: '#F5D90A',
     padding: 10,
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
   },
   levelUpText: {
-    color: '#7B4513',
+    color: '#7F5AF0',
     fontWeight: 'bold',
     fontSize: 16,
   },
 });
 
 const MissionsScreen = (props: any) => {
-  return <MissionsScreenComponent {...props} />;
+  return (
+    <SafeAreaViewSafeAreaContext style={styles.container}>
+      <MissionsScreenComponent {...props} />
+    </SafeAreaViewSafeAreaContext>
+  );
 };
 
 export default MissionsScreen; 

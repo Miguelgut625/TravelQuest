@@ -9,6 +9,7 @@ import { setRefreshJournal } from '../../features/journalSlice';
 import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface JournalScreenProps {
   route: RouteProp<TabParamList, 'Journal'>;
@@ -165,6 +166,8 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   const windowWidth = Dimensions.get('window').width;
   const CARD_WIDTH = windowWidth - 60; // Reducimos el margen total (30px a cada lado)
 
+  const insets = useSafeAreaInsets();
+
   useEffect(() => {
     fetchJournalEntries();
 
@@ -284,7 +287,14 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   if (cities.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Diario de Viaje</Text>
+        <Text
+          style={[
+            styles.title,
+            { marginTop: insets.top + 24 }
+          ]}
+        >
+          Diario de Viaje
+        </Text>
         <EmptyState message="Aún no tienes entradas en tu diario. Completa misiones para añadir fotos a tu diario de viaje." />
       </View>
     );
@@ -312,7 +322,14 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Diario de Viaje</Text>
+      <Text
+        style={[
+          styles.title,
+          { marginTop: insets.top + 20 }
+        ]}
+      >
+        Diario de Viaje
+      </Text>
       <View style={styles.cityCarouselContainer}>
         <TouchableOpacity
           style={[styles.navButton, styles.navButtonLeft]}
@@ -377,14 +394,15 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginVertical: 15,
     marginHorizontal: 15,
-    color: '#005F9E',
+    color: '#F5D90A',
+    letterSpacing: 1,
   },
   cityCarouselContainer: {
     height: 220,
@@ -405,37 +423,37 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 15,
     overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#232634',
   },
   entriesList: {
     flex: 1,
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
+    marginHorizontal: 18,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
     elevation: 5,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 5,
+    color: '#F5D90A',
+    letterSpacing: 1,
   },
   cardDate: {
-    color: '#666',
+    color: '#A1A1AA',
     fontSize: 12,
     marginBottom: 10,
   },
   cardContent: {
-    color: '#333',
+    color: '#FFF',
     marginBottom: 10,
   },
   photoGrid: {
@@ -451,13 +469,13 @@ const styles = StyleSheet.create({
   morePhotos: {
     width: 80,
     height: 80,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#7F5AF0',
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   morePhotosText: {
-    color: 'white',
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -466,7 +484,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tag: {
-    color: '#005F9E',
+    color: '#2CB67D',
     marginRight: 10,
     fontSize: 12,
   },
@@ -474,24 +492,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#181A20',
   },
   loadingText: {
     marginTop: 10,
-    color: '#005F9E',
+    color: '#F5D90A',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#181A20',
   },
   errorText: {
-    color: '#D32F2F',
+    color: '#F5D90A',
     marginBottom: 20,
     textAlign: 'center',
+    fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: '#005F9E',
+    backgroundColor: '#7F5AF0',
     padding: 10,
     borderRadius: 5,
   },
@@ -505,7 +526,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: '#666',
+    color: '#A1A1AA',
     marginTop: 10,
     textAlign: 'center',
     fontSize: 16,
@@ -546,14 +567,14 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFF',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
   },
   viewMissionsText: {
-    color: '#fff',
+    color: '#F5D90A',
     marginTop: 8,
     fontSize: 16,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
@@ -565,7 +586,7 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateY: -25 }],
     zIndex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#232634',
     borderRadius: 25,
     padding: 10,
     elevation: 5,

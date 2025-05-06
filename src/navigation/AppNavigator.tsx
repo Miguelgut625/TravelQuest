@@ -151,8 +151,19 @@ const TabNavigator = () => {
           // @ts-ignore
           return <Ionicons name={iconName} size={size || 24} color={color} />;
         },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#F5D90A',
+        tabBarInactiveTintColor: '#7F5AF0',
+        tabBarStyle: {
+          backgroundColor: '#232634',
+          borderTopColor: '#393552',
+          height: 60,
+        },
+        tabBarLabelStyle: {
+          fontWeight: 'bold',
+          fontSize: 13,
+          fontFamily: 'System',
+          letterSpacing: 1,
+        },
         headerShown: false,
       })}
     >

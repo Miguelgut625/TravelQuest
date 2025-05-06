@@ -1,9 +1,10 @@
 // src/screens/main/LeaderboardScreen.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { supabase } from '../../services/supabase'; 
 import { useNavigation } from '@react-navigation/native'; // Importa el hook de navegación
 import { Ionicons } from '@expo/vector-icons'; // Importa los íconos de Ionicons
+import { SafeAreaView as SafeAreaViewRN } from 'react-native-safe-area-context';
 
 interface LeaderboardItem {
   id: string; // Asegúrate de que este campo exista en tu tabla
@@ -53,24 +54,24 @@ const LeaderboardScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size={50} color="#005F9E" />
-      </View>
+      <SafeAreaViewRN style={styles.container}>
+        <ActivityIndicator size={50} color="#F5D90A" />
+      </SafeAreaViewRN>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <SafeAreaViewRN style={styles.container}>
         <Text style={styles.errorText}>Error: {error}</Text>
-      </View>
+      </SafeAreaViewRN>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaViewRN style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color="#005F9E" />
+        <Ionicons name="arrow-back" size={24} color="#F5D90A" />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Tabla de clasificación</Text>
@@ -78,16 +79,18 @@ const LeaderboardScreen = () => {
         data={leaderboardData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
+        style={{ flex: 1 }}
       />
-    </View>
+    </SafeAreaViewRN>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#f8f9fa', // Color de fondo
+    backgroundColor: '#181A20',
+    paddingHorizontal: 16,
+    paddingTop: 32,
   },
   backButton: {
     flexDirection: 'row',
@@ -97,57 +100,57 @@ const styles = StyleSheet.create({
   backButtonText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#005F9E',
+    color: '#F5D90A', // Amarillo misterioso
+    fontWeight: 'bold',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
-    color: '#005F9E', // Color del texto del título
+    color: '#F5D90A', // Amarillo misterioso
+    letterSpacing: 1,
   },
   itemContainer: {
     padding: 12,
     marginVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#ffffff', // Color de fondo de los elementos
+    borderRadius: 10,
+    backgroundColor: '#232634', // Fondo misterioso de las tarjetas
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2, // Para Android
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 2,
   },
   itemText: {
     fontSize: 18,
-    color: '#495057', // Color del texto de los elementos
+    color: '#E5E7EB', // Gris claro para mejor contraste, no blanco puro
   },
   firstPlaceText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFD700', // Color dorado para el primer lugar
+    color: '#F5D90A', // Amarillo misterioso para el primer lugar
   },
   secondPlaceText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#C0C0C0', // Color plateado para el segundo lugar
+    color: '#7F5AF0', // Violeta misterioso para el segundo lugar
   },
   thirdPlaceText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#CD7F32', // Color bronce para el tercer lugar
+    color: '#2CB67D', // Verde neón para el tercer lugar
   },
   titleText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#005F9E', // Color para los títulos de los demás lugares
+    color: '#A1A1AA', // Gris claro para los demás lugares
   },
   errorText: {
-    color: '#D32F2F',
+    color: '#F5D90A', // Amarillo misterioso para errores
     textAlign: 'center',
     marginTop: 20,
+    fontWeight: 'bold',
   },
 });
 

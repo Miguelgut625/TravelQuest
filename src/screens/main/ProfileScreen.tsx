@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { calculateNextLevelXP } from '../../services/experienceService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -59,6 +60,7 @@ const ProfileScreen = () => {
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(100);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchUserStats();
@@ -444,7 +446,7 @@ const ProfileScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { paddingTop: insets.top + 24 }]}>
       <View style={styles.headerBackground}>
         <View style={styles.header}>
           <View style={styles.avatar}>
@@ -594,15 +596,17 @@ const ProfileScreen = () => {
       </View>
 
 
-      <TouchableOpacity
-        style={[styles.logoutButton, loading && styles.disabledButton]}
-        onPress={handleLogout}
-        disabled={loading}
-      >
-        <Text style={styles.logoutButtonText}>
-          {loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
-        </Text>
-      </TouchableOpacity>
+      <View style={{ marginBottom: 48 }}>
+        <TouchableOpacity
+          style={[styles.logoutButton, loading && styles.disabledButton]}
+          onPress={handleLogout}
+          disabled={loading}
+        >
+          <Text style={styles.logoutButtonText}>
+            {loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal
         visible={isChangePasswordVisible}
@@ -686,11 +690,18 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
   },
   headerBackground: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#232634',
     padding: 20,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
@@ -700,14 +711,22 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#7F5AF0',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#2CB67D',
+    shadowColor: '#7F5AF0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
   },
   avatarText: {
     fontSize: 40,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#FFF',
+    letterSpacing: 2,
   },
   userInfo: {
     flex: 1,
@@ -716,26 +735,23 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#FFF',
     marginBottom: 5,
   },
   email: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#A1A1AA',
   },
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     marginTop: -20,
     marginHorizontal: 20,
     borderRadius: 10,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -751,22 +767,22 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#F5D90A',
+    textShadowColor: '#7F5AF0',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#A1A1AA',
   },
   section: {
     margin: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 3,
@@ -775,14 +791,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#333',
+    color: '#7F5AF0',
   },
   socialContainer: {
     flexDirection: 'column',
     alignItems: 'center',
   },
   socialButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#7F5AF0',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -790,27 +806,32 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'center',
+    shadowColor: '#2CB67D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 2,
   },
   socialButtonText: {
-    color: 'white',
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 10,
   },
   socialDescription: {
     fontSize: 12,
-    color: 'black',
+    color: '#A1A1AA',
     textAlign: 'center',
   },
   logoutButton: {
     margin: 20,
-    backgroundColor: '#f44336',
+    backgroundColor: '#7F5AF0',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
   },
   logoutButtonText: {
-    color: 'white',
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -821,7 +842,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     padding: 20,
     borderRadius: 10,
     width: '90%',
@@ -834,8 +855,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   input: {
+    backgroundColor: '#6f627f',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#7F5AF0',
     borderRadius: 5,
     padding: 10,
     marginBottom: 15,
@@ -870,18 +892,18 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   errorMessage: {
-    backgroundColor: '#ffebee',
-    color: '#c62828',
+    backgroundColor: '#232634',
+    color: '#F5D90A',
   },
   successMessage: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
+    backgroundColor: '#232634',
+    color: '#2CB67D',
   },
   disabledButton: {
     opacity: 0.7,
   },
   privacyContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: {
@@ -899,6 +921,7 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: 'center',
     marginBottom: 10,
+    color: 'white',
   },
   privacyButtonText: {
     fontSize: 16,
@@ -907,12 +930,12 @@ const styles = StyleSheet.create({
   },
   privacyDescription: {
     fontSize: 14,
-    color: '#666',
+    color: 'white',
     textAlign: 'center',
   },
   requestsContainer: {
     margin: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 15,
     shadowColor: '#000',
@@ -928,7 +951,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#333',
+    color: '#7F5AF0',
   },
   requestItem: {
     flexDirection: 'row',
@@ -940,30 +963,30 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   acceptButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2CB67D',
     borderRadius: 5,
     padding: 5,
     marginLeft: 10,
   },
   acceptButtonText: {
-    color: 'white',
+    color: '#181A20',
     fontSize: 16,
     fontWeight: 'bold',
   },
   rejectButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#7F5AF0',
     borderRadius: 5,
     padding: 5,
     marginLeft: 10,
   },
   rejectButtonText: {
-    color: 'white',
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
   sendRequestContainer: {
     margin: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 15,
     shadowColor: '#000',
@@ -977,7 +1000,7 @@ const styles = StyleSheet.create({
   },
   noRequestsText: {
     textAlign: 'center',
-    color: '#666',
+    color: 'white',
     marginBottom: 10,
   },
   levelContainer: {
@@ -1010,11 +1033,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgesButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#7f5af0',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
     marginHorizontal: 5,
+    width: '100%',
   },
   badgesButtonContent: {
     flexDirection: 'row',

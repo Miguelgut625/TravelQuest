@@ -178,7 +178,7 @@ const DateRangePickerMobile: React.FC<{
       >
         <View style={styles.datePickerContent}>
           <Text style={styles.datePickerText}>{formatDateRange()}</Text>
-          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="white" />
+          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="#F5D90A" />
         </View>
       </TouchableOpacity>
 
@@ -194,7 +194,7 @@ const DateRangePickerMobile: React.FC<{
               <View style={styles.calendarHeader}>
                 <Text style={styles.calendarTitle}>Selecciona fechas</Text>
                 <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                  <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color="#F5D90A" />
                 </TouchableOpacity>
               </View>
 
@@ -207,23 +207,31 @@ const DateRangePickerMobile: React.FC<{
                 firstDay={1}
                 enableSwipeMonths={true}
                 theme={{
-                  calendarBackground: '#ffffff',
-                  textSectionTitleColor: '#b6c1cd',
-                  selectedDayBackgroundColor: '#005F9E',
-                  selectedDayTextColor: '#ffffff',
-                  todayTextColor: '#005F9E',
-                  dayTextColor: '#2d4150',
-                  textDisabledColor: '#d9e1e8',
-                  dotColor: '#005F9E',
-                  selectedDotColor: '#ffffff',
-                  arrowColor: '#005F9E',
-                  monthTextColor: '#005F9E',
-                  indicatorColor: '#005F9E',
-                  textDayFontWeight: '300',
-                  textDayHeaderFontWeight: '300',
-                  textDayFontSize: 14,
-                  textMonthFontSize: 14,
-                  textDayHeaderFontSize: 12
+                  calendarBackground: '#232634',
+                  textSectionTitleColor: '#7F5AF0',
+                  selectedDayBackgroundColor: '#7F5AF0',
+                  selectedDayTextColor: '#2CB67D',
+                  todayTextColor: '#F5D90A',
+                  dayTextColor: '#2CB67D',
+                  textDisabledColor: '#393552',
+                  dotColor: '#2CB67D',
+                  selectedDotColor: '#F5D90A',
+                  arrowColor: '#F5D90A',
+                  monthTextColor: '#F5D90A',
+                  indicatorColor: '#2CB67D',
+                  textDayFontWeight: '500',
+                  textDayHeaderFontWeight: '700',
+                  textDayFontSize: 15,
+                  textMonthFontSize: 16,
+                  textDayHeaderFontSize: 13,
+                  'stylesheet.calendar.header': {
+                    week: {
+                      marginTop: 6,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#232634',
+                    }
+                  }
                 }}
               />
 
@@ -312,7 +320,7 @@ const DateRangePickerWeb: React.FC<{
       >
         <View style={styles.datePickerContent}>
           <Text style={styles.datePickerText}>{formatDateRange()}</Text>
-          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="white" />
+          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="#F5D90A" />
         </View>
       </TouchableOpacity>
 
@@ -336,7 +344,7 @@ const DateRangePickerWeb: React.FC<{
               <View style={styles.calendarHeader}>
                 <Text style={styles.calendarTitle}>Selecciona fechas</Text>
                 <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                  <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color="#F5D90A" />
                 </TouchableOpacity>
               </View>
 
@@ -362,13 +370,13 @@ const DateRangePickerWeb: React.FC<{
                 }}
                 markingType={'period'}
                 theme={{
-                  calendarBackground: '#ffffff',
-                  selectedDayBackgroundColor: '#005F9E',
-                  selectedDayTextColor: '#ffffff',
-                  todayTextColor: '#005F9E',
-                  dayTextColor: '#2d4150',
-                  textDisabledColor: '#d9e1e8',
-                  arrowColor: '#005F9E',
+                  calendarBackground: '#232634',
+                  selectedDayBackgroundColor: '#7F5AF0',
+                  selectedDayTextColor: '#FFF',
+                  todayTextColor: '#F5D90A',
+                  dayTextColor: '#FFF',
+                  textDisabledColor: '#393552',
+                  arrowColor: '#F5D90A',
                 }}
               />
 
@@ -864,7 +872,7 @@ const MapScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Barra superior con botón para expandir/colapsar */}
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>TravelQuest</Text>
@@ -936,10 +944,8 @@ const MapScreen = () => {
       {/* Contenedor del formulario, que puede estar colapsado - colocado al final para que se muestre encima */}
       {!isFormCollapsed && (
         <ScrollView
-          style={[
-            styles.searchContainer,
-            isSmallScreen && styles.searchContainerSmall
-          ]}
+          style={styles.searchContainer}
+          contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
         >
           <TextInput
@@ -1044,24 +1050,24 @@ const MapScreen = () => {
         }}
         onSelect={handleShareJourney}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20', // Fondo oscuro misterioso
   },
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#232634', // Fondo header oscuro
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: '#393552',
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1070,28 +1076,30 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: '#F5D90A', // Amarillo misterioso
+    fontFamily: 'System', // Puedes cambiar por una fuente custom si la tienes
+    letterSpacing: 2,
+    textShadowColor: '#7F5AF0',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   collapseButton: {
     padding: 5,
   },
   searchContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#232634', // Fondo oscuro
     padding: 15,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
     position: 'absolute',
-    top: 51,
+    top: 90,
     left: 0,
     right: 0,
     zIndex: 9,
@@ -1107,12 +1115,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   input: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#6f627f', // Fondo input oscuro
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#7F5AF0', // Borde violeta
+    color: '#FFFFFF', // Texto blanco
+    fontSize: 16,
+    fontFamily: 'System',
+    letterSpacing: 1,
   },
   smallInput: {
     flex: 0.4,
@@ -1121,6 +1133,7 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     zIndex: 1,
+    backgroundColor: '#232634', // Fondo oscuro detrás del mapa
   },
   mapContainerExpanded: {
     flex: 1,
@@ -1143,7 +1156,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   button: {
-    backgroundColor: '#005F9E',
+    backgroundColor: '#7F5AF0', // Botón violeta
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -1151,16 +1164,21 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   buttonDisabled: {
-    backgroundColor: '#78909C',
+    backgroundColor: '#393552',
   },
   buttonText: {
-    color: 'white',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
+    fontFamily: 'System',
+    letterSpacing: 1,
   },
   errorText: {
-    color: '#D32F2F',
+    color: '#F5D90A', // Amarillo misterioso para errores
     marginTop: 10,
+    fontWeight: 'bold',
+    fontFamily: 'System',
+    letterSpacing: 1,
   },
   modalContainer: {
     flex: 1,
@@ -1218,12 +1236,14 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   datePickerButton: {
-    backgroundColor: '#005F9E',
+    backgroundColor: '#232634',
     borderRadius: 8,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#7F5AF0',
   },
   datePickerContent: {
     flexDirection: 'row',
@@ -1232,9 +1252,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   datePickerText: {
-    color: 'white',
-    fontSize: 14,
+    color: '#F5D90A',
+    fontSize: 15,
     fontWeight: 'bold',
+    fontFamily: 'System',
+    letterSpacing: 1,
   },
   calendarOverlay: {
     position: 'absolute',
@@ -1250,7 +1272,7 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
   },
   calendarContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 10,
     marginTop: 5,
@@ -1261,17 +1283,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 5,
+    backgroundColor: '#232634',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    padding: 10,
   },
   calendarTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5D90A',
+    fontFamily: 'System',
+    letterSpacing: 1,
   },
   calendarSubtitle: {
     fontSize: 16,
-    color: '#333',
+    color: '#7F5AF0',
     textAlign: 'center',
     marginVertical: 10,
+    fontFamily: 'System',
   },
   calendarControls: {
     flexDirection: 'row',
@@ -1303,27 +1332,24 @@ const styles = StyleSheet.create({
     top: '100%',
     left: 0,
     right: 0,
-    backgroundColor: 'white',
-    borderRadius: 5,
+    backgroundColor: '#232634',
+    borderRadius: 10,
     maxHeight: 200,
     zIndex: 2,
-    elevation: 5,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
   },
   suggestionItem: {
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#393552',
   },
   suggestionText: {
     fontSize: 16,
-    color: '#333',
+    color: '#FFF',
   },
   loadingContainer: {
     flex: 1,

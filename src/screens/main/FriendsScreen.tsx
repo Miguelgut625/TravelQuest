@@ -81,7 +81,7 @@ const FriendsScreen = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size={40} color="#005F9E" />
+        <ActivityIndicator size={40} color="#F5D90A" />
       </View>
     );
   }
@@ -102,14 +102,22 @@ const FriendsScreen = () => {
             <Text style={styles.badgeText}>{item.unreadMessages}</Text>
           </View>
         )}
-        <Ionicons name="chatbubble-outline" size={24} color="#005F9E" />
+        <Ionicons name="chatbubble-outline" size={24} color="#F5D90A" />
       </View>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Lista de Amigos</Text>
+      <View style={styles.headerRowCustom}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <Ionicons name="arrow-back" size={28} color="#7F5AF0" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Lista de Amigos</Text>
+      </View>
       {friends.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
@@ -138,14 +146,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f9f9f9',
+    paddingTop: 56,
+    backgroundColor: '#181A20',
+  },
+  headerRowCustom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginBottom: 10,
+    marginHorizontal: 10,
+    height: 48,
+    position: 'relative',
+  },
+  backButton: {
+    zIndex: 2,
+    padding: 4,
   },
   title: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#005F9E',
+    color: '#F5D90A',
+    letterSpacing: 1,
+    zIndex: 1,
   },
   friendItem: {
     padding: 15,

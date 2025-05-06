@@ -22,6 +22,7 @@ import { getConversation, sendMessage, markMessagesAsRead, subscribeToMessages, 
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ChatScreen = () => {
   const route = useRoute();
@@ -41,6 +42,7 @@ const ChatScreen = () => {
   const subscriptionRef = React.useRef(null);
   const initialLoadRef = React.useRef(true);
   const messageCountRef = React.useRef(0);
+  const insets = useSafeAreaInsets();
 
   // Manejador para nuevos mensajes recibidos
   const handleNewMessage = React.useCallback((newMessage: Message) => {
@@ -366,7 +368,7 @@ const ChatScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top + 16 }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
@@ -491,16 +493,19 @@ const ChatScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
+    paddingTop: 24, // <-- margen superior general
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#181A20',
   },
   messagesContainer: {
     paddingHorizontal: 10,
     paddingVertical: 10,
+    paddingTop: 32, // <-- margen superior solo para los mensajes
   },
   messageContainer: {
     maxWidth: '80%',
@@ -510,15 +515,15 @@ const styles = StyleSheet.create({
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#005F9E',
+    backgroundColor: '#7F5AF0', // Violeta misterioso
   },
   friendMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#000000',
+    backgroundColor: '#232634', // Fondo misterioso
   },
   messageText: {
     fontSize: 16,
-    color: 'white',
+    color: '#FFF',
   },
   messageImage: {
     width: 200,
@@ -528,14 +533,14 @@ const styles = StyleSheet.create({
   },
   messageTime: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#A1A1AA',
     marginTop: 5,
     textAlign: 'right',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#232634', // Fondo misterioso
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
@@ -546,13 +551,14 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#393552', // Input misterioso
     borderRadius: 20,
     maxHeight: 100,
+    color: '#FFF',
   },
   sendButton: {
     marginLeft: 10,
-    backgroundColor: '#005F9E',
+    backgroundColor: '#2CB67D', // Verde neón misterioso
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -560,18 +566,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#393552',
   },
   // Estilos para vista previa de imagen
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(24,26,32,0.95)',
   },
   imagePreviewContainer: {
     width: '90%',
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     borderRadius: 10,
     padding: 20,
     alignItems: 'center',
@@ -579,7 +585,7 @@ const styles = StyleSheet.create({
   previewTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: '#F5D90A',
     marginBottom: 15,
   },
   previewImage: {
@@ -601,11 +607,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   previewButtonText: {
-    color: 'white',
+    color: '#FFF',
     fontWeight: 'bold',
   },
   cancelButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#7F5AF0',
   },
   // Estilos para imagen a pantalla completa
   fullImageContainer: {

@@ -111,7 +111,7 @@ const ConversationsScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size={40} color="#4CAF50" />
+        <ActivityIndicator size={40} color="#F5D90A" />
       </View>
     );
   }
@@ -175,11 +175,19 @@ const ConversationsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Mensajes</Text>
+      <View style={styles.headerRowCustom}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <Ionicons name="arrow-back" size={28} color="#7F5AF0" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Mensajes</Text>
+      </View>
       
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubble-outline" size={60} color="#ccc" />
+          <Ionicons name="chatbubble-outline" size={60} color="#7F5AF0" />
           <Text style={styles.emptyText}>
             No tienes conversaciones aún.
           </Text>
@@ -196,7 +204,7 @@ const ConversationsScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#4CAF50']}
+              colors={['#F5D90A']}
             />
           }
           contentContainerStyle={{ paddingVertical: 10 }}
@@ -209,13 +217,24 @@ const ConversationsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#181A20',
+    paddingTop: 56,
+  },
+  headerRowCustom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    marginHorizontal: 10,
+  },
+  backButton: {
+    marginRight: 10,
+    padding: 4,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginVertical: 15,
-    marginHorizontal: 20,
+    color: '#F5D90A',
+    letterSpacing: 1,
   },
   loadingContainer: {
     flex: 1,
