@@ -30,6 +30,7 @@ import { linking } from './linking';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import FriendProfileScreen from '../screens/main/FriendProfileScreen';
 
+
 // Define los parámetros para las pestañas principales
 export type TabParamList = {
   Map: undefined;
@@ -63,6 +64,9 @@ type RootStackParamList = {
   FriendProfile: {
     friendId: string;
     friendName: string;
+  };
+  UserProfileScreen: {
+    userId: string;
   };
 };
 
@@ -139,6 +143,7 @@ const MainFlow = () => {
           headerShown: false
         }}
       />
+      
     </Stack.Navigator>
   );
 };
@@ -194,16 +199,16 @@ const TabNavigator = () => {
           title: 'Mapa'
         }}
       />
-      <Tab.Screen 
-        name="Missions" 
+      <Tab.Screen
+        name="Missions"
         component={MissionsScreen}
         options={{
           title: 'Misiones'
         }}
       />
-      <Tab.Screen 
-        name="Journal" 
-        component={JournalScreen} 
+      <Tab.Screen
+        name="Journal"
+        component={JournalScreen}
         initialParams={{ refresh: false }}
         options={{
           title: 'Diario'
@@ -216,8 +221,8 @@ const TabNavigator = () => {
           title: 'Mensajes'
         }}
       />
-      <Tab.Screen 
-        name="Profile" 
+      <Tab.Screen
+        name="Profile"
         component={ProfileScreen}
         options={{
           title: 'Perfil'
@@ -244,8 +249,8 @@ const AppNavigator = () => {
 
   return (
     <SafeAreaProvider>
-      <StatusBar 
-        barStyle="light-content" 
+      <StatusBar
+        barStyle="light-content"
         backgroundColor="#005F9E"
         translucent={true}
       />

@@ -1,7 +1,7 @@
 // src/screens/main/LeaderboardScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
-import { supabase } from '../../services/supabase'; 
+import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native'; // Importa el hook de navegación
 import { Ionicons } from '@expo/vector-icons'; // Importa los íconos de Ionicons
 
@@ -21,9 +21,9 @@ const LeaderboardScreen = () => {
     const fetchLeaderboardData = async () => {
       try {
         const { data, error } = await supabase
-          .from('users') 
+          .from('users')
           .select('id, username, points') // Asegúrate de incluir el campo id
-          .order('points', { ascending: false }); 
+          .order('points', { ascending: false });
 
         if (error) throw error;
 
@@ -41,13 +41,15 @@ const LeaderboardScreen = () => {
 
   const renderItem = ({ item, index }: { item: LeaderboardItem; index: number }) => (
     <View style={styles.itemContainer}>
-      <Text style={styles.itemText}>
-        {index + 1}. {item.username}: {item.points} puntos
-        {index === 0 && <Text style={styles.firstPlaceText}> 🏆 Explorador Supremo</Text>}
-        {index === 1 && <Text style={styles.secondPlaceText}> 🌍 Aventurero Global</Text>}
-        {index === 2 && <Text style={styles.thirdPlaceText}> ✈️ Viajero Frecuente</Text>}
-        {index > 2 && <Text style={styles.titleText}> 🌍 Viajero Experto</Text>}
-      </Text>
+      <View style={styles.rankContainer}>
+        <Text style={styles.rankText}>{index + 1}.</Text>
+        <Text style={styles.usernameText}>{item.username}</Text>
+      </View>
+      <Text style={styles.pointsText}>{item.points} puntos</Text>
+      {index === 0 && <Text style={styles.firstPlaceText}>🏆 Explorador Supremo</Text>}
+      {index === 1 && <Text style={styles.secondPlaceText}>🌍 Aventurero Global</Text>}
+      {index === 2 && <Text style={styles.thirdPlaceText}>✈️ Viajero Frecuente</Text>}
+      {index > 2 && <Text style={styles.titleText}>🌍 Viajero Experto</Text>}
     </View>
   );
 
@@ -86,8 +88,7 @@ const LeaderboardScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#f8f9fa', // Color de fondo
+    backgroundColor: '#f5f5f5', // Mismo color de fondo que en FriendProfileScreen
   },
   backButton: {
     flexDirection: 'row',
@@ -97,52 +98,70 @@ const styles = StyleSheet.create({
   backButtonText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#005F9E',
+    color: '#005F9E', // Consistente con el color de la app
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
-    color: '#005F9E', // Color del texto del título
+    color: '#005F9E', // Consistente con el color de la app
   },
   itemContainer: {
-    padding: 12,
-    marginVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#ffffff', // Color de fondo de los elementos
+    padding: 16,
+    marginVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'white',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2, // Para Android
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
-  itemText: {
+  rankContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rankText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#005F9E',
+    marginRight: 8,
+  },
+  usernameText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  pointsText: {
     fontSize: 18,
-    color: '#495057', // Color del texto de los elementos
+    color: '#666',
+    marginBottom: 4,
   },
   firstPlaceText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFD700', // Color dorado para el primer lugar
+    color: '#FFD700',
   },
   secondPlaceText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#C0C0C0', // Color plateado para el segundo lugar
+    color: '#C0C0C0',
   },
   thirdPlaceText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#CD7F32', // Color bronce para el tercer lugar
+    color: '#CD7F32',
   },
   titleText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#005F9E', // Color para los títulos de los demás lugares
+    color: '#005F9E',
   },
   errorText: {
     color: '#D32F2F',
