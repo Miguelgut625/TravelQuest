@@ -9,7 +9,7 @@ import { getProfilePictureUrl } from '../../services/profileService';
 import { CLOUDINARY_CONFIG } from '../../config/cloudinary';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
-import { deleteFriendship, sendFriendRequest } from '../../services/friendService';
+import { deleteFriendship, sendFriendRequest, cancelFriendRequest } from '../../services/friendService';
 
 interface JourneyMission {
   id: string;
@@ -317,25 +317,49 @@ const FriendProfileScreen = () => {
     );
   };
 
+  const handleCancelRequest = async () => {
+    if (!user) return;
+    try {
+      const { success, error } = await cancelFriendRequest(user.id, friendId);
+      if (success) {
+        Alert.alert('Éxito', 'Solicitud de amistad cancelada');
+        await checkPendingRequest();
+        navigation.goBack();
+      } else {
+        Alert.alert('Error', error || 'No se pudo cancelar la solicitud de amistad');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo cancelar la solicitud de amistad');
+    }
+  };
+
   const renderActionIcon = () => {
     console.log('Rendering icon with states:', { isFriend, hasPendingRequest });
     let iconName = "person-add";
     let iconColor = "#005F9E";
+    let onPressAction = handleAddFriend;
 
     if (isFriend) {
       iconName = "person-remove";
       iconColor = "#ff4444";
+      onPressAction = handleDeleteFriendship;
     } else if (hasPendingRequest) {
-      iconName = "time";
+      iconName = "close-circle";
       iconColor = "#FFA000";
+      onPressAction = handleCancelRequest;
     }
 
     return (
-      <Ionicons 
-        name={iconName}
-        size={22} 
-        color={iconColor}
-      />
+      <TouchableOpacity
+        style={styles.actionIconProfile}
+        onPress={onPressAction}
+      >
+        <Ionicons 
+          name={iconName}
+          size={22} 
+          color={iconColor}
+        />
+      </TouchableOpacity>
     );
   };
 
@@ -363,12 +387,7 @@ const FriendProfileScreen = () => {
         </View>
 
         <View style={styles.profileSection}>
-          <TouchableOpacity
-            style={styles.actionIconProfile}
-            onPress={isFriend ? handleDeleteFriendship : handleAddFriend}
-          >
-            {renderActionIcon()}
-          </TouchableOpacity>
+          {renderActionIcon()}
           {profilePicUrl ? (
             <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
           ) : (

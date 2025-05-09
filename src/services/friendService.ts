@@ -44,7 +44,8 @@ export const getFriends = async (userId: string) => {
 // Función para obtener todas las solicitudes de amistad pendientes
 export const getFriendRequests = async (userId: string) => {
   try {
-    const { data, error } = await supabase
+    // Obtener solicitudes recibidas
+    const { data: receivedRequests, error: receivedError } = await supabase
       .from('friendship_invitations')
       .select(`
         id,
@@ -58,14 +59,48 @@ export const getFriendRequests = async (userId: string) => {
       .eq('receiverId', userId)
       .eq('status', 'Pending');
 
-    if (error) throw error;
+    if (receivedError) throw receivedError;
 
-    return data.map((request: any) => ({
+    // Obtener solicitudes enviadas
+    const { data: sentRequests, error: sentError } = await supabase
+      .from('friendship_invitations')
+      .select(`
+        id,
+        "receiverId",
+        created_at,
+        users!friendship_invitations_receiverId_fkey (
+          id,
+          username
+        )
+      `)
+      .eq('senderId', userId)
+      .eq('status', 'Pending');
+
+    if (sentError) throw sentError;
+
+    // Procesar solicitudes recibidas
+    const processedReceivedRequests = receivedRequests.map((request: any) => ({
       id: request.id,
       senderId: request.senderId,
       username: request.users.username,
-      createdAt: request.created_at
+      createdAt: request.created_at,
+      type: 'received'
     }));
+
+    // Procesar solicitudes enviadas
+    const processedSentRequests = sentRequests.map((request: any) => ({
+      id: request.id,
+      receiverId: request.receiverId,
+      username: request.users.username,
+      createdAt: request.created_at,
+      type: 'sent'
+    }));
+
+    // Combinar y ordenar todas las solicitudes por fecha
+    const allRequests = [...processedReceivedRequests, ...processedSentRequests]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return allRequests;
   } catch (error) {
     console.error('Error fetching friend requests:', error);
     return [];
@@ -230,5 +265,26 @@ export const deleteFriendship = async (userId1: string, userId2: string) => {
   } catch (error) {
     console.error('Error al eliminar la amistad:', error);
     return { success: false, error };
+  }
+};
+
+export const cancelFriendRequest = async (senderId: string, receiverId: string) => {
+  try {
+    const { error } = await supabase
+      .from('friendship_invitations')
+      .delete()
+      .eq('senderId', senderId)
+      .eq('receiverId', receiverId)
+      .eq('status', 'Pending');
+
+    if (error) {
+      console.error('Error al cancelar la solicitud:', error);
+      return { success: false, error: 'No se pudo cancelar la solicitud de amistad' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error al cancelar la solicitud:', error);
+    return { success: false, error: 'No se pudo cancelar la solicitud de amistad' };
   }
 }; 

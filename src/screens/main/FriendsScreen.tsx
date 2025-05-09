@@ -18,7 +18,7 @@ import { supabase } from '../../services/supabase';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { countUnreadMessages } from '../../services/messageService';
-import { getFriends, sendFriendRequest, getFriendRequests, acceptFriendRequest, rejectFriendRequest } from '../../services/friendService';
+import { getFriends, sendFriendRequest, getFriendRequests, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '../../services/friendService';
 import { searchUsersByUsername } from '../../services/userService';
 
 interface Friend {
@@ -33,6 +33,8 @@ interface FriendRequest {
   senderId: string;
   username: string;
   createdAt: string;
+  type: string;
+  receiverId: string;
 }
 
 const FriendsScreen = () => {
@@ -43,6 +45,7 @@ const FriendsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
   const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends');
+  const [activeRequestTab, setActiveRequestTab] = useState<'received' | 'sent'>('received');
   const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set());
   
   // Estados para el buscador
@@ -167,6 +170,23 @@ const FriendsScreen = () => {
     }
   };
 
+  const handleCancelRequest = async (requestId: string) => {
+    try {
+      const request = friendRequests.find(r => r.id === requestId);
+      if (!request || !user) return;
+
+      const { success, error } = await cancelFriendRequest(user.id, request.receiverId);
+      if (success) {
+        Alert.alert('Éxito', 'Solicitud cancelada correctamente');
+        fetchData();
+      } else {
+        Alert.alert('Error', error || 'No se pudo cancelar la solicitud');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo cancelar la solicitud');
+    }
+  };
+
   const isUserFriend = (userId: string) => {
     return friends.some(friend => friend.user2Id === userId);
   };
@@ -253,34 +273,103 @@ const FriendsScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderRequestItem = ({ item }: { item: FriendRequest }) => (
-    <View style={styles.requestItem}>
-      <View style={styles.requestInfo}>
-        <Text style={styles.requestUsername}>{item.username}</Text>
-        <Text style={styles.requestDate}>
-          {new Date(item.createdAt).toLocaleDateString('es-ES', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-          })}
-        </Text>
+  const renderFriendRequests = () => {
+    const receivedRequests = friendRequests.filter(request => request.type === 'received');
+    const sentRequests = friendRequests.filter(request => request.type === 'sent');
+
+    return (
+      <View style={styles.requestsContainer}>
+        <View style={styles.requestTabsContainer}>
+          <TouchableOpacity
+            style={[styles.requestTab, activeRequestTab === 'received' && styles.activeRequestTab]}
+            onPress={() => setActiveRequestTab('received')}
+          >
+            <Text style={[styles.requestTabText, activeRequestTab === 'received' && styles.activeRequestTabText]}>
+              Recibidas ({receivedRequests.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.requestTab, activeRequestTab === 'sent' && styles.activeRequestTab]}
+            onPress={() => setActiveRequestTab('sent')}
+          >
+            <Text style={[styles.requestTabText, activeRequestTab === 'sent' && styles.activeRequestTabText]}>
+              Enviadas ({sentRequests.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeRequestTab === 'received' ? (
+          receivedRequests.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No tienes solicitudes recibidas</Text>
+            </View>
+          ) : (
+            <View style={styles.requestsList}>
+              {receivedRequests.map((request) => (
+                <View key={request.id} style={styles.requestItem}>
+                  <View style={styles.requestInfo}>
+                    <Text style={styles.requestUsername}>{request.username}</Text>
+                    <Text style={styles.requestDate}>
+                      {new Date(request.createdAt).toLocaleDateString('es-ES', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </Text>
+                  </View>
+                  <View style={styles.requestActions}>
+                    <TouchableOpacity
+                      style={[styles.requestButton, styles.acceptButton]}
+                      onPress={() => handleAcceptRequest(request.id)}
+                    >
+                      <Ionicons name="checkmark" size={24} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.requestButton, styles.rejectButton]}
+                      onPress={() => handleRejectRequest(request.id)}
+                    >
+                      <Ionicons name="close" size={24} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )
+        ) : (
+          sentRequests.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No tienes solicitudes enviadas</Text>
+            </View>
+          ) : (
+            <View style={styles.requestsList}>
+              {sentRequests.map((request) => (
+                <View key={request.id} style={styles.requestItem}>
+                  <View style={styles.requestInfo}>
+                    <Text style={styles.requestUsername}>{request.username}</Text>
+                    <Text style={styles.requestDate}>
+                      {new Date(request.createdAt).toLocaleDateString('es-ES', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </Text>
+                  </View>
+                  <View style={styles.requestActions}>
+                    <TouchableOpacity
+                      style={[styles.requestButton, styles.cancelButton]}
+                      onPress={() => handleCancelRequest(request.id)}
+                    >
+                      <Ionicons name="close-circle" size={24} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )
+        )}
       </View>
-      <View style={styles.requestActions}>
-        <TouchableOpacity
-          style={[styles.requestButton, styles.acceptButton]}
-          onPress={() => handleAcceptRequest(item.id)}
-        >
-          <Ionicons name="checkmark" size={24} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.requestButton, styles.rejectButton]}
-          onPress={() => handleRejectRequest(item.id)}
-        >
-          <Ionicons name="close" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -371,26 +460,7 @@ const FriendsScreen = () => {
           />
         )
       ) : (
-        friendRequests.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              No tienes solicitudes de amistad pendientes
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={friendRequests}
-            keyExtractor={(item) => item.id}
-            renderItem={renderRequestItem}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={['#005F9E']}
-              />
-            }
-          />
-        )
+        renderFriendRequests()
       )}
     </View>
   );
@@ -655,6 +725,9 @@ const styles = StyleSheet.create({
   rejectButton: {
     backgroundColor: '#FF5252',
   },
+  cancelButton: {
+    backgroundColor: '#FFA000',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -666,6 +739,44 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  requestsContainer: {
+    flex: 1,
+  },
+  requestTabsContainer: {
+    flexDirection: 'row',
+    marginBottom: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  requestTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeRequestTab: {
+    backgroundColor: '#005F9E',
+  },
+  requestTabText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  activeRequestTabText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  requestsList: {
+    flex: 1,
   },
 });
 
