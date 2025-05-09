@@ -71,7 +71,6 @@ const ProfileScreen = () => {
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(100);
-  const [friendCount, setFriendCount] = useState(0);
   const [advancedStats, setAdvancedStats] = useState<AdvancedStats>({
     completedMissions: 0,
     expiredMissions: 0,
@@ -86,7 +85,6 @@ const ProfileScreen = () => {
 
   useEffect(() => {
     fetchUserStats();
-    fetchFriendCount();
     fetchAdvancedStats();
   }, [user?.id]);
 
@@ -161,23 +159,6 @@ const ProfileScreen = () => {
       Alert.alert('Error', 'No se pudieron cargar las estadísticas');
     } finally {
       setLoadingStats(false);
-    }
-  };
-
-  const fetchFriendCount = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('friends')
-        .select('*')
-        .or(`user1Id.eq.${user.id},user2Id.eq.${user.id}`);
-
-      if (error) throw error;
-      // Dividimos por 2 ya que cada amistad se cuenta dos veces
-      setFriendCount(Math.floor((data?.length || 0) / 2));
-    } catch (error) {
-      console.error('Error al obtener el número de amigos:', error);
     }
   };
 
@@ -594,7 +575,7 @@ const ProfileScreen = () => {
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{stats.visitedCities}</Text>
-              <Text style={styles.statLabel}>Ciudades</Text>
+              <Text style={styles.statLabel}>Viajes</Text>
             </View>
           </>
         )}
@@ -625,7 +606,7 @@ const ProfileScreen = () => {
             onPress={() => navigation.navigate('Friends')}
           >
             <Ionicons name="people" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Amigos ({friendCount})</Text>
+            <Text style={styles.socialButtonText}>Amigos</Text>
           </TouchableOpacity>
           <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
           <TouchableOpacity
