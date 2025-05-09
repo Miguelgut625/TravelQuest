@@ -36,6 +36,17 @@ interface FriendshipRequest {
   };
 }
 
+interface AdvancedStats {
+  completedMissions: number;
+  expiredMissions: number;
+  pendingMissions: number;
+  completionRate: number;
+  visitedCities: number;
+  cityRepeatCount: { [cityName: string]: number };
+  totalPoints: number;
+  averagePointsPerMission: number;
+}
+
 type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const ProfileScreen = () => {
@@ -60,10 +71,23 @@ const ProfileScreen = () => {
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(100);
+  const [friendCount, setFriendCount] = useState(0);
+  const [advancedStats, setAdvancedStats] = useState<AdvancedStats>({
+    completedMissions: 0,
+    expiredMissions: 0,
+    pendingMissions: 0,
+    completionRate: 0,
+    visitedCities: 0,
+    cityRepeatCount: {},
+    totalPoints: 0,
+    averagePointsPerMission: 0
+  });
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchUserStats();
+    fetchFriendCount();
+    fetchAdvancedStats();
   }, [user?.id]);
 
   const fetchUserStats = async () => {
@@ -137,6 +161,93 @@ const ProfileScreen = () => {
       Alert.alert('Error', 'No se pudieron cargar las estadísticas');
     } finally {
       setLoadingStats(false);
+    }
+  };
+
+  const fetchFriendCount = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('friends')
+        .select('*')
+        .or(`user1Id.eq.${user.id},user2Id.eq.${user.id}`);
+
+      if (error) throw error;
+      // Dividimos por 2 ya que cada amistad se cuenta dos veces
+      setFriendCount(Math.floor((data?.length || 0) / 2));
+    } catch (error) {
+      console.error('Error al obtener el número de amigos:', error);
+    }
+  };
+
+  const fetchAdvancedStats = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Obtener todos los journeys del usuario
+      const { data: journeys, error: journeysError } = await supabase
+        .from('journeys')
+        .select(`
+          id,
+          cityId,
+          journeys_missions!inner (
+            completed,
+            end_date,
+            challenges!inner (
+              points
+            )
+          ),
+          cities!inner (
+            name
+          )
+        `)
+        .eq('userId', user.id);
+
+      if (journeysError) throw journeysError;
+
+      const stats: AdvancedStats = {
+        completedMissions: 0,
+        expiredMissions: 0,
+        pendingMissions: 0,
+        completionRate: 0,
+        visitedCities: 0,
+        cityRepeatCount: {},
+        totalPoints: 0,
+        averagePointsPerMission: 0
+      };
+
+      const cityCount: { [cityName: string]: number } = {};
+      let totalMissions = 0;
+
+      journeys?.forEach((journey: any) => {
+        const cityName = journey.cities.name;
+        cityCount[cityName] = (cityCount[cityName] || 0) + 1;
+
+        journey.journeys_missions.forEach((mission: any) => {
+          totalMissions++;
+          if (mission.completed) {
+            stats.completedMissions++;
+            stats.totalPoints += mission.challenges.points;
+          } else {
+            const endDate = new Date(mission.end_date);
+            if (endDate < new Date()) {
+              stats.expiredMissions++;
+            } else {
+              stats.pendingMissions++;
+            }
+          }
+        });
+      });
+
+      stats.visitedCities = Object.keys(cityCount).length;
+      stats.cityRepeatCount = cityCount;
+      stats.completionRate = totalMissions > 0 ? (stats.completedMissions / totalMissions) * 100 : 0;
+      stats.averagePointsPerMission = stats.completedMissions > 0 ? stats.totalPoints / stats.completedMissions : 0;
+
+      setAdvancedStats(stats);
+    } catch (error) {
+      console.error('Error obteniendo estadísticas avanzadas:', error);
     }
   };
 
@@ -514,7 +625,7 @@ const ProfileScreen = () => {
             onPress={() => navigation.navigate('Friends')}
           >
             <Ionicons name="people" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Amigos</Text>
+            <Text style={styles.socialButtonText}>Amigos ({friendCount})</Text>
           </TouchableOpacity>
           <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
           <TouchableOpacity
@@ -595,6 +706,50 @@ const ProfileScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Nueva sección de Estadísticas Avanzadas */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Estadísticas Avanzadas</Text>
+        <View style={styles.advancedStatsContainer}>
+          <View style={styles.advancedStatItem}>
+            <Text style={styles.advancedStatValue}>{advancedStats.completedMissions}</Text>
+            <Text style={styles.advancedStatLabel}>Misiones Completadas</Text>
+          </View>
+          <View style={styles.advancedStatItem}>
+            <Text style={styles.advancedStatValue}>{advancedStats.expiredMissions}</Text>
+            <Text style={styles.advancedStatLabel}>Misiones Expiradas</Text>
+          </View>
+          <View style={styles.advancedStatItem}>
+            <Text style={styles.advancedStatValue}>{advancedStats.pendingMissions}</Text>
+            <Text style={styles.advancedStatLabel}>Misiones Pendientes</Text>
+          </View>
+          <View style={styles.advancedStatItem}>
+            <Text style={styles.advancedStatValue}>{advancedStats.completionRate.toFixed(1)}%</Text>
+            <Text style={styles.advancedStatLabel}>Tasa de Completado</Text>
+          </View>
+          <View style={styles.advancedStatItem}>
+            <Text style={styles.advancedStatValue}>{advancedStats.visitedCities}</Text>
+            <Text style={styles.advancedStatLabel}>Ciudades Visitadas</Text>
+          </View>
+          <View style={styles.advancedStatItem}>
+            <Text style={styles.advancedStatValue}>{advancedStats.averagePointsPerMission.toFixed(1)}</Text>
+            <Text style={styles.advancedStatLabel}>Puntos/Misión</Text>
+          </View>
+        </View>
+
+        {/* Sección de Ciudades Repetidas */}
+        <View style={styles.repeatedCitiesContainer}>
+          <Text style={styles.repeatedCitiesTitle}>Ciudades Más Visitadas</Text>
+          {Object.entries(advancedStats.cityRepeatCount)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 3)
+            .map(([city, count]) => (
+              <View key={city} style={styles.repeatedCityItem}>
+                <Text style={styles.repeatedCityName}>{city}</Text>
+                <Text style={styles.repeatedCityCount}>{count} visitas</Text>
+              </View>
+            ))}
+        </View>
+      </View>
 
       <View style={{ marginBottom: 48 }}>
         <TouchableOpacity
@@ -1061,6 +1216,60 @@ const styles = StyleSheet.create({
   sendRequestButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  advancedStatsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  advancedStatItem: {
+    width: '48%',
+    backgroundColor: '#2D2F3A',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  advancedStatValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#F5D90A',
+    marginBottom: 5,
+  },
+  advancedStatLabel: {
+    fontSize: 12,
+    color: '#A1A1AA',
+    textAlign: 'center',
+  },
+  repeatedCitiesContainer: {
+    backgroundColor: '#2D2F3A',
+    borderRadius: 10,
+    padding: 15,
+    marginTop: 10,
+  },
+  repeatedCitiesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#F5D90A',
+    marginBottom: 10,
+  },
+  repeatedCityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#393552',
+  },
+  repeatedCityName: {
+    fontSize: 14,
+    color: '#FFF',
+  },
+  repeatedCityCount: {
+    fontSize: 14,
+    color: '#F5D90A',
     fontWeight: 'bold',
   },
 });
