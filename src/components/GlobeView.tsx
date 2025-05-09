@@ -4,10 +4,12 @@ import { View, StyleSheet, Platform, ActivityIndicator, Text, Dimensions, Linkin
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { Region } from '../types/map';
-import { FAB, Button } from 'react-native-paper';
+import { FAB, Button, Divider, Card } from 'react-native-paper';
 import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { useSelector } from 'react-redux';
+import { getWeatherByCity, getWeatherByCoordinates, getUserJourneyCities, getForecastByCity, getForecastByCoordinates } from '../services/weatherService';
 
 // Token de Cesium
 const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiNGNjYzBhOS0wYzA1LTRiNTQtYWJhYi01YjEwNTZiZmJhNDQiLCJpZCI6MjkwMjQyLCJpYXQiOjE3NDM1ODE4NTB9.M05o3luP4BS1qlxa46iP5PWBPIos1RpFjsXhqj8Xl0Q';
@@ -521,6 +523,57 @@ interface WeatherData {
   sys: {
     country: string;
   };
+  coord?: {
+    lat: number;
+    lon: number;
+  };
+}
+
+/**
+ * Interfaz para un día del pronóstico
+ */
+interface ForecastDay {
+  dt: number;
+  date: Date;
+  temp: {
+    day: number;
+    min: number;
+    max: number;
+  };
+  feels_like: {
+    day: number;
+  };
+  pressure: number;
+  humidity: number;
+  weather: Array<{
+    id: number;
+    main: string;
+    description: string;
+    icon: string;
+  }>;
+  speed: number;
+  deg: number;
+  clouds: number;
+  pop: number;
+  rain?: number;
+}
+
+/**
+ * Interfaz para los datos del pronóstico de 7 días
+ */
+interface ForecastData {
+  lat: number;
+  lon: number;
+  timezone: number;
+  timezone_offset: number;
+  city_name: string;
+  country: string;
+  daily: ForecastDay[];
+}
+
+interface City {
+  id: string;
+  name: string;
 }
 
 /**
@@ -567,8 +620,15 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   
   // Estados para el clima
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [forecastData, setForecastData] = useState<ForecastData | null>(null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [weatherModalVisible, setWeatherModalVisible] = useState(false);
+  const [userCities, setUserCities] = useState<City[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [cityDropdownVisible, setCityDropdownVisible] = useState(false);
+  const [showForecast, setShowForecast] = useState(false);
+  
+  const userId = useSelector((state: any) => state.auth?.user?.id);
 
   // Efecto para logging del ciclo de vida
   useEffect(() => {
@@ -598,6 +658,23 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       clearInterval(checkInterval);
     };
   }, [isWebViewReady]);
+
+  // Cargar las ciudades del usuario cuando se abre el modal
+  useEffect(() => {
+    if (weatherModalVisible && userId) {
+      loadUserCities();
+    }
+  }, [weatherModalVisible, userId]);
+  
+  // Función para cargar las ciudades donde el usuario tiene viajes
+  const loadUserCities = async () => {
+    try {
+      const cities = await getUserJourneyCities(userId);
+      setUserCities(cities);
+    } catch (error) {
+      console.error('Error cargando ciudades del usuario:', error);
+    }
+  };
 
   // Cambiar entre mapa 3D y 2D
   const toggleMapMode = async () => {
@@ -716,9 +793,17 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   };
 
   // Función para obtener los datos del clima
-  const getWeatherData = async () => {
+  const getWeatherData = async (cityName?: string) => {
     try {
       setIsLoadingWeather(true);
+      setForecastData(null);
+      
+      // Validar el parámetro cityName
+      if (cityName && typeof cityName !== 'string') {
+        console.error('Error: cityName no es una cadena:', cityName);
+        setIsLoadingWeather(false);
+        return;
+      }
       
       // Verificar si la API key está configurada correctamente
       if (!OPENWEATHERMAP_API_KEY || OPENWEATHERMAP_API_KEY === 'TU_API_KEY_AQUI') {
@@ -737,50 +822,99 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         return;
       }
       
-      // Primero obtenemos la ubicación actual
+      // Obtener datos del clima basados en el nombre de ciudad o ubicación actual
+      let weatherResponse;
+      let forecastResponse;
+      
+      if (cityName) {
+        console.log(`Obteniendo clima y pronóstico para: ${cityName}`);
+        setSelectedCity(cityName);
+        
+        // Obtener el clima actual y el pronóstico de 7 días para la ciudad
+        weatherResponse = await getWeatherByCity(cityName, OPENWEATHERMAP_API_KEY);
+        forecastResponse = await getForecastByCity(cityName, OPENWEATHERMAP_API_KEY);
+      } else {
+        console.log('Obteniendo clima y pronóstico para ubicación actual');
+        setSelectedCity(null);
+        
+        // Obtener ubicación actual
       const location = await getUserLocation();
-      
       if (!location) {
-        Alert.alert('Error', 'No se pudo obtener tu ubicación actual');
-        setIsLoadingWeather(false);
-        return;
+          throw new Error('No se pudo obtener la ubicación actual.');
+        }
+        
+        // Obtener el clima actual y el pronóstico de 7 días para la ubicación actual
+        weatherResponse = await getWeatherByCoordinates(
+          location.coords.latitude,
+          location.coords.longitude,
+          OPENWEATHERMAP_API_KEY
+        );
+        
+        forecastResponse = await getForecastByCoordinates(
+          location.coords.latitude,
+          location.coords.longitude,
+          OPENWEATHERMAP_API_KEY
+        );
       }
       
-      // Hacemos la petición a OpenWeatherMap API
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${location.coords.latitude}&lon=${location.coords.longitude}&units=metric&lang=es&appid=${OPENWEATHERMAP_API_KEY}`
-      );
-      
-      const data = await response.json();
-      
-      // Verificar si la respuesta contiene un error
-      if (data.cod && data.cod !== 200) {
-        console.error('Error en la respuesta de OpenWeatherMap:', data);
-        Alert.alert('Error', `Error al obtener datos del clima: ${data.message || 'Verifica tu API key'}`);
-        setIsLoadingWeather(false);
-        return;
-      }
-      
-      // Verificar que los datos están completos
-      if (!data.main || !data.weather) {
-        console.error('Datos incompletos en la respuesta:', data);
-        Alert.alert('Error', 'Los datos del clima están incompletos o tienen formato incorrecto');
-        setIsLoadingWeather(false);
-        return;
-      }
-      
-      setWeatherData(data);
+      // Actualizar los estados con los datos recibidos
+      setWeatherData(weatherResponse);
+      setForecastData(forecastResponse);
       setWeatherModalVisible(true);
+      
+      // También cargar las ciudades del usuario para el desplegable
+      if (userId) {
+        const cities = await getUserJourneyCities(userId);
+        setUserCities(cities);
+      }
+      
     } catch (error) {
       console.error('Error obteniendo datos del clima:', error);
-      Alert.alert('Error', `No se pudo obtener la información del clima: ${error.message || 'Error desconocido'}`);
+      Alert.alert(
+        'Error',
+        `No se pudieron obtener los datos del clima: ${error.message}`
+      );
     } finally {
       setIsLoadingWeather(false);
     }
   };
+  
+  // Función para seleccionar una ciudad y obtener su clima
+  const selectCity = (cityName: string) => {
+    console.log('Seleccionando ciudad:', typeof cityName, cityName);
+    // Asegurar que cityName es una cadena
+    if (typeof cityName !== 'string') {
+      console.error('Error: cityName no es una cadena:', cityName);
+      return;
+    }
+    
+    setCityDropdownVisible(false);
+    if (cityName === 'Mi ubicación actual') {
+      setWeatherData(null); // Limpiar datos actuales mientras cargamos nuevos
+      getWeatherData(); // Sin argumentos para usar la ubicación actual
+    } else if (cityName !== selectedCity) {
+      setWeatherData(null); // Limpiar datos actuales mientras cargamos nuevos
+      getWeatherData(cityName);
+    }
+  };
 
   // Modal para mostrar los datos del clima
-  const WeatherModal = () => (
+  const WeatherModal = () => {
+    // Función para convertir timestamp a día de la semana
+    const getDayOfWeek = (date: Date) => {
+      const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      return days[date.getDay()];
+    };
+    
+    // Función para formatear fecha completa
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('es-ES', { 
+        day: 'numeric', 
+        month: 'long' 
+      });
+    };
+    
+    return (
     <Modal
       visible={weatherModalVisible}
       transparent={true}
@@ -790,20 +924,153 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       <View style={styles.weatherModalOverlay}>
         <View style={styles.weatherModalContent}>
           <View style={styles.weatherModalHeader}>
-            <Text style={styles.weatherModalTitle}>Clima Actual</Text>
+              <Text style={styles.weatherModalTitle}>
+                {selectedCity ? `Clima en ${selectedCity}` : 'Clima en tu ubicación'}
+              </Text>
             <TouchableOpacity onPress={() => setWeatherModalVisible(false)}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
+            
+            {/* Pestañas para alternar entre clima actual y pronóstico */}
+            <View style={styles.weatherTabs}>
+              <TouchableOpacity 
+                style={[styles.weatherTab, !showForecast && styles.weatherTabActive]}
+                onPress={() => setShowForecast(false)}
+              >
+                <Text style={[styles.weatherTabText, !showForecast && styles.weatherTabTextActive]}>
+                  Actual
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.weatherTab, showForecast && styles.weatherTabActive]}
+                onPress={() => setShowForecast(true)}
+              >
+                <Text style={[styles.weatherTabText, showForecast && styles.weatherTabTextActive]}>
+                  Próximos 7 días
+                </Text>
+              </TouchableOpacity>
+            </View>
           
           <ScrollView style={styles.weatherModalBody}>
-            {weatherData ? (
+              {isLoadingWeather ? (
+                <View style={styles.weatherLoading}>
+                  <ActivityIndicator size="large" color="#005F9E" />
+                  <Text style={styles.weatherLoadingText}>Cargando información del clima...</Text>
+                </View>
+              ) : showForecast ? (
+                // Vista de pronóstico de 7 días
+                forecastData ? (
+                  <View style={styles.forecastContainer}>
+                    {forecastData.daily.slice(0, 7).map((day, index) => (
+                      <Card key={index} style={styles.forecastCard}>
+                        <Card.Content>
+                          <View style={styles.forecastDayHeader}>
+                            <Text style={styles.forecastDay}>
+                              {index === 0 ? 'Hoy' : getDayOfWeek(day.date)}
+                            </Text>
+                            <Text style={styles.forecastDate}>
+                              {formatDate(day.date)}
+                            </Text>
+                          </View>
+                          
+                          <View style={styles.forecastRow}>
+                            <View style={styles.forecastIconContainer}>
+                              <Image 
+                                source={{ uri: `https://openweathermap.org/img/wn/${day.weather[0].icon}@2x.png` }} 
+                                style={styles.forecastIcon} 
+                              />
+                              <Text style={styles.forecastDescription}>
+                                {day.weather[0].description}
+                              </Text>
+                            </View>
+                            
+                            <View style={styles.forecastTemps}>
+                              <Text style={styles.forecastTempMax}>
+                                <Ionicons name="arrow-up" size={16} color="#FF5722" />
+                                {Math.round(day.temp.max)}°C
+                              </Text>
+                              <Text style={styles.forecastTempMin}>
+                                <Ionicons name="arrow-down" size={16} color="#2196F3" />
+                                {Math.round(day.temp.min)}°C
+                              </Text>
+                            </View>
+                          </View>
+                          
+                          <View style={styles.forecastDetails}>
+                            <View style={styles.forecastDetailItem}>
+                              <Ionicons name="water-outline" size={18} color="#005F9E" />
+                              <Text style={styles.forecastDetailText}>{day.humidity}%</Text>
+                            </View>
+                            
+                            <View style={styles.forecastDetailItem}>
+                              <Ionicons name="umbrella-outline" size={18} color="#005F9E" />
+                              <Text style={styles.forecastDetailText}>{Math.round(day.pop * 100)}%</Text>
+                            </View>
+                            
+                            <View style={styles.forecastDetailItem}>
+                              <Ionicons name="compass-outline" size={18} color="#005F9E" />
+                              <Text style={styles.forecastDetailText}>{Math.round(day.speed * 3.6)} km/h</Text>
+                            </View>
+                          </View>
+                        </Card.Content>
+                      </Card>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.weatherLoading}>
+                    <Text style={styles.weatherErrorText}>No hay datos de pronóstico disponibles</Text>
+                  </View>
+                )
+              ) : (
+                // Vista de clima actual
+                weatherData ? (
               <>
                 <View style={styles.weatherMainInfo}>
+                      <TouchableOpacity 
+                        style={styles.citySelector} 
+                        onPress={() => setCityDropdownVisible(!cityDropdownVisible)}
+                      >
                   <Text style={styles.weatherLocation}>
                     {weatherData?.name || 'Ubicación desconocida'}
                     {weatherData?.sys?.country ? `, ${weatherData.sys.country}` : ''}
                   </Text>
+                        <Ionicons name={cityDropdownVisible ? "chevron-up" : "chevron-down"} size={18} color="#005F9E" />
+                      </TouchableOpacity>
+                      
+                      {cityDropdownVisible && (
+                        <View style={styles.citiesDropdown}>
+                          <TouchableOpacity 
+                            style={styles.cityItem}
+                            onPress={() => {
+                              console.log('Seleccionando Mi ubicación actual');
+                              selectCity('Mi ubicación actual');
+                            }}
+                          >
+                            <Ionicons name="locate" size={16} color="#005F9E" />
+                            <Text style={styles.cityItemText}>Mi ubicación actual</Text>
+                          </TouchableOpacity>
+                          
+                          {userCities.length > 0 ? (
+                            userCities.map(city => (
+                              <TouchableOpacity 
+                                key={city.id}
+                                style={styles.cityItem}
+                                onPress={() => {
+                                  console.log('Seleccionando ciudad:', city.name);
+                                  selectCity(city.name);
+                                }}
+                              >
+                                <Ionicons name="location" size={16} color="#005F9E" />
+                                <Text style={styles.cityItemText}>{city.name}</Text>
+                              </TouchableOpacity>
+                            ))
+                          ) : (
+                            <Text style={styles.noCitiesText}>No tienes viajes guardados</Text>
+                          )}
+                        </View>
+                      )}
+                      
                   <View style={styles.weatherMainRow}>
                     <Text style={styles.weatherTemp}>{Math.round(weatherData?.main?.temp || 0)}°C</Text>
                     {weatherData?.weather?.[0]?.icon && (
@@ -850,15 +1117,16 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
               </>
             ) : (
               <View style={styles.weatherLoading}>
-                <ActivityIndicator size="large" color="#005F9E" />
-                <Text style={styles.weatherLoadingText}>Cargando información del clima...</Text>
+                    <Text style={styles.weatherErrorText}>No hay datos del clima disponibles</Text>
               </View>
+                )
             )}
           </ScrollView>
         </View>
       </View>
     </Modal>
   );
+  };
 
   // Exponer funciones a los componentes padres
   useImperativeHandle(ref, () => ({
@@ -1093,6 +1361,29 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
     </View>
   );
 
+  // Añadir FABs para funcionalidades
+  const renderFABs = () => {
+    return (
+      <View style={styles.fabContainer}>
+        {/* FAB para ver información del clima */}
+        <FAB
+          testID="fab"
+          style={[styles.fab, { backgroundColor: isLoadingWeather ? '#ccc' : '#005F9E' }]}
+          icon="weather-partly-cloudy"
+          color="#fff"
+          disabled={isLoadingWeather}
+          onPress={() => {
+            console.log("Botón de clima presionado manualmente");
+            // Llamar getWeatherData sin argumentos para usar ubicación actual
+            getWeatherData();
+          }}
+        />
+        
+        {/* ... otros FABs ... */}
+      </View>
+    );
+  };
+
   // Renderización del componente
   return (
     <View style={styles.container}>
@@ -1197,10 +1488,13 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         <View style={styles.buttonContainer}>
           <FAB
             style={styles.fab}
-            icon="weather-lightning"
+            icon="weather-partly-cloudy"
             color="#fff"
             loading={isLoadingWeather}
-            onPress={getWeatherData}
+            onPress={() => {
+              console.log("Botón de clima presionado desde buttonContainer");
+              getWeatherData();
+            }}
           />
           <FAB
             style={styles.fab}
@@ -1434,7 +1728,157 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#666',
-  }
+  },
+  citySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8
+  },
+  citiesDropdown: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 5,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    alignSelf: 'stretch',
+  },
+  cityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  cityItemText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+  },
+  noCitiesText: {
+    textAlign: 'center',
+    paddingVertical: 10,
+    color: '#777',
+    fontStyle: 'italic',
+  },
+  fabContainer: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+  },
+  weatherTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  weatherTab: {
+    flex: 1,
+    padding: 10,
+    alignItems: 'center',
+  },
+  weatherTabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#005F9E',
+  },
+  weatherTabText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+    textAlign: 'center',
+  },
+  weatherTabTextActive: {
+    color: '#005F9E',
+  },
+  forecastContainer: {
+    padding: 10,
+  },
+  forecastCard: {
+    marginBottom: 10,
+    elevation: 2,
+  },
+  forecastDayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  forecastDay: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  forecastDate: {
+    fontSize: 14,
+    color: '#666',
+  },
+  forecastRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  forecastIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 2,
+  },
+  forecastIcon: {
+    width: 50,
+    height: 50,
+  },
+  forecastDescription: {
+    fontSize: 14,
+    color: '#666',
+    textTransform: 'capitalize',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  forecastTemps: {
+    alignItems: 'flex-end',
+    flex: 1,
+  },
+  forecastTempMax: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FF5722',
+    marginBottom: 4,
+  },
+  forecastTempMin: {
+    fontSize: 16,
+    color: '#2196F3',
+  },
+  forecastDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 8,
+  },
+  forecastDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  forecastDetailText: {
+    marginLeft: 4,
+    fontSize: 14,
+    color: '#666',
+  },
+  weatherErrorText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#ff5252',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
 }); 
 
 export default GlobeView; 

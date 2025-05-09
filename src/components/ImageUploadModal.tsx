@@ -216,25 +216,8 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       setVerificationMessage('Preparando imagen para análisis...');
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      // Convertir la imagen a formato base64
-      setVerificationMessage('Procesando imagen...');
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
-      // Crear un objeto FileReader para convertir el blob a base64
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          // Actualizar mensaje y esperar un momento
-          setVerificationMessage('Analizando contenido de la imagen...');
-          await new Promise(r => setTimeout(r, 1000));
-          
-          // El resultado es una string con formato "data:image/jpeg;base64,BASE64_DATA"
-          const base64data = reader.result?.toString().split(',')[1] || '';
-          
-          // Construir la solicitud para la API de Gemini
-          const apiKey = 'AIzaSyB4PuDOYXgbH9egme1UCO0CiRcOV4kVfMM';
-          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      // Verificar si es una URL de Cloudinary
+      const isCloudinaryImage = imageUri && imageUri.includes('cloudinary.com');
           
           // Crear el prompt para Gemini
           const prompt = `Esta imagen fue tomada para completar la siguiente misión: "${missionTitle}". 
@@ -247,28 +230,83 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           
           Explica brevemente tu razonamiento después de tu respuesta.`;
           
-          // Actualizar mensaje y avanzar progreso
+      // Actualizar mensaje
           setVerificationMessage('Consultando a la IA sobre la imagen...');
           setVerificationProgress(prev => Math.min(prev + 10, 90));
           
-          // Crear el cuerpo de la solicitud
-          const requestBody = {
+      // Construir la solicitud para la API de Gemini
+      const apiKey = 'AIzaSyB4PuDOYXgbH9egme1UCO0CiRcOV4kVfMM';
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      let requestBody;
+      
+      if (isCloudinaryImage) {
+        // Para imágenes de Cloudinary, usar la URL directamente
+        console.log('Usando URL de Cloudinary para verificación:', imageUri.substring(0, 50) + '...');
+        
+        // Método 1: Usar la URL directamente en el texto
+        requestBody = {
             contents: [
               {
                 parts: [
-                  {
-                    text: prompt
-                  },
+                { text: prompt + `\n\nURL de la imagen: ${imageUri}` }
+              ]
+            }
+          ]
+        };
+        
+        try {
+          // Intentar hacer una solicitud a la URL de Cloudinary para asegurarse de que es accesible
+          await fetch(imageUri, { method: 'HEAD' });
+        } catch (fetchError) {
+          console.warn('Error verificando accesibilidad de URL de Cloudinary:', fetchError);
+          // Continuamos de todos modos, ya que la API de Gemini intentará acceder a la URL
+        }
+      } else {
+        // Para imágenes locales, convertir a base64
+        setVerificationMessage('Procesando imagen...');
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        
+        // Crear un objeto FileReader para convertir el blob a base64
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            // El resultado es una string con formato "data:image/jpeg;base64,BASE64_DATA"
+            const result = reader.result?.toString() || '';
+            const base64 = result.split(',')[1] || '';
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        
+        // Verificar que el base64 sea válido
+        if (!base64Data || base64Data.length < 100) {
+          console.error('Error: datos base64 inválidos');
+          clearInterval(progressInterval);
+          setVerificationMessage('Error procesando la imagen. Intenta con otra imagen.');
+          setVerificationProgress(100);
+          await new Promise(r => setTimeout(r, 1500));
+          return false;
+        }
+        
+        // Crear el cuerpo de la solicitud con los datos base64
+        requestBody = {
+          contents: [
+            {
+              parts: [
+                { text: prompt },
                   {
                     inline_data: {
                       mime_type: "image/jpeg",
-                      data: base64data
+                    data: base64Data
                     }
                   }
                 ]
               }
             ]
           };
+      }
           
           // Enviar la solicitud a la API de Gemini
           try {
@@ -281,15 +319,127 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             });
             
             if (!geminiResponse.ok) {
-              console.error('Error en la respuesta de Gemini:', await geminiResponse.text());
+          const errorText = await geminiResponse.text();
+          console.error('Error en la respuesta de Gemini:', errorText);
+          
+          // Intentar con método alternativo si es una imagen de Cloudinary y falló el primero
+          if (isCloudinaryImage && !requestBody.contents[0].parts[1]) {
+            console.log('Intentando método alternativo para la imagen de Cloudinary...');
+            // Método alternativo: Descargar la imagen y convertirla a base64
+            try {
+              const imgResponse = await fetch(imageUri);
+              const imgBlob = await imgResponse.blob();
+              
+              const base64Data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result?.toString() || '';
+                  const base64 = result.split(',')[1] || '';
+                  resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(imgBlob);
+              });
+              
+              // Crear un nuevo cuerpo de solicitud con los datos base64
+              const newRequestBody = {
+                contents: [
+                  {
+                    parts: [
+                      { text: prompt },
+                      {
+                        inline_data: {
+                          mime_type: "image/jpeg",
+                          data: base64Data
+                        }
+                      }
+                    ]
+                  }
+                ]
+              };
+              
+              // Intentar nuevamente con los datos base64
+              const retryResponse = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newRequestBody)
+              });
+              
+              if (!retryResponse.ok) {
+                throw new Error(`Error en segundo intento: ${await retryResponse.text()}`);
+              }
+              
+              const retryData = await retryResponse.json();
+              const retryText = retryData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              console.log('Respuesta de Gemini (segundo intento):', retryText);
+              
+              // Verificar si la respuesta indica que la imagen cumple
+              const imageComplies = retryText.includes('SÍ CUMPLE');
+              
               clearInterval(progressInterval);
-              setVerificationMessage('No se pudo verificar la imagen. Continuando de todos modos...');
               setVerificationProgress(100);
               
-              // En caso de error, no permitimos continuar
-              await new Promise(r => setTimeout(r, 1500));
-              resolve(false);
-              return;
+              if (!imageComplies) {
+                // Extraer la explicación
+                const explanation = retryText.split('NO CUMPLE').length > 1 ? 
+                  retryText.split('NO CUMPLE')[1].trim() : 
+                  'La imagen no parece cumplir con los requisitos de la misión.';
+                
+                Alert.alert(
+                  "La imagen no cumple con la misión",
+                  `${explanation}\n\nPor favor, selecciona otra imagen que cumpla con los requisitos.`,
+                  [
+                    {
+                      text: "Seleccionar otra imagen",
+                      onPress: () => {
+                        setImage(null);
+                        setVerifyingImage(false);
+                      }
+                    }
+                  ]
+                );
+                return false;
+              } else {
+                setVerificationMessage('Verificación exitosa. Preparando carga...');
+                await new Promise(r => setTimeout(r, 1000));
+                return true;
+              }
+            } catch (altError) {
+              console.error('Error en método alternativo:', altError);
+              // Continuar con el flujo normal en caso de error
+            }
+          }
+          
+          // Si llegamos aquí, ambos métodos fallaron o no era una imagen de Cloudinary
+          clearInterval(progressInterval);
+          setVerificationMessage('Verificación fallida. Continuando sin verificar...');
+          setVerificationProgress(100);
+          
+          // Preguntar al usuario si desea continuar de todos modos
+          await new Promise(r => setTimeout(r, 1000));
+          
+          return new Promise<boolean>((resolveAlert) => {
+            Alert.alert(
+              "Error de verificación",
+              "No se pudo verificar si la imagen cumple con la misión. ¿Deseas continuar de todos modos?",
+              [
+                {
+                  text: "Cancelar",
+                  onPress: () => {
+                    setVerifyingImage(false);
+                    resolveAlert(false);
+                  },
+                  style: "cancel"
+                },
+                {
+                  text: "Continuar",
+                  onPress: () => resolveAlert(true)
+                }
+              ]
+            );
+          });
             }
             
             setVerificationMessage('Interpretando respuesta de IA...');
@@ -314,6 +464,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               // Esperar un momento antes de mostrar la alerta
               await new Promise(r => setTimeout(r, 500));
               
+          return new Promise<boolean>((resolveAlert) => {
               Alert.alert(
                 "La imagen no cumple con la misión",
                 `${explanation}\n\nPor favor, selecciona otra imagen que cumpla con los requisitos.`,
@@ -323,17 +474,17 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     onPress: () => {
                       setImage(null);
                       setVerifyingImage(false);
-                      resolve(false);
+                    resolveAlert(false);
                     }
                   }
                 ]
               );
-              resolve(false);
+          });
             } else {
               setVerificationMessage('Verificación exitosa. Preparando carga...');
               // Esperamos un momento para mostrar el progreso completo
               await new Promise(r => setTimeout(r, 1000));
-              resolve(true);
+          return true;
             }
           } catch (fetchError) {
             console.error('Error al comunicarse con Gemini:', fetchError);
@@ -341,21 +492,58 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             setVerificationMessage('Error de conexión. No se puede verificar la imagen.');
             setVerificationProgress(100);
             
-            // En caso de error, no permitimos continuar
+        // En caso de error, preguntar si desea continuar
             await new Promise(r => setTimeout(r, 1500));
-            resolve(false);
-          }
-        };
-        reader.readAsDataURL(blob);
+        
+        return new Promise<boolean>((resolveAlert) => {
+          Alert.alert(
+            "Error de verificación",
+            "No se pudo verificar la imagen debido a un error de conexión. ¿Deseas continuar de todos modos?",
+            [
+              {
+                text: "Cancelar",
+                onPress: () => {
+                  setVerifyingImage(false);
+                  resolveAlert(false);
+                },
+                style: "cancel"
+              },
+              {
+                text: "Continuar",
+                onPress: () => resolveAlert(true)
+              }
+            ]
+          );
       });
+      }
     } catch (error) {
       console.error('Error al verificar la imagen con Gemini:', error);
-      setVerificationMessage('Error al verificar la imagen. No se puede completar la misión.');
+      setVerificationMessage('Error al verificar la imagen. Continuando sin verificar...');
       setVerificationProgress(100);
       
-      // En caso de error en la verificación, no permitimos continuar
+      // En caso de error en la verificación, preguntar si desea continuar
       await new Promise(r => setTimeout(r, 1500));
-      return false;
+      
+      return new Promise<boolean>((resolveAlert) => {
+        Alert.alert(
+          "Error de verificación",
+          "Ocurrió un problema al verificar la imagen. ¿Deseas continuar de todos modos?",
+          [
+            {
+              text: "Cancelar",
+              onPress: () => {
+                setVerifyingImage(false);
+                resolveAlert(false);
+              },
+              style: "cancel"
+            },
+            {
+              text: "Continuar",
+              onPress: () => resolveAlert(true)
+            }
+          ]
+        );
+      });
     }
   };
 

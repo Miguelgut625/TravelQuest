@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { createJournalEntry } from './journalService';
 import { addExperienceToUser } from './experienceService';
+import { analyzeImage } from './aiService';
 
 export const getUserPoints = async (userId: string) => {
     try {
@@ -46,7 +47,7 @@ export const addPointsToUser = async (userId: string, points: number) => {
 };
 
 export const completeMission = async (missionId: string, userId: string, imageUrl?: string) => {
-    console.log('Iniciando completeMission con parámetros:', { missionId, userId, imageUrl });
+    console.log('Iniciando completeMission con parámetros:', { missionId, userId, imageUrl: imageUrl ? 'imagen proporcionada' : 'sin imagen' });
     
     try {
         // Verificar que tenemos los datos necesarios
@@ -67,7 +68,9 @@ export const completeMission = async (missionId: string, userId: string, imageUr
                 challenges (
                     id,
                     title,
-                    points
+                    points,
+                    type,
+                    description
                 )
             `)
             .eq('id', missionId)
@@ -96,41 +99,26 @@ export const completeMission = async (missionId: string, userId: string, imageUr
         };
 
         
-        // Añadir URL de imagen si existe - CORREGIDO para usar directamente picture_url
+        // Añadir URL de imagen si existe
         if (imageUrl) {
-            console.log('Añadiendo URL de imagen a picture_url:', imageUrl);
-            
-            try {
-                // Usar directamente picture_url
-                updateData.picture_url = imageUrl;
-                const { error } = await supabase
-                    .from('journeys_missions')
-                    .update(updateData)
-                    .eq('id', missionId);
-                    
-                if (error) {
-                    console.error('Error al actualizar con picture_url:', error.message);
-                    // Si falla, actualizar sin la imagen
-                    delete updateData.picture_url;
-                    const { error: error2 } = await supabase
-                        .from('journeys_missions')
-                        .update({ completed: true, completed_at: new Date().toISOString() })
-                        .eq('id', missionId);
-                        
-                    if (error2) throw error2;
-                }
-            } catch (error: any) {
-                console.warn('Error con la columna de imagen pero continuando:', error.message);
-            }
-        } else {
-            // Si no hay imagen, solo actualizar el estado completado
-            console.log('Actualizando sin imagen...');
-            const { error } = await supabase
+            console.log('Añadiendo URL de imagen a picture_url');
+            updateData.picture_url = imageUrl;
+        }
+        
+        // Actualizar el estado de la misión
+        try {
+            const { error: updateError } = await supabase
                 .from('journeys_missions')
-                .update({ completed: true, completed_at: new Date().toISOString() })
+                .update(updateData)
                 .eq('id', missionId);
-                
-            if (error) throw error;
+            
+            if (updateError) {
+                console.error('Error al actualizar misión:', updateError);
+                throw updateError;
+            }
+        } catch (updateErr) {
+            console.error('Error en la operación de actualización:', updateErr);
+            throw updateErr;
         }
         
         // Añadir los puntos al usuario
@@ -138,49 +126,103 @@ export const completeMission = async (missionId: string, userId: string, imageUr
         console.log('Añadiendo puntos al usuario:', points);
         await addPointsToUser(userId, points);
         
-        // Si hay una imagen, intentamos agregar una entrada al diario
-        if (imageUrl) {
-            try {
-                console.log('Creando entrada en el diario...');
-                // Obtener información de la ciudad
-                const { data: journeyData, error: journeyError } = await supabase
-                    .from('journeys')
-                    .select(`
-                        id,
-                        cityId,
-                        cities (name)
-                    `)
-                    .eq('id', missionData.journeyId)
-                    .single();
-
-                if (journeyError) {
-                    console.warn('Error obteniendo datos de journey:', journeyError);
-                    return points; // Retornamos puntos y no creamos entrada en el diario
-                }
-                
-                // Crear entrada en el diario
-                console.log('Datos de journey obtenidos, creando entrada de diario:', journeyData);
-                
-                await createJournalEntry({
-                    userId: userId,
-                    cityId: journeyData.cityId,
-                    missionId: missionId,
-                    title: `Misión completada: ${missionData.challenges.title}`,
-                    content: `He completado esta misión en ${journeyData.cities?.name || 'mi viaje'}.`,
-                    photos: [imageUrl]
-                });
-                
-                console.log('Entrada de diario creada exitosamente');
-            } catch (error) {
-                console.warn('Error creando entrada en el diario, pero la misión se completó:', error);
-                // No lanzamos el error para no interrumpir el flujo
-            }
-        }
-
-        console.log('Misión completada exitosamente, retornando puntos:', points);
         return points;
+        
     } catch (error) {
-        console.error('Error en completeMission:', error);
+        console.error('Error completando misión:', error);
         throw error;
     }
+};
+
+/**
+ * Genera una descripción detallada para el diario cuando la IA falla
+ * @param cityName Nombre de la ciudad
+ * @param missionTitle Título de la misión
+ * @param isArtMission Indica si la misión está relacionada con arte
+ * @returns Descripción generada
+ */
+const generateFallbackDescription = (cityName: string, missionTitle: string, isArtMission: boolean): string => {
+    // Frases introductorias
+    const intros = [
+        `Hoy he completado una misión fascinante en ${cityName}.`,
+        `Durante mi viaje por ${cityName}, he logrado completar una de mis misiones.`,
+        `Mi aventura en ${cityName} continúa, y he documentado este momento especial.`,
+        `Explorando ${cityName}, he tenido la oportunidad de completar esta misión.`,
+        `Mi recorrido por ${cityName} me ha permitido vivir esta experiencia única.`
+    ];
+    
+    // Frases sobre el ambiente
+    const ambience = [
+        "El ambiente era realmente encantador, con una luz perfecta para capturar el momento.",
+        "El entorno era impresionante, lleno de color, vida y energía local.",
+        "Las calles estaban llenas de gente local y otros viajeros, todos disfrutando del lugar.",
+        "La arquitectura y el ambiente del lugar me transportaron a otra época.",
+        "El clima era perfecto, lo que añadió un toque especial a esta experiencia."
+    ];
+    
+    // Descripciones de arte
+    const artDescriptions = [
+        "La obra destacaba por su técnica magistral y la rica paleta de colores utilizada por el artista.",
+        "La exposición presentaba piezas de diferentes épocas, permitiéndome apreciar la evolución del estilo artístico.",
+        "La colección incluía obras de artistas tanto reconocidos como emergentes, ofreciendo una visión completa del panorama artístico.",
+        "La forma en que la luz interactuaba con la obra creaba un efecto casi hipnótico, resaltando cada detalle.",
+        "El museo estaba organizado de manera que podía seguir un recorrido cronológico a través de diferentes movimientos artísticos."
+    ];
+    
+    // Descripciones turísticas
+    const touristDescriptions = [
+        "Este lugar es uno de los puntos emblemáticos de la ciudad, y ahora entiendo por qué atrae a tantos visitantes.",
+        "La historia de este sitio se remonta a siglos atrás, y cada piedra parece contar una parte de esa historia.",
+        "Los sabores locales y la gastronomía tradicional complementaron perfectamente mi visita a este lugar.",
+        "Desde este punto, pude disfrutar de unas vistas panorámicas espectaculares de toda la ciudad.",
+        "Los habitantes locales fueron increíblemente amables y me compartieron anécdotas fascinantes sobre este lugar."
+    ];
+    
+    // Reflexiones finales
+    const closings = [
+        `Esta experiencia en ${cityName} quedará guardada en mi memoria como uno de los momentos destacados de mi viaje.`,
+        `Sin duda, ${cityName} tiene mucho más que ofrecer, y estoy deseando seguir explorando sus rincones.`,
+        `Este momento captado en ${cityName} representa perfectamente la esencia de mi viaje y mi conexión con este lugar.`,
+        `Llevaré conmigo los recuerdos de ${cityName} y de esta particular experiencia durante mucho tiempo.`,
+        `Esta misión completada ha enriquecido mi comprensión de la cultura y la historia de ${cityName}.`
+    ];
+    
+    // Seleccionar aleatoriamente una frase de cada categoría
+    const getRandomElement = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+    
+    // Construir la descripción
+    let description = getRandomElement(intros) + "\n\n";
+    description += `La misión "${missionTitle}" me llevó a capturar este momento único. `;
+    description += getRandomElement(ambience) + "\n\n";
+    
+    // Añadir descripciones específicas según el tipo de misión
+    if (isArtMission) {
+        description += getRandomElement(artDescriptions) + "\n";
+        description += getRandomElement(artDescriptions) + "\n\n";
+    } else {
+        description += getRandomElement(touristDescriptions) + "\n";
+        description += getRandomElement(touristDescriptions) + "\n\n";
+    }
+    
+    // Añadir más contenido para hacer la descripción más extensa
+    description += "Mi recorrido por este lugar me permitió observar detalles que normalmente pasarían desapercibidos. ";
+    description += "La interacción con el entorno y las personas locales me ayudó a entender mejor la cultura y tradiciones. ";
+    description += `${cityName} tiene un carácter único que se refleja en su arquitectura, gastronomía y en la actitud de sus habitantes.\n\n`;
+    
+    // Añadir más detalles según el tipo de misión
+    if (isArtMission) {
+        description += "El arte tiene el poder de transcender barreras culturales y temporales, permitiéndonos conectar con las perspectivas y emociones de personas de diferentes épocas y lugares. ";
+        description += "Observar detenidamente cada obra me ha permitido apreciar los detalles técnicos, las influencias y el contexto histórico que las rodea. ";
+        description += "El contraste entre diferentes estilos y períodos artísticos enriquece nuestra comprensión de la evolución del arte a lo largo del tiempo.\n\n";
+    } else {
+        description += "Viajar no solo implica visitar lugares nuevos, sino también experimentar diferentes formas de vida y perspectivas. ";
+        description += "Cada ciudad tiene su propio ritmo y carácter, reflejado en su arquitectura, en sus espacios públicos y en cómo interactúan sus habitantes. ";
+        description += "Explorar lugares fuera de las rutas turísticas tradicionales me ha permitido descubrir gemas ocultas y vivir experiencias más auténticas.\n\n";
+    }
+    
+    // Cierre
+    description += getRandomElement(closings) + "\n\n";
+    description += "Al revisar esta fotografía en el futuro, recordaré no solo el lugar, sino también las sensaciones, los sonidos y las personas que formaron parte de esta experiencia única.";
+    
+    return description;
 }; 

@@ -13,9 +13,11 @@ import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
 import { addExperienceToUser } from '../../services/experienceService';
 import { awardSpecificBadges } from '../../services/badgeService';
+import { analyzeImage } from '../../services/aiService';
 import { useTheme } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-context';
+import { getUserPoints } from '../../services/pointsService';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -41,6 +43,7 @@ interface JourneyMission {
   id: string;
   completed: boolean;
   cityName: string;
+  cityId?: string;
   end_date: string;
   challenge: {
     title: string;
@@ -350,6 +353,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const [error, setError] = useState<string | null>(null);
   const [completingMission, setCompletingMission] = useState(false);
   const [missionCompleted, setMissionCompleted] = useState(false);
+  const [generatingDescription, setGeneratingDescription] = useState(false);
   const [completedMissionInfo, setCompletedMissionInfo] = useState<{
     title: string;
     points: number;
@@ -359,6 +363,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     xpGained: number;
     remainingXP: number;
     xpNext: number;
+    journalEntry?: {
+      content: string;
+      imageUrl: string;
+    };
   } | null>(null);
   const [userPoints, setUserPoints] = useState(0);
   // @ts-ignore - React hook error
@@ -367,6 +375,27 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const [missionToShare, setMissionToShare] = useState<JourneyMission | null>(null);
   const dispatch = useDispatch();
   const theme = useTheme();
+
+  // Función para obtener cityId por nombre
+  const getCityIdByName = async (cityName: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('cities')
+        .select('id')
+        .eq('name', cityName)
+        .single();
+      
+      if (error || !data) {
+        console.error('Error al obtener cityId por nombre:', error);
+        return '';
+      }
+      
+      return data.id;
+    } catch (error) {
+      console.error('Error al buscar cityId:', error);
+      return '';
+    }
+  };
 
   const fetchMissions = async () => {
     if (!user?.id) {
@@ -470,6 +499,24 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       // Organizar misiones por ciudad
       const missionsByCity: CityMissions = {};
       allMissions.forEach((mission: JourneyMission) => {
+        // Añadir el cityId a cada misión si está disponible en el journey
+        const journeyData = allJourneys.find(j => 
+          j.journeys_missions.some(jm => jm.id === mission.id)
+        );
+        
+        if (journeyData && journeyData.cityId) {
+          mission.cityId = journeyData.cityId;
+        } else if (journeyData && journeyData.cities) {
+          // Intentar obtener el cityId de otra manera
+          (async () => {
+            try {
+              mission.cityId = await getCityIdByName(mission.cityName);
+            } catch (e) {
+              console.warn('No se pudo obtener el cityId para', mission.cityName);
+            }
+          })();
+        }
+        
         if (!missionsByCity[mission.cityName]) {
           missionsByCity[mission.cityName] = {
             completed: [],
@@ -540,128 +587,275 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   }, [journeyId]);
 
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
-    if (!user?.id) return;
+    console.log('🎯 Iniciando completeMission para misión:', missionId);
+    
+    if (!user) {
+      Alert.alert('Error', 'Debes iniciar sesión para completar misiones.');
+      return;
+    }
+
+    if (completingMission) {
+      console.log('⚠️ Ya hay una misión en proceso de completarse, ignorando solicitud');
+      return;
+    }
 
     try {
       setCompletingMission(true);
 
-      // Encontrar la misión en el estado local
+      // Buscar la misión en los datos locales
       let foundMissionTitle = '';
       let foundMissionPoints = 0;
       let foundCityName = '';
+      let foundMission = null;
 
       Object.keys(cityMissions).forEach((cityName) => {
         const pending = cityMissions[cityName].pending;
-        const foundMission = pending.find((m) => m.id === missionId);
-        if (foundMission) {
-          foundMissionTitle = foundMission.challenge.title;
-          foundMissionPoints = foundMission.challenge.points;
+        const mission = pending.find((m) => m.id === missionId);
+        if (mission) {
+          foundMission = mission;
+          foundMissionTitle = mission.challenge.title;
+          foundMissionPoints = mission.challenge.points;
           foundCityName = cityName;
         }
       });
 
-      if (!foundMissionTitle || !foundCityName) {
-        throw new Error('Misión no encontrada');
-      }
-
-      // Guardar información básica de la misión antes de completarla
+      // Preparar información para mostrar en el modal
       setCompletedMissionInfo({
         title: foundMissionTitle,
         points: foundMissionPoints,
         cityName: foundCityName,
-        xpGained: 0,
-        remainingXP: 0,
-        xpNext: 0
-      });
-
-      // Completar misión en la base de datos
-      await completeMission(
-        missionId,
-        user?.id || '',
-        imageUrl
-      );
-
-      // Otorgar insignias por completar misión
-      await awardSpecificBadges(user.id, 'completeMission');
-
-      // Añadir experiencia y verificar si subió de nivel
-      const experienceResult = await addExperienceToUser(user.id, foundMissionPoints);
-
-      // Actualizar la información de misión completada con datos de experiencia
-      setCompletedMissionInfo(prev => ({
-        ...prev,
-        levelUp: experienceResult.leveledUp,
-        newLevel: experienceResult.level,
         xpGained: foundMissionPoints,
-        remainingXP: experienceResult.xp,
-        xpNext: experienceResult.xpNext
-      }));
-
-      // Crear entrada en el diario para esta misión completada
-      if (imageUrl) {
-        await createJournalEntry({
-          userId: user?.id || '',
-          cityId: foundCityName || '',
-          missionId: missionId,
-          title: `Misión completada: ${foundMissionTitle}`,
+        remainingXP: 0,
+        xpNext: 50,
+        journalEntry: imageUrl ? {
           content: `He completado la misión "${foundMissionTitle}" en ${foundCityName}. ¡Conseguí ${foundMissionPoints} puntos!`,
-          photos: [imageUrl],
-          tags: [foundCityName || '', 'Misión completada']
-        });
-      }
-
-      // Actualizar el estado local
-      setCityMissions((prev) => {
-        const updatedMissions = { ...prev };
-        const city = updatedMissions[foundCityName];
-
-        // Encontrar el índice de la misión en las pendientes
-        const index = city.pending.findIndex((m) => m.id === missionId);
-
-        if (index !== -1) {
-          // Obtener la misión y marcarla como completada
-          const mission = { ...city.pending[index], completed: true };
-
-          // Eliminar la misión de pendientes
-          city.pending.splice(index, 1);
-
-          // Añadir la misión a completadas
-          city.completed.push(mission);
-        }
-
-        return updatedMissions;
+        imageUrl
+        } : undefined
       });
 
-      // Actualizar la UI de puntos
-      setUserPoints((prev) => prev + foundMissionPoints);
-
-      // Actualizar el estado global
+      // Actualizar estado en Redux para reflejar cambios inmediatamente en la UI
       dispatch(dispatchCompleteMission(missionId));
       dispatch(setRefreshJournal(true));
 
-      // Mostrar el modal de misión completada
+      // 1. Completar la misión en la base de datos 
+      console.log('🔄 Completando misión en la base de datos...');
+
+      // Iniciar el proceso en segundo plano sin esperar su finalización
+      Promise.resolve().then(async () => {
+          try {
+          // Completar la misión en la base de datos
+            await completeMission(missionId, user?.id || '', imageUrl);
+            console.log('✅ Misión completada en la base de datos');
+
+          // 2. Si hay imagen, crear entrada de diario y proceso posterior
+      if (imageUrl) {
+              try {
+                // Intentar obtener el cityId con fallback
+                let cityId = 'unknown';
+                try {
+                  cityId = foundMission?.cityId || await getCityIdByName(foundCityName);
+                } catch (err) {
+                  console.error('❌ Error obteniendo cityId:', err);
+                }
+                
+              // Activar indicador de generación de descripción
+                setGeneratingDescription(true);
+                
+              // Crear entrada de diario inicialmente sin descripción
+                console.log('📝 Creando entrada de diario inicial...');
+                const journalEntry = await createJournalEntry({
+          userId: user?.id || '',
+                  cityId: cityId,
+          missionId: missionId,
+          title: `Misión completada: ${foundMissionTitle}`,
+                content: '', // Sin descripción inicial
+          photos: [imageUrl],
+          tags: [foundCityName || '', 'Misión completada']
+        });
+              console.log('✅ Entrada inicial creada exitosamente');
+                
+              // Generar descripción con IA dentro de un bloque try-catch independiente con timeout
+              console.log('🤖 Iniciando generación de descripción con IA en segundo plano...');
+                
+              // Crear un prompt específico para generar información histórica
+                const customPrompt = `Analiza la imagen adjunta tomada durante mi misión "${foundMissionTitle}" en ${foundCityName}.
+                
+                CONTEXTO: La misión consistía en ${foundMission?.challenge?.description || foundMissionTitle}
+                
+                Escribe una entrada de diario como si fueses un gui turistico explicando lo que se ve en la imagen (máximo 200 palabras) que DEBE incluir:
+                
+                1. IDENTIFICACIÓN DEL CONTENIDO DE LA IMAGEN:
+                   - Si es un monumento: su nombre exacto y estilo arquitectónico
+                   - Si es una planta o animal: su especie y características
+                   - Si es una obra de arte: su nombre y autor
+                   - Si es un lugar: su nombre completo y función
+                
+                2. INFORMACIÓN HISTÓRICA SOBRE LO MOSTRADO EN LA IMAGEN:
+                   - Año de construcción/creación/fundación del elemento principal
+                   - Origen histórico o etimológico del nombre
+                   - Un hecho importante en su historia
+                
+                3. DOS CURIOSIDADES INTERESANTES sobre el elemento principal que aparece en la imagen
+                
+                4. Una breve REFLEXIÓN PERSONAL como si yo hubiera tomado la foto durante mi visita
+                
+                ESTILO: Reflexivo, personal, emocionante, como un diario de viaje auténtico.
+                FORMATO: Párrafos cortos y claros, en primera persona.
+                
+                IMPORTANTE: Concéntrate en analizar y describir LO QUE SE VE EN LA IMAGEN, no lugares genéricos de la ciudad. Sé preciso con los datos históricos pero mantén un tono personal.`;
+                
+              // Usar un timeout adicional de protección para el proceso de IA
+              const aiTimeoutPromise = new Promise<void>((resolve) => {
+                setTimeout(() => {
+                  console.warn('⚠️ Timeout de seguridad activado para proceso de IA');
+                  setGeneratingDescription(false);
+                  resolve();
+                }, 60000); // 60 segundos de tiempo máximo
+              });
+              
+              // Promesa para el proceso de IA
+              const aiProcessPromise = (async () => {
+                try {
+                  console.log('📤 Enviando imagen para análisis con IA...');
+                  // Verificar que la URL de la imagen es válida
+                  if (!imageUrl || !imageUrl.startsWith('http')) {
+                    throw new Error('URL de imagen inválida: ' + imageUrl);
+                  }
+                  
+                  console.log('🖼️ Utilizando imagen de Cloudinary:', imageUrl.substring(0, 50) + '...');
+                  const aiDescription = await analyzeImage(imageUrl, foundCityName, 'tourist', customPrompt);
+                  console.log('📄 Descripción generada por IA:', aiDescription.substring(0, 50) + '...');
+
+                  // Actualizar la entrada con la descripción generada
+                  if (aiDescription && aiDescription.length > 20) {
+                    console.log('🔄 Actualizando entrada con descripción de IA...');
+
+                    try {
+                    const { error } = await supabase
+                      .from('journal_entries')
+                      .update({ content: aiDescription })
+                      .eq('missionid', missionId)
+                      .eq('userid', user?.id || '');
+                      
+                    if (error) {
+                      console.error('❌ Error al actualizar la entrada con IA:', error);
+                        throw error;
+                    } else {
+                      console.log('✅ ENTRADA ACTUALIZADA EXITOSAMENTE con descripción IA');
+                    }
+                    } catch (dbError) {
+                      console.error('❌ Error de base de datos:', dbError);
+                      // Reintento con un enfoque alternativo
+                      try {
+                        console.log('🔄 Reintentando actualización con método alternativo...');
+                        const { error: retryError } = await supabase.rpc('update_journal_entry', {
+                          p_mission_id: missionId,
+                          p_user_id: user?.id || '',
+                          p_content: aiDescription
+                        });
+                        
+                        if (!retryError) {
+                          console.log('✅ Actualización exitosa con método alternativo');
+                  } else {
+                          throw retryError;
+                        }
+                      } catch (finalError) {
+                        console.error('❌ Fallo en todos los intentos de actualización:', finalError);
+                        throw finalError;
+                      }
+                    }
+                  } else {
+                    console.warn('⚠️ Descripción demasiado corta o vacía');
+                    throw new Error('Descripción inválida');
+                  }
+                } catch (aiError) {
+                  console.error('❌ Error en proceso de IA:', aiError);
+                  console.log('🔄 Utilizando respuesta de fallback...');
+
+                  // Actualizar con una descripción de respaldo
+                  const fallbackDesc = `He completado la misión "${foundMissionTitle}" en ${foundCityName}. Durante mi visita, tuve la oportunidad de capturar esta imagen que muestra un elemento importante de la ciudad. La experiencia fue realmente enriquecedora y me permitió conectar con la historia y cultura local de manera única. ¡Conseguí ${foundMissionPoints} puntos completando esta aventura!`;
+                  
+                  try {
+                    await supabase
+                      .from('journal_entries')
+                      .update({ content: fallbackDesc })
+                      .eq('missionid', missionId)
+                      .eq('userid', user?.id || '');
+                      
+                    console.log('✅ Entrada actualizada con descripción de respaldo');
+                  } catch (e) {
+                    console.error('❌ Error final al actualizar con descripción de respaldo:', e);
+                  }
+                } finally {
+                  console.log('🏁 Finalizando proceso de IA');
+                  setGeneratingDescription(false);
+      dispatch(setRefreshJournal(true));
+                }
+              })();
+              
+              // Ejecutar ambas promesas en paralelo
+              Promise.race([aiProcessPromise, aiTimeoutPromise])
+                .catch(err => {
+                  console.error('❌ Error en proceso paralelo de IA:', err);
+                  setGeneratingDescription(false);
+                });
+                
+              } catch (journalError) {
+                console.error('❌ Error al crear entrada del diario:', journalError);
+                setGeneratingDescription(false);
+                dispatch(setRefreshJournal(true));
+              }
+            }
+            
+          // Otorgar insignias y añadir experiencia en un proceso independiente
+          Promise.resolve().then(async () => {
+            try {
+              await awardSpecificBadges(user.id, 'completeMission');
+              const expResult = await addExperienceToUser(user.id, foundMissionPoints);
+              console.log('🏆 Experiencia añadida:', expResult);
+    } catch (error) {
+              console.error('⚠️ Error otorgando recompensas:', error);
+              // No bloquear el flujo por errores en recompensas
+            }
+          }).catch(err => {
+            console.warn('⚠️ Error en proceso de recompensas:', err);
+            // Capturar cualquier error no controlado
+          });
+          
+        } catch (processingError) {
+          console.error('❌ Error crítico en proceso de fondo:', processingError);
+            setGeneratingDescription(false);
+            dispatch(setRefreshJournal(true));
+          }
+      }).catch(uncaughtError => {
+        // Capturar cualquier error no controlado en la promesa principal
+        console.error('❌ Error no controlado en proceso principal:', uncaughtError);
+        setGeneratingDescription(false);
+      });
+
+      // Mostrar el modal de la misión completada
       setMissionCompleted(true);
 
     } catch (error) {
-      console.error('Error al completar la misión:', error);
+      console.error('❌ Error al iniciar proceso de completar misión:', error);
       Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
-      setMissionCompleted(false);
-    } finally {
       setCompletingMission(false);
     }
   };
 
+  // Función para manejar la navegación automática al journal
   useEffect(() => {
-    if (missionCompleted) {
-      // Si la misión se completó, programar la navegación al diario
-      const timer = setTimeout(() => {
-        setMissionCompleted(false);
+    if (completingMission && !missionCompleted) {
+      console.log('⏱️ Navegando automáticamente al journal');
+      // Navegamos al journal después de un breve tiempo
+      const navigationTimeout = setTimeout(() => {
+        setCompletingMission(false);
         navigation.navigate('Journal', { refresh: true });
-      }, 3000);
-
-      return () => clearTimeout(timer);
+      }, 1000); // 1 segundo de espera
+      
+      return () => clearTimeout(navigationTimeout);
     }
-  }, [missionCompleted, navigation]);
+  }, [completingMission, missionCompleted, navigation]);
 
   const handleShareJourney = async (friend: Friend) => {
     if (!journeyId) {
@@ -685,6 +879,22 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     } finally {
       setIsShareModalVisible(false);
     }
+  };
+
+  // Añadir componente de loader para el estado de generación
+  const renderGeneratingLoader = () => {
+    if (generatingDescription) {
+      return (
+        <View style={styles.generatingLoaderOverlay}>
+          <View style={styles.generatingLoaderContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.generatingText}>Generando descripción del diario...</Text>
+            <Text style={styles.generatingSubtext}>Esto puede tardar unos momentos...</Text>
+          </View>
+        </View>
+      );
+    }
+    return null;
   };
 
   if (loading) {
@@ -815,8 +1025,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         visible={missionCompleted}
         info={completedMissionInfo}
         onFinished={() => {
+          console.log('Modal de misión completada cerrado');
           setMissionCompleted(false);
-          navigation.navigate('Journal', { refresh: true });
         }}
       />
 
@@ -830,6 +1040,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         onClose={() => setIsShareModalVisible(false)}
         onSelect={handleShareJourney}
       />
+
+      {renderGeneratingLoader()}
     </SafeAreaView>
   );
 };
@@ -1050,7 +1262,7 @@ const styles = StyleSheet.create({
   expiredTime: {
     color: '#f44336',
   },
-  loadingOverlay: {
+  generatingLoaderOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -1059,64 +1271,38 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    zIndex: 1000,
+  },
+  generatingLoaderContainer: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  generatingText: {
+    color: 'white',
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  generatingSubtext: {
+    color: 'white',
+    marginTop: 5,
+    fontSize: 14,
+    textAlign: 'center',
   },
   shareIcon: {
     padding: 5,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    maxHeight: '80%'
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10
-  },
-  friendItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc'
-  },
-  friendName: {
-    fontSize: 16
-  },
-  friendPoints: {
-    fontSize: 14,
-    color: '#666'
-  },
-  cancelButton: {
-    marginTop: 10,
-    backgroundColor: '#D32F2F',
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center'
-  },
-  cancelButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
-  },
-  levelUpContainer: {
-    marginTop: 15,
-    backgroundColor: '#FFD700',
-    padding: 10,
-    borderRadius: 8,
-    width: '100%',
-    alignItems: 'center',
-  },
-  levelUpText: {
-    color: '#7B4513',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
 });
 

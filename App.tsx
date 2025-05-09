@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import './src/services/mapshim'; // Importar shim para react-native-maps
 import { PersistGate } from 'redux-persist/integration/react';
 import { Provider } from 'react-redux';
 import { store, persistor } from './src/features/store';

@@ -221,3 +221,65 @@ export const searchCities = async (searchTerm: string) => {
     return [];
   }
 }; 
+
+// Función para obtener las ciudades donde el usuario tiene viajes
+export const getUserJourneyCities = async (userId: string) => {
+  try {
+    // Obtenemos los viajes del usuario y las ciudades relacionadas
+    const { data, error } = await supabase
+      .from('journeys')
+      .select(`
+        id,
+        cityId,
+        cities (
+          id,
+          name
+        )
+      `)
+      .eq('userId', userId);
+
+    if (error) {
+      console.error('Error obteniendo ciudades de viajes:', error);
+      return [];
+    }
+
+    // Filtrar para obtener solo ciudades válidas y eliminar duplicados
+    const uniqueCities = data
+      .filter(journey => journey.cities && journey.cities.id && journey.cities.name)
+      .map(journey => journey.cities)
+      .filter((city, index, self) => 
+        index === self.findIndex((c) => c.id === city.id)
+      );
+
+    return uniqueCities;
+  } catch (error) {
+    console.error('Error obteniendo ciudades de viajes del usuario:', error);
+    return [];
+  }
+};
+
+// Función para obtener datos del clima por nombre de ciudad
+export const getWeatherByCity = async (cityName: string, apiKey: string) => {
+  try {
+    // Hacemos la petición a OpenWeatherMap API usando el nombre de la ciudad
+    const response = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&units=metric&lang=es&appid=${apiKey}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Error al obtener datos del clima: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Verificar si la respuesta contiene un error
+    if (data.cod && data.cod !== 200) {
+      throw new Error(`Error en la respuesta del clima: ${data.message || 'Código de error: ' + data.cod}`);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error obteniendo datos del clima por ciudad:', error);
+    throw error;
+  }
+}; 

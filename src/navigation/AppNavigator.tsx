@@ -15,6 +15,7 @@ import VerifyEmailScreen from '../screens/auth/VerifyEmailScreen';
 import MapScreen from '../screens/main/MapScreen';
 import MissionsScreen from '../screens/main/MissionsScreen';
 import JournalScreen from '../screens/main/JournalScreen';
+import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import LeaderboardScreen from '../screens/main/LeaderboardScreen';
 import FriendsScreen from '../screens/main/FriendsScreen';
@@ -56,6 +57,9 @@ type RootStackParamList = {
   Chat: {
     friendId: string;
     friendName: string;
+  };
+  JournalEntryDetail: {
+    entry: any;
   };
   BadgesScreen: undefined;
   Friends: undefined;
@@ -109,6 +113,13 @@ const MainFlow = () => {
             backgroundColor: theme.colors.primary,
           },
           headerTintColor: 'white',
+        }}
+      />
+      <Stack.Screen
+        name="JournalEntryDetail"
+        component={JournalEntryDetailScreen}
+        options={{
+          headerShown: false
         }}
       />
       <Stack.Screen

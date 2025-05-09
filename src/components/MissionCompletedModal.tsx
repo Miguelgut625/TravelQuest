@@ -1,195 +1,284 @@
-import React from 'react';
-import { View, Text, Modal, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, memo } from 'react';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-interface MissionInfo {
-  title: string;
-  points: number;
-  cityName: string;
-  levelUp?: boolean;
-  newLevel?: number;
-  xpGained?: number;
-  remainingXP?: number;
-  xpNext?: number;
-}
 
 interface MissionCompletedModalProps {
   visible: boolean;
-  info: MissionInfo | null;
+  info: {
+    title: string;
+    points: number;
+    cityName: string;
+    levelUp?: boolean;
+    newLevel?: number;
+    xpGained: number;
+    remainingXP: number;
+    xpNext: number;
+    journalEntry?: {
+      content: string;
+      imageUrl: string;
+    };
+  } | null;
   onFinished?: () => void;
 }
 
-const MissionCompletedModal = ({ visible, info, onFinished }: MissionCompletedModalProps) => {
+// Componente memorizado para evitar re-renderizaciones innecesarias
+const MissionCompletedModal = memo(({ visible, info, onFinished }: MissionCompletedModalProps) => {
+  // Si no hay info, no renderizar nada
   if (!info) return null;
+
+  // Extraer solo lo que necesitamos para mostrar la descripción
+  const journalContent = info.journalEntry?.content || '';
+  const hasLongContent = journalContent.length > 100;
+  const shortContent = hasLongContent ? journalContent.substring(0, 150) + '...' : journalContent;
+  const imageUrl = info.journalEntry?.imageUrl;
+
+  // Calcular porcentaje de XP para la barra de progreso
+  const xpPercentage = Math.min(100, Math.max(0, (info.remainingXP / info.xpNext) * 100));
 
   return (
     <Modal
       visible={visible}
       transparent={true}
       animationType="fade"
+      onRequestClose={onFinished}
     >
-      <View style={styles.modalContainer}>
+      <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.confettiContainer}>
-            <Ionicons name="checkmark-circle" size={70} color="#4CAF50" />
-          </View>
-          
-          <Text style={styles.modalTitle}>¡Misión Completada!</Text>
-          <Text style={styles.modalText}>{info.title}</Text>
-          <Text style={styles.modalCity}>en {info.cityName}</Text>
-          <Text style={styles.modalPoints}>+{info.points} puntos</Text>
-          <Text style={styles.modalXP}>+{info.xpGained || info.points} XP</Text>
-          
-          {info.levelUp && info.newLevel ? (
-            <View style={styles.levelUpContainer}>
-              <Text style={styles.levelUpText}>¡Has subido al nivel {info.newLevel}!</Text>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            {/* Cabecera del modal */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>¡Misión Completada!</Text>
+              <TouchableOpacity style={styles.closeButton} onPress={onFinished}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Información de la misión */}
+            <View style={styles.missionInfoContainer}>
+              <Text style={styles.missionTitle}>{info.title}</Text>
+              <Text style={styles.missionCity}>en {info.cityName}</Text>
+            </View>
+
+            {/* Imagen de la misión si existe */}
+            {imageUrl && (
+              <View style={styles.imageContainer}>
+                <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.missionImage}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
+
+            {/* Recompensas */}
+            <View style={styles.rewardsContainer}>
+              <Text style={styles.rewardsTitle}>Recompensas</Text>
+              <View style={styles.rewardItem}>
+                <Ionicons name="star" size={24} color="#FFC107" />
+                <Text style={styles.rewardText}>{info.points} puntos</Text>
+              </View>
+              <View style={styles.rewardItem}>
+                <Ionicons name="trophy" size={24} color="#4CAF50" />
+                <Text style={styles.rewardText}>+{info.xpGained} XP</Text>
+              </View>
+            </View>
+
+            {/* Información de nivel */}
+            <View style={styles.levelContainer}>
+              {info.levelUp ? (
+                <Text style={styles.levelUpText}>
+                  ¡Has subido al nivel {info.newLevel}! 🎉
+                </Text>
+              ) : (
+                <Text style={styles.levelText}>
+                  Te faltan {info.xpNext - info.remainingXP} XP para el siguiente nivel
+                </Text>
+              )}
               
-              {info.remainingXP !== undefined && info.xpNext !== undefined && (
-                <View style={styles.xpProgressContainer}>
-                  <View style={styles.xpProgressBar}>
-                    <View 
-                      style={[
-                        styles.xpProgress, 
-                        { width: `${(info.remainingXP / info.xpNext) * 100}%` }
-                      ]} 
-                    />
-                  </View>
-                  <Text style={styles.xpProgressText}>
-                    {info.remainingXP}/{info.xpNext} XP para nivel {info.newLevel + 1}
-                  </Text>
-                </View>
-              )}
+              {/* Barra de progreso de XP */}
+              <View style={styles.xpProgressBackground}>
+                <View 
+                  style={[
+                    styles.xpProgressFill, 
+                    { width: `${xpPercentage}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.xpText}>
+                {info.remainingXP} / {info.xpNext} XP
+              </Text>
             </View>
-          ) : (
-            <View style={styles.xpProgressContainer}>
-              {info.remainingXP !== undefined && info.xpNext !== undefined && (
-                <>
-                  <View style={styles.xpProgressBar}>
-                    <View 
-                      style={[
-                        styles.xpProgress, 
-                        { width: `${(info.remainingXP / info.xpNext) * 100}%` }
-                      ]} 
-                    />
-                  </View>
-                  <Text style={styles.xpProgressText}>
-                    {info.remainingXP}/{info.xpNext} XP para el siguiente nivel
-                  </Text>
-                </>
-              )}
-            </View>
-          )}
-          
-          <TouchableOpacity
-            style={styles.button}
-            onPress={onFinished}
-          >
-            <Text style={styles.buttonText}>Continuar</Text>
-          </TouchableOpacity>
+
+            {/* Botón para cerrar */}
+            <TouchableOpacity style={styles.continueButton} onPress={onFinished}>
+              <Text style={styles.continueButtonText}>Continuar</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </View>
     </Modal>
   );
-};
+});
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 15,
   },
   modalContent: {
     backgroundColor: 'white',
     borderRadius: 15,
-    padding: 20,
-    alignItems: 'center',
-    width: '80%',
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    overflow: 'hidden',
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
-  confettiContainer: {
-    marginBottom: 20,
+  scrollContent: {
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#005F9E',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  missionInfoContainer: {
+    marginBottom: 15,
+  },
+  missionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  missionCity: {
+    fontSize: 16,
+    color: '#666',
+  },
+  imageContainer: {
+    marginVertical: 15,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  missionImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+  },
+  descriptionContainer: {
+    marginVertical: 15,
+    backgroundColor: '#f9f9f9',
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    minHeight: 100,
+  },
+  descriptionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  descriptionContent: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  readMoreText: {
+    marginTop: 10,
+    color: '#005F9E',
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  rewardsContainer: {
+    marginVertical: 15,
+  },
+  rewardsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  rewardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  rewardText: {
+    fontSize: 16,
+    marginLeft: 10,
+    color: '#333',
+  },
+  levelContainer: {
+    marginVertical: 15,
+  },
+  levelUpText: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#4CAF50',
     marginBottom: 10,
-  },
-  modalText: {
-    fontSize: 18,
-    color: '#333',
     textAlign: 'center',
-    marginBottom: 5,
   },
-  modalCity: {
-    fontSize: 16,
+  levelText: {
+    fontSize: 14,
     color: '#666',
-    marginBottom: 15,
-  },
-  modalPoints: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFA000',
     marginBottom: 5,
   },
-  modalXP: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#5C6BC0',
-    marginBottom: 10,
-  },
-  levelUpContainer: {
-    marginTop: 10,
-    backgroundColor: '#FFD700',
-    padding: 10,
-    borderRadius: 8,
-    width: '100%',
-    alignItems: 'center',
-  },
-  levelUpText: {
-    color: '#7B4513',
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  xpProgressContainer: {
-    width: '100%',
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  xpProgressBar: {
-    height: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 4,
-    width: '100%',
+  xpProgressBackground: {
+    height: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    marginBottom: 5,
     overflow: 'hidden',
   },
-  xpProgress: {
+  xpProgressFill: {
+    backgroundColor: '#4CAF50',
     height: '100%',
-    backgroundColor: '#5C6BC0',
-    borderRadius: 4,
+    borderRadius: 5,
   },
-  xpProgressText: {
+  xpText: {
     fontSize: 12,
     color: '#666',
-    marginTop: 5,
+    textAlign: 'right',
   },
-  button: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 30,
-    paddingVertical: 10,
-    borderRadius: 25,
-    marginTop: 20,
+  continueButton: {
+    backgroundColor: '#005F9E',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 15,
   },
-  buttonText: {
+  continueButtonText: {
     color: 'white',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

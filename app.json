@@ -86,7 +86,8 @@
       "eas": {
         "projectId": "c2ecce27-7f4c-4193-afb9-b7c7a30e1339"
       },
-      "openWeatherMapApiKey": "7b4032296ff42f3251c5b97a5eff8ef7"
+      "openWeatherMapApiKey": "7b4032296ff42f3251c5b97a5eff8ef7",
+      "googleAiApiKey": "AIzaSyB4PuDOYXgbH9egme1UCO0CiRcOV4kVfMM"
     },
     "newArchEnabled": false,
     "owner": "miguel625guti"

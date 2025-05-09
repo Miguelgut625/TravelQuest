@@ -218,41 +218,7 @@ var completeMission = function (missionId, userId, imageUrl) { return __awaiter(
                 return [4 /*yield*/, (0, exports.addPointsToUser)(userId, points)];
             case 12:
                 _d.sent();
-                if (!imageUrl) return [3 /*break*/, 17];
-                _d.label = 13;
-            case 13:
-                _d.trys.push([13, 16, , 17]);
-                console.log('Creando entrada en el diario...');
-                return [4 /*yield*/, supabase_1.supabase
-                        .from('journeys')
-                        .select("\n                        id,\n                        cityId,\n                        cities (name)\n                    ")
-                        .eq('id', missionData.journeyId)
-                        .single()];
-            case 14:
-                _b = _d.sent(), journeyData = _b.data, journeyError = _b.error;
-                if (journeyError) {
-                    console.warn('Error obteniendo datos de journey:', journeyError);
-                    return [2 /*return*/, points]; // Retornamos puntos y no creamos entrada en el diario
-                }
-                // Crear entrada en el diario
-                console.log('Datos de journey obtenidos, creando entrada de diario:', journeyData);
-                return [4 /*yield*/, (0, journalService_1.createJournalEntry)({
-                        userId: userId,
-                        cityId: journeyData.cityId,
-                        missionId: missionId,
-                        title: "Misi\u00F3n completada: ".concat(missionData.challenges.title),
-                        content: "He completado esta misi\u00F3n en ".concat(((_c = journeyData.cities) === null || _c === void 0 ? void 0 : _c.name) || 'mi viaje', "."),
-                        photos: [imageUrl]
-                    })];
-            case 15:
-                _d.sent();
-                console.log('Entrada de diario creada exitosamente');
-                return [3 /*break*/, 17];
-            case 16:
-                error_5 = _d.sent();
-                console.warn('Error creando entrada en el diario, pero la misión se completó:', error_5);
-                return [3 /*break*/, 17];
-            case 17:
+                // Eliminamos la creación de entrada en el diario ya que ahora se maneja desde MissionsScreen.tsx
                 console.log('Misión completada exitosamente, retornando puntos:', points);
                 return [2 /*return*/, points];
             case 18:

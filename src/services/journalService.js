@@ -757,3 +757,233 @@ var createJournalEntry = function (data) { return __awaiter(void 0, void 0, void
     });
 }); };
 exports.createJournalEntry = createJournalEntry;
+
+/**
+ * Añade una foto a una entrada del diario existente
+ * @param entryId ID de la entrada del diario
+ * @param photoUrl URL de la foto a añadir
+ * @returns true si la operación fue exitosa
+ */
+var addPhotoToEntry = function (entryId, photoUrl) { return __awaiter(void 0, void 0, void 0, function () {
+    var _a, entry, fetchError, currentPhotos, updatedPhotos, updateError, error_1;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
+            case 0:
+                _b.trys.push([0, 2, , 3]);
+                return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_entries')
+                        .select('photos')
+                        .eq('id', entryId)
+                        .single()];
+            case 1:
+                _a = _b.sent(), entry = _a.data, fetchError = _a.error;
+                if (fetchError) {
+                    console.error('Error al obtener entrada del diario:', fetchError);
+                    return [2 /*return*/, false];
+                }
+                // Verificar si photos existe y es un array
+                currentPhotos = Array.isArray(entry.photos) ? entry.photos : [];
+                // Añadir la nueva foto al array
+                updatedPhotos = currentPhotos.concat([photoUrl]);
+                return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_entries')
+                        .update({ photos: updatedPhotos })
+                        .eq('id', entryId)];
+            case 2:
+                updateError = (_b.sent()).error;
+                if (updateError) {
+                    console.error('Error al actualizar fotos en la entrada:', updateError);
+                    return [2 /*return*/, false];
+                }
+                return [2 /*return*/, true];
+            case 3:
+                error_1 = _b.sent();
+                console.error('Error al añadir foto a la entrada:', error_1);
+                return [2 /*return*/, false];
+            case 4: return [2 /*return*/];
+        }
+    });
+}); };
+exports.addPhotoToEntry = addPhotoToEntry;
+
+/**
+ * Añade un comentario a una entrada del diario existente
+ * @param entryId ID de la entrada del diario
+ * @param userId ID del usuario que hace el comentario
+ * @param comment Texto del comentario
+ * @returns true si la operación fue exitosa
+ */
+var addCommentToEntry = function (entryId, userId, comment) { return __awaiter(void 0, void 0, void 0, function () {
+    var tableExists, result, error_1, newComment, entryContent, contentUpdate, updateResult, error_2;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
+            case 0:
+                _b.trys.push([0, 7, , 8]);
+                tableExists = false;
+                _b.label = 1;
+            case 1:
+                _b.trys.push([1, 3, , 4]);
+                return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_comments')
+                        .select('id')
+                        .limit(1)];
+            case 2:
+                result = _b.sent();
+                if (result && !result.error) {
+                    tableExists = true;
+                }
+                return [3 /*break*/, 4];
+            case 3:
+                error_1 = _b.sent();
+                console.log('La tabla journal_comments no existe o no es accesible:', error_1);
+                return [3 /*break*/, 4];
+            case 4:
+                if (!tableExists) return [3 /*break*/, 5];
+                // Intenta insertar en la tabla de comentarios
+                try {
+                    console.log('Intentando insertar en tabla journal_comments');
+                    return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_comments')
+                        .insert({
+                            entry_id: entryId,
+                            user_id: userId,
+                            comment: comment,
+                            created_at: new Date().toISOString()
+                        })];
+                } catch (error) {
+                    console.error('Error inesperado al insertar en journal_comments:', error);
+                    tableExists = false; // Intentar el método alternativo
+                }
+                _b.label = 5;
+            case 5:
+                if (!!tableExists) return [3 /*break*/, 6];
+                console.log('Usando método alternativo: añadir comentario al contenido de la entrada');
+                
+                // En lugar de intentar acceder a un campo comments que no existe
+                // añadiremos el comentario al final del contenido de la entrada
+                newComment = "\n\n[Comentario de Usuario - " + new Date().toLocaleString() + "]\n" + comment;
+                
+                // Primero obtenemos el contenido actual
+                return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_entries')
+                        .select('content')
+                        .eq('id', entryId)
+                        .single()];
+            case 6:
+                entryContent = _b.sent();
+                
+                if (entryContent.error) {
+                    console.error('Error al obtener contenido de la entrada:', entryContent.error);
+                    return [2 /*return*/, false];
+                }
+                
+                // Añadimos el comentario al contenido existente
+                contentUpdate = {
+                    content: (entryContent.data.content || '') + newComment
+                };
+                
+                console.log('Actualizando contenido con el comentario añadido');
+                return [4 /*yield*/, supabase_1.supabase
+                    .from('journal_entries')
+                    .update(contentUpdate)
+                    .eq('id', entryId)];
+            case 7:
+                updateResult = _b.sent();
+                if (updateResult.error) {
+                    console.error('Error al actualizar la entrada con el comentario:', updateResult.error);
+                    return [2 /*return*/, false];
+                }
+                
+                console.log('Comentario añadido exitosamente al contenido de la entrada');
+                return [2 /*return*/, true]; // Devolver true ya que el comentario se guardó localmente
+            case 8:
+                error_2 = _b.sent();
+                console.error('Error general al añadir comentario:', error_2);
+                return [2 /*return*/, false];
+        }
+    });
+}); };
+exports.addCommentToEntry = addCommentToEntry;
+
+/**
+ * Obtiene una entrada específica del diario por su ID
+ * @param entryId ID de la entrada a obtener
+ * @returns La entrada del diario o null si no se encuentra
+ */
+var getJournalEntryById = function (entryId) { return __awaiter(void 0, void 0, void 0, function () {
+    var _a, entry, error, cityName, _b, cityData, cityError, possibleCityTag, error_1;
+    return __generator(this, function (_c) {
+        switch (_c.label) {
+            case 0:
+                _c.trys.push([0, 3, , 4]);
+                console.log("Obteniendo entrada del diario con ID: " + entryId);
+                return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_entries')
+                        .select('*')
+                        .eq('id', entryId)
+                        .single()];
+            case 1:
+                _a = _c.sent(), entry = _a.data, error = _a.error;
+                if (error) {
+                    console.error('Error obteniendo entrada del diario:', error);
+                    return [2 /*return*/, null];
+                }
+                if (!entry) {
+                    console.log('No se encontró la entrada del diario');
+                    return [2 /*return*/, null];
+                }
+                cityName = 'Ciudad Desconocida';
+                _c.label = 2;
+            case 2:
+                try {
+                    if (entry.cityid) {
+                        return [4 /*yield*/, supabase_1.supabase
+                            .from('cities')
+                            .select('name')
+                            .eq('id', entry.cityid)
+                            .single()];
+                    }
+                }
+                catch (e) {
+                    console.warn('Error al obtener nombre de la ciudad:', e);
+                }
+                return [3 /*break*/, 3];
+            case 3:
+                _b = _c.sent(), cityData = _b.data, cityError = _b.error;
+                if (!cityError && cityData) {
+                    cityName = cityData.name;
+                }
+                // Si no tenemos el nombre de la ciudad, intentar extraerlo de las etiquetas
+                if (cityName === 'Ciudad Desconocida' && entry.tags && Array.isArray(entry.tags)) {
+                    possibleCityTag = entry.tags.find(function (tag) {
+                        return tag !== 'misión' &&
+                            tag !== 'mission' &&
+                            tag !== 'viaje' &&
+                            tag !== 'travel' &&
+                            tag.charAt(0).toUpperCase() === tag.charAt(0);
+                    });
+                    if (possibleCityTag) {
+                        cityName = possibleCityTag;
+                    }
+                }
+                return [2 /*return*/, {
+                        id: entry.id,
+                        userId: entry.userid,
+                        cityId: entry.cityid,
+                        missionId: entry.missionid,
+                        title: entry.title,
+                        content: entry.content || '',
+                        photos: Array.isArray(entry.photos) ? entry.photos : [],
+                        location: entry.location,
+                        created_at: entry.created_at,
+                        tags: Array.isArray(entry.tags) ? entry.tags : [],
+                        city_name: cityName
+                    }];
+            case 4:
+                error_1 = _c.sent();
+                console.error('Error obteniendo entrada del diario:', error_1);
+                return [2 /*return*/, null];
+        }
+    });
+}); };
+exports.getJournalEntryById = getJournalEntryById;
