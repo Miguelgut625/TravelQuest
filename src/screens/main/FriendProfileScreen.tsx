@@ -9,7 +9,7 @@ import { getProfilePictureUrl } from '../../services/profileService';
 import { CLOUDINARY_CONFIG } from '../../config/cloudinary';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
-import { deleteFriendship } from '../../services/friendService';
+import { deleteFriendship, sendFriendRequest } from '../../services/friendService';
 
 interface JourneyMission {
   id: string;
@@ -118,10 +118,14 @@ const FriendProfileScreen = () => {
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
   const user = useSelector((state: RootState) => state.auth.user);
   const [friendshipDate, setFriendshipDate] = useState<string | null>(null);
+  const [isFriend, setIsFriend] = useState(false);
 
   useEffect(() => {
+    console.log('FriendProfileScreen - useEffect triggered');
+    console.log('Current user:', user?.id);
+    console.log('Friend ID:', friendId);
     fetchFriendData();
-    fetchFriendshipDate();
+    checkFriendshipStatus();
   }, [friendId]);
 
   const fetchFriendData = async () => {
@@ -202,22 +206,49 @@ const FriendProfileScreen = () => {
     }
   };
 
-  const fetchFriendshipDate = async () => {
-    if (!user || !friendId) return;
+  const checkFriendshipStatus = async () => {
+    if (!user || !friendId) {
+      console.log('checkFriendshipStatus - Missing user or friendId');
+      return;
+    }
     try {
-      const { data, error } = await supabase
+      console.log('Checking friendship between:', user.id, 'and', friendId);
+      // Verificar si existe una relación de amistad en cualquier dirección
+      const { data: friendshipData, error: friendshipError } = await supabase
         .from('friends')
         .select('created_at')
-        .or(`and(user1Id.eq.${user.id},user2Id.eq.${friendId}),and(user1Id.eq.${friendId},user2Id.eq.${user.id})`)
-        .order('created_at', { ascending: true })
-        .limit(1);
-      if (!error && data && data.length > 0) {
-        setFriendshipDate(data[0].created_at);
+        .or(`and(user1Id.eq.${user.id},user2Id.eq.${friendId}),and(user1Id.eq.${friendId},user2Id.eq.${user.id})`);
+
+      console.log('Friendship check result:', { friendshipData, friendshipError });
+
+      if (!friendshipError && friendshipData && friendshipData.length > 0) {
+        console.log('Setting isFriend to true');
+        setIsFriend(true);
+        setFriendshipDate(friendshipData[0].created_at);
       } else {
+        console.log('Setting isFriend to false');
+        setIsFriend(false);
         setFriendshipDate(null);
       }
     } catch (e) {
+      console.error('Error checking friendship status:', e);
+      setIsFriend(false);
       setFriendshipDate(null);
+    }
+  };
+
+  const handleAddFriend = async () => {
+    if (!user) return;
+    try {
+      const { success, error } = await sendFriendRequest(user.id, friendId);
+      if (success) {
+        Alert.alert('Éxito', 'Solicitud de amistad enviada');
+        navigation.goBack();
+      } else {
+        throw error;
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo enviar la solicitud de amistad');
     }
   };
 
@@ -274,10 +305,14 @@ const FriendProfileScreen = () => {
 
         <View style={styles.profileSection}>
           <TouchableOpacity
-            style={styles.deleteIconProfile}
-            onPress={handleDeleteFriendship}
+            style={styles.actionIconProfile}
+            onPress={isFriend ? handleDeleteFriendship : handleAddFriend}
           >
-            <Ionicons name="trash" size={22} color="#ff4444" />
+            <Ionicons 
+              name={isFriend ? "person-remove" : "person-add"} 
+              size={22} 
+              color={isFriend ? "#ff4444" : "#005F9E"} 
+            />
           </TouchableOpacity>
           {profilePicUrl ? (
             <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
@@ -400,7 +435,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     position: 'relative',
   },
-  deleteIconProfile: {
+  actionIconProfile: {
     position: 'absolute',
     top: 10,
     right: 10,
