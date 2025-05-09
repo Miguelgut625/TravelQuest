@@ -119,6 +119,7 @@ const FriendProfileScreen = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const [friendshipDate, setFriendshipDate] = useState<string | null>(null);
   const [isFriend, setIsFriend] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
 
   useEffect(() => {
     console.log('FriendProfileScreen - useEffect triggered');
@@ -126,7 +127,8 @@ const FriendProfileScreen = () => {
     console.log('Friend ID:', friendId);
     fetchFriendData();
     checkFriendshipStatus();
-  }, [friendId]);
+    checkPendingRequest();
+  }, [friendId, user?.id]);
 
   const fetchFriendData = async () => {
     if (!friendId) return;
@@ -237,15 +239,50 @@ const FriendProfileScreen = () => {
     }
   };
 
+  const checkPendingRequest = async () => {
+    if (!user || !friendId) return;
+    try {
+      console.log('Checking pending requests for:', { userId: user.id, friendId });
+      
+      // Verificar solicitudes enviadas
+      const { data: sentRequest, error: sentError } = await supabase
+        .from('friendship_invitations')
+        .select('id')
+        .eq('senderId', user.id)
+        .eq('receiverId', friendId)
+        .eq('status', 'Pending')
+        .maybeSingle();
+
+      // Verificar solicitudes recibidas
+      const { data: receivedRequest, error: receivedError } = await supabase
+        .from('friendship_invitations')
+        .select('id')
+        .eq('senderId', friendId)
+        .eq('receiverId', user.id)
+        .eq('status', 'Pending')
+        .maybeSingle();
+
+      console.log('Request check results:', { sentRequest, receivedRequest });
+
+      const hasPending = (!sentError && sentRequest) || (!receivedError && receivedRequest);
+      console.log('Setting hasPendingRequest to:', hasPending);
+      setHasPendingRequest(hasPending);
+    } catch (error) {
+      console.error('Error checking pending request:', error);
+      setHasPendingRequest(false);
+    }
+  };
+
   const handleAddFriend = async () => {
     if (!user) return;
     try {
       const { success, error } = await sendFriendRequest(user.id, friendId);
       if (success) {
         Alert.alert('Éxito', 'Solicitud de amistad enviada');
+        await checkPendingRequest();
         navigation.goBack();
       } else {
-        throw error;
+        Alert.alert('Error', error || 'No se pudo enviar la solicitud de amistad');
       }
     } catch (error) {
       Alert.alert('Error', 'No se pudo enviar la solicitud de amistad');
@@ -280,6 +317,28 @@ const FriendProfileScreen = () => {
     );
   };
 
+  const renderActionIcon = () => {
+    console.log('Rendering icon with states:', { isFriend, hasPendingRequest });
+    let iconName = "person-add";
+    let iconColor = "#005F9E";
+
+    if (isFriend) {
+      iconName = "person-remove";
+      iconColor = "#ff4444";
+    } else if (hasPendingRequest) {
+      iconName = "time";
+      iconColor = "#FFA000";
+    }
+
+    return (
+      <Ionicons 
+        name={iconName}
+        size={22} 
+        color={iconColor}
+      />
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -308,11 +367,7 @@ const FriendProfileScreen = () => {
             style={styles.actionIconProfile}
             onPress={isFriend ? handleDeleteFriendship : handleAddFriend}
           >
-            <Ionicons 
-              name={isFriend ? "person-remove" : "person-add"} 
-              size={22} 
-              color={isFriend ? "#ff4444" : "#005F9E"} 
-            />
+            {renderActionIcon()}
           </TouchableOpacity>
           {profilePicUrl ? (
             <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
@@ -359,7 +414,14 @@ const FriendProfileScreen = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Últimos Viajes</Text>
-          {Object.values(entriesByCity).length === 0 ? (
+          {!isFriend ? (
+            <View style={styles.journalEmptyContainer}>
+              <Ionicons name="lock-closed" size={64} color="#ccc" />
+              <Text style={styles.journalEmptyText}>
+                No puedes ver los viajes de {friendName} hasta que sean amigos
+              </Text>
+            </View>
+          ) : Object.values(entriesByCity).length === 0 ? (
             <Text style={styles.emptyText}>No hay viajes completados</Text>
           ) : (
             Object.values(entriesByCity).map((cityEntries, index) => (

@@ -45,24 +45,24 @@ export const getFriends = async (userId: string) => {
 export const getFriendRequests = async (userId: string) => {
   try {
     const { data, error } = await supabase
-      .from('friend_requests')
+      .from('friendship_invitations')
       .select(`
         id,
-        sender_id,
+        "senderId",
         created_at,
-        users!friend_requests_sender_id_fkey (
+        users!friendship_invitations_senderId_fkey (
           id,
           username
         )
       `)
-      .eq('receiver_id', userId)
-      .eq('status', 'pending');
+      .eq('receiverId', userId)
+      .eq('status', 'Pending');
 
     if (error) throw error;
 
     return data.map((request: any) => ({
       id: request.id,
-      senderId: request.sender_id,
+      senderId: request.senderId,
       username: request.users.username,
       createdAt: request.created_at
     }));
@@ -75,6 +75,33 @@ export const getFriendRequests = async (userId: string) => {
 // Función para enviar una solicitud de amistad
 export const sendFriendRequest = async (senderId: string, receiverId: string) => {
   try {
+    // Verificar si ya existe una solicitud pendiente
+    const { data: existingRequests, error: checkError } = await supabase
+      .from('friendship_invitations')
+      .select('id, status')
+      .or(`and(senderId.eq.${senderId},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${senderId})`)
+      .in('status', ['Pending', 'accepted']);
+
+    if (checkError) throw checkError;
+
+    // Verificar si hay alguna solicitud pendiente o aceptada
+    const pendingRequest = existingRequests?.find(req => req.status === 'Pending');
+    const acceptedRequest = existingRequests?.find(req => req.status === 'accepted');
+
+    if (pendingRequest) {
+      return { 
+        success: false, 
+        error: 'Ya existe una solicitud de amistad pendiente con este usuario' 
+      };
+    }
+
+    if (acceptedRequest) {
+      return { 
+        success: false, 
+        error: 'Ya son amigos con este usuario' 
+      };
+    }
+
     const { data, error } = await supabase
       .from('friendship_invitations')
       .insert({
@@ -114,22 +141,22 @@ export const acceptFriendRequest = async (requestId: string) => {
   try {
     // 1. Obtener información de la solicitud
     const { data: requestData, error: requestError } = await supabase
-      .from('friend_requests')
-      .select('sender_id, receiver_id')
+      .from('friendship_invitations')
+      .select('senderId, receiverId')
       .eq('id', requestId)
       .single();
 
     if (requestError) throw requestError;
 
-    const senderId = requestData.sender_id;
-    const receiverId = requestData.receiver_id;
+    const senderId = requestData.senderId;
+    const receiverId = requestData.receiverId;
 
     // 2. Iniciar una transacción para realizar todas las operaciones
     // Supabase no soporta transacciones directamente, así que hacemos las operaciones en secuencia
 
     // 3. Actualizar el estado de la solicitud a 'accepted'
     const { error: updateError } = await supabase
-      .from('friend_requests')
+      .from('friendship_invitations')
       .update({ status: 'accepted' })
       .eq('id', requestId);
 
@@ -167,7 +194,7 @@ export const acceptFriendRequest = async (requestId: string) => {
 export const rejectFriendRequest = async (requestId: string) => {
   try {
     const { error } = await supabase
-      .from('friend_requests')
+      .from('friendship_invitations')
       .update({ status: 'rejected' })
       .eq('id', requestId);
 

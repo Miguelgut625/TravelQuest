@@ -662,26 +662,26 @@ class NotificationService {
 
   // Método para notificar una solicitud de amistad
   public async notifyFriendRequest(
-    userId: string,
-    requesterId: string,
-    requesterName: string
+    receiverId: string,    // ID del usuario que recibe la solicitud
+    senderId: string,      // ID del usuario que envía la solicitud
+    senderName: string     // Nombre del usuario que envía la solicitud
   ) {
     const title = '¡Nueva solicitud de amistad!';
-    const body = `${requesterName} quiere conectar contigo en TravelQuest`;
+    const body = `${senderName} quiere conectar contigo en TravelQuest`;
 
     try {
       // Guardar en base de datos
       const { error } = await supabase
         .from('notifications')
         .insert({
-          userid: userId,
+          userid: receiverId,  // Asegurarnos de que se guarda para el receptor
           title,
           message: body,
           type: 'friend_request',
           read: false,
           data: { 
-            requesterId,
-            requesterName
+            requesterId: senderId,
+            requesterName: senderName
           },
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -700,8 +700,8 @@ class NotificationService {
             body,
             data: { 
               type: 'friend_request',
-              requesterId,
-              requesterName 
+              requesterId: senderId,
+              requesterName: senderName 
             },
             sound: 'default',
             priority: Notifications.AndroidNotificationPriority.HIGH,
@@ -712,10 +712,10 @@ class NotificationService {
 
       // También enviar notificación push
       await sendPushNotification(
-        userId,
+        receiverId,  // Asegurarnos de que se envía al receptor
         title,
         body,
-        { type: 'friend_request', requesterId, requesterName }
+        { type: 'friend_request', requesterId: senderId, requesterName: senderName }
       );
 
       return true;

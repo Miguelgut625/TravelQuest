@@ -43,6 +43,7 @@ const FriendsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
   const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends');
+  const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set());
   
   // Estados para el buscador
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,6 +75,17 @@ const FriendsScreen = () => {
       // Obtener solicitudes de amistad
       const requests = await getFriendRequests(user.id);
       setFriendRequests(requests);
+
+      // Obtener solicitudes pendientes enviadas
+      const { data: sentRequests, error: sentError } = await supabase
+        .from('friendship_invitations')
+        .select('receiverId')
+        .eq('senderId', user.id)
+        .eq('status', 'Pending');
+
+      if (!sentError && sentRequests) {
+        setPendingRequests(new Set(sentRequests.map(req => req.receiverId)));
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -120,10 +132,11 @@ const FriendsScreen = () => {
       const { success, error } = await sendFriendRequest(user.id, userId);
       if (success) {
         Alert.alert('Éxito', 'Solicitud de amistad enviada');
+        setPendingRequests(prev => new Set([...prev, userId]));
         setShowSearchResults(false);
         setSearchQuery('');
       } else {
-        throw error;
+        Alert.alert('Error', error || 'No se pudo enviar la solicitud de amistad');
       }
     } catch (error) {
       Alert.alert('Error', 'No se pudo enviar la solicitud de amistad');
@@ -168,6 +181,7 @@ const FriendsScreen = () => {
         ) : searchResults.length > 0 ? (
           searchResults.map((result) => {
             const isFriend = isUserFriend(result.id);
+            const hasPendingRequest = pendingRequests.has(result.id);
             return (
               <TouchableOpacity
                 key={result.id}
@@ -197,7 +211,11 @@ const FriendsScreen = () => {
                     style={styles.addFriendButton}
                     onPress={() => handleSendFriendRequest(result.id)}
                   >
-                    <Ionicons name="person-add-outline" size={24} color="#005F9E" />
+                    <Ionicons 
+                      name={hasPendingRequest ? "time-outline" : "person-add-outline"} 
+                      size={24} 
+                      color={hasPendingRequest ? "#FFA000" : "#005F9E"} 
+                    />
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
