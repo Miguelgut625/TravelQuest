@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // URL base de la API
-const API_URL = 'http://192.168.1.5:5000/api';
+const API_URL = 'http://192.168.1.38:5000/api';
 
 // Tipos de datos para insignias
 export interface Badge {

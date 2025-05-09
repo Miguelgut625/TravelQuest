@@ -51,6 +51,21 @@ const createUser = async (req, res) => {
   try {
     console.log('Intentando registrar usuario:', { email, username });
     
+    // Verificar si el username ya existe
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', username)
+      .single();
+
+    if (checkError && !checkError.message.includes('No rows found')) {
+      throw checkError;
+    }
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Este nombre de usuario ya está en uso' });
+    }
+    
     // Primero, registrar al usuario con Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),

@@ -2,10 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
-import { Badge, UserBadge, getUserBadges, checkAllBadges } from '../../services/badgeService';
 import BadgesList from '../../components/BadgesList';
 import BadgeDetailModal from '../../components/BadgeDetailModal';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
+
+// URL base de la API
+const API_URL = 'http://192.168.1.38:5000/api';
+
+// Interfaces
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: 'missions' | 'cities' | 'level' | 'social' | 'special';
+  threshold: number;
+  created_at: string;
+}
+
+interface UserBadge {
+  id: string;
+  userId: string;
+  badgeId: string;
+  unlocked_at: string;
+  badges?: Badge;
+}
 
 interface BadgesScreenProps {
   navigation: any;
@@ -26,11 +48,11 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
       setLoading(true);
       
       // Verificar y otorgar nuevas insignias si corresponde
-      await checkAllBadges(user.id);
+      await axios.get(`${API_URL}/badges/check/${user.id}`);
       
       // Obtener las insignias actualizadas del usuario
-      const badges = await getUserBadges(user.id);
-      setUserBadges(badges);
+      const response = await axios.get(`${API_URL}/badges/user/${user.id}`);
+      setUserBadges(response.data || []);
     } catch (error) {
       console.error('Error al cargar insignias:', error);
     } finally {

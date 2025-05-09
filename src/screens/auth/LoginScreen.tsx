@@ -15,7 +15,11 @@ import { WebView } from 'react-native-webview';
 import axios from 'axios';
 
 // URL base de la API
-const API_URL = 'http://192.168.1.5:5000/api';
+const API_URL = 'http://192.168.1.38:5000/api';
+
+// Configuración de Axios
+axios.defaults.timeout = 10000; // 10 segundos de timeout
+axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 // Asegurar que la redirección de autenticación en web se maneje correctamente
 WebBrowser.maybeCompleteAuthSession();
