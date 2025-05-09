@@ -4,6 +4,8 @@ import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity }
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native'; // Importa el hook de navegación
 import { Ionicons } from '@expo/vector-icons'; // Importa los íconos de Ionicons
+import { useSelector } from 'react-redux';
+import { RootState } from '../../features/store';
 
 interface LeaderboardItem {
   id: string; // Asegúrate de que este campo exista en tu tabla
@@ -13,6 +15,7 @@ interface LeaderboardItem {
 
 const LeaderboardScreen = () => {
   const navigation = useNavigation(); // Obtén el objeto de navegación
+  const { user } = useSelector((state: RootState) => state.auth);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +46,18 @@ const LeaderboardScreen = () => {
     <View style={styles.itemContainer}>
       <View style={styles.rankContainer}>
         <Text style={styles.rankText}>{index + 1}.</Text>
-        <Text style={styles.usernameText}>{item.username}</Text>
+        <TouchableOpacity 
+          onPress={() => {
+            if (user && item.id === user.id) {
+              navigation.navigate('Profile');
+            } else {
+              navigation.navigate('FriendProfile', { friendId: item.id, friendName: item.username, rankIndex: index });
+            }
+          }}
+          style={styles.usernameContainer}
+        >
+          <Text style={styles.usernameText}>{item.username}</Text>
+        </TouchableOpacity>
       </View>
       <Text style={styles.pointsText}>{item.points} puntos</Text>
       {index === 0 && <Text style={styles.firstPlaceText}>🏆 Explorador Supremo</Text>}
@@ -131,6 +145,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#005F9E',
     marginRight: 8,
+  },
+  usernameContainer: {
+    flex: 1,
   },
   usernameText: {
     fontSize: 20,

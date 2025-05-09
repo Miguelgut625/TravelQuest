@@ -45,6 +45,7 @@ interface FriendProfileScreenProps {
     params: {
       friendId: string;
       friendName: string;
+      rankIndex?: number;
     };
   };
 }
@@ -102,7 +103,7 @@ const EmptyState = ({ message }: { message: string }) => (
 const FriendProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { friendId, friendName } = route.params as { friendId: string; friendName: string };
+  const { friendId, friendName, rankIndex } = route.params as { friendId: string; friendName: string; rankIndex?: number };
   const [loading, setLoading] = useState(true);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
   const [stats, setStats] = useState({
@@ -396,6 +397,9 @@ const FriendProfileScreen = () => {
             </View>
           )}
           <Text style={styles.username}>{friendName}</Text>
+          {typeof rankIndex === 'number' && (
+            <Text style={getRankTitleStyle(rankIndex)}>{getRankTitle(rankIndex)}</Text>
+          )}
           <View style={styles.levelContainer}>
             <Text style={styles.levelText}>Nivel {level}</Text>
             <View style={styles.xpBar}>
@@ -768,6 +772,42 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 4,
   },
+  firstPlaceText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFD700',
+  },
+  secondPlaceText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#C0C0C0',
+  },
+  thirdPlaceText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#CD7F32',
+  },
+  titleText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
 });
+
+function getRankTitle(rankIndex: number) {
+  if (rankIndex === 0) return '🏆 Explorador Supremo';
+  if (rankIndex === 1) return '🌍 Aventurero Global';
+  if (rankIndex === 2) return '✈️ Viajero Frecuente';
+  if (rankIndex > 2 && rankIndex < 10) return '🌍 Viajero Experto';
+  return '';
+}
+
+function getRankTitleStyle(rankIndex: number) {
+  if (rankIndex === 0) return styles.firstPlaceText;
+  if (rankIndex === 1) return styles.secondPlaceText;
+  if (rankIndex === 2) return styles.thirdPlaceText;
+  if (rankIndex > 2 && rankIndex < 10) return styles.titleText;
+  return undefined;
+}
 
 export default FriendProfileScreen; 
