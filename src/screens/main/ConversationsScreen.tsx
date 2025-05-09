@@ -134,7 +134,7 @@ const ConversationsScreen = () => {
     return (
       <TouchableOpacity
         style={styles.conversationItem}
-        onPress={() => openChat(item.conversation_user_id, item.username || 'Usuario')}
+        onPress={() => openChat(item.conversation_user_id, item.username )}
       >
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -144,7 +144,7 @@ const ConversationsScreen = () => {
         
         <View style={styles.messageInfo}>
           <View style={styles.headerRow}>
-            <Text style={styles.username}>{item.username || 'Usuario'}</Text>
+            <Text style={styles.username}>{item.username }</Text>
             <Text style={styles.timestamp}>{formattedDate}</Text>
           </View>
           
@@ -250,34 +250,34 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: '#A0A0A0',
     marginTop: 20,
   },
   emptySubtext: {
     fontSize: 16,
-    color: '#888',
+    color: '#A0A0A0',
     textAlign: 'center',
     marginTop: 10,
   },
   conversationItem: {
     flexDirection: 'row',
     padding: 15,
-    backgroundColor: 'white',
+    backgroundColor: '#2D2F3A',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#181A20',
     alignItems: 'center',
   },
   avatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#7F5AF0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
   },
   avatarText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
   },
@@ -292,9 +292,10 @@ const styles = StyleSheet.create({
   username: {
     fontWeight: '600',
     fontSize: 16,
+    color: '#F5D90A',
   },
   timestamp: {
-    color: '#888',
+    color: '#A0A0A0',
     fontSize: 12,
   },
   messageRow: {
@@ -303,16 +304,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lastMessage: {
-    color: '#666',
+    color: '#A0A0A0',
     fontSize: 14,
     flex: 1,
   },
   unreadMessage: {
-    color: '#000',
+    color: '#F5D90A',
     fontWeight: '500',
   },
   badgeContainer: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#7F5AF0',
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -322,7 +323,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
   },

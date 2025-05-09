@@ -48,22 +48,22 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#333" />
+            <Ionicons name="close" size={24} color="#7F5AF0" />
           </TouchableOpacity>
           
           <View style={styles.badgeHeader}>
             <View style={styles.badgeIconContainer}>
               {badge.icon ? (
                 <Image 
-                source={{ uri: badge.icon }} 
-                style={styles.badgeIcon} 
+                  source={{ uri: badge.icon }} 
+                  style={styles.badgeIcon} 
                   resizeMode="cover"
                 />
               ) : (
                 <Ionicons 
                   name={getBadgeIconByCategory(badge.category)} 
                   size={80} 
-                  color="#4CAF50" 
+                  color="#F5D90A" 
                 />
               )}
             </View>
@@ -106,17 +106,21 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#2D2F3A',
     borderRadius: 15,
     padding: 20,
     width: '85%',
     maxHeight: '80%',
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   closeButton: {
     position: 'absolute',
@@ -134,14 +138,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 60,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
     marginBottom: 15,
     overflow: 'hidden',
     borderWidth: 3,
-    borderColor: '#e0e0e0',
+    borderColor: '#7F5AF0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
   },
@@ -152,7 +156,7 @@ const styles = StyleSheet.create({
   badgeName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5D90A',
     textAlign: 'center',
   },
   categoryContainer: {
@@ -162,12 +166,12 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#A0A0A0',
     marginRight: 5,
   },
   categoryValue: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#7F5AF0',
   },
   descriptionContainer: {
     marginBottom: 15,
@@ -175,12 +179,12 @@ const styles = StyleSheet.create({
   descriptionLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#A0A0A0',
     marginBottom: 5,
   },
   descriptionText: {
     fontSize: 16,
-    color: '#333',
+    color: '#A0A0A0',
     lineHeight: 22,
   },
   thresholdContainer: {
@@ -189,12 +193,12 @@ const styles = StyleSheet.create({
   thresholdLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#A0A0A0',
     marginBottom: 5,
   },
   thresholdText: {
     fontSize: 16,
-    color: '#333',
+    color: '#A0A0A0',
     lineHeight: 22,
   },
   shareButton: {

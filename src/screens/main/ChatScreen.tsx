@@ -372,6 +372,15 @@ const ChatScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      <View style={styles.headerContainer}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={28} color="#7F5AF0" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{friendName || 'Usuario'}</Text>
+      </View>
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -629,6 +638,27 @@ const styles = StyleSheet.create({
     top: 40,
     right: 20,
     zIndex: 10,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#2D2F3A', // Gris oscuro
+    borderBottomWidth: 1,
+    borderBottomColor: '#181A20', // Fondo oscuro
+  },
+  backButton: {
+    position: 'absolute',
+    left: 10,
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#F5D90A', // Amarillo misterioso
+    letterSpacing: 1,
   },
 });
 

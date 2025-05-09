@@ -133,7 +133,7 @@ const FriendsScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#005F9E']}
+              colors={['#F5D90A']}
             />
           }
         />
@@ -177,13 +177,13 @@ const styles = StyleSheet.create({
     padding: 15,
     marginVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#2D2F3A',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 1.41,
     elevation: 2,
     flexDirection: 'row',
@@ -196,10 +196,11 @@ const styles = StyleSheet.create({
   friendName: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#F5D90A',
   },
   friendPoints: {
     fontSize: 16,
-    color: '#666',
+    color: '#A0A0A0',
   },
   chatIconContainer: {
     position: 'relative',

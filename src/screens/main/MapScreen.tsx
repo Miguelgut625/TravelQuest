@@ -877,7 +877,7 @@ const MapScreen = () => {
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>TravelQuest</Text>
         <TouchableOpacity onPress={toggleFormCollapse} style={styles.collapseButton}>
-          <Ionicons name={isFormCollapsed ? "chevron-down" : "chevron-up"} size={24} color="#005F9E" />
+          <Ionicons name={isFormCollapsed ? "chevron-down" : "chevron-up"} size={24} color="#7F5AF0" />
         </TouchableOpacity>
       </View>
 
@@ -890,17 +890,17 @@ const MapScreen = () => {
         {startDate && endDate && (
           <View style={styles.durationOverlay}>
             <Text style={styles.durationOverlayText}>
-              <Ionicons name="calendar" size={16} color="white" /> {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
+              <Ionicons name="calendar" size={16} color="#F5D90A" /> {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
             </Text>
             <Text style={styles.durationOverlayText}>
-              <Ionicons name="time" size={16} color="white" /> Duración: {calculateDuration(startDate, endDate)} días
+              <Ionicons name="time" size={16} color="#F5D90A" /> Duración: {calculateDuration(startDate, endDate)} días
             </Text>
           </View>
         )}
 
         {isLoadingLocation ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#005F9E" />
+            <ActivityIndicator size="large" color="#7F5AF0" />
             <Text style={styles.loadingText}>Cargando ubicación...</Text>
           </View>
         ) : errorLocationMsg ? (
@@ -934,8 +934,8 @@ const MapScreen = () => {
               style={styles.floatingButton}
               onPress={retryLoadGlobe}
             >
-              <Ionicons name="refresh" size={20} color="white" style={{ marginRight: 5 }} />
-              <Text style={{ color: 'white', fontWeight: 'bold' }}>Recargar Globo 3D</Text>
+              <Ionicons name="refresh" size={20} color="#F5D90A" style={{ marginRight: 5 }} />
+              <Text style={{ color: '#F5D90A', fontWeight: 'bold' }}>Recargar Globo 3D</Text>
             </TouchableOpacity>
           </>
         )}
@@ -1030,7 +1030,7 @@ const MapScreen = () => {
       {/* Overlay para cambiar entre vistas */}
       {changingView && (
         <View style={styles.changingViewOverlay}>
-          <ActivityIndicator size="large" color="#FFF" />
+          <ActivityIndicator size="large" color="#F5D90A" />
           <Text style={styles.loadingText}>Cargando vista...</Text>
         </View>
       )}
@@ -1410,25 +1410,25 @@ const styles = StyleSheet.create({
   },
   tagButton: {
     borderWidth: 1.5,
-    borderColor: '#005F9E',
+    borderColor: '#7F5AF0',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     margin: 5,
-    backgroundColor: 'white',
+    backgroundColor: '#232634',
     minWidth: 95,
   },
   tagButtonSelected: {
-    backgroundColor: '#005F9E',
+    backgroundColor: '#7F5AF0',
   },
   tagText: {
-    color: '#005F9E',
+    color: '#F5D90A',
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
   },
   tagTextSelected: {
-    color: 'white',
+    color: '#FFFFFF',
   },
   errorContainer: {
     flex: 1,

@@ -73,7 +73,7 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color="#7F5AF0" />
         </TouchableOpacity>
         <Text style={styles.title}>Mis Insignias</Text>
         <View style={styles.rightPlaceholder} />
@@ -120,7 +120,7 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#181A20',
   },
   header: {
     flexDirection: 'row',
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#2D2F3A',
   },
   rightPlaceholder: {
     width: 40,
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5D90A',
     flex: 1,
     textAlign: 'center',
   },
@@ -158,18 +158,18 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#666',
+    color: '#A0A0A0',
   },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 15,
-    backgroundColor: 'white',
+    backgroundColor: '#2D2F3A',
     borderRadius: 10,
     margin: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -180,18 +180,18 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#F5D90A',
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#666',
+    color: '#A0A0A0',
     textAlign: 'center',
     marginTop: 5,
   },
   divider: {
     width: 1,
     height: '80%',
-    backgroundColor: '#eee',
+    backgroundColor: '#2D2F3A',
   },
 });
 

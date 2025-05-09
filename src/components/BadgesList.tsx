@@ -145,13 +145,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 10,
+    backgroundColor: '#181A20',
   },
   loadingContainer: {
     padding: 20,
     alignItems: 'center',
   },
   loadingText: {
-    color: '#666',
+    color: '#A0A0A0',
     fontSize: 16,
   },
   emptyContainer: {
@@ -162,12 +163,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#A0A0A0',
     marginTop: 10,
   },
   tipText: {
     fontSize: 14,
-    color: '#888',
+    color: '#A0A0A0',
     marginTop: 5,
     textAlign: 'center',
   },
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5D90A',
     marginLeft: 8,
   },
   badgeContainer: {
@@ -193,6 +194,11 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     elevation: 2,
+    backgroundColor: '#2D2F3A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   badgeContent: {
     flexDirection: 'row',
@@ -205,10 +211,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 15,
     borderRadius: 30,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#181A20',
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: '#7F5AF0',
   },
   badgeIcon: {
     width: 56,
@@ -222,18 +228,18 @@ const styles = StyleSheet.create({
   badgeName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#F5D90A',
     marginBottom: 4,
   },
   badgeDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#A0A0A0',
     marginBottom: 4,
     lineHeight: 18,
   },
   unlockDate: {
     fontSize: 12,
-    color: '#888',
+    color: '#A0A0A0',
     fontStyle: 'italic',
   },
 });
