@@ -55,7 +55,8 @@ const unlockBadge = async (req, res) => {
   try {
     console.log(`Iniciando desbloqueo de insignia: ID=${badgeId} para usuario: ID=${userId}`);
     
-    // Verificar si existe la insignia
+    // Verificar si existe la insignia en la tabla badges
+    console.log(`Verificando si la insignia ${badgeId} existe...`);
     const { data: badgeExists, error: badgeError } = await supabase
       .from('badges')
       .select('id, name')
@@ -63,15 +64,19 @@ const unlockBadge = async (req, res) => {
       .single();
       
     if (badgeError) {
-      console.error(`Error al verificar insignia:`, badgeError);
+      console.error(`Error al verificar si la insignia ${badgeId} existe:`, badgeError);
       return res.status(400).json({ error: badgeError.message });
     }
     
     if (!badgeExists) {
+      console.error(`La insignia con ID ${badgeId} no existe en la tabla badges`);
       return res.status(404).json({ error: 'La insignia no existe' });
     }
     
+    console.log(`Insignia encontrada: ${badgeExists.name} (${badgeId})`);
+    
     // Verificar si el usuario ya tiene esta insignia
+    console.log(`Verificando si el usuario ${userId} ya tiene la insignia ${badgeId}...`);
     const { data: existingBadge, error: checkError } = await supabase
       .from('user_badges')
       .select('id')
@@ -79,13 +84,25 @@ const unlockBadge = async (req, res) => {
       .eq('badgeId', badgeId)
       .single();
 
-    if (!checkError) {
+    if (checkError) {
+      if (checkError.code === 'PGRST116') {
+        // PGRST116 es el código de "no se encontró registro", que es lo que esperamos
+        console.log(`Confirmado: El usuario ${userId} no tiene la insignia ${badgeId} todavía`);
+      } else {
+        console.error(`Error al verificar si el usuario ya tiene la insignia:`, checkError);
+        return res.status(400).json({ error: checkError.message });
+      }
+    } else {
+      // Si ya tiene la insignia, informar y devolver éxito
+      console.log(`El usuario ${userId} ya tiene la insignia ${badgeId} - No se realizarán cambios`);
       return res.status(200).json({ 
         success: true, 
         message: 'El usuario ya tiene esta insignia',
         alreadyHad: true
       });
     }
+
+    console.log(`Insertando nueva insignia para usuario ${userId}: ${badgeId}`);
     
     // Añadir la insignia al usuario
     const { data: insertData, error: insertError } = await supabase
@@ -100,9 +117,11 @@ const unlockBadge = async (req, res) => {
       .select();
 
     if (insertError) {
-      console.error(`Error al insertar insignia:`, insertError);
+      console.error(`Error al insertar insignia en user_badges:`, insertError);
       return res.status(400).json({ error: insertError.message });
     }
+    
+    console.log(`¡Insignia otorgada exitosamente! Datos insertados:`, insertData);
     
     res.status(201).json({
       success: true,
@@ -125,9 +144,26 @@ const checkAllBadges = async (req, res) => {
   }
   
   try {
-    const unlockedBadges = [];
+    // Obtener todas las insignias que el usuario podría desbloquear
+    const unlockedBadges = await checkUserEligibility(userId);
     
-    // 1. Verificar insignias de misiones
+    res.status(200).json({
+      success: true,
+      unlockedBadges: unlockedBadges || []
+    });
+  } catch (error) {
+    console.error('Error al verificar todas las insignias:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Verificar elegibilidad del usuario para todas las insignias
+const checkUserEligibility = async (userId) => {
+  try {
+    // Este sería el lugar para implementar toda la lógica de verificación
+    // que ya tienes en badgeService.ts
+    
+    // Por ejemplo, verificar misiones completadas
     const { data: missionStats, error: statsError } = await supabase
       .from('journeys_missions')
       .select('id, completed')
@@ -136,9 +172,10 @@ const checkAllBadges = async (req, res) => {
       .count();
 
     if (statsError) throw statsError;
+
     const completedMissions = missionStats?.count || 0;
     
-    // Obtener insignias de misiones
+    // Obtener insignias de misiones que el usuario podría desbloquear
     const { data: missionBadges, error: badgesError } = await supabase
       .from('badges')
       .select('*')
@@ -146,111 +183,59 @@ const checkAllBadges = async (req, res) => {
 
     if (badgesError) throw badgesError;
     
-    // Verificar cada insignia de misión
+    const unlockedBadges = [];
+    
+    // Intentar desbloquear cada insignia elegible
     for (const badge of (missionBadges || [])) {
       if (completedMissions >= badge.threshold) {
-        const result = await unlockBadgeForUser(userId, badge.id);
-        if (result.success && !result.alreadyHad) {
+        try {
+          // Verificar si el usuario ya tiene esta insignia
+          const { data: existingBadge, error: checkError } = await supabase
+            .from('user_badges')
+            .select('id')
+            .eq('userId', userId)
+            .eq('badgeId', badge.id)
+            .single();
+          
+          // Si no hay error, el usuario ya tiene la insignia
+          if (!checkError) {
+            continue;
+          }
+          
+          // Si el error no es "no data found", algo salió mal
+          if (checkError.code !== 'PGRST116') {
+            console.error('Error al verificar badge existente:', checkError);
+            continue;
+          }
+          
+          // Insertar la nueva insignia
+          const { error: insertError } = await supabase
+            .from('user_badges')
+            .insert([
+              {
+                userId,
+                badgeId: badge.id,
+                unlocked_at: new Date().toISOString()
+              }
+            ]);
+            
+          if (insertError) {
+            console.error('Error al insertar badge:', insertError);
+            continue;
+          }
+          
           unlockedBadges.push(badge.name);
+        } catch (error) {
+          console.error('Error procesando badge:', error);
+          continue;
         }
       }
     }
     
-    // 2. Verificar insignias de nivel
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('points')
-      .eq('id', userId)
-      .single();
-      
-    if (!userError && userData) {
-      const { data: levelBadges, error: levelError } = await supabase
-        .from('badges')
-        .select('*')
-        .eq('category', 'level');
-        
-      if (!levelError) {
-        for (const badge of (levelBadges || [])) {
-          if (userData.points >= badge.threshold) {
-            const result = await unlockBadgeForUser(userId, badge.id);
-            if (result.success && !result.alreadyHad) {
-              unlockedBadges.push(badge.name);
-            }
-          }
-        }
-      }
-    }
-    
-    // 3. Verificar insignias de ciudades
-    const { data: cityStats, error: cityError } = await supabase
-      .from('user_cities')
-      .select('cityId')
-      .eq('userId', userId)
-      .count();
-      
-    if (!cityError && cityStats) {
-      const { data: cityBadges, error: cityBadgesError } = await supabase
-        .from('badges')
-        .select('*')
-        .eq('category', 'cities');
-        
-      if (!cityBadgesError) {
-        for (const badge of (cityBadges || [])) {
-          if (cityStats.count >= badge.threshold) {
-            const result = await unlockBadgeForUser(userId, badge.id);
-            if (result.success && !result.alreadyHad) {
-              unlockedBadges.push(badge.name);
-            }
-          }
-        }
-      }
-    }
-    
-    res.status(200).json({
-      success: true,
-      unlockedBadges: unlockedBadges
-    });
+    return unlockedBadges;
   } catch (error) {
-    console.error('Error al verificar todas las insignias:', error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Función auxiliar para desbloquear insignia
-const unlockBadgeForUser = async (userId, badgeId) => {
-  try {
-    // Verificar si el usuario ya tiene la insignia
-    const { data: existingBadge, error: checkError } = await supabase
-      .from('user_badges')
-      .select('id')
-      .eq('userId', userId)
-      .eq('badgeId', badgeId)
-      .single();
-
-    if (!checkError) {
-      return { success: true, alreadyHad: true };
-    }
-    
-    // Insertar la nueva insignia
-    const { error: insertError } = await supabase
-      .from('user_badges')
-      .insert([
-        {
-          userId,
-          badgeId,
-          unlocked_at: new Date().toISOString()
-        }
-      ]);
-      
-    if (insertError) {
-      console.error('Error al insertar badge:', insertError);
-      return { success: false, alreadyHad: false };
-    }
-    
-    return { success: true, alreadyHad: false };
-  } catch (error) {
-    console.error('Error en unlockBadgeForUser:', error);
-    return { success: false, alreadyHad: false };
+    console.error('Error en checkUserEligibility:', error);
+    return [];
   }
 };
 
