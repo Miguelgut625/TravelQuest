@@ -20,22 +20,6 @@ import { API_URL } from '../../config/api';
 axios.defaults.timeout = 10000; // 10 segundos de timeout
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
-// Asegurar que la redirección de autenticación en web se maneje correctamente
-WebBrowser.maybeCompleteAuthSession();
-
-// Detectar si estamos en desarrollo web o en dispositivo móvil
-const isNative = Platform.OS !== 'web';
-const isMobileDevice = isNative || (Platform.OS === 'web' && /Mobi|Android/i.test(navigator.userAgent));
-
-// Solo configuramos URL para desarrollo web
-let redirectUrl = '';
-if (!isNative && !isMobileDevice) {
-  // URL para desarrollo web (localhost)
-  redirectUrl = 'http://localhost:3000';
-}
-
-console.log('Plataforma:', Platform.OS, 'Es dispositivo móvil:', isMobileDevice);
-console.log('URL de redirección configurada:', redirectUrl || 'Usando config por defecto');
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -47,29 +31,6 @@ const LoginScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const error = useSelector((state: any) => state.auth.error);
 
-  // Verificar si hay una sesión activa cuando la pantalla se carga
-  useEffect(() => {
-    checkAndSetSession();
-  }, []);
-
-  // Configurar petición de Google Auth usando AuthSession
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    androidClientId: '867203082977-v6lt7u50bc1geniog48vcv4mt51obo0g.apps.googleusercontent.com', // Android OAuth Client ID
-    iosClientId: '867203082977-v6lt7u50bc1geniog48vcv4mt51obo0g.apps.googleusercontent.com', // opcional para iOS
-    redirectUri: makeRedirectUri({ scheme: 'com.travelquest.app' }), // custom scheme nativo
-  });
-
-  // Escuchar la respuesta de Google
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      if (id_token) {
-        handleGoogleToken(id_token);
-      } else {
-        dispatch(setError('No se recibió ID token de Google'));
-      }
-    }
-  }, [response]);
 
  
   const handleLogin = async () => {
@@ -82,25 +43,11 @@ const LoginScreen = () => {
       setLoading(true);
       dispatch(setAuthState('loading'));
       dispatch(setError(null));
-
-      console.log('Iniciando sesión para:', email);
-      
-      // Mostrar los datos que se enviarán al servidor
-      console.log('Datos a enviar:', {
-        email: email.trim(),
-        password: password.trim()
-      });
-      console.log('URL completa:', `${API_URL}/users/login`);
-
       // Llamada a la API para iniciar sesión
       const response = await axios.post(`${API_URL}/users/login`, {
         email: email.trim(),
         password: password.trim()
       });
-
-      // Si llegamos aquí, la autenticación fue exitosa
-      console.log('Login exitoso:', response.data);
-
       // Actualizar el estado con los datos del usuario
       dispatch(setUser({
         email: response.data.user.email || '',
@@ -131,7 +78,6 @@ const LoginScreen = () => {
       } else {
         // Error de red o conexión
         dispatch(setError('No se pudo conectar con el servidor. Verifica tu conexión a internet.'));
-        console.log('API URL utilizada:', `${API_URL}/users/login`);
       }
       
       dispatch(setAuthState('unauthenticated'));
@@ -144,46 +90,6 @@ const LoginScreen = () => {
     navigation.navigate('ForgotPassword');
   };
 
-  // Función centralizada para verificar y establecer la sesión
-  const checkAndSetSession = async (retryCount = 0, maxRetries = 5) => {
-    try {
-      console.log(`Verificando sesión (intento ${retryCount + 1}/${maxRetries + 1})...`);
-      
-      // Verificar si hay una sesión activa
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error al obtener sesión:', error);
-        return false;
-      }
-      
-      if (data?.session?.user) {
-        console.log('¡Sesión detectada!', data.session.user.email);
-        
-        // Actualizar el estado con los datos del usuario
-        dispatch(setUser({
-          email: data.session.user.email || '',
-          id: data.session.user.id,
-          username: data.session.user.user_metadata?.name || data.session.user.email?.split('@')[0]
-        }));
-        
-        dispatch(setAuthState('authenticated'));
-        navigation.navigate('Main');
-        return true;
-      } else if (retryCount < maxRetries) {
-        // Si no hay sesión pero quedan intentos, esperar y reintentar
-        console.log('Sesión no detectada, reintentando en 2 segundos...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return checkAndSetSession(retryCount + 1, maxRetries);
-      } else {
-        console.log('No se pudo detectar la sesión después de múltiples intentos');
-        return false;
-      }
-    } catch (e) {
-      console.error('Error en checkAndSetSession:', e);
-      return false;
-    }
-  };
 
   // Añadir un listener para eventos de autenticación con reintentos
   useEffect(() => {
@@ -203,10 +109,7 @@ const LoginScreen = () => {
             }));
             dispatch(setAuthState('authenticated'));
             navigation.navigate('Main');
-          } else {
-            // Intenta verificar la sesión con reintentos si el evento no trae los datos
-            checkAndSetSession();
-          }
+          } 
         } else if (event === 'INITIAL_SESSION') {
           // También verificamos si ya hay una sesión inicial
           console.log('Verificando sesión inicial...');
@@ -233,23 +136,6 @@ const LoginScreen = () => {
     };
   }, [dispatch, navigation]);
 
-  // Agregar un efecto cuando la app vuelve a primer plano
-  useEffect(() => {
-    const handleAppStateChange = async (nextAppState) => {
-      if (nextAppState === 'active') {
-        console.log('App volvió a primer plano, verificando sesión...');
-        checkAndSetSession();
-      }
-    };
-
-    // Registrar para eventos de cambio de estado de la app
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    // Limpiar al desmontar
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   return (
     <View style={styles.container}>
