@@ -20,5 +20,5 @@ app.use('/api', appRoutes);
 // Escuchar en todas las interfaces de red
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`También accesible en http://192.168.1.38:${PORT}`);
+  console.log(`También accesible en http://192.168.1.5:${PORT}`);
 });

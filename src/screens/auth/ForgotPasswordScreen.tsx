@@ -12,9 +12,10 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
+
 
 // URL base de la API
-const API_URL = 'http://192.168.1.38:5000/api';
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 

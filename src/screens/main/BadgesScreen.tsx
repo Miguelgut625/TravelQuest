@@ -6,9 +6,7 @@ import BadgesList from '../../components/BadgesList';
 import BadgeDetailModal from '../../components/BadgeDetailModal';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-
-// URL base de la API
-const API_URL = 'http://192.168.1.38:5000/api';
+import { API_URL } from '../../config/api';
 
 // Interfaces
 interface Badge {

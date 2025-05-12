@@ -13,10 +13,9 @@ import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import { WebView } from 'react-native-webview';
 import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 // URL base de la API
-const API_URL = 'http://192.168.1.38:5000/api';
-
 // Configuración de Axios
 axios.defaults.timeout = 10000; // 10 segundos de timeout
 axios.defaults.headers.common['Content-Type'] = 'application/json';

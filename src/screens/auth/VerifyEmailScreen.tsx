@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
-
-// URL base de la API
-const API_URL = 'http://192.168.1.38:5000/api';
+import { API_URL } from '../../config/api';
 
 const VerifyEmailScreen = ({ route }: any) => {
   const { email } = route.params || {};

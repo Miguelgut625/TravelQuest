@@ -3,9 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { useDispatch } from 'react-redux';
 import { setUser, setToken } from '../../features/authSlice';
 import axios from 'axios';
-
-// URL base de la API
-const API_URL = 'http://192.168.1.38:5000/api';
+import { API_URL } from '../../config/api';
 
 const RegisterScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
