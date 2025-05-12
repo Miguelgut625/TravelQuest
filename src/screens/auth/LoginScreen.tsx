@@ -84,7 +84,6 @@ const LoginScreen = () => {
         username: userData?.username || 'Usuario'
       }));
       dispatch(setAuthState('authenticated'));
-      navigation.navigate('Main');
 
     } catch (error) {
       console.error('Error inesperado durante el login:', error);

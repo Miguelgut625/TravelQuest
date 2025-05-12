@@ -174,7 +174,6 @@ export const checkMissionBadges = async (userId: string): Promise<string[]> => {
 
     return unlockedBadges;
   } catch (error) {
-    console.error('Error al verificar insignias de misiones:', error);
     return [];
   }
 };
@@ -269,13 +268,11 @@ export const checkSocialBadges = async (userId: string): Promise<string[]> => {
     
     // Obtener el número de amigos del usuario
     const { data: connections, error: connectionsError, count } = await supabase
-      .from('user_connections') // Ajustar al nombre real de la tabla de conexiones
+      .from('friends') 
       .select('id', { count: 'exact' })
-      .eq('userId', userId)
-      .eq('status', 'accepted'); // Solo contar conexiones aceptadas
+      .eq('user1Id', userId)
     
     if (connectionsError) {
-      console.error('Error al contar conexiones sociales:', connectionsError);
       return [];
     }
     
@@ -603,41 +600,40 @@ export const checkNewCityBadgeAndAwardPoints = async (userId: string): Promise<{
 export const checkPhotographerBadge = async (userId: string): Promise<boolean> => {
   try {
     if (!userId) return false;
-    
-    // Contar fotos subidas por el usuario
-    const { data, error, count } = await supabase
-      .from('user_photos') // Ajustar al nombre real de la tabla
-      .select('id', { count: 'exact' })
-      .eq('userId', userId);
-      
-    if (error) {
-      console.error('Error al contar fotos del usuario:', error);
-      return false;
-    }
-    
+
+    // Contar fotos subidas por el usuario, relacionando journeys_missions con journeys
+    const { count, error } = await supabase
+      .from('journeys_missions')
+      .select('picture_url', { count: 'exact' })
+      .in('journeyId',
+        supabase
+          .from('journeys')
+          .select('id')
+          .eq('userId', userId)
+      );
+
+    if (error) return false;
+
     const photoCount = count || 0;
-    
-    // Si el usuario ha subido al menos 50 fotos
+
     if (photoCount >= 50) {
-      // Buscar la insignia correspondiente
       const { data: badgeData } = await supabase
         .from('badges')
         .select('id')
         .eq('name', 'Fotógrafo Viajero')
         .single();
-      
+
       if (badgeData?.id) {
-        // Otorgar la insignia
         return await unlockBadge(userId, badgeData.id);
       }
     }
-    
+
     return false;
-  } catch (error) {
-    console.error('Error al verificar insignia de fotógrafo:', error);
+  } catch {
     return false;
   }
 };
+
 
 // Función para verificar y otorgar la insignia de Maratonista de Viajes
 export const checkMarathonBadge = async (userId: string): Promise<boolean> => {
@@ -659,7 +655,6 @@ export const checkMarathonBadge = async (userId: string): Promise<boolean> => {
       .lte('completed_at', endOfDay);
       
     if (error) {
-      console.error('Error al contar misiones diarias:', error);
       return false;
     }
     
@@ -687,111 +682,8 @@ export const checkMarathonBadge = async (userId: string): Promise<boolean> => {
   }
 };
 
-// Función para verificar y otorgar la insignia de Explorador Nocturno
-export const checkNightExplorerBadge = async (userId: string): Promise<boolean> => {
-  try {
-    if (!userId) return false;
-    
-    // Contar misiones completadas durante la noche (entre 8 PM y 6 AM)
-    const { data, error, count } = await supabase
-      .from('journeys_missions')
-      .select('id, completed_at', { count: 'exact' })
-      .eq('journeys.userId', userId)
-      .eq('completed', true)
-      .not('completed_at', 'is', null);
-      
-    if (error) {
-      console.error('Error al contar misiones nocturnas:', error);
-      return false;
-    }
-    
-    // Filtrar para contar solo misiones nocturnas
-    let nightMissions = 0;
-    if (data) {
-      nightMissions = data.filter((mission: { completed_at: string | null }) => {
-        if (!mission.completed_at) return false;
-        
-        const completionTime = new Date(mission.completed_at);
-        const hour = completionTime.getHours();
-        
-        // Entre 8 PM (20) y 6 AM (6)
-        return hour >= 20 || hour < 6;
-      }).length;
-    }
-    
-    // Si el usuario ha completado al menos 20 misiones nocturnas
-    if (nightMissions >= 20) {
-      // Buscar la insignia correspondiente
-      const { data: badgeData } = await supabase
-        .from('badges')
-        .select('id')
-        .eq('name', 'Explorador Nocturno')
-        .single();
-      
-      if (badgeData?.id) {
-        // Otorgar la insignia
-        return await unlockBadge(userId, badgeData.id);
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error al verificar insignia de explorador nocturno:', error);
-    return false;
-  }
-};
 
-// Función para verificar y otorgar la insignia de Viajero Todo Terreno
-export const checkAllTerrainBadge = async (userId: string): Promise<boolean> => {
-  try {
-    if (!userId) return false;
-    
-    // Obtener tipos de lugares donde el usuario ha completado misiones
-    const { data, error } = await supabase
-      .from('journeys_missions')
-      .select(`
-        id,
-        missions!inner(
-          type
-        )
-      `)
-      .eq('journeys.userId', userId)
-      .eq('completed', true);
-      
-    if (error) {
-      console.error('Error al obtener tipos de misiones:', error);
-      return false;
-    }
-    
-    // Extraer tipos únicos de lugares
-    const placeTypes = new Set<string>();
-    data?.forEach((item: { missions?: { type?: string } }) => {
-      if (item.missions?.type) {
-        placeTypes.add(item.missions.type);
-      }
-    });
-    
-    // Si el usuario ha completado misiones en al menos 5 tipos diferentes de lugares
-    if (placeTypes.size >= 5) {
-      // Buscar la insignia correspondiente
-      const { data: badgeData } = await supabase
-        .from('badges')
-        .select('id')
-        .eq('name', 'Viajero Todo Terreno')
-        .single();
-      
-      if (badgeData?.id) {
-        // Otorgar la insignia
-        return await unlockBadge(userId, badgeData.id);
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error al verificar insignia todo terreno:', error);
-    return false;
-  }
-};
+
 
 // Función para verificar todos los logros especiales
 export const checkSpecialBadges = async (userId: string): Promise<string[]> => {
@@ -803,12 +695,11 @@ export const checkSpecialBadges = async (userId: string): Promise<string[]> => {
     // Verificar cada insignia especial
     const photographerResult = await checkPhotographerBadge(userId);
     const marathonResult = await checkMarathonBadge(userId);
-    const nightExplorerResult = await checkNightExplorerBadge(userId);
-    const allTerrainResult = await checkAllTerrainBadge(userId);
+
     
     // Obtener nombres de las insignias desbloqueadas
-    if (photographerResult || marathonResult || nightExplorerResult || allTerrainResult) {
-      const badgeNames = ['Fotógrafo Viajero', 'Maratonista de Viajes', 'Explorador Nocturno', 'Viajero Todo Terreno'];
+    if (photographerResult || marathonResult ) {
+      const badgeNames = ['Fotógrafo Viajero', 'Maratonista de Viajes'];
       
       const { data: badgesData } = await supabase
         .from('badges')
