@@ -7,6 +7,7 @@ interface CustomUser {
   email: string | null;
   username?: string;
   profilePicture?: string;
+  custom_title?: string;
 }
 
 interface AuthSliceState {

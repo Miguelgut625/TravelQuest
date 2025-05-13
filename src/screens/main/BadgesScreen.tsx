@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { Badge, UserBadge, getUserBadges, checkAllBadges } from '../../services/badgeService';
 import BadgesList from '../../components/BadgesList';
 import BadgeDetailModal from '../../components/BadgeDetailModal';
 import { Ionicons } from '@expo/vector-icons';
+import { setUser } from '../../features/auth/authSlice';
+import { supabase } from '../../services/supabase';
 
 interface BadgesScreenProps {
   navigation: any;
@@ -13,21 +15,23 @@ interface BadgesScreenProps {
 
 const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const dispatch = useDispatch();
   const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [currentTitle, setCurrentTitle] = useState<string>('');
 
   const fetchBadges = async () => {
     if (!user?.id) return;
-    
+
     try {
       setLoading(true);
-      
+
       // Verificar y otorgar nuevas insignias si corresponde
       await checkAllBadges(user.id);
-      
+
       // Obtener las insignias actualizadas del usuario
       const badges = await getUserBadges(user.id);
       setUserBadges(badges);
@@ -39,8 +43,21 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
     }
   };
 
+  const fetchCurrentTitle = async () => {
+    if (!user?.id) return;
+    const { data, error } = await supabase
+      .from('users')
+      .select('custom_title')
+      .eq('id', user.id)
+      .single();
+    if (!error && data?.custom_title) {
+      setCurrentTitle(data.custom_title);
+    }
+  };
+
   useEffect(() => {
     fetchBadges();
+    fetchCurrentTitle();
   }, [user?.id]);
 
   const handleRefresh = () => {
@@ -57,6 +74,20 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
     setModalVisible(false);
   };
 
+  const handleSetTitle = async (title: string) => {
+    if (!user?.id) return;
+    const { error } = await supabase
+      .from('users')
+      .update({ custom_title: title })
+      .eq('id', user.id);
+    if (!error) {
+      setCurrentTitle(title);
+      dispatch(setUser({ ...user, custom_title: title }));
+    } else {
+      alert('No se pudo actualizar el título');
+    }
+  };
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -69,7 +100,7 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
@@ -78,7 +109,7 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
         <Text style={styles.title}>Mis Insignias</Text>
         <View style={styles.rightPlaceholder} />
       </View>
-      
+
       <ScrollView style={styles.content}>
         <View style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
@@ -105,6 +136,8 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
           userBadges={userBadges}
           loading={refreshing}
           onBadgePress={handleBadgePress}
+          onSetTitle={handleSetTitle}
+          currentTitle={currentTitle}
         />
 
         <BadgeDetailModal

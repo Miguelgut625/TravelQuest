@@ -1,0 +1,863 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, ActivityIndicator, ScrollView, Platform, Dimensions, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '../../features/store';
+import { supabase } from '../../services/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
+import { deleteFriendship, sendFriendRequest, cancelFriendRequest } from '../../services/friendService';
+import { getRankTitle, getRankTitleStyle } from '../../utils/rankUtils';
+import { useNavigation, useRoute } from '@react-navigation/native';
+
+interface JourneyMission {
+    id: string;
+    title: string;
+    points: number;
+    entries: {
+        id: string;
+        title: string;
+        content: string;
+        photos: string[];
+        created_at: string;
+    }[];
+    completed: boolean;
+    challenges: {
+        points: number;
+    };
+}
+
+interface Journey {
+    id: string;
+    cityId: string;
+    cities: {
+        name: string;
+        country: string;
+    };
+    created_at: string;
+    journeys_missions: {
+        completed: boolean;
+        challenges: {
+            points: number;
+        };
+    }[];
+}
+
+interface FriendProfileScreenProps {
+    route: {
+        params: {
+            friendId: string;
+            friendName: string;
+            rankIndex?: number;
+        };
+    };
+}
+
+const { width } = Dimensions.get('window');
+const JOURNEY_IMAGE_WIDTH = width - 40; // 20 de padding en cada lado
+
+const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
+    <TouchableOpacity style={styles.journalCard}>
+        <Text style={styles.journalCardTitle}>{entry.title}</Text>
+        <Text style={styles.journalCardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+        {entry.missionId && (
+            <View style={styles.journalMissionBadge}>
+                <Ionicons name="trophy" size={16} color="#4CAF50" />
+                <Text style={styles.journalMissionBadgeText}>Misión Completada</Text>
+            </View>
+        )}
+        <Text style={styles.journalCardContent} numberOfLines={3}>
+            {entry.content}
+        </Text>
+        {entry.photos && entry.photos.length > 0 && (
+            <View style={styles.journalPhotoGrid}>
+                {entry.photos.slice(0, 3).map((photo, index) => (
+                    <Image
+                        key={index}
+                        source={{ uri: photo }}
+                        style={styles.journalThumbnail}
+                        resizeMode="cover"
+                    />
+                ))}
+                {entry.photos.length > 3 && (
+                    <View style={styles.journalMorePhotos}>
+                        <Text style={styles.journalMorePhotosText}>+{entry.photos.length - 3}</Text>
+                    </View>
+                )}
+            </View>
+        )}
+        <View style={styles.journalTags}>
+            {entry.tags && entry.tags.map((tag, index) => (
+                <Text key={index} style={styles.journalTag}>
+                    #{tag}
+                </Text>
+            ))}
+        </View>
+    </TouchableOpacity>
+);
+
+const EmptyState = ({ message }: { message: string }) => (
+    <View style={styles.journalEmptyContainer}>
+        <Ionicons name="journal-outline" size={64} color="#ccc" />
+        <Text style={styles.journalEmptyText}>{message}</Text>
+    </View>
+);
+
+const FriendProfileScreen = () => {
+    const navigation = useNavigation();
+    const route = useRoute();
+    const { friendId, friendName: initialFriendName, rankIndex } = route.params as { friendId: string; friendName: string; rankIndex?: number };
+    const user = useSelector((state: RootState) => state.auth.user);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isFriend, setIsFriend] = useState(false);
+    const [friendshipDate, setFriendshipDate] = useState<string | null>(null);
+    const [hasPendingRequest, setHasPendingRequest] = useState(false);
+    const [localRankIndex, setLocalRankIndex] = useState<number | undefined>(rankIndex);
+    const [displayName, setDisplayName] = useState(initialFriendName);
+    const [friendPoints, setFriendPoints] = useState(0);
+    const [journeys, setJourneys] = useState<Journey[]>([]);
+    const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+    const [level, setLevel] = useState(1);
+    const [xp, setXp] = useState(0);
+    const [xpNext, setXpNext] = useState(50);
+    const [stats, setStats] = useState({
+        totalPoints: 0,
+        completedMissions: 0,
+        visitedCities: 0
+    });
+    const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
+    const [customTitle, setCustomTitle] = useState<string | null>(null);
+    const [friendshipChecked, setFriendshipChecked] = useState(false);
+
+    useEffect(() => {
+        console.log('FriendProfileScreen - useEffect triggered');
+        console.log('Current user:', user?.id);
+        console.log('Friend ID:', friendId);
+        setFriendshipChecked(false);
+        checkFriendshipStatus();
+        checkPendingRequest();
+        // Si no viene el rankIndex por navegación, lo calculamos consultando el leaderboard
+        const fetchRankIndex = async () => {
+            if (rankIndex === undefined && friendId) {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('id')
+                    .order('points', { ascending: false });
+                if (!error && data) {
+                    const index = data.findIndex((user: any) => user.id === friendId);
+                    if (index !== -1) {
+                        setLocalRankIndex(index);
+                    }
+                }
+            } else if (rankIndex !== undefined) {
+                setLocalRankIndex(rankIndex);
+            }
+        };
+        fetchRankIndex();
+    }, [friendId, user?.id, rankIndex]);
+
+    useEffect(() => {
+        if (user && friendId && friendshipChecked) {
+            fetchFriendData();
+        }
+    }, [isFriend, friendId, user?.id, friendshipChecked]);
+
+    const fetchFriendData = async () => {
+        if (!user || !friendId) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Obtener los puntos, nivel, XP y privacidad del amigo
+            const { data: friendData, error: friendError } = await supabase
+                .from('users')
+                .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title')
+                .eq('id', friendId)
+                .single();
+
+            if (friendError) throw friendError;
+
+            // Comprobar privacidad del perfil
+            const canViewProfile =
+                friendData.profile_visibility === 'public' ||
+                (friendData.profile_visibility === 'friends' && isFriend) ||
+                (friendData.profile_visibility === 'private' && user?.id === friendId);
+
+            if (!canViewProfile) {
+                setError('No tienes permiso para ver este perfil');
+                setLoading(false);
+                return;
+            }
+
+            setDisplayName(friendData.username);
+            setFriendPoints(friendData.points);
+            setLevel(friendData.level || 1);
+            setXp(friendData.xp || 0);
+            setXpNext(friendData.xp_next || 50);
+            setProfilePicUrl(friendData.profile_pic_url || null);
+            setCustomTitle(friendData.custom_title || null);
+
+            // Obtener las ciudades visitadas del amigo desde journeys
+            const { data: journeys, error: journeysError } = await supabase
+                .from('journeys')
+                .select('cityId')
+                .eq('userId', friendId);
+            if (journeysError) throw journeysError;
+            const uniqueCities = new Set((journeys || []).map((j: any) => j.cityId)).size;
+
+            // Obtener las entradas del diario del amigo
+            const entries = await getUserJournalEntries(friendId);
+            setEntriesByCity(entries);
+
+            // Calcular estadísticas
+            const cities = Object.keys(entries);
+            let completedMissions = 0;
+            cities.forEach(city => {
+                completedMissions += entries[city].filter((e: CityJournalEntry) => e.missionId).length;
+            });
+
+            setStats({
+                totalPoints: friendData.points || 0,
+                completedMissions,
+                visitedCities: uniqueCities
+            });
+
+        } catch (error) {
+            console.error('Error fetching friend data:', error);
+            setError('No se pudieron cargar los datos del perfil');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const checkFriendshipStatus = async () => {
+        if (!user || !friendId) {
+            console.log('checkFriendshipStatus - Missing user or friendId');
+            setFriendshipChecked(true);
+            return;
+        }
+        try {
+            console.log('Checking friendship between:', user.id, 'and', friendId);
+            // Verificar si existe una relación de amistad en cualquier dirección
+            const { data: friendshipData, error: friendshipError } = await supabase
+                .from('friends')
+                .select('created_at')
+                .or(`and(user1Id.eq.${user.id},user2Id.eq.${friendId}),and(user1Id.eq.${friendId},user2Id.eq.${user.id})`);
+
+            console.log('Friendship check result:', { friendshipData, friendshipError });
+
+            if (!friendshipError && friendshipData && friendshipData.length > 0) {
+                console.log('Setting isFriend to true');
+                setIsFriend(true);
+                setFriendshipDate(friendshipData[0].created_at);
+            } else {
+                console.log('Setting isFriend to false');
+                setIsFriend(false);
+                setFriendshipDate(null);
+            }
+        } catch (e) {
+            console.error('Error checking friendship status:', e);
+            setIsFriend(false);
+            setFriendshipDate(null);
+        } finally {
+            setFriendshipChecked(true);
+        }
+    };
+
+    const checkPendingRequest = async () => {
+        if (!user || !friendId) return;
+        try {
+            console.log('Checking pending requests for:', { userId: user.id, friendId });
+
+            // Verificar solicitudes enviadas
+            const { data: sentRequest, error: sentError } = await supabase
+                .from('friendship_invitations')
+                .select('id')
+                .eq('senderId', user.id)
+                .eq('receiverId', friendId)
+                .eq('status', 'Pending')
+                .maybeSingle();
+
+            // Verificar solicitudes recibidas
+            const { data: receivedRequest, error: receivedError } = await supabase
+                .from('friendship_invitations')
+                .select('id')
+                .eq('senderId', friendId)
+                .eq('receiverId', user.id)
+                .eq('status', 'Pending')
+                .maybeSingle();
+
+            console.log('Request check results:', { sentRequest, receivedRequest });
+
+            const hasPending = (!sentError && sentRequest) || (!receivedError && receivedRequest);
+            console.log('Setting hasPendingRequest to:', hasPending);
+            setHasPendingRequest(hasPending);
+        } catch (error) {
+            console.error('Error checking pending request:', error);
+            setHasPendingRequest(false);
+        }
+    };
+
+    const handleAddFriend = async () => {
+        if (!user) return;
+        try {
+            const { success, error } = await sendFriendRequest(user.id, friendId);
+            if (success) {
+                Alert.alert('Éxito', 'Solicitud de amistad enviada');
+                await checkPendingRequest();
+                navigation.goBack();
+            } else {
+                Alert.alert('Error', error || 'No se pudo enviar la solicitud de amistad');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo enviar la solicitud de amistad');
+        }
+    };
+
+    const handleDeleteFriendship = async () => {
+        if (!user) return;
+        Alert.alert(
+            'Eliminar amistad',
+            '¿Estás seguro de que quieres eliminar esta amistad?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const { success, error } = await deleteFriendship(user.id, friendId);
+                            if (success) {
+                                Alert.alert('Éxito', 'Amistad eliminada correctamente');
+                                navigation.goBack();
+                            } else {
+                                throw error;
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', 'No se pudo eliminar la amistad');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleCancelRequest = async () => {
+        if (!user) return;
+        try {
+            const { success, error } = await cancelFriendRequest(user.id, friendId);
+            if (success) {
+                Alert.alert('Éxito', 'Solicitud de amistad cancelada');
+                await checkPendingRequest();
+                navigation.goBack();
+            } else {
+                Alert.alert('Error', error || 'No se pudo cancelar la solicitud de amistad');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo cancelar la solicitud de amistad');
+        }
+    };
+
+    const renderActionIcon = () => {
+        console.log('Rendering icon with states:', { isFriend, hasPendingRequest });
+        let iconName = "person-add";
+        let iconColor = "#005F9E";
+        let onPressAction = handleAddFriend;
+
+        if (isFriend) {
+            iconName = "person-remove";
+            iconColor = "#ff4444";
+            onPressAction = handleDeleteFriendship;
+        } else if (hasPendingRequest) {
+            iconName = "close-circle";
+            iconColor = "#FFA000";
+            onPressAction = handleCancelRequest;
+        }
+
+        return (
+            <TouchableOpacity
+                style={styles.actionIconProfile}
+                onPress={onPressAction}
+            >
+                <Ionicons
+                    name={iconName}
+                    size={22}
+                    color={iconColor}
+                />
+            </TouchableOpacity>
+        );
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size={40} color="#005F9E" />
+            </View>
+        );
+    }
+
+    if (error === 'No tienes permiso para ver este perfil') {
+        return (
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <View style={styles.privateContainer}>
+                    <Ionicons name="lock-closed" size={80} color="#ccc" style={{ marginBottom: 20 }} />
+                    <Text style={styles.privateTitle}>Perfil privado</Text>
+                    <Text style={styles.privateText}>Este usuario ha configurado su perfil como privado. No tienes permiso para ver su información.</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top']}>
+            <ScrollView>
+                <View style={styles.headerBackground}>
+                    <View style={styles.header}>
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={() => navigation.goBack()}
+                        >
+                            <Ionicons name="arrow-back" size={24} color="#fff" />
+                        </TouchableOpacity>
+                        <Text style={styles.title}>Perfil de {displayName}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.profileSection}>
+                    {renderActionIcon()}
+                    {profilePicUrl ? (
+                        <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
+                    ) : (
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>{displayName.charAt(0)}</Text>
+                        </View>
+                    )}
+                    <Text style={styles.username}>{displayName}</Text>
+                    {customTitle && (
+                        <Text style={styles.customTitle}>{customTitle}</Text>
+                    )}
+                    {localRankIndex !== undefined && (
+                        <Text style={getRankTitleStyle(localRankIndex)}>{getRankTitle(localRankIndex)}</Text>
+                    )}
+                    <View style={styles.levelContainer}>
+                        <Text style={styles.levelText}>Nivel {level}</Text>
+                        <View style={styles.xpBar}>
+                            <View
+                                style={[
+                                    styles.xpProgress,
+                                    { width: `${(xp / xpNext) * 100}%` }
+                                ]}
+                            />
+                        </View>
+                        <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
+                    </View>
+                    <Text style={styles.points}>Puntos: {friendPoints}</Text>
+                    {friendshipDate && (
+                        <Text style={styles.friendshipDate}>
+                            Amigos desde: {new Date(friendshipDate).toLocaleDateString('es-ES', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                            })}
+                        </Text>
+                    )}
+                </View>
+
+                <View style={styles.statsSection}>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{stats.completedMissions}</Text>
+                        <Text style={styles.statLabel}>Misiones Completadas</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{stats.visitedCities}</Text>
+                        <Text style={styles.statLabel}>Ciudades Visitadas</Text>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Últimos Viajes</Text>
+                    {!isFriend ? (
+                        <View style={styles.journalEmptyContainer}>
+                            <Ionicons name="lock-closed" size={64} color="#ccc" />
+                            <Text style={styles.journalEmptyText}>
+                                No puedes ver los viajes de {displayName} hasta que sean amigos
+                            </Text>
+                        </View>
+                    ) : Object.values(entriesByCity).length === 0 ? (
+                        <Text style={styles.emptyText}>No hay viajes completados</Text>
+                    ) : (
+                        Object.values(entriesByCity).map((cityEntries, index) => (
+                            <View key={index} style={styles.journeyItem}>
+                                <View style={styles.journeyImagesContainer}>
+                                    {cityEntries.length > 0 && cityEntries[0].photos && cityEntries[0].photos.length > 0 ? (
+                                        <Image
+                                            source={{ uri: cityEntries[0].photos[0] }}
+                                            style={styles.journeyImage}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View style={[styles.journeyImage, styles.noImageContainer]}>
+                                            <Ionicons name="image-outline" size={40} color="#666" />
+                                        </View>
+                                    )}
+                                </View>
+                                <View style={styles.journeyContent}>
+                                    <Text style={styles.journeyCity}>{cityEntries[0]?.city_name || 'Ciudad Desconocida'}</Text>
+                                    <Text style={styles.journeyDescription} numberOfLines={2}>
+                                        {cityEntries.length > 0 ? cityEntries[0].content : 'Sin descripción'}
+                                    </Text>
+                                    <View style={styles.journeyFooter}>
+                                        <Text style={styles.journeyDate}>
+                                            {cityEntries.length > 0 ? new Date(cityEntries[0].created_at).toLocaleDateString('es-ES', {
+                                                day: 'numeric',
+                                                month: 'long',
+                                                year: 'numeric'
+                                            }) : 'Fecha desconocida'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        ))
+                    )}
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerBackground: {
+        backgroundColor: '#005F9E',
+        padding: 20,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        marginRight: 16,
+    },
+    title: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: 'white',
+        marginRight: 6,
+    },
+    profileSection: {
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: 'white',
+        marginBottom: 10,
+        position: 'relative',
+    },
+    actionIconProfile: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 2,
+        backgroundColor: 'white',
+        borderRadius: 20,
+        padding: 4,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        marginBottom: 10,
+        backgroundColor: '#005F9E',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarText: {
+        fontSize: 40,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    username: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 5,
+    },
+    levelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
+    },
+    levelText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginRight: 10,
+    },
+    xpBar: {
+        height: 10,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 5,
+        flex: 1,
+    },
+    xpProgress: {
+        height: '100%',
+        backgroundColor: '#005F9E',
+        borderRadius: 5,
+    },
+    xpText: {
+        fontSize: 14,
+        color: '#666',
+    },
+    points: {
+        fontSize: 16,
+        color: '#666',
+    },
+    statsSection: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        padding: 20,
+        backgroundColor: 'white',
+    },
+    statItem: {
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#005F9E',
+    },
+    statLabel: {
+        fontSize: 14,
+        color: '#666',
+        marginTop: 5,
+    },
+    section: {
+        margin: 20,
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 15,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 15,
+        color: '#333',
+    },
+    journeyItem: {
+        marginBottom: 20,
+        backgroundColor: 'white',
+        borderRadius: 10,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    journeyImagesContainer: {
+        height: 200,
+        width: '100%',
+    },
+    journeyImage: {
+        width: '100%',
+        height: 200,
+        borderTopLeftRadius: 10,
+        borderTopRightRadius: 10,
+    },
+    noImageContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f5',
+    },
+    journeyContent: {
+        padding: 15,
+    },
+    journeyCity: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 5,
+    },
+    journeyDescription: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 10,
+    },
+    journeyFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    journeyDate: {
+        fontSize: 12,
+        color: '#999',
+    },
+    pointsContainer: {
+        backgroundColor: '#005F9E',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    pointsText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginRight: 4,
+    },
+    pointsLabel: {
+        color: 'white',
+        fontSize: 12,
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: '#666',
+        marginVertical: 20,
+    },
+    journalCard: {
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 10,
+    },
+    journalCardTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 5,
+    },
+    journalCardDate: {
+        fontSize: 12,
+        color: '#999',
+    },
+    journalMissionBadge: {
+        backgroundColor: '#4CAF50',
+        padding: 2,
+        borderRadius: 5,
+        marginBottom: 5,
+    },
+    journalMissionBadgeText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    journalCardContent: {
+        fontSize: 14,
+        color: '#666',
+    },
+    journalPhotoGrid: {
+        flexDirection: 'row',
+        marginTop: 5,
+    },
+    journalThumbnail: {
+        width: 100,
+        height: 100,
+        marginRight: 5,
+        borderRadius: 5,
+    },
+    journalMorePhotos: {
+        backgroundColor: '#f5f5f5',
+        padding: 5,
+        borderRadius: 5,
+    },
+    journalMorePhotosText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    journalTags: {
+        flexDirection: 'row',
+        marginTop: 5,
+    },
+    journalTag: {
+        backgroundColor: '#f5f5f5',
+        padding: 2,
+        borderRadius: 5,
+        marginRight: 5,
+    },
+    journalEmptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    journalEmptyText: {
+        fontSize: 16,
+        color: '#666',
+        marginTop: 20,
+    },
+    friendshipDate: {
+        fontSize: 14,
+        color: '#888',
+        marginTop: 4,
+    },
+    firstPlaceText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#FFD700',
+    },
+    secondPlaceText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#C0C0C0',
+    },
+    thirdPlaceText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#CD7F32',
+    },
+    titleText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    privateContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    privateTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+    privateText: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
+    },
+    customTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#7F5AF0',
+        marginBottom: 2,
+        textAlign: 'center',
+    },
+});
+
+export default FriendProfileScreen; 

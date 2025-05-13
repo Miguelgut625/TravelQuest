@@ -26,6 +26,7 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import ChatScreen from '../screens/main/ChatScreen';
 import ConversationsScreen from '../screens/main/ConversationsScreen';
 import { linking } from './linking';
+import FriendProfileScreen from '../screens/main/FriendProfileScreen';
 
 // Define los parámetros para las pestañas principales
 export type TabParamList = {
@@ -54,6 +55,11 @@ type RootStackParamList = {
     friendName: string;
   };
   BadgesScreen: undefined;
+  FriendProfile: {
+    friendId: string;
+    friendName: string;
+    rankIndex?: number;
+  };
 };
 
 type AuthStackParamList = {
@@ -120,6 +126,11 @@ const MainFlow = () => {
           },
           headerTintColor: 'white',
         }}
+      />
+      <Stack.Screen
+        name="FriendProfile"
+        component={FriendProfileScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

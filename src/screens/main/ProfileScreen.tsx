@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList, Platform } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { logout, setAuthState } from '../../features/authSlice';
+import { logout, setAuthState, setUser } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { calculateNextLevelXP } from '../../services/experienceService';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { updateProfilePicture, getProfilePictureUrl } from '../../services/profileService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getUserBadges } from '../../services/badgeService';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -36,15 +39,13 @@ interface FriendshipRequest {
   };
 }
 
-interface AdvancedStats {
-  completedMissions: number;
-  expiredMissions: number;
-  pendingMissions: number;
-  completionRate: number;
-  visitedCities: number;
-  cityRepeatCount: { [cityName: string]: number };
-  totalPoints: number;
-  averagePointsPerMission: number;
+interface User {
+  email: string;
+  id: string;
+  username?: string;
+  profile_pic_url?: string;
+  profile_visibility?: 'public' | 'friends' | 'private';
+  custom_title?: string;
 }
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -65,27 +66,39 @@ const ProfileScreen = () => {
     visitedCities: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
-  const [friendshipRequests, setFriendshipRequests] = useState<FriendshipRequest[]>([]);
-  const [isRequestsVisible, setIsRequestsVisible] = useState(false);
-  const [username, setUsername] = useState('');
   const [level, setLevel] = useState(0);
   const [xp, setXp] = useState(0);
   const [xpNext, setXpNext] = useState(100);
-  const [advancedStats, setAdvancedStats] = useState<AdvancedStats>({
-    completedMissions: 0,
-    expiredMissions: 0,
-    pendingMissions: 0,
-    completionRate: 0,
-    visitedCities: 0,
-    cityRepeatCount: {},
-    totalPoints: 0,
-    averagePointsPerMission: 0
-  });
-  const insets = useSafeAreaInsets();
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'friends' | 'private'>('public');
+  const [badges, setBadges] = useState<any[]>([]);
+  const [selectedTitle, setSelectedTitle] = useState<string>('');
+  const [savingTitle, setSavingTitle] = useState(false);
+
+  // Manejador global de errores no capturados para este componente
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      console.error('Error no capturado en ProfileScreen:', event.error);
+      // No mostramos un Alert aquí para evitar bloquear la UI
+      // Simplemente registramos el error para depuración
+    };
+
+    // Agregar el listener solo en navegadores web
+    if (Platform.OS === 'web') {
+      window.addEventListener('error', handleGlobalError);
+      return () => {
+        window.removeEventListener('error', handleGlobalError);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     fetchUserStats();
-    fetchAdvancedStats();
+    fetchProfilePicture();
+    fetchProfileVisibility();
+    fetchBadges();
+    fetchCurrentTitle();
   }, [user?.id]);
 
   const fetchUserStats = async () => {
@@ -125,13 +138,13 @@ const ProfileScreen = () => {
       const stats = {
         totalPoints: 0,
         completedMissions: 0,
-        visitedCities: 0
+        visitedCities: new Set<string>()
       };
 
       (journeys as Journey[])?.forEach((journey: Journey) => {
-        // Añadir la ciudad a las visitadas
+        // Añadir la ciudad a las visitadas (usando Set para evitar duplicados)
         if (journey.cityId) {
-          stats.visitedCities++;
+          stats.visitedCities.add(journey.cityId);
         }
 
         // Contar misiones completadas y puntos
@@ -146,7 +159,7 @@ const ProfileScreen = () => {
       setStats({
         totalPoints: userPointsData?.points || 0,
         completedMissions: stats.completedMissions,
-        visitedCities: stats.visitedCities
+        visitedCities: stats.visitedCities.size
       });
 
       // Actualizar nivel y XP
@@ -162,74 +175,165 @@ const ProfileScreen = () => {
     }
   };
 
-  const fetchAdvancedStats = async () => {
+  const fetchProfilePicture = async () => {
     if (!user?.id) return;
 
     try {
-      // Obtener todos los journeys del usuario
-      const { data: journeys, error: journeysError } = await supabase
-        .from('journeys')
-        .select(`
-          id,
-          cityId,
-          journeys_missions!inner (
-            completed,
-            end_date,
-            challenges!inner (
-              points
-            )
-          ),
-          cities!inner (
-            name
-          )
-        `)
-        .eq('userId', user.id);
+      const picUrl = await getProfilePictureUrl(user.id);
+      setProfilePicUrl(picUrl);
+    } catch (error) {
+      console.error('Error al obtener la foto de perfil:', error);
+    }
+  };
 
-      if (journeysError) throw journeysError;
+  const fetchProfileVisibility = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('profile_visibility')
+        .eq('id', user.id)
+        .single();
 
-      const stats: AdvancedStats = {
-        completedMissions: 0,
-        expiredMissions: 0,
-        pendingMissions: 0,
-        completionRate: 0,
-        visitedCities: 0,
-        cityRepeatCount: {},
-        totalPoints: 0,
-        averagePointsPerMission: 0
-      };
+      if (error) throw error;
+      setProfileVisibility(data?.profile_visibility || 'public');
+    } catch (error) {
+      console.error('Error al obtener configuración de privacidad:', error);
+    }
+  };
 
-      const cityCount: { [cityName: string]: number } = {};
-      let totalMissions = 0;
+  const updateProfileVisibility = async (visibility: 'public' | 'friends' | 'private') => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ profile_visibility: visibility })
+        .eq('id', user.id);
 
-      journeys?.forEach((journey: any) => {
-        const cityName = journey.cities.name;
-        cityCount[cityName] = (cityCount[cityName] || 0) + 1;
+      if (error) throw error;
+      setProfileVisibility(visibility);
+      Alert.alert('Éxito', 'Configuración de privacidad actualizada');
+    } catch (error) {
+      console.error('Error al actualizar configuración de privacidad:', error);
+      Alert.alert('Error', 'No se pudo actualizar la configuración de privacidad');
+    }
+  };
 
-        journey.journeys_missions.forEach((mission: any) => {
-          totalMissions++;
-          if (mission.completed) {
-            stats.completedMissions++;
-            stats.totalPoints += mission.challenges.points;
-          } else {
-            const endDate = new Date(mission.end_date);
-            if (endDate < new Date()) {
-              stats.expiredMissions++;
-            } else {
-              stats.pendingMissions++;
-            }
-          }
-        });
+  const pickImage = async () => {
+    try {
+      // Solicitar permisos
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Se requieren permisos', 'Se necesita acceso a la galería para seleccionar una imagen');
+        return;
+      }
+
+      // Lanzar el selector de imágenes
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
       });
 
-      stats.visitedCities = Object.keys(cityCount).length;
-      stats.cityRepeatCount = cityCount;
-      stats.completionRate = totalMissions > 0 ? (stats.completedMissions / totalMissions) * 100 : 0;
-      stats.averagePointsPerMission = stats.completedMissions > 0 ? stats.totalPoints / stats.completedMissions : 0;
-
-      setAdvancedStats(stats);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await handleImageUpload(result.assets[0].uri);
+      }
     } catch (error) {
-      console.error('Error obteniendo estadísticas avanzadas:', error);
+      console.error('Error al seleccionar imagen:', error);
+      Alert.alert('Error', 'No se pudo seleccionar la imagen');
     }
+  };
+
+  const takePhoto = async () => {
+    try {
+      // Solicitar permisos de cámara
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Se requieren permisos', 'Se necesita acceso a la cámara para tomar una foto');
+        return;
+      }
+
+      // Lanzar la cámara
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await handleImageUpload(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error al tomar foto:', error);
+      Alert.alert('Error', 'No se pudo tomar la foto');
+    }
+  };
+
+  const handleImageUpload = async (imageUri: string) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Debes iniciar sesión para cambiar tu foto de perfil');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+
+      // Subir la imagen a Cloudinary y actualizar en la base de datos
+      const cloudinaryUrl = await updateProfilePicture(user.id, imageUri);
+
+      // Actualizar el estado local
+      setProfilePicUrl(cloudinaryUrl);
+
+      // Actualizar el estado de Redux si es necesario
+      // Asegurarse de que user y sus propiedades existan antes de actualizar
+      if (user) {
+        try {
+          // Usar setUser en lugar de updateUser para actualizar el perfil
+          dispatch(setUser({
+            ...user,
+            profile_pic_url: cloudinaryUrl
+          }));
+        } catch (reduxError) {
+          console.error('Error al actualizar el estado Redux:', reduxError);
+          // Continuar con el flujo aunque falle la actualización de Redux
+        }
+      }
+
+      // Mostrar un mensaje de éxito más discreto
+      console.log('Foto de perfil actualizada correctamente');
+      // Mostrar un Alert sólo si todo funciona correctamente
+      Alert.alert('Éxito', 'Foto de perfil actualizada correctamente');
+    } catch (error: any) {
+      console.error('Error al subir la imagen:', error);
+      Alert.alert('Error', `No se pudo actualizar la foto de perfil: ${error.message}`);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const showImageOptions = () => {
+    Alert.alert(
+      'Cambiar foto de perfil',
+      'Selecciona una opción',
+      [
+        {
+          text: 'Tomar foto',
+          onPress: takePhoto
+        },
+        {
+          text: 'Elegir de la galería',
+          onPress: pickImage
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        }
+      ]
+    );
   };
 
   const handleLogout = async () => {
@@ -387,352 +491,243 @@ const ProfileScreen = () => {
     }
   };
 
-  // Función para alternar la visibilidad de las solicitudes
-  const toggleRequestsVisibility = () => {
-    setIsRequestsVisible(!isRequestsVisible);
-  };
-
-  // Función para aceptar una solicitud de amistad
-  const handleAcceptRequest = async (id: string) => {
+  const fetchBadges = async () => {
+    if (!user?.id) return;
     try {
-      const { data: invitation, error: invitationError } = await supabase
-        .from('friendship_invitations')
-        .select('senderId, receiverId')
-        .eq('id', id)
-        .single();
-
-      if (invitationError) throw invitationError;
-
-      const { senderId, receiverId } = invitation;
-
-      const { data: updatedInvitation, error: updateError } = await supabase
-        .from('friendship_invitations')
-        .update({ status: 'Accepted' })
-        .eq('id', id)
-        .single();
-
-      if (updateError) throw updateError;
-
-      const { data: newFriendship, error: insertError } = await supabase
-        .from('friends')
-        .insert([{ user1Id: senderId, user2Id: receiverId }])
-        .single();
-
-      if (insertError) throw insertError;
-
-      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-      alert('Solicitud aceptada con éxito!');
-    } catch (error: any) {
-      console.error('Error al aceptar la solicitud:', error.message);
-      alert('Hubo un error al aceptar la solicitud: ' + error.message);
+      const userBadges = await getUserBadges(user.id);
+      setBadges(userBadges || []);
+    } catch (e) {
+      setBadges([]);
     }
   };
 
-  // Función para rechazar una solicitud de amistad
-  const handleRejectRequest = async (id: string) => {
-    try {
-      const { data: updatedInvitation, error: updateError } = await supabase
-        .from('friendship_invitations')
-        .update({ status: 'Rejected' })
-        .eq('id', id)
-        .single();
-
-      if (updateError) throw updateError;
-
-      setFriendshipRequests((prevRequests) => prevRequests.filter(request => request.id !== id));
-      alert('Solicitud rechazada con éxito!');
-    } catch (error: any) {
-      console.error('Error al rechazar la solicitud:', error.message);
-      alert('Hubo un error al rechazar la solicitud: ' + error.message);
+  const fetchCurrentTitle = async () => {
+    if (!user?.id) return;
+    const { data, error } = await supabase
+      .from('users')
+      .select('custom_title')
+      .eq('id', user.id)
+      .single();
+    if (!error && data?.custom_title) {
+      setSelectedTitle(data.custom_title);
     }
   };
 
-  // Función para enviar una solicitud de amistad
-  const handleSendRequest = async () => {
-    try {
-      const { data: receiver, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', username)
-        .single();
-
-      if (userError) throw userError;
-
-      const receiverId = receiver.id;
-
-      if (user?.id === receiverId) {
-        alert('No puedes enviarte una solicitud a ti mismo');
-        return;
-      }
-
-      const { data: friends, error: friendsError } = await supabase
-        .from('friends')
-        .select('*')
-        .or(`and(user1Id.eq.${user?.id},user2Id.eq.${receiverId}),and(user1Id.eq.${receiverId},user2Id.eq.${user?.id})`)
-        .single();
-
-      if (friends) {
-        alert('Ya son amigos');
-        return;
-      }
-
-      const { data: existingRequest, error: requestError } = await supabase
-        .from('friendship_invitations')
-        .select('*')
-        .or(`and(senderId.eq.${user?.id},receiverId.eq.${receiverId}),and(senderId.eq.${receiverId},receiverId.eq.${user?.id})`)
-        .eq('status', 'Pending')
-        .single();
-
-      if (existingRequest) {
-        alert('Ya existe una solicitud pendiente entre estos usuarios');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('friendship_invitations')
-        .insert([{ senderId: user?.id, receiverId }])
-        .single();
-
-      if (error) throw error;
-      if (!data) throw new Error('No se ha encontrado ese usuario');
-
-      alert('Solicitud enviada con éxito!');
-    } catch (error: any) {
-      console.error('Error al enviar la solicitud:', error.message);
-      alert('Error al enviar la solicitud: ' + error.message);
-    }
-  };
-
-  const fetchPendingRequests = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('friendship_invitations')
-        .select(`
-        id, senderId, created_at, receiverId, status,
-        users:senderId (username)
-      `)
-        .eq('receiverId', user?.id)
-        .eq('status', 'Pending');
-
-      if (error) throw error;
-      console.log('Solicitudes pendientes obtenidas:', user?.id);
-
-      console.log('Solicitudes pendientes obtenidas:', data);
-      return data;
-    } catch (error: any) {
-      console.error('Error al obtener solicitudes pendientes:', error.message);
-      return [];
-    }
-  };
-
-  // Llamar a esta función cuando se haga clic en el botón correspondiente
-  const handleFetchPendingRequests = async () => {
-    // Alternar el estado de isRequestsVisible
-    setIsRequestsVisible(!isRequestsVisible);
-
-    // Solo buscar solicitudes pendientes si se van a mostrar
-    if (!isRequestsVisible) {
-      const requests = await fetchPendingRequests();
-      setFriendshipRequests(requests);
+  const handleSaveTitle = async () => {
+    if (!user?.id) return;
+    setSavingTitle(true);
+    const { error } = await supabase
+      .from('users')
+      .update({ custom_title: selectedTitle })
+      .eq('id', user.id);
+    setSavingTitle(false);
+    if (!error) {
+      Alert.alert('Éxito', 'Título actualizado');
+    } else {
+      Alert.alert('Error', 'No se pudo actualizar el título');
     }
   };
 
   return (
-    <ScrollView style={[styles.container, { paddingTop: insets.top + 24 }]}>
-      <View style={styles.headerBackground}>
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.name}>{user?.username || user?.email?.split('@')[0] || 'Usuario'}</Text>
-            <Text style={styles.email}>{user?.email}</Text>
-            <View style={styles.levelContainer}>
-              <Text style={styles.levelText}>Nivel {level}</Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progress, { width: `${(xp / xpNext) * 100}%` }]} />
-              </View>
-              <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.stats}>
-        {loadingStats ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size={40} color="#005F9E" />
-          </View>
-        ) : (
-          <>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalPoints}</Text>
-              <Text style={styles.statLabel}>Puntos</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.completedMissions}</Text>
-              <Text style={styles.statLabel}>Misiones</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.visitedCities}</Text>
-              <Text style={styles.statLabel}>Viajes</Text>
-            </View>
-          </>
-        )}
-      </View>
-      {/* Sección para Insignias */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Logros</Text>
-        <View style={styles.badgesContainer}>
-          <TouchableOpacity
-            style={styles.badgesButton}
-            onPress={() => {
-              navigation.navigate('BadgesScreen');
-            }}
-          >
-            <View style={styles.badgesButtonContent}>
-              <Ionicons name="medal" size={24} color="white" />
-              <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
-              <Ionicons name="chevron-forward" size={20} color="white" />
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Social</Text>
-        <View style={styles.socialContainer}>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => navigation.navigate('Friends')}
-          >
-            <Ionicons name="people" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Amigos</Text>
-          </TouchableOpacity>
-          <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => navigation.navigate('Leaderboard')}
-          >
-            <Ionicons name="trophy" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Leaderboard</Text>
-          </TouchableOpacity>
-          <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => navigation.navigate('Conversations')}
-          >
-            <Ionicons name="chatbubbles" size={24} color="white" />
-            <Text style={styles.socialButtonText}>Conversaciones</Text>
-          </TouchableOpacity>
-          <Text style={styles.socialDescription}>Chatea con tus amigos</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Seguridad</Text>
-        <View style={styles.privacyContainer}>
-          <TouchableOpacity
-            style={styles.privacyButton}
-            onPress={() => setIsChangePasswordVisible(true)}
-          >
-            <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
-          </TouchableOpacity>
-          <Text style={styles.privacyDescription}>
-            Actualiza tu contraseña para mantener tu cuenta segura
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.requestsContainer}>
-        <TouchableOpacity onPress={handleFetchPendingRequests}>
-          <Text style={styles.requestsTitle}>
-            {isRequestsVisible ? 'Ocultar Solicitudes' : 'Ver Solicitudes'}
-          </Text>
-        </TouchableOpacity>
-
-        {isRequestsVisible && (
-          friendshipRequests.length === 0 ? (
-            <Text style={styles.noRequestsText}>No hay solicitudes pendientes</Text>
-          ) : (
-            <FlatList
-              data={friendshipRequests}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.requestItem}>
-                  <Text style={styles.requestText}>
-                    {item.users.username || 'Usuario desconocido'} te ha enviado una solicitud.
-                  </Text>
-                  <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptRequest(item.id)}>
-                    <Text style={styles.acceptButtonText}>Aceptar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.rejectButton} onPress={() => handleRejectRequest(item.id)}>
-                    <Text style={styles.rejectButtonText}>Rechazar</Text>
-                  </TouchableOpacity>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView>
+        <View style={styles.headerBackground}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.avatarContainer} onPress={showImageOptions}>
+              {uploadingImage ? (
+                <View style={styles.avatar}>
+                  <ActivityIndicator size="large" color="white" />
+                </View>
+              ) : profilePicUrl ? (
+                <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
                 </View>
               )}
-            />
-          )
-        )}
-      </View>
-
-      <View style={styles.sendRequestContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre de usuario"
-          value={username}
-          onChangeText={setUsername}
-        />
-        <TouchableOpacity style={styles.sendRequestButton} onPress={handleSendRequest}>
-          <Text style={styles.sendRequestButtonText}>Enviar Solicitud</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Nueva sección de Estadísticas Avanzadas */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Estadísticas Avanzadas</Text>
-        <View style={styles.advancedStatsContainer}>
-          <View style={styles.advancedStatItem}>
-            <Text style={styles.advancedStatValue}>{advancedStats.completedMissions}</Text>
-            <Text style={styles.advancedStatLabel}>Misiones Completadas</Text>
-          </View>
-          <View style={styles.advancedStatItem}>
-            <Text style={styles.advancedStatValue}>{advancedStats.expiredMissions}</Text>
-            <Text style={styles.advancedStatLabel}>Misiones Expiradas</Text>
-          </View>
-          <View style={styles.advancedStatItem}>
-            <Text style={styles.advancedStatValue}>{advancedStats.pendingMissions}</Text>
-            <Text style={styles.advancedStatLabel}>Misiones Pendientes</Text>
-          </View>
-          <View style={styles.advancedStatItem}>
-            <Text style={styles.advancedStatValue}>{advancedStats.completionRate.toFixed(1)}%</Text>
-            <Text style={styles.advancedStatLabel}>Tasa de Completado</Text>
-          </View>
-          <View style={styles.advancedStatItem}>
-            <Text style={styles.advancedStatValue}>{advancedStats.visitedCities}</Text>
-            <Text style={styles.advancedStatLabel}>Ciudades Visitadas</Text>
-          </View>
-          <View style={styles.advancedStatItem}>
-            <Text style={styles.advancedStatValue}>{advancedStats.averagePointsPerMission.toFixed(1)}</Text>
-            <Text style={styles.advancedStatLabel}>Puntos/Misión</Text>
-          </View>
-        </View>
-
-        {/* Sección de Ciudades Repetidas */}
-        <View style={styles.repeatedCitiesContainer}>
-          <Text style={styles.repeatedCitiesTitle}>Ciudades Más Visitadas</Text>
-          {Object.entries(advancedStats.cityRepeatCount)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 3)
-            .map(([city, count]) => (
-              <View key={city} style={styles.repeatedCityItem}>
-                <Text style={styles.repeatedCityName}>{city}</Text>
-                <Text style={styles.repeatedCityCount}>{count} visitas</Text>
+              <View style={styles.cameraIconContainer}>
+                <Ionicons name="camera" size={20} color="white" />
               </View>
-            ))}
+            </TouchableOpacity>
+            <View style={styles.userInfo}>
+              <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
+              {user?.custom_title && (
+                <Text style={styles.customTitle}>{user.custom_title}</Text>
+              )}
+              <Text style={styles.email}>{user?.email}</Text>
+              <View style={styles.levelContainer}>
+                <Text style={styles.levelText}>Nivel {level}</Text>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progress, { width: `${(xp / xpNext) * 100}%` }]} />
+                </View>
+                <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
 
-      <View style={{ marginBottom: 48 }}>
+        <View style={styles.stats}>
+          {loadingStats ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size={40} color="#005F9E" />
+            </View>
+          ) : (
+            <>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.totalPoints}</Text>
+                <Text style={styles.statLabel}>Puntos</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.completedMissions}</Text>
+                <Text style={styles.statLabel}>Misiones</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.visitedCities}</Text>
+                <Text style={styles.statLabel}>Ciudades</Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Social */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Social</Text>
+          <View style={styles.socialContainer}>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => navigation.navigate('Friends')}
+            >
+              <Ionicons name="people" size={24} color="white" />
+              <Text style={styles.socialButtonText}>Amigos</Text>
+            </TouchableOpacity>
+            <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => navigation.navigate('Leaderboard')}
+            >
+              <Ionicons name="trophy" size={24} color="white" />
+              <Text style={styles.socialButtonText}>Leaderboard</Text>
+            </TouchableOpacity>
+            <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
+          </View>
+        </View>
+
+        {/* Logros/Insignias */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Logros</Text>
+          <View style={styles.badgesContainer}>
+            <TouchableOpacity
+              style={styles.badgesButton}
+              onPress={() => {
+                navigation.navigate('BadgesScreen');
+              }}
+            >
+              <View style={styles.badgesButtonContent}>
+                <Ionicons name="medal" size={24} color="white" />
+                <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
+                <Ionicons name="chevron-forward" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Privacidad */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Privacidad</Text>
+          <View style={styles.privacyContainer}>
+            <Text style={styles.privacyDescription}>
+              Configura quién puede ver tu perfil
+            </Text>
+            <View style={styles.privacyOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.privacyOption,
+                  profileVisibility === 'public' && styles.selectedPrivacyOption
+                ]}
+                onPress={() => updateProfileVisibility('public')}
+              >
+                <Ionicons
+                  name="globe-outline"
+                  size={24}
+                  color={profileVisibility === 'public' ? 'white' : '#005F9E'}
+                />
+                <Text style={[
+                  styles.privacyOptionText,
+                  profileVisibility === 'public' && styles.selectedPrivacyOptionText
+                ]}>
+                  Público
+                </Text>
+                <Text style={styles.privacyOptionDescription}>
+                  Cualquier usuario puede ver tu perfil
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.privacyOption,
+                  profileVisibility === 'friends' && styles.selectedPrivacyOption
+                ]}
+                onPress={() => updateProfileVisibility('friends')}
+              >
+                <Ionicons
+                  name="people-outline"
+                  size={24}
+                  color={profileVisibility === 'friends' ? 'white' : '#005F9E'}
+                />
+                <Text style={[
+                  styles.privacyOptionText,
+                  profileVisibility === 'friends' && styles.selectedPrivacyOptionText
+                ]}>
+                  Solo Amigos
+                </Text>
+                <Text style={styles.privacyOptionDescription}>
+                  Solo tus amigos pueden ver tu perfil
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.privacyOption,
+                  profileVisibility === 'private' && styles.selectedPrivacyOption
+                ]}
+                onPress={() => updateProfileVisibility('private')}
+              >
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={24}
+                  color={profileVisibility === 'private' ? 'white' : '#005F9E'}
+                />
+                <Text style={[
+                  styles.privacyOptionText,
+                  profileVisibility === 'private' && styles.selectedPrivacyOptionText
+                ]}>
+                  Privado
+                </Text>
+                <Text style={styles.privacyOptionDescription}>
+                  Nadie puede ver tu perfil
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Seguridad */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Seguridad</Text>
+          <View style={styles.privacyContainer}>
+            <TouchableOpacity
+              style={styles.privacyButton}
+              onPress={() => setIsChangePasswordVisible(true)}
+            >
+              <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
+            </TouchableOpacity>
+            <Text style={styles.privacyDescription}>
+              Actualiza tu contraseña para mantener tu cuenta segura
+            </Text>
+          </View>
+        </View>
+
+        {/* Cerrar sesión */}
         <TouchableOpacity
           style={[styles.logoutButton, loading && styles.disabledButton]}
           onPress={handleLogout}
@@ -742,127 +737,144 @@ const ProfileScreen = () => {
             {loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
           </Text>
         </TouchableOpacity>
-      </View>
 
-      <Modal
-        visible={isChangePasswordVisible}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
+        <Modal
+          visible={isChangePasswordVisible}
+          transparent={true}
+          animationType="slide"
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
 
-            {message.text ? (
-              <Text style={[styles.messageText, message.type === 'error' ? styles.errorMessage : styles.successMessage]}>
-                {message.text}
-              </Text>
-            ) : null}
+              {message.text ? (
+                <Text style={[styles.messageText, message.type === 'error' ? styles.errorMessage : styles.successMessage]}>
+                  {message.text}
+                </Text>
+              ) : null}
 
-            <TextInput
-              style={styles.input}
-              placeholder="Contraseña actual"
-              secureTextEntry
-              value={currentPassword}
-              onChangeText={(text) => {
-                setCurrentPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Nueva contraseña"
-              secureTextEntry
-              value={newPassword}
-              onChangeText={(text) => {
-                setNewPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Confirmar nueva contraseña"
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                setMessage({ type: '', text: '' });
-              }}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setIsChangePasswordVisible(false);
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
+              <TextInput
+                style={styles.input}
+                placeholder="Contraseña actual"
+                secureTextEntry
+                value={currentPassword}
+                onChangeText={(text) => {
+                  setCurrentPassword(text);
                   setMessage({ type: '', text: '' });
                 }}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
+              />
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton, loading && styles.disabledButton]}
-                onPress={handleChangePassword}
-                disabled={loading}
-              >
-                <Text style={styles.modalButtonText}>
-                  {loading ? 'Guardando...' : 'Guardar'}
-                </Text>
-              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                placeholder="Nueva contraseña"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={(text) => {
+                  setNewPassword(text);
+                  setMessage({ type: '', text: '' });
+                }}
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Confirmar nueva contraseña"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  setMessage({ type: '', text: '' });
+                }}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setIsChangePasswordVisible(false);
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setMessage({ type: '', text: '' });
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton, loading && styles.disabledButton]}
+                  onPress={handleChangePassword}
+                  disabled={loading}
+                >
+                  <Text style={styles.modalButtonText}>
+                    {loading ? 'Guardando...' : 'Guardar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181A20',
+    backgroundColor: '#f5f5f5',
   },
   headerBackground: {
-    backgroundColor: '#232634',
+    backgroundColor: '#005F9E',
     padding: 20,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#7F5AF0',
+  avatarContainer: {
+    position: 'relative',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 15,
+    backgroundColor: '#005F9E',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#2CB67D',
-    shadowColor: '#7F5AF0',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#005F9E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#005F9E',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
   },
   avatarText: {
     fontSize: 40,
     fontWeight: 'bold',
-    color: '#FFF',
-    letterSpacing: 2,
+    color: 'white',
   },
   userInfo: {
     flex: 1,
@@ -871,23 +883,26 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: 'white',
     marginBottom: 5,
   },
   email: {
     fontSize: 16,
-    color: '#A1A1AA',
+    color: 'rgba(255,255,255,0.8)',
   },
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 20,
-    backgroundColor: '#232634',
+    backgroundColor: 'white',
     marginTop: -20,
     marginHorizontal: 20,
     borderRadius: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -903,22 +918,22 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#F5D90A',
-    textShadowColor: '#7F5AF0',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    color: '#005F9E',
   },
   statLabel: {
     fontSize: 14,
-    color: '#A1A1AA',
+    color: '#666',
   },
   section: {
     margin: 20,
-    backgroundColor: '#232634',
+    backgroundColor: 'white',
     borderRadius: 10,
     padding: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 3,
@@ -927,14 +942,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#7F5AF0',
+    color: '#333',
   },
   socialContainer: {
     flexDirection: 'column',
     alignItems: 'center',
   },
   socialButton: {
-    backgroundColor: '#7F5AF0',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -942,32 +957,27 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'center',
-    shadowColor: '#2CB67D',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 2,
   },
   socialButtonText: {
-    color: '#FFF',
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 10,
   },
   socialDescription: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: 'black',
     textAlign: 'center',
   },
   logoutButton: {
     margin: 20,
-    backgroundColor: '#7F5AF0',
+    backgroundColor: '#f44336',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
   },
   logoutButtonText: {
-    color: '#FFF',
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -978,7 +988,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#232634',
+    backgroundColor: 'white',
     padding: 20,
     borderRadius: 10,
     width: '90%',
@@ -991,9 +1001,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   input: {
-    backgroundColor: '#6f627f',
     borderWidth: 1,
-    borderColor: '#7F5AF0',
+    borderColor: '#ddd',
     borderRadius: 5,
     padding: 10,
     marginBottom: 15,
@@ -1028,18 +1037,18 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   errorMessage: {
-    backgroundColor: '#232634',
-    color: '#F5D90A',
+    backgroundColor: '#ffebee',
+    color: '#c62828',
   },
   successMessage: {
-    backgroundColor: '#232634',
-    color: '#2CB67D',
+    backgroundColor: '#e8f5e9',
+    color: '#2e7d32',
   },
   disabledButton: {
     opacity: 0.7,
   },
   privacyContainer: {
-    backgroundColor: '#232634',
+    backgroundColor: 'white',
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: {
@@ -1052,12 +1061,11 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   privacyButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
     marginBottom: 10,
-    color: 'white',
   },
   privacyButtonText: {
     fontSize: 16,
@@ -1066,78 +1074,8 @@ const styles = StyleSheet.create({
   },
   privacyDescription: {
     fontSize: 14,
-    color: 'white',
+    color: '#666',
     textAlign: 'center',
-  },
-  requestsContainer: {
-    margin: 20,
-    backgroundColor: '#232634',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  requestsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#7F5AF0',
-  },
-  requestItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  requestText: {
-    flex: 1,
-    color: '#333',
-  },
-  acceptButton: {
-    backgroundColor: '#2CB67D',
-    borderRadius: 5,
-    padding: 5,
-    marginLeft: 10,
-  },
-  acceptButtonText: {
-    color: '#181A20',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  rejectButton: {
-    backgroundColor: '#7F5AF0',
-    borderRadius: 5,
-    padding: 5,
-    marginLeft: 10,
-  },
-  rejectButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  sendRequestContainer: {
-    margin: 20,
-    backgroundColor: '#232634',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  noRequestsText: {
-    textAlign: 'center',
-    color: 'white',
-    marginBottom: 10,
   },
   levelContainer: {
     marginTop: 5,
@@ -1169,12 +1107,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgesButton: {
-    backgroundColor: '#7f5af0',
+    backgroundColor: '#005F9E',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
     marginHorizontal: 5,
-    width: '100%',
   },
   badgesButtonContent: {
     flexDirection: 'row',
@@ -1186,72 +1123,43 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
-  sendRequestButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginTop: 5,
-    width: '100%',
-  },
-  sendRequestButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  advancedStatsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-  advancedStatItem: {
-    width: '48%',
-    backgroundColor: '#2D2F3A',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  advancedStatValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#F5D90A',
-    marginBottom: 5,
-  },
-  advancedStatLabel: {
-    fontSize: 12,
-    color: '#A1A1AA',
-    textAlign: 'center',
-  },
-  repeatedCitiesContainer: {
-    backgroundColor: '#2D2F3A',
-    borderRadius: 10,
-    padding: 15,
+  privacyOptions: {
     marginTop: 10,
   },
-  repeatedCitiesTitle: {
+  privacyOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#005F9E',
+  },
+  selectedPrivacyOption: {
+    backgroundColor: '#005F9E',
+  },
+  privacyOptionText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#F5D90A',
-    marginBottom: 10,
+    color: '#005F9E',
+    marginLeft: 10,
+    flex: 1,
   },
-  repeatedCityItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#393552',
+  selectedPrivacyOptionText: {
+    color: 'white',
   },
-  repeatedCityName: {
-    fontSize: 14,
-    color: '#FFF',
+  privacyOptionDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 10,
   },
-  repeatedCityCount: {
-    fontSize: 14,
-    color: '#F5D90A',
+  customTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#7F5AF0',
+    marginBottom: 2,
+    textAlign: 'center',
   },
 });
 

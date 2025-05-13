@@ -10,9 +10,11 @@ interface BadgesListProps {
   userBadges: UserBadge[];
   loading: boolean;
   onBadgePress?: (badge: Badge) => void;
+  onSetTitle?: (title: string) => void;
+  currentTitle?: string;
 }
 
-const BadgesList = ({ userBadges, loading, onBadgePress }: BadgesListProps) => {
+const BadgesList = ({ userBadges, loading, onBadgePress, onSetTitle, currentTitle }: BadgesListProps) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -72,8 +74,10 @@ const BadgesList = ({ userBadges, loading, onBadgePress }: BadgesListProps) => {
     const badge = userBadge.badges;
     if (!badge) return null;
 
+    const isCurrentTitle = currentTitle === badge.name;
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.badgeContainer}
         onPress={() => onBadgePress && onBadgePress(badge)}
       >
@@ -81,22 +85,22 @@ const BadgesList = ({ userBadges, loading, onBadgePress }: BadgesListProps) => {
           <View style={styles.badgeContent}>
             <View style={styles.badgeIconContainer}>
               {typeof badge.icon === 'string' ? (
-                <Image 
-                  source={{ uri: badge.icon }} 
-                  style={styles.badgeIcon} 
+                <Image
+                  source={{ uri: badge.icon }}
+                  style={styles.badgeIcon}
                   resizeMode="cover"
                 />
               ) : typeof badge.icon === 'number' || (typeof badge.icon === 'object' && badge.icon !== null) ? (
-                <Image 
-                  source={badge.icon} 
-                  style={styles.badgeIcon} 
+                <Image
+                  source={badge.icon}
+                  style={styles.badgeIcon}
                   resizeMode="cover"
                 />
               ) : (
-                <Ionicons 
-                  name={getBadgeIconByCategory(badge.category)} 
-                  size={40} 
-                  color="#4CAF50" 
+                <Ionicons
+                  name={getBadgeIconByCategory(badge.category)}
+                  size={40}
+                  color="#4CAF50"
                 />
               )}
             </View>
@@ -106,6 +110,17 @@ const BadgesList = ({ userBadges, loading, onBadgePress }: BadgesListProps) => {
               <Text style={styles.unlockDate}>
                 Desbloqueada: {new Date(userBadge.unlocked_at).toLocaleDateString()}
               </Text>
+              {onSetTitle && (
+                <TouchableOpacity
+                  style={[styles.setTitleButton, isCurrentTitle && styles.setTitleButtonActive]}
+                  onPress={() => onSetTitle(badge.name)}
+                  disabled={isCurrentTitle}
+                >
+                  <Text style={[styles.setTitleButtonText, isCurrentTitle && styles.setTitleButtonTextActive]}>
+                    {isCurrentTitle ? 'Título actual' : 'Usar como título'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </Surface>
@@ -241,6 +256,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#A0A0A0',
     fontStyle: 'italic',
+  },
+  setTitleButton: {
+    marginTop: 8,
+    backgroundColor: '#005F9E',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignSelf: 'flex-start',
+  },
+  setTitleButtonActive: {
+    backgroundColor: '#4CAF50',
+  },
+  setTitleButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  setTitleButtonTextActive: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });
 

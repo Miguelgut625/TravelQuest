@@ -4,6 +4,7 @@ interface User {
   email: string;
   id: string;
   username?: string;
+  profile_pic_url?: string;
 }
 
 interface AuthState {
