@@ -296,4 +296,75 @@ export const cancelFriendRequest = async (senderId: string, receiverId: string) 
     console.error('Error al cancelar la solicitud:', error);
     return { success: false, error: 'No se pudo cancelar la solicitud de amistad' };
   }
+};
+
+// Función para obtener amigos en común entre dos usuarios
+export const getMutualFriends = async (userId1: string, userId2: string) => {
+  try {
+    // Obtener amigos del primer usuario (donde es user1Id)
+    const { data: user1FriendsAsUser1, error: user1Error } = await supabase
+      .from('friends')
+      .select('user2Id')
+      .eq('user1Id', userId1);
+
+    if (user1Error) throw user1Error;
+
+    // Obtener amigos del primer usuario (donde es user2Id)
+    const { data: user1FriendsAsUser2, error: user1Error2 } = await supabase
+      .from('friends')
+      .select('user1Id')
+      .eq('user2Id', userId1);
+
+    if (user1Error2) throw user1Error2;
+
+    // Obtener amigos del segundo usuario (donde es user1Id)
+    const { data: user2FriendsAsUser1, error: user2Error } = await supabase
+      .from('friends')
+      .select('user2Id')
+      .eq('user1Id', userId2);
+
+    if (user2Error) throw user2Error;
+
+    // Obtener amigos del segundo usuario (donde es user2Id)
+    const { data: user2FriendsAsUser2, error: user2Error2 } = await supabase
+      .from('friends')
+      .select('user1Id')
+      .eq('user2Id', userId2);
+
+    if (user2Error2) throw user2Error2;
+
+    // Combinar los IDs de amigos de ambos usuarios
+    const user1FriendIds = [
+      ...user1FriendsAsUser1.map(f => f.user2Id),
+      ...user1FriendsAsUser2.map(f => f.user1Id)
+    ];
+    
+    const user2FriendIds = [
+      ...user2FriendsAsUser1.map(f => f.user2Id),
+      ...user2FriendsAsUser2.map(f => f.user1Id)
+    ];
+
+    // Encontrar IDs de amigos en común
+    const mutualFriendIds = user1FriendIds.filter(id => user2FriendIds.includes(id));
+
+    if (mutualFriendIds.length === 0) return [];
+
+    // Obtener detalles de los amigos en común
+    const { data: mutualFriendsData, error: mutualError } = await supabase
+      .from('users')
+      .select('id, username, points, profile_pic_url')
+      .in('id', mutualFriendIds);
+
+    if (mutualError) throw mutualError;
+
+    return mutualFriendsData.map(friend => ({
+      user2Id: friend.id,
+      username: friend.username,
+      points: friend.points,
+      profilePicUrl: friend.profile_pic_url
+    }));
+  } catch (error) {
+    console.error('Error al obtener amigos en común:', error);
+    return [];
+  }
 }; 

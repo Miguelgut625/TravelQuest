@@ -6,7 +6,7 @@ import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
-import { deleteFriendship, sendFriendRequest, cancelFriendRequest } from '../../services/friendService';
+import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends } from '../../services/friendService';
 import { getRankTitle, getRankTitleStyle } from '../../utils/rankUtils';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -129,6 +129,8 @@ const FriendProfileScreen = () => {
     const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
     const [customTitle, setCustomTitle] = useState<string | null>(null);
     const [friendshipChecked, setFriendshipChecked] = useState(false);
+    const [mutualFriends, setMutualFriends] = useState<any[]>([]);
+    const [loadingMutualFriends, setLoadingMutualFriends] = useState(false);
 
     useEffect(() => {
         console.log('FriendProfileScreen - useEffect triggered');
@@ -137,6 +139,7 @@ const FriendProfileScreen = () => {
         setFriendshipChecked(false);
         checkFriendshipStatus();
         checkPendingRequest();
+        fetchMutualFriends();
         // Si no viene el rankIndex por navegación, lo calculamos consultando el leaderboard
         const fetchRankIndex = async () => {
             if (rankIndex === undefined && friendId) {
@@ -390,6 +393,20 @@ const FriendProfileScreen = () => {
         );
     };
 
+    const fetchMutualFriends = async () => {
+        if (!user || !friendId) return;
+        
+        try {
+            setLoadingMutualFriends(true);
+            const mutualFriendsList = await getMutualFriends(user.id, friendId);
+            setMutualFriends(mutualFriendsList);
+        } catch (error) {
+            console.error('Error al obtener amigos en común:', error);
+        } finally {
+            setLoadingMutualFriends(false);
+        }
+    };
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -475,6 +492,43 @@ const FriendProfileScreen = () => {
                         <Text style={styles.statLabel}>Ciudades Visitadas</Text>
                     </View>
                 </View>
+                
+                {isFriend && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Amigos en Común</Text>
+                        {loadingMutualFriends ? (
+                            <ActivityIndicator size="small" color="#005F9E" />
+                        ) : mutualFriends.length > 0 ? (
+                            <FlatList
+                                data={mutualFriends}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                keyExtractor={(item) => item.user2Id}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.mutualFriendItem}
+                                        onPress={() => navigation.navigate('FriendProfile', {
+                                            friendId: item.user2Id,
+                                            friendName: item.username
+                                        })}
+                                    >
+                                        {item.profilePicUrl ? (
+                                            <Image source={{ uri: item.profilePicUrl }} style={styles.mutualFriendAvatar} />
+                                        ) : (
+                                            <View style={[styles.mutualFriendAvatar, styles.mutualFriendAvatarPlaceholder]}>
+                                                <Text style={styles.mutualFriendAvatarText}>{item.username.charAt(0)}</Text>
+                                            </View>
+                                        )}
+                                        <Text style={styles.mutualFriendName} numberOfLines={1}>{item.username}</Text>
+                                        <Text style={styles.mutualFriendPoints}>{item.points} pts</Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        ) : (
+                            <Text style={styles.emptyText}>No tienen amigos en común</Text>
+                        )}
+                    </View>
+                )}
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Últimos Viajes</Text>
@@ -522,6 +576,43 @@ const FriendProfileScreen = () => {
                         ))
                     )}
                 </View>
+
+                {isFriend && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Amigos en Común</Text>
+                        {loadingMutualFriends ? (
+                            <ActivityIndicator size="small" color="#005F9E" />
+                        ) : mutualFriends.length > 0 ? (
+                            <FlatList
+                                data={mutualFriends}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                keyExtractor={(item) => item.user2Id}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.mutualFriendItem}
+                                        onPress={() => navigation.navigate('FriendProfile', {
+                                            friendId: item.user2Id,
+                                            friendName: item.username
+                                        })}
+                                    >
+                                        {item.profilePicUrl ? (
+                                            <Image source={{ uri: item.profilePicUrl }} style={styles.mutualFriendAvatar} />
+                                        ) : (
+                                            <View style={[styles.mutualFriendAvatar, styles.mutualFriendAvatarPlaceholder]}>
+                                                <Text style={styles.mutualFriendAvatarText}>{item.username.charAt(0)}</Text>
+                                            </View>
+                                        )}
+                                        <Text style={styles.mutualFriendName} numberOfLines={1}>{item.username}</Text>
+                                        <Text style={styles.mutualFriendPoints}>{item.points} pts</Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        ) : (
+                            <Text style={styles.emptyText}>No tienen amigos en común</Text>
+                        )}
+                    </View>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -857,6 +948,35 @@ const styles = StyleSheet.create({
         color: '#7F5AF0',
         marginBottom: 2,
         textAlign: 'center',
+    },
+    mutualFriendItem: {
+        marginRight: 10,
+        alignItems: 'center',
+    },
+    mutualFriendAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        marginBottom: 5,
+    },
+    mutualFriendAvatarPlaceholder: {
+        backgroundColor: '#f5f5f5',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    mutualFriendAvatarText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#666',
+    },
+    mutualFriendName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    mutualFriendPoints: {
+        fontSize: 14,
+        color: '#666',
     },
 });
 
