@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ActivityIndicator, ScrollView, Platform, Dimensions, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
-import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends } from '../../services/friendService';
+import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends, getFriendRank } from '../../services/friendService';
 import { getRankTitle, getRankTitleStyle } from '../../utils/rankUtils';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface JourneyMission {
     id: string;
@@ -133,31 +134,19 @@ const FriendProfileScreen = () => {
     const [loadingMutualFriends, setLoadingMutualFriends] = useState(false);
 
     useEffect(() => {
-        console.log('FriendProfileScreen - useEffect triggered');
-        console.log('Current user:', user?.id);
-        console.log('Friend ID:', friendId);
         setFriendshipChecked(false);
         checkFriendshipStatus();
         checkPendingRequest();
         fetchMutualFriends();
-        // Si no viene el rankIndex por navegación, lo calculamos consultando el leaderboard
-        const fetchRankIndex = async () => {
-            if (rankIndex === undefined && friendId) {
-                const { data, error } = await supabase
-                    .from('users')
-                    .select('id')
-                    .order('points', { ascending: false });
-                if (!error && data) {
-                    const index = data.findIndex((user: any) => user.id === friendId);
-                    if (index !== -1) {
-                        setLocalRankIndex(index);
-                    }
+        if (rankIndex === undefined && friendId) {
+            getFriendRank(friendId).then(index => {
+                if (index !== undefined) {
+                    setLocalRankIndex(index);
                 }
-            } else if (rankIndex !== undefined) {
-                setLocalRankIndex(rankIndex);
-            }
-        };
-        fetchRankIndex();
+            });
+        } else if (rankIndex !== undefined) {
+            setLocalRankIndex(rankIndex);
+        }
     }, [friendId, user?.id, rankIndex]);
 
     useEffect(() => {
@@ -173,16 +162,9 @@ const FriendProfileScreen = () => {
             setLoading(true);
             setError(null);
 
-            // Obtener los puntos, nivel, XP y privacidad del amigo
-            const { data: friendData, error: friendError } = await supabase
-                .from('users')
-                .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title')
-                .eq('id', friendId)
-                .single();
+            const response = await axios.get(`${API_URL}/users/${friendId}`);
+            const friendData = response.data;
 
-            if (friendError) throw friendError;
-
-            // Comprobar privacidad del perfil
             const canViewProfile =
                 friendData.profile_visibility === 'public' ||
                 (friendData.profile_visibility === 'friends' && isFriend) ||
@@ -202,19 +184,13 @@ const FriendProfileScreen = () => {
             setProfilePicUrl(friendData.profile_pic_url || null);
             setCustomTitle(friendData.custom_title || null);
 
-            // Obtener las ciudades visitadas del amigo desde journeys
-            const { data: journeys, error: journeysError } = await supabase
-                .from('journeys')
-                .select('cityId')
-                .eq('userId', friendId);
-            if (journeysError) throw journeysError;
-            const uniqueCities = new Set((journeys || []).map((j: any) => j.cityId)).size;
+            const journeysResponse = await axios.get(`${API_URL}/journeys/user/${friendId}`);
+            const journeys = journeysResponse.data;
+            const uniqueCities = new Set(journeys.map((j: any) => j.cityId)).size;
 
-            // Obtener las entradas del diario del amigo
             const entries = await getUserJournalEntries(friendId);
             setEntriesByCity(entries);
 
-            // Calcular estadísticas
             const cities = Object.keys(entries);
             let completedMissions = 0;
             cities.forEach(city => {
@@ -228,7 +204,6 @@ const FriendProfileScreen = () => {
             });
 
         } catch (error) {
-            console.error('Error fetching friend data:', error);
             setError('No se pudieron cargar los datos del perfil');
         } finally {
             setLoading(false);
@@ -237,31 +212,21 @@ const FriendProfileScreen = () => {
 
     const checkFriendshipStatus = async () => {
         if (!user || !friendId) {
-            console.log('checkFriendshipStatus - Missing user or friendId');
             setFriendshipChecked(true);
             return;
         }
         try {
-            console.log('Checking friendship between:', user.id, 'and', friendId);
-            // Verificar si existe una relación de amistad en cualquier dirección
-            const { data: friendshipData, error: friendshipError } = await supabase
-                .from('friends')
-                .select('created_at')
-                .or(`and(user1Id.eq.${user.id},user2Id.eq.${friendId}),and(user1Id.eq.${friendId},user2Id.eq.${user.id})`);
+            const response = await axios.get(`${API_URL}/friends/status/${user.id}/${friendId}`);
+            const data = response.data;
 
-            console.log('Friendship check result:', { friendshipData, friendshipError });
-
-            if (!friendshipError && friendshipData && friendshipData.length > 0) {
-                console.log('Setting isFriend to true');
+            if (data.isFriend) {
                 setIsFriend(true);
-                setFriendshipDate(friendshipData[0].created_at);
+                setFriendshipDate(data.friendshipDate);
             } else {
-                console.log('Setting isFriend to false');
                 setIsFriend(false);
                 setFriendshipDate(null);
             }
         } catch (e) {
-            console.error('Error checking friendship status:', e);
             setIsFriend(false);
             setFriendshipDate(null);
         } finally {
@@ -272,33 +237,10 @@ const FriendProfileScreen = () => {
     const checkPendingRequest = async () => {
         if (!user || !friendId) return;
         try {
-            console.log('Checking pending requests for:', { userId: user.id, friendId });
-
-            // Verificar solicitudes enviadas
-            const { data: sentRequest, error: sentError } = await supabase
-                .from('friendship_invitations')
-                .select('id')
-                .eq('senderId', user.id)
-                .eq('receiverId', friendId)
-                .eq('status', 'Pending')
-                .maybeSingle();
-
-            // Verificar solicitudes recibidas
-            const { data: receivedRequest, error: receivedError } = await supabase
-                .from('friendship_invitations')
-                .select('id')
-                .eq('senderId', friendId)
-                .eq('receiverId', user.id)
-                .eq('status', 'Pending')
-                .maybeSingle();
-
-            console.log('Request check results:', { sentRequest, receivedRequest });
-
-            const hasPending = (!sentError && sentRequest) || (!receivedError && receivedRequest);
-            console.log('Setting hasPendingRequest to:', hasPending);
-            setHasPendingRequest(hasPending);
+            const response = await axios.get(`${API_URL}/friends/pending-request/${user.id}/${friendId}`);
+            const data = response.data;
+            setHasPendingRequest(data.hasPendingRequest);
         } catch (error) {
-            console.error('Error checking pending request:', error);
             setHasPendingRequest(false);
         }
     };
@@ -364,7 +306,6 @@ const FriendProfileScreen = () => {
     };
 
     const renderActionIcon = () => {
-        console.log('Rendering icon with states:', { isFriend, hasPendingRequest });
         let iconName = "person-add";
         let iconColor = "#005F9E";
         let onPressAction = handleAddFriend;
