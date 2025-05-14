@@ -1,13 +1,26 @@
 // friendRoutes.js
 const { Router } = require('express');
-const { obtenerSolicitudesPendientes, aceptarSolicitud, rechazarSolicitud, enviarSolicitud } = require('../controllers/friendControlles.js');
+const {
+  getFriends,
+  getFriendRequests,
+  sendFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  deleteFriendship,
+  cancelFriendRequest,
+  getMutualFriends
+} = require('../controllers/friendController');
 
 const router = Router();
 
 // Rutas para amigos
-router.get('/requests/:id', obtenerSolicitudesPendientes);
-router.get('/accept-requests/:id', aceptarSolicitud);
-router.get('/reject-requests/:id', rechazarSolicitud);
-router.post('/send-request', enviarSolicitud);
+router.get('/:userId', getFriends);
+router.get('/requests/:userId', getFriendRequests);
+router.post('/send-request', sendFriendRequest);
+router.put('/accept-request/:requestId', acceptFriendRequest);
+router.put('/reject-request/:requestId', rejectFriendRequest);
+router.delete('/:userId1/:userId2', deleteFriendship);
+router.delete('/cancel-request/:senderId/:receiverId', cancelFriendRequest);
+router.get('/mutual/:userId1/:userId2', getMutualFriends);
 
 module.exports = router;
