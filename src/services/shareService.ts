@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import NotificationService from './NotificationService';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { createJourneyGroup } from './groupService';
 
 // Definir la interfaz Friend aquí ya que no se exporta desde FriendsScreen
@@ -10,11 +10,11 @@ export interface Friend {
   points: number;
 }
 
-// Función para compartir un viaje con un amigo
+// Función para compartir un viaje con múltiples amigos
 export const shareJourney = async (
     journeyId: string,
     ownerId: string,
-    friend: Friend
+    friends: Friend[] | Friend
 ): Promise<boolean> => {
     if (!journeyId) {
         Alert.alert('Error', 'No se pudo compartir el journey porque no se encontró el ID del viaje.');
@@ -22,6 +22,9 @@ export const shareJourney = async (
     }
 
     try {
+        // Convertir a array si se recibe un solo amigo para mantener compatibilidad
+        const friendsArray = Array.isArray(friends) ? friends : [friends];
+        
         // Obtener información del viaje (nombre de la ciudad, fechas)
         const { data: journeyData, error: journeyError } = await supabase
             .from('journeys')
@@ -50,30 +53,16 @@ export const shareJourney = async (
 
         if (userError) throw userError;
 
-        // Verificar si el viaje ya fue compartido
-        const { data: existingShare, error: existingShareError } = await supabase
-            .from('journeys_shared')
-            .select('id, status')
-            .eq('journeyId', journeyId)
-            .eq('sharedWithUserId', friend.user2Id)
-            .single();
-
-        // Si ya existe y está aceptado, no hacemos nada
-        if (!existingShareError && existingShare && existingShare.status === 'accepted') {
-            Alert.alert('Información', `El viaje ya fue compartido con ${friend.username} anteriormente.`);
-            return true;
-        }
-
         // Preparar fechas
         const startDate = new Date(journeyData.start_date);
         const endDate = new Date(journeyData.end_date);
         const cityName = journeyData.cities?.name || 'destino desconocido';
-
-        // Crear un grupo para el viaje
+        
+        // Crear un grupo para el viaje con todos los amigos
         const groupResult = await createJourneyGroup(
             journeyId,
             ownerId,
-            friend.user2Id,
+            friendsArray.map(friend => friend.user2Id),
             cityName,
             startDate,
             endDate
@@ -83,46 +72,81 @@ export const shareJourney = async (
             throw new Error('No se pudo crear el grupo para el viaje');
         }
 
-        // Guardar en journeys_shared con estado pendiente si no existía antes
-        if (existingShareError || !existingShare) {
-            const { error } = await supabase
-                .from('journeys_shared')
-                .insert({
+        // Procesar cada amigo
+        let successCount = 0;
+        for (const friend of friendsArray) {
+            try {
+                // Verificar si el viaje ya fue compartido con este amigo
+                const { data: existingShare, error: existingShareError } = await supabase
+                    .from('journeys_shared')
+                    .select('id, status')
+                    .eq('journeyId', journeyId)
+                    .eq('sharedWithUserId', friend.user2Id)
+                    .single();
+
+                // Si ya existe y está aceptado, saltamos este amigo
+                if (!existingShareError && existingShare && existingShare.status === 'accepted') {
+                    console.log(`El viaje ya fue compartido con ${friend.username} anteriormente.`);
+                    successCount++;
+                    continue;
+                }
+
+                // Guardar en journeys_shared con estado pendiente si no existía antes
+                if (existingShareError || !existingShare) {
+                    const { error } = await supabase
+                        .from('journeys_shared')
+                        .insert({
+                            journeyId,
+                            ownerId,
+                            sharedWithUserId: friend.user2Id,
+                            status: 'pending',
+                            group_id: groupResult.groupId
+                        });
+
+                    if (error) throw error;
+                } else {
+                    // Actualizar el registro existente para agregarle el groupId si no lo tenía
+                    const { error } = await supabase
+                        .from('journeys_shared')
+                        .update({
+                            group_id: groupResult.groupId,
+                            status: 'pending'
+                        })
+                        .eq('id', existingShare.id);
+
+                    if (error) throw error;
+                }
+
+                // Enviar notificación al amigo
+                const notificationService = NotificationService.getInstance();
+                await notificationService.notifyJourneyInvitation(
+                    friend.user2Id,
+                    journeyData.description,
                     journeyId,
-                    ownerId,
-                    sharedWithUserId: friend.user2Id,
-                    status: 'pending',
-                    groupId: groupResult.groupId
-                });
-
-            if (error) throw error;
-        } else {
-            // Actualizar el registro existente para agregarle el groupId si no lo tenía
-            const { error } = await supabase
-                .from('journeys_shared')
-                .update({
-                    groupId: groupResult.groupId,
-                    status: 'pending'
-                })
-                .eq('id', existingShare.id);
-
-            if (error) throw error;
+                    userData.username,
+                    cityName,
+                    startDate.toISOString(),
+                    endDate.toISOString()
+                );
+                
+                successCount++;
+            } catch (friendError) {
+                console.error(`Error al compartir con ${friend.username}:`, friendError);
+                // Continuamos con el siguiente amigo aunque haya error con uno
+            }
         }
 
-        // Enviar notificación al amigo
-        const notificationService = NotificationService.getInstance();
-        await notificationService.notifyJourneyInvitation(
-            friend.user2Id,
-            journeyData.description,
-            userData.username,
-            cityName,
-            startDate,
-            endDate,
-            groupResult.invitationId,
-            journeyId
-        );
-
-        Alert.alert('Éxito', `Se ha enviado una invitación de viaje a ${friend.username}. Se le notificará cuando acepte.`);
+        if (successCount === 0) {
+            throw new Error('No se pudo compartir el viaje con ningún amigo');
+        } else if (successCount < friendsArray.length) {
+            Alert.alert('Información', `Se ha compartido el viaje con ${successCount} de ${friendsArray.length} amigos seleccionados.`);
+        } else {
+            const friendsText = friendsArray.length === 1 
+                ? friendsArray[0].username 
+                : `${friendsArray.length} amigos`;
+            Alert.alert('Éxito', `Se ha enviado una invitación de viaje a ${friendsText}. Se te notificará cuando acepten.`);
+        }
+        
         return true;
     } catch (error) {
         console.error('Error al compartir viaje:', error);

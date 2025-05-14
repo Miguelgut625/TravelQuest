@@ -337,16 +337,19 @@ export const getPendingGroupInvitations = async (userId: string) => {
 export const createJourneyGroup = async (
   journeyId: string,
   ownerId: string,
-  friendId: string,
+  friendIds: string[] | string,
   cityName: string,
   startDate: Date,
   endDate: Date
 ): Promise<{
   success: boolean;
   groupId?: string;
-  invitationId?: string;
+  invitationIds?: Record<string, string>;
 }> => {
   try {
+    // Convertir a array si se recibe un solo ID para mantener compatibilidad
+    const friendIdsArray = Array.isArray(friendIds) ? friendIds : [friendIds];
+    
     // Obtener información del usuario propietario
     const ownerInfo = await getUserInfoById(ownerId);
     if (!ownerInfo) throw new Error('No se pudo obtener información del propietario');
@@ -358,28 +361,40 @@ export const createJourneyGroup = async (
     const group = await createGroup(groupName, ownerId, description, journeyId);
     if (!group) throw new Error('No se pudo crear el grupo');
     
-    // Invitar al amigo al grupo
-    const inviteSuccess = await inviteUserToGroup(group.id, friendId, ownerId);
-    if (!inviteSuccess) throw new Error('No se pudo invitar al amigo al grupo');
+    // Invitar a todos los amigos al grupo
+    const invitationIds: Record<string, string> = {};
+    
+    for (const friendId of friendIdsArray) {
+      try {
+        // Invitar al amigo al grupo
+        const inviteSuccess = await inviteUserToGroup(group.id, friendId, ownerId);
+        if (!inviteSuccess) {
+          console.error(`No se pudo invitar al amigo ${friendId} al grupo`);
+          continue;
+        }
 
-    // Obtener el ID de la invitación para poder referenciarla
-    const { data: invitationData, error: invitationError } = await supabase
-      .from('group_members')
-      .select('id')
-      .eq('group_id', group.id)
-      .eq('user_id', friendId)
-      .eq('status', 'pending')
-      .single();
+        // Obtener el ID de la invitación para poder referenciarla
+        const { data: invitationData, error: invitationError } = await supabase
+          .from('group_members')
+          .select('id')
+          .eq('group_id', group.id)
+          .eq('user_id', friendId)
+          .eq('status', 'pending')
+          .single();
 
-    if (invitationError) {
-      console.error('Error al obtener ID de invitación:', invitationError);
-      return { success: true, groupId: group.id };
+        if (!invitationError && invitationData) {
+          invitationIds[friendId] = invitationData.id;
+        }
+      } catch (error) {
+        console.error(`Error al invitar al amigo ${friendId}:`, error);
+        // Continuamos con el siguiente amigo
+      }
     }
 
     return {
       success: true,
       groupId: group.id,
-      invitationId: invitationData.id
+      invitationIds: Object.keys(invitationIds).length > 0 ? invitationIds : undefined
     };
   } catch (error) {
     console.error('Error al crear grupo de viaje:', error);
