@@ -26,6 +26,7 @@
     "@supabase/supabase-js": "^2.39.3",
     "@types/google-maps": "^3.2.6",
     "@types/react-datepicker": "^4.19.5",
+    "axios": "^1.9.0",
     "cesium": "^1.110.0",
     "cors": "^2.8.5",
     "expo": "~52.0.8",
@@ -74,11 +75,14 @@
     "@babel/plugin-transform-object-rest-spread": "^7.24.0",
     "@babel/plugin-transform-optional-catch-binding": "^7.24.0",
     "@babel/plugin-transform-optional-chaining": "^7.24.0",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.18",
     "@types/react": "~18.3.12",
     "copy-webpack-plugin": "^13.0.0",
     "expo-module-scripts": "^4.0.5",
     "metro-react-native-babel-transformer": "^0.77.0",
-    "typescript": "^5.3.0"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   },
   "private": true,
   "resolutions": {

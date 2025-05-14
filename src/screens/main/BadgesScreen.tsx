@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { Badge, UserBadge, getUserBadges, checkAllBadges } from '../../services/badgeService';
+import { Badge, UserBadge, getUserBadges, checkAllBadges, updateUserTitle, getUserTitle } from '../../services/badgeService';
 import BadgesList from '../../components/BadgesList';
 import BadgeDetailModal from '../../components/BadgeDetailModal';
 import { Ionicons } from '@expo/vector-icons';
 import { setUser } from '../../features/auth/authSlice';
-import { supabase } from '../../services/supabase';
 
 interface BadgesScreenProps {
   navigation: any;
@@ -45,14 +44,8 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 
   const fetchCurrentTitle = async () => {
     if (!user?.id) return;
-    const { data, error } = await supabase
-      .from('users')
-      .select('custom_title')
-      .eq('id', user.id)
-      .single();
-    if (!error && data?.custom_title) {
-      setCurrentTitle(data.custom_title);
-    }
+    const title = await getUserTitle(user.id);
+    setCurrentTitle(title);
   };
 
   useEffect(() => {
@@ -76,15 +69,14 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 
   const handleSetTitle = async (title: string) => {
     if (!user?.id) return;
-    const { error } = await supabase
-      .from('users')
-      .update({ custom_title: title })
-      .eq('id', user.id);
-    if (!error) {
+    
+    const result = await updateUserTitle(user.id, title);
+    
+    if (result.success && result.user) {
       setCurrentTitle(title);
       dispatch(setUser({ ...user, custom_title: title }));
     } else {
-      alert('No se pudo actualizar el título');
+      alert(result.error || 'No se pudo actualizar el título');
     }
   };
 
