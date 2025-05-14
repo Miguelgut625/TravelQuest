@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator, ScrollView, Platform, Dimensions, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, ActivityIndicator, ScrollView, Platform, Dimensions, TouchableOpacity, FlatList, Alert, Modal } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
-import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends } from '../../services/friendService';
+import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends, getFriends } from '../../services/friendService';
 import { getRankTitle, getRankTitleStyle } from '../../utils/rankUtils';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -131,6 +131,13 @@ const FriendProfileScreen = () => {
     const [friendshipChecked, setFriendshipChecked] = useState(false);
     const [mutualFriends, setMutualFriends] = useState<any[]>([]);
     const [loadingMutualFriends, setLoadingMutualFriends] = useState(false);
+    const [friendsList, setFriendsList] = useState<any[]>([]);
+    const [loadingFriends, setLoadingFriends] = useState(false);
+    const [showFriendsModal, setShowFriendsModal] = useState(false);
+    const [friendsCount, setFriendsCount] = useState(0);
+    const [myFriends, setMyFriends] = useState<any[]>([]);
+    const [myPendingRequests, setMyPendingRequests] = useState<string[]>([]);
+    const [friendsVisibility, setFriendsVisibility] = useState<'public' | 'friends' | 'private'>('public');
 
     useEffect(() => {
         console.log('FriendProfileScreen - useEffect triggered');
@@ -140,6 +147,8 @@ const FriendProfileScreen = () => {
         checkFriendshipStatus();
         checkPendingRequest();
         fetchMutualFriends();
+        fetchFriendsList();
+        fetchMyFriendsAndRequests();
         // Si no viene el rankIndex por navegación, lo calculamos consultando el leaderboard
         const fetchRankIndex = async () => {
             if (rankIndex === undefined && friendId) {
@@ -176,7 +185,7 @@ const FriendProfileScreen = () => {
             // Obtener los puntos, nivel, XP y privacidad del amigo
             const { data: friendData, error: friendError } = await supabase
                 .from('users')
-                .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title')
+                .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title, friends_visibility')
                 .eq('id', friendId)
                 .single();
 
@@ -201,6 +210,7 @@ const FriendProfileScreen = () => {
             setXpNext(friendData.xp_next || 50);
             setProfilePicUrl(friendData.profile_pic_url || null);
             setCustomTitle(friendData.custom_title || null);
+            setFriendsVisibility(friendData.friends_visibility || 'public');
 
             // Obtener las ciudades visitadas del amigo desde journeys
             const { data: journeys, error: journeysError } = await supabase
@@ -395,7 +405,7 @@ const FriendProfileScreen = () => {
 
     const fetchMutualFriends = async () => {
         if (!user || !friendId) return;
-        
+
         try {
             setLoadingMutualFriends(true);
             const mutualFriendsList = await getMutualFriends(user.id, friendId);
@@ -404,6 +414,43 @@ const FriendProfileScreen = () => {
             console.error('Error al obtener amigos en común:', error);
         } finally {
             setLoadingMutualFriends(false);
+        }
+    };
+
+    const fetchFriendsList = async () => {
+        setLoadingFriends(true);
+        try {
+            const list = await getFriends(friendId);
+            setFriendsList(list);
+            setFriendsCount(list.length);
+        } catch (e) {
+            setFriendsList([]);
+            setFriendsCount(0);
+        } finally {
+            setLoadingFriends(false);
+        }
+    };
+
+    // Obtener amigos y solicitudes pendientes del usuario actual
+    const fetchMyFriendsAndRequests = async () => {
+        if (!user?.id) return;
+        try {
+            const friends = await getFriends(user.id);
+            setMyFriends(friends);
+            // Obtener solicitudes pendientes enviadas
+            const { data: sentRequests, error: sentError } = await supabase
+                .from('friendship_invitations')
+                .select('receiverId')
+                .eq('senderId', user.id)
+                .eq('status', 'Pending');
+            if (!sentError && sentRequests) {
+                setMyPendingRequests(sentRequests.map((req: any) => req.receiverId));
+            } else {
+                setMyPendingRequests([]);
+            }
+        } catch (e) {
+            setMyFriends([]);
+            setMyPendingRequests([]);
         }
     };
 
@@ -480,6 +527,11 @@ const FriendProfileScreen = () => {
                             })}
                         </Text>
                     )}
+                    {/* Estadística de amigos */}
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, alignSelf: 'flex-start' }} onPress={() => setShowFriendsModal(true)}>
+                        <Ionicons name="people" size={20} color="#005F9E" style={{ marginRight: 6 }} />
+                        <Text style={{ fontSize: 16, color: '#005F9E', fontWeight: 'bold' }}>{friendsCount} Amigos</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.statsSection}>
@@ -492,7 +544,83 @@ const FriendProfileScreen = () => {
                         <Text style={styles.statLabel}>Ciudades Visitadas</Text>
                     </View>
                 </View>
-                
+
+                {/* Modal de amigos */}
+                <Modal
+                    visible={showFriendsModal}
+                    animationType="slide"
+                    transparent={true}
+                    onRequestClose={() => setShowFriendsModal(false)}
+                >
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+                        <View style={{ backgroundColor: 'white', borderRadius: 10, width: '90%', maxHeight: '80%' }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
+                                <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Amigos de {displayName}</Text>
+                                <TouchableOpacity onPress={() => setShowFriendsModal(false)}>
+                                    <Ionicons name="close" size={28} color="#005F9E" />
+                                </TouchableOpacity>
+                            </View>
+                            {(() => {
+                                // Lógica de visibilidad de amigos
+                                if (friendsVisibility === 'private' && user?.id !== friendId) {
+                                    return <Text style={{ textAlign: 'center', margin: 20, color: '#666' }}>Este usuario prefiere no mostrar su lista de amigos.</Text>;
+                                }
+                                if (friendsVisibility === 'friends' && !isFriend && user?.id !== friendId) {
+                                    return <Text style={{ textAlign: 'center', margin: 20, color: '#666' }}>Solo los amigos pueden ver la lista de amigos de este usuario.</Text>;
+                                }
+                                if (loadingFriends) {
+                                    return <ActivityIndicator size="large" color="#005F9E" style={{ margin: 20 }} />;
+                                }
+                                if (friendsList.length === 0) {
+                                    return <Text style={{ textAlign: 'center', margin: 20, color: '#666' }}>No tiene amigos aún.</Text>;
+                                }
+                                return (
+                                    <FlatList
+                                        data={friendsList}
+                                        keyExtractor={item => item.user2Id}
+                                        renderItem={({ item }) => {
+                                            const isMyFriend = myFriends.some(f => f.user2Id === item.user2Id);
+                                            const hasPending = myPendingRequests.includes(item.user2Id);
+                                            return (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderColor: '#eee' }}>
+                                                    <TouchableOpacity style={{ flex: 1 }} onPress={() => {
+                                                        setShowFriendsModal(false);
+                                                        navigation.navigate('FriendProfile', {
+                                                            friendId: item.user2Id,
+                                                            friendName: item.username,
+                                                            rankIndex: item.rankIndex
+                                                        });
+                                                    }}>
+                                                        <Text style={{ fontSize: 16, fontWeight: 'bold' }}>{item.username}</Text>
+                                                        <Text style={{ color: '#666' }}>{item.points} puntos</Text>
+                                                    </TouchableOpacity>
+                                                    {item.user2Id === user.id ? (
+                                                        <Text style={{ color: '#005F9E', fontWeight: 'bold', marginLeft: 10 }}>Tú</Text>
+                                                    ) : !isMyFriend && !hasPending ? (
+                                                        <TouchableOpacity
+                                                            style={{ backgroundColor: '#005F9E', borderRadius: 20, padding: 8, marginLeft: 10 }}
+                                                            onPress={async () => {
+                                                                await sendFriendRequest(user.id, item.user2Id);
+                                                                fetchFriendsList();
+                                                            }}
+                                                        >
+                                                            <Ionicons name="person-add-outline" size={20} color="white" />
+                                                        </TouchableOpacity>
+                                                    ) : hasPending ? (
+                                                        <Ionicons name="time-outline" size={20} color="#FFA000" style={{ marginLeft: 10 }} />
+                                                    ) : isMyFriend ? (
+                                                        <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" style={{ marginLeft: 10 }} />
+                                                    ) : null}
+                                                </View>
+                                            );
+                                        }}
+                                    />
+                                );
+                            })()}
+                        </View>
+                    </View>
+                </Modal>
+
                 {isFriend && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Amigos en Común</Text>
@@ -576,43 +704,6 @@ const FriendProfileScreen = () => {
                         ))
                     )}
                 </View>
-
-                {isFriend && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Amigos en Común</Text>
-                        {loadingMutualFriends ? (
-                            <ActivityIndicator size="small" color="#005F9E" />
-                        ) : mutualFriends.length > 0 ? (
-                            <FlatList
-                                data={mutualFriends}
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                keyExtractor={(item) => item.user2Id}
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity
-                                        style={styles.mutualFriendItem}
-                                        onPress={() => navigation.navigate('FriendProfile', {
-                                            friendId: item.user2Id,
-                                            friendName: item.username
-                                        })}
-                                    >
-                                        {item.profilePicUrl ? (
-                                            <Image source={{ uri: item.profilePicUrl }} style={styles.mutualFriendAvatar} />
-                                        ) : (
-                                            <View style={[styles.mutualFriendAvatar, styles.mutualFriendAvatarPlaceholder]}>
-                                                <Text style={styles.mutualFriendAvatarText}>{item.username.charAt(0)}</Text>
-                                            </View>
-                                        )}
-                                        <Text style={styles.mutualFriendName} numberOfLines={1}>{item.username}</Text>
-                                        <Text style={styles.mutualFriendPoints}>{item.points} pts</Text>
-                                    </TouchableOpacity>
-                                )}
-                            />
-                        ) : (
-                            <Text style={styles.emptyText}>No tienen amigos en común</Text>
-                        )}
-                    </View>
-                )}
             </ScrollView>
         </SafeAreaView>
     );

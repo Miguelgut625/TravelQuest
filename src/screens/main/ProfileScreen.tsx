@@ -72,6 +72,7 @@ const ProfileScreen = () => {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'friends' | 'private'>('public');
+  const [friendsVisibility, setFriendsVisibility] = useState<'public' | 'friends' | 'private'>('public');
   const [badges, setBadges] = useState<any[]>([]);
   const [selectedTitle, setSelectedTitle] = useState<string>('');
   const [savingTitle, setSavingTitle] = useState(false);
@@ -191,12 +192,13 @@ const ProfileScreen = () => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('profile_visibility')
+        .select('profile_visibility, friends_visibility')
         .eq('id', user.id)
         .single();
 
       if (error) throw error;
       setProfileVisibility(data?.profile_visibility || 'public');
+      setFriendsVisibility(data?.friends_visibility || 'public');
     } catch (error) {
       console.error('Error al obtener configuración de privacidad:', error);
     }
@@ -209,13 +211,28 @@ const ProfileScreen = () => {
         .from('users')
         .update({ profile_visibility: visibility })
         .eq('id', user.id);
-
       if (error) throw error;
       setProfileVisibility(visibility);
       Alert.alert('Éxito', 'Configuración de privacidad actualizada');
     } catch (error) {
       console.error('Error al actualizar configuración de privacidad:', error);
       Alert.alert('Error', 'No se pudo actualizar la configuración de privacidad');
+    }
+  };
+
+  const updateFriendsVisibility = async (visibility: 'public' | 'friends' | 'private') => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ friends_visibility: visibility })
+        .eq('id', user.id);
+      if (error) throw error;
+      setFriendsVisibility(visibility);
+      Alert.alert('Éxito', 'Configuración de privacidad de amigos actualizada');
+    } catch (error) {
+      console.error('Error al actualizar configuración de privacidad de amigos:', error);
+      Alert.alert('Error', 'No se pudo actualizar la configuración de privacidad de amigos');
     }
   };
 
@@ -550,10 +567,10 @@ const ProfileScreen = () => {
               </View>
             </TouchableOpacity>
             <View style={styles.userInfo}>
+              {selectedTitle ? (
+                <Text style={styles.customTitle}>{selectedTitle}</Text>
+              ) : null}
               <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
-              {user?.custom_title && (
-                <Text style={styles.customTitle}>{user.custom_title}</Text>
-              )}
               <Text style={styles.email}>{user?.email}</Text>
               <View style={styles.levelContainer}>
                 <Text style={styles.levelText}>Nivel {level}</Text>
@@ -634,78 +651,57 @@ const ProfileScreen = () => {
         {/* Privacidad */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacidad</Text>
-          <View style={styles.privacyContainer}>
-            <Text style={styles.privacyDescription}>
-              Configura quién puede ver tu perfil
-            </Text>
-            <View style={styles.privacyOptions}>
+          {/* Visibilidad del perfil */}
+          <View style={[styles.privacyContainer, { marginBottom: 16 }]}>
+            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede ver tu perfil</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
               <TouchableOpacity
-                style={[
-                  styles.privacyOption,
-                  profileVisibility === 'public' && styles.selectedPrivacyOption
-                ]}
+                style={[styles.privacyRadio, profileVisibility === 'public' && styles.privacyRadioSelected]}
                 onPress={() => updateProfileVisibility('public')}
               >
-                <Ionicons
-                  name="globe-outline"
-                  size={24}
-                  color={profileVisibility === 'public' ? 'white' : '#005F9E'}
-                />
-                <Text style={[
-                  styles.privacyOptionText,
-                  profileVisibility === 'public' && styles.selectedPrivacyOptionText
-                ]}>
-                  Público
-                </Text>
-                <Text style={styles.privacyOptionDescription}>
-                  Cualquier usuario puede ver tu perfil
-                </Text>
+                <Ionicons name="globe-outline" size={20} color={profileVisibility === 'public' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, profileVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
-                style={[
-                  styles.privacyOption,
-                  profileVisibility === 'friends' && styles.selectedPrivacyOption
-                ]}
+                style={[styles.privacyRadio, profileVisibility === 'friends' && styles.privacyRadioSelected]}
                 onPress={() => updateProfileVisibility('friends')}
               >
-                <Ionicons
-                  name="people-outline"
-                  size={24}
-                  color={profileVisibility === 'friends' ? 'white' : '#005F9E'}
-                />
-                <Text style={[
-                  styles.privacyOptionText,
-                  profileVisibility === 'friends' && styles.selectedPrivacyOptionText
-                ]}>
-                  Solo Amigos
-                </Text>
-                <Text style={styles.privacyOptionDescription}>
-                  Solo tus amigos pueden ver tu perfil
-                </Text>
+                <Ionicons name="people-outline" size={20} color={profileVisibility === 'friends' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, profileVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
-                style={[
-                  styles.privacyOption,
-                  profileVisibility === 'private' && styles.selectedPrivacyOption
-                ]}
+                style={[styles.privacyRadio, profileVisibility === 'private' && styles.privacyRadioSelected]}
                 onPress={() => updateProfileVisibility('private')}
               >
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={24}
-                  color={profileVisibility === 'private' ? 'white' : '#005F9E'}
-                />
-                <Text style={[
-                  styles.privacyOptionText,
-                  profileVisibility === 'private' && styles.selectedPrivacyOptionText
-                ]}>
-                  Privado
-                </Text>
-                <Text style={styles.privacyOptionDescription}>
-                  Nadie puede ver tu perfil
-                </Text>
+                <Ionicons name="lock-closed-outline" size={20} color={profileVisibility === 'private' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, profileVisibility === 'private' && styles.privacyRadioTextSelected]}>Privado</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          {/* Visibilidad de amigos */}
+          <View style={styles.privacyContainer}>
+            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede ver tu lista de amigos</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <TouchableOpacity
+                style={[styles.privacyRadio, friendsVisibility === 'public' && styles.privacyRadioSelected]}
+                onPress={() => updateFriendsVisibility('public')}
+              >
+                <Ionicons name="globe-outline" size={20} color={friendsVisibility === 'public' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, friendsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.privacyRadio, friendsVisibility === 'friends' && styles.privacyRadioSelected]}
+                onPress={() => updateFriendsVisibility('friends')}
+              >
+                <Ionicons name="people-outline" size={20} color={friendsVisibility === 'friends' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, friendsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.privacyRadio, friendsVisibility === 'private' && styles.privacyRadioSelected]}
+                onPress={() => updateFriendsVisibility('private')}
+              >
+                <Ionicons name="lock-closed-outline" size={20} color={friendsVisibility === 'private' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, friendsVisibility === 'private' && styles.privacyRadioTextSelected]}>Solo tú</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1123,43 +1119,38 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
-  privacyOptions: {
-    marginTop: 10,
-  },
-  privacyOption: {
+  privacyRadio: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#005F9E',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginHorizontal: 2,
+    backgroundColor: 'white',
+    minWidth: 90,
+    flexGrow: 1,
+    marginVertical: 4,
+    flexBasis: '30%',
+    justifyContent: 'center',
   },
-  selectedPrivacyOption: {
+  privacyRadioSelected: {
     backgroundColor: '#005F9E',
   },
-  privacyOptionText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  privacyRadioText: {
+    marginLeft: 6,
     color: '#005F9E',
-    marginLeft: 10,
-    flex: 1,
+    fontWeight: 'bold',
   },
-  selectedPrivacyOptionText: {
+  privacyRadioTextSelected: {
     color: 'white',
-  },
-  privacyOptionDescription: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 10,
   },
   customTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#7F5AF0',
     marginBottom: 2,
-    textAlign: 'center',
   },
 });
 
