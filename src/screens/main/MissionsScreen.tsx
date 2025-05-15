@@ -4,11 +4,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Scr
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
-import { completeMission } from '../../services/pointsService';
-import { RouteProp } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { Card, ProgressBar, useTheme, Surface } from 'react-native-paper';
 import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
+import { completeMission } from '../../services/pointsService';
 import ImageUploadModal from '../../components/ImageUploadModal';
 import { setRefreshJournal } from '../../features/journalSlice';
 import { createJournalEntry } from '../../services/journalService';
@@ -16,7 +13,12 @@ import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
 import { addExperienceToUser } from '../../services/experienceService';
 import { awardSpecificBadges } from '../../services/badgeService';
-import { SafeAreaView as SafeAreaViewSafeAreaContext } from 'react-native-safe-area-context';
+import { analyzeImage } from '../../services/aiService';
+import { useTheme } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-context';
+import { getUserPoints } from '../../services/pointsService';
+import { RouteProp } from '@react-navigation/native';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -340,16 +342,13 @@ const modalStyles = StyleSheet.create({
 const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => {
   const { journeyId } = route.params || {};
   const { user } = useSelector((state: RootState) => state.auth);
-  // @ts-ignore - React hook error
   const [cityMissions, setCityMissions] = useState<CityMissions>({});
-  // @ts-ignore - React hook error
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
-  // @ts-ignore - React hook error
   const [loading, setLoading] = useState(true);
-  // @ts-ignore - React hook error
   const [error, setError] = useState<string | null>(null);
   const [completingMission, setCompletingMission] = useState(false);
   const [missionCompleted, setMissionCompleted] = useState(false);
+  const [generatingDescription, setGeneratingDescription] = useState(false);
   const [completedMissionInfo, setCompletedMissionInfo] = useState<{
     title: string;
     points: number;
@@ -359,14 +358,25 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     xpGained: number;
     remainingXP: number;
     xpNext: number;
+    journalEntry?: {
+      content: string;
+      imageUrl: string;
+    };
   } | null>(null);
   const [userPoints, setUserPoints] = useState(0);
-  // @ts-ignore - React hook error
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
-  // @ts-ignore - React hook error
   const [missionToShare, setMissionToShare] = useState<JourneyMission | null>(null);
   const dispatch = useDispatch();
   const theme = useTheme();
+
+  // Cargar puntos del usuario al inicio
+  useEffect(() => {
+    if (user?.id) {
+      getUserPoints(user.id).then(points => {
+        setUserPoints(points);
+      }).catch(console.error);
+    }
+  }, [user?.id]);
 
   const fetchMissions = async () => {
     if (!user?.id) {
@@ -496,113 +506,167 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   }, [journeyId]);
 
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
-    if (!user?.id) return;
+    console.log('🎯 Iniciando completeMission para misión:', missionId);
+
+    if (!user) {
+      Alert.alert('Error', 'Debes iniciar sesión para completar misiones.');
+      return;
+    }
+
+    if (completingMission) {
+      console.log('⚠️ Ya hay una misión en proceso de completarse, ignorando solicitud');
+      return;
+    }
 
     try {
       setCompletingMission(true);
 
-      // Encontrar la misión en el estado local
+      // Buscar la misión en los datos locales
       let foundMissionTitle = '';
       let foundMissionPoints = 0;
       let foundCityName = '';
+      let foundMission = null;
 
       Object.keys(cityMissions).forEach((cityName) => {
         const pending = cityMissions[cityName].pending;
-        const foundMission = pending.find((m) => m.id === missionId);
-        if (foundMission) {
-          foundMissionTitle = foundMission.challenge.title;
-          foundMissionPoints = foundMission.challenge.points;
+        const mission = pending.find((m) => m.id === missionId);
+        if (mission) {
+          foundMission = mission;
+          foundMissionTitle = mission.challenge.title;
+          foundMissionPoints = mission.challenge.points;
           foundCityName = cityName;
         }
       });
 
-      if (!foundMissionTitle || !foundCityName) {
-        throw new Error('Misión no encontrada');
-      }
-
-      // Guardar información básica de la misión antes de completarla
+      // Preparar información para mostrar en el modal
       setCompletedMissionInfo({
         title: foundMissionTitle,
         points: foundMissionPoints,
         cityName: foundCityName,
-        xpGained: 0,
-        remainingXP: 0,
-        xpNext: 0
-      });
-
-      // Completar misión en la base de datos
-      await completeMission(
-        missionId,
-        user?.id || '',
-        imageUrl
-      );
-
-      // Otorgar insignias por completar misión
-      await awardSpecificBadges(user.id, 'completeMission');
-
-      // Añadir experiencia y verificar si subió de nivel
-      const experienceResult = await addExperienceToUser(user.id, foundMissionPoints);
-
-      // Actualizar la información de misión completada con datos de experiencia
-      setCompletedMissionInfo(prev => ({
-        ...prev,
-        levelUp: experienceResult.leveledUp,
-        newLevel: experienceResult.level,
         xpGained: foundMissionPoints,
-        remainingXP: experienceResult.xp,
-        xpNext: experienceResult.xpNext
-      }));
-
-      // Crear entrada en el diario para esta misión completada
-      if (imageUrl) {
-        await createJournalEntry({
-          userId: user?.id || '',
-          cityId: foundCityName || '',
-          missionId: missionId,
-          title: `Misión completada: ${foundMissionTitle}`,
+        remainingXP: 0,
+        xpNext: 50,
+        journalEntry: imageUrl ? {
           content: `He completado la misión "${foundMissionTitle}" en ${foundCityName}. ¡Conseguí ${foundMissionPoints} puntos!`,
-          photos: [imageUrl],
-          tags: [foundCityName || '', 'Misión completada']
-        });
-      }
-
-      // Actualizar el estado local
-      setCityMissions((prev) => {
-        const updatedMissions = { ...prev };
-        const city = updatedMissions[foundCityName];
-
-        // Encontrar el índice de la misión en las pendientes
-        const index = city.pending.findIndex((m) => m.id === missionId);
-
-        if (index !== -1) {
-          // Obtener la misión y marcarla como completada
-          const mission = { ...city.pending[index], completed: true };
-
-          // Eliminar la misión de pendientes
-          city.pending.splice(index, 1);
-
-          // Añadir la misión a completadas
-          city.completed.push(mission);
-        }
-
-        return updatedMissions;
+          imageUrl
+        } : undefined
       });
 
-      // Actualizar la UI de puntos
-      setUserPoints((prev) => prev + foundMissionPoints);
-
-      // Actualizar el estado global
+      // Actualizar estado en Redux para reflejar cambios inmediatamente en la UI
       dispatch(dispatchCompleteMission(missionId));
       dispatch(setRefreshJournal(true));
+
+      // Iniciar el proceso en segundo plano
+      Promise.resolve().then(async () => {
+        try {
+          // Completar la misión en la base de datos
+          await completeMission(missionId, user?.id || '', imageUrl);
+          console.log('✅ Misión completada en la base de datos');
+
+          // Si hay imagen, crear entrada de diario y proceso posterior
+          if (imageUrl) {
+            try {
+              // Intentar obtener el cityId con fallback
+              let cityId = foundMission?.cityId || await getCityIdByName(foundCityName);
+
+              // Activar indicador de generación de descripción
+              setGeneratingDescription(true);
+
+              // Crear entrada de diario inicial
+              console.log('📝 Creando entrada de diario inicial...');
+              const journalEntry = await createJournalEntry({
+                userId: user?.id || '',
+                cityId: cityId,
+                missionId: missionId,
+                title: `Misión completada: ${foundMissionTitle}`,
+                content: '', // Sin descripción inicial
+                photos: [imageUrl],
+                tags: [foundCityName || '', 'Misión completada']
+              });
+
+              // Generar descripción con IA
+              console.log('🤖 Iniciando generación de descripción con IA...');
+
+              const customPrompt = `Analiza la imagen adjunta tomada durante mi misión "${foundMissionTitle}" en ${foundCityName}.
+              
+              CONTEXTO: La misión consistía en ${foundMission?.challenge?.description || foundMissionTitle}
+              
+              Escribe una entrada de diario como si fueses un guía turístico explicando lo que se ve en la imagen (máximo 200 palabras) que DEBE incluir:
+              
+              1. IDENTIFICACIÓN DEL CONTENIDO DE LA IMAGEN:
+                 - Si es un monumento: su nombre exacto y estilo arquitectónico
+                 - Si es una planta o animal: su especie y características
+                 - Si es una obra de arte: su nombre y autor
+                 - Si es un lugar: su nombre completo y función
+              
+              2. INFORMACIÓN HISTÓRICA SOBRE LO MOSTRADO EN LA IMAGEN:
+                 - Año de construcción/creación/fundación del elemento principal
+                 - Origen histórico o etimológico del nombre
+                 - Un hecho importante en su historia
+              
+              3. DOS CURIOSIDADES INTERESANTES sobre el elemento principal que aparece en la imagen
+              
+              4. Una breve REFLEXIÓN PERSONAL como si yo hubiera tomado la foto durante mi visita
+              
+              ESTILO: Reflexivo, personal, emocionante, como un diario de viaje auténtico.
+              FORMATO: Párrafos cortos y claros, en primera persona.`;
+
+              try {
+                const aiDescription = await analyzeImage(imageUrl, customPrompt);
+
+                if (aiDescription && aiDescription.length > 20) {
+                  await supabase
+                    .from('journal_entries')
+                    .update({ content: aiDescription })
+                    .eq('missionid', missionId)
+                    .eq('userid', user?.id || '');
+                }
+              } catch (aiError) {
+                console.error('Error en proceso de IA:', aiError);
+                // Usar descripción de respaldo
+                const fallbackDesc = `He completado la misión "${foundMissionTitle}" en ${foundCityName}. Durante mi visita, tuve la oportunidad de capturar esta imagen que muestra un elemento importante de la ciudad. La experiencia fue realmente enriquecedora y me permitió conectar con la historia y cultura local de manera única. ¡Conseguí ${foundMissionPoints} puntos completando esta aventura!`;
+
+                await supabase
+                  .from('journal_entries')
+                  .update({ content: fallbackDesc })
+                  .eq('missionid', missionId)
+                  .eq('userid', user?.id || '');
+              }
+            } catch (journalError) {
+              console.error('Error al crear entrada del diario:', journalError);
+            } finally {
+              setGeneratingDescription(false);
+              dispatch(setRefreshJournal(true));
+            }
+          }
+
+          // Otorgar insignias y experiencia
+          await awardSpecificBadges(user.id, 'completeMission');
+          const expResult = await addExperienceToUser(user.id, foundMissionPoints);
+
+          // Actualizar información de misión completada con datos de experiencia
+          setCompletedMissionInfo(prev => ({
+            ...prev!,
+            levelUp: expResult.leveledUp,
+            newLevel: expResult.level,
+            remainingXP: expResult.xp,
+            xpNext: expResult.xpNext
+          }));
+
+        } catch (error) {
+          console.error('Error en proceso de fondo:', error);
+          Alert.alert('Error', 'Hubo un problema al procesar la misión. Por favor, inténtalo de nuevo.');
+        } finally {
+          setCompletingMission(false);
+        }
+      });
 
       // Mostrar el modal de misión completada
       setMissionCompleted(true);
 
     } catch (error) {
-      console.error('Error al completar la misión:', error);
+      console.error('Error al completar misión:', error);
       Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
-      setMissionCompleted(false);
-    } finally {
       setCompletingMission(false);
     }
   };
@@ -641,6 +705,22 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     } finally {
       setIsShareModalVisible(false);
     }
+  };
+
+  // Renderizar el loader de generación de descripción
+  const renderGeneratingLoader = () => {
+    if (generatingDescription) {
+      return (
+        <View style={styles.generatingLoaderOverlay}>
+          <View style={styles.generatingLoaderContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.generatingText}>Generando descripción del diario...</Text>
+            <Text style={styles.generatingSubtext}>Esto puede tardar unos momentos...</Text>
+          </View>
+        </View>
+      );
+    }
+    return null;
   };
 
   if (loading) {
@@ -789,6 +869,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         onClose={() => setIsShareModalVisible(false)}
         onSelect={handleShareJourney}
       />
+
+      {renderGeneratingLoader()}
     </SafeAreaView>
   );
 };
@@ -1015,16 +1097,44 @@ const styles = StyleSheet.create({
   expiredTime: {
     color: '#f44336',
   },
-  loadingOverlay: {
+  generatingLoaderOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    zIndex: 1000,
+  },
+  generatingLoaderContainer: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  generatingText: {
+    color: 'white',
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  generatingSubtext: {
+    color: 'white',
+    marginTop: 5,
+    fontSize: 14,
+    textAlign: 'center',
   },
   shareIcon: {
     padding: 5,
@@ -1089,9 +1199,9 @@ const styles = StyleSheet.create({
 
 const MissionsScreen = (props: any) => {
   return (
-    <SafeAreaViewSafeAreaContext style={styles.container}>
+    <SafeAreaViewContext style={styles.container}>
       <MissionsScreenComponent {...props} />
-    </SafeAreaViewSafeAreaContext>
+    </SafeAreaViewContext>
   );
 };
 

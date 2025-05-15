@@ -20,7 +20,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Agregar un listener para errores de autenticación
 supabase.auth.onAuthStateChange((event, session) => {
   console.log('Auth state changed:', event);
-  
+
   // Si el token expiró o hubo un error, intentamos refrescar la sesión
   if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
     console.log('Token refreshed successfully');
@@ -34,12 +34,12 @@ export const refreshSession = async () => {
   try {
     console.log('Intentando refrescar la sesión...');
     const { data, error } = await supabase.auth.refreshSession();
-    
+
     if (error) {
       console.error('Error refreshing session:', error);
       return { success: false, error };
     }
-    
+
     console.log('Sesión refrescada exitosamente');
     return { success: true, data };
   } catch (error) {
@@ -52,29 +52,29 @@ export const refreshSession = async () => {
 export const ensureValidSession = async () => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     if (!session) {
       console.log('No hay sesión activa');
       return { valid: false };
     }
-    
+
     // Verificar si el token expira en menos de 5 minutos
     const expiresAt = new Date(session.expires_at || 0);
     const now = new Date();
     const fiveMinutes = 5 * 60 * 1000;
-    
+
     if (expiresAt.getTime() - now.getTime() < fiveMinutes) {
       console.log('Token cerca de expirar, refrescando...');
       const { success, data, error } = await refreshSession();
-      
+
       if (!success) {
         console.error('No se pudo refrescar el token:', error);
         return { valid: false, error };
       }
-      
+
       return { valid: true, session: data.session };
     }
-    
+
     return { valid: true, session };
   } catch (error) {
     console.error('Error al verificar la sesión:', error);
@@ -164,7 +164,7 @@ export const updateMissionProgress = async (missionId: string, userId: string, c
 export const verifyCredentials = async (email: string, password: string) => {
   try {
     console.log('Verificando credenciales para:', email);
-    
+
     // Usar el sistema de autenticación incorporado de Supabase
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
@@ -219,5 +219,67 @@ export const searchCities = async (searchTerm: string) => {
   } catch (error) {
     console.error('Error searching cities:', error);
     return [];
+  }
+};
+
+// Función para obtener las ciudades donde el usuario tiene viajes
+export const getUserJourneyCities = async (userId: string) => {
+  try {
+    // Obtenemos los viajes del usuario y las ciudades relacionadas
+    const { data, error } = await supabase
+      .from('journeys')
+      .select(`
+        id,
+        cityId,
+        cities (
+          id,
+          name
+        )
+      `)
+      .eq('userId', userId);
+
+    if (error) {
+      console.error('Error obteniendo ciudades de viajes:', error);
+      return [];
+    }
+
+    // Filtrar para obtener solo ciudades válidas y eliminar duplicados
+    const uniqueCities = data
+      .filter(journey => journey.cities && journey.cities.id && journey.cities.name)
+      .map(journey => journey.cities)
+      .filter((city, index, self) =>
+        index === self.findIndex((c) => c.id === city.id)
+      );
+
+    return uniqueCities;
+  } catch (error) {
+    console.error('Error obteniendo ciudades de viajes del usuario:', error);
+    return [];
+  }
+};
+
+// Función para obtener datos del clima por nombre de ciudad
+export const getWeatherByCity = async (cityName: string, apiKey: string) => {
+  try {
+    // Hacemos la petición a OpenWeatherMap API usando el nombre de la ciudad
+    const response = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&units=metric&lang=es&appid=${apiKey}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Error al obtener datos del clima: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    // Verificar si la respuesta contiene un error
+    if (data.cod && data.cod !== 200) {
+      throw new Error(`Error en la respuesta del clima: ${data.message || 'Código de error: ' + data.cod}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error obteniendo datos del clima por ciudad:', error);
+    throw error;
   }
 }; 

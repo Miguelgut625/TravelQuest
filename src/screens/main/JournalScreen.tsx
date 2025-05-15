@@ -15,39 +15,100 @@ interface JournalScreenProps {
   route: RouteProp<TabParamList, 'Journal'>;
 }
 
-const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
-  <TouchableOpacity style={styles.card}>
-    <Text style={styles.cardTitle}>{entry.title}</Text>
-    <Text style={styles.cardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
-    <Text style={styles.cardContent} numberOfLines={3}>
-      {entry.content}
-    </Text>
-    {entry.photos && entry.photos.length > 0 && (
-      <View style={styles.photoGrid}>
-        {entry.photos.slice(0, 3).map((photo, index) => (
-          <Image
-            key={index}
-            source={{ uri: photo }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
-        ))}
-        {entry.photos.length > 3 && (
-          <View style={styles.morePhotos}>
-            <Text style={styles.morePhotosText}>+{entry.photos.length - 3}</Text>
-          </View>
-        )}
+const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
+  const [expanded, setExpanded] = useState(false);
+  const navigation = useNavigation<any>();
+
+  const handlePress = () => {
+    setExpanded(!expanded);
+  };
+
+  const handleLongPress = () => {
+    navigation.navigate('JournalEntryDetail', { entry });
+  };
+
+  const openDetailView = () => {
+    navigation.navigate('JournalEntryDetail', { entry });
+  };
+
+  const isDetailedDescription = entry.content && entry.content.length > 150;
+
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      delayLongPress={500}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{entry.title}</Text>
+        <TouchableOpacity
+          style={styles.detailButton}
+          onPress={openDetailView}
+        >
+          <Ionicons name="expand-outline" size={20} color="#005F9E" />
+        </TouchableOpacity>
       </View>
-    )}
-    <View style={styles.tags}>
-      {entry.tags && entry.tags.map((tag, index) => (
-        <Text key={index} style={styles.tag}>
-          #{tag}
+      <Text style={styles.cardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+
+      {isDetailedDescription ? (
+        <>
+          <Text style={styles.cardContent} numberOfLines={expanded ? undefined : 3}>
+            {entry.content}
+          </Text>
+          {!expanded && (
+            <Text style={styles.expandText}>
+              Toca para ver más... o presiona el botón para ver en pantalla completa
+            </Text>
+          )}
+        </>
+      ) : (
+        <Text style={styles.cardContent}>
+          {entry.content}
         </Text>
-      ))}
-    </View>
-  </TouchableOpacity>
-);
+      )}
+
+      {expanded && isDetailedDescription && (
+        <View style={styles.actionRow}>
+          <Text style={styles.collapseText}>Toca para colapsar</Text>
+          <TouchableOpacity
+            onPress={openDetailView}
+            style={styles.viewDetailButton}
+          >
+            <Text style={styles.viewDetailText}>Ver detalle</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {entry.photos && entry.photos.length > 0 && (
+        <View style={styles.photoGrid}>
+          {entry.photos.slice(0, 3).map((photo, index) => (
+            <TouchableOpacity key={index} onPress={openDetailView}>
+              <Image
+                source={{ uri: photo }}
+                style={styles.thumbnail}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ))}
+          {entry.photos.length > 3 && (
+            <View style={styles.morePhotos}>
+              <Text style={styles.morePhotosText}>+{entry.photos.length - 3}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      <View style={styles.tags}>
+        {entry.tags && entry.tags.map((tag, index) => (
+          <Text key={index} style={styles.tag}>
+            #{tag}
+          </Text>
+        ))}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const EmptyState = ({ message }: { message: string }) => (
   <View style={styles.emptyContainer}>
@@ -302,21 +363,19 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 
   const renderCityCard = ({ item }: { item: string }) => (
     <View style={[styles.cityCardContainer, { width: windowWidth }]}>
-      <View style={styles.cityCardContent}>
-        <CityCard
-          city={item}
-          entries={entriesByCity[item]}
-          onPress={() => {
-            const index = cities.indexOf(item);
-            setSelectedCity(item);
-            setCurrentCityIndex(index);
-            flatListRef.current?.scrollToOffset({
-              offset: index * windowWidth,
-              animated: true
-            });
-          }}
-        />
-      </View>
+      <CityCard
+        city={item}
+        entries={entriesByCity[item]}
+        onPress={() => {
+          const index = cities.indexOf(item);
+          setSelectedCity(item);
+          setCurrentCityIndex(index);
+          flatListRef.current?.scrollToOffset({
+            offset: index * windowWidth,
+            animated: true
+          });
+        }}
+      />
     </View>
   );
 
@@ -415,7 +474,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cityCardContent: {
-    width: Dimensions.get('window').width - 60,
     paddingHorizontal: 0,
   },
   cityCard: {
@@ -428,24 +486,39 @@ const styles = StyleSheet.create({
   entriesList: {
     flex: 1,
   },
+  entriesListContent: {
+    paddingHorizontal: 15,
+    paddingBottom: 20,
+  },
   card: {
     backgroundColor: '#232634',
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
-    marginHorizontal: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
+    flex: 1,
     color: '#F5D90A',
     letterSpacing: 1,
+  },
+  detailButton: {
+    padding: 5,
   },
   cardDate: {
     color: '#A1A1AA',
@@ -455,6 +528,35 @@ const styles = StyleSheet.create({
   cardContent: {
     color: '#FFF',
     marginBottom: 10,
+    lineHeight: 20,
+  },
+  expandText: {
+    color: '#7F5AF0',
+    fontStyle: 'italic',
+    marginBottom: 10,
+    fontSize: 12,
+  },
+  collapseText: {
+    color: '#7F5AF0',
+    fontStyle: 'italic',
+    fontSize: 12,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  viewDetailButton: {
+    backgroundColor: '#7F5AF0',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  viewDetailText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   photoGrid: {
     flexDirection: 'row',
@@ -475,7 +577,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   morePhotosText: {
-    color: '#FFF',
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -600,6 +702,12 @@ const styles = StyleSheet.create({
   },
   navButtonRight: {
     right: 15,
+  },
+  noImageBackground: {
+    flex: 1,
+    backgroundColor: '#232634',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

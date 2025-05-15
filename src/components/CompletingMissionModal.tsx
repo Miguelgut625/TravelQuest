@@ -5,9 +5,11 @@ interface CompletingMissionModalProps {
   visible: boolean;
 }
 
-const CompletingMissionModal = ({ visible }: CompletingMissionModalProps) => {
+const CompletingMissionModal = ({
+  visible
+}: CompletingMissionModalProps) => {
   if (!visible) return null;
-  
+
   return (
     <Modal
       transparent={true}
@@ -17,9 +19,9 @@ const CompletingMissionModal = ({ visible }: CompletingMissionModalProps) => {
       <View style={styles.modalContainer}>
         <View style={styles.loadingCard}>
           <ActivityIndicator size={40} color="#005F9E" />
-          <Text style={styles.loadingTitle}>Completando misión</Text>
+          <Text style={styles.loadingTitle}>Procesando</Text>
           <Text style={styles.loadingDescription}>
-            Estamos guardando tu progreso...
+            Guardando tu progreso...
           </Text>
         </View>
       </View>
@@ -52,6 +54,7 @@ const styles = StyleSheet.create({
   loadingDescription: {
     color: '#666',
     textAlign: 'center',
+    marginBottom: 15,
   }
 });
 

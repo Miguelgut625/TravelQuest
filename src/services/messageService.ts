@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { uploadImageToCloudinary } from './cloudinaryService';
 import { sendPushNotification } from './NotificationService';
+import NotificationService from './NotificationService';
 
 export interface Message {
   id: string;
@@ -45,11 +46,12 @@ export const sendMessage = async (senderId: string, receiverId: string, content:
 
       if (!userError && senderData) {
         // Enviar notificación push al destinatario
-        sendNewMessageNotification(
+        const notificationService = NotificationService.getInstance();
+        await notificationService.notifyNewMessage(
           receiverId,
+          senderId,
           senderData.username || 'Usuario',
-          content,
-          senderId
+          content
         ).catch(notifError => {
           console.error('Error enviando notificación push:', notifError);
         });
@@ -108,11 +110,12 @@ export const sendImageMessage = async (senderId: string, receiverId: string, ima
 
       if (!userError && senderData) {
         // Enviar notificación push al destinatario
-        sendNewMessageNotification(
+        const notificationService = NotificationService.getInstance();
+        await notificationService.notifyNewMessage(
           receiverId,
+          senderId,
           senderData.username || 'Usuario',
-          '📷 Te ha enviado una imagen',
-          senderId
+          '📷 Te ha enviado una imagen'
         ).catch(notifError => {
           console.error('Error enviando notificación push:', notifError);
         });
@@ -285,6 +288,120 @@ export const countUnreadMessages = async (userId: string): Promise<number> => {
     return count || 0;
   } catch (error) {
     console.error('Error inesperado contando mensajes no leídos:', error);
+    throw error;
+  }
+};
+
+// Suscripción a mensajes de grupo en tiempo real
+export const subscribeToGroupMessages = (
+  groupId: string,
+  onNewMessage: (message: any) => void
+) => {
+  // Nombre único para el canal del grupo
+  const channelName = `group_messages_${groupId}`;
+  console.log(`Creando suscripción a canal de grupo: ${channelName}`);
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'group_messages',
+        filter: `group_id=eq.${groupId}`
+      },
+      (payload) => {
+        if (payload.new) {
+          onNewMessage(payload.new);
+        }
+      }
+    )
+    .subscribe();
+
+  // Devuelve un objeto con método unsubscribe para limpiar la suscripción
+  return {
+    unsubscribe: () => {
+      supabase.removeChannel(channel);
+    }
+  };
+};
+
+// Función para enviar un mensaje a un grupo
+export const sendGroupMessage = async (
+  groupId: string,
+  senderId: string,
+  text: string | null,
+  imageUrl: string | null,
+  senderUsername: string
+): Promise<any> => {
+  try {
+    console.log(`Enviando mensaje de grupo: De ${senderId} al grupo ${groupId}`);
+
+    const { data, error } = await supabase
+      .from('group_messages')
+      .insert({
+        group_id: groupId,
+        sender_id: senderId,
+        text: text,
+        image_url: imageUrl,
+        sender_username: senderUsername,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error enviando mensaje de grupo:', error);
+      throw error;
+    }
+
+    console.log('Mensaje de grupo enviado con éxito:', data);
+    return data;
+  } catch (error) {
+    console.error('Error inesperado enviando mensaje de grupo:', error);
+    throw error;
+  }
+};
+
+// Función para obtener los mensajes de un grupo
+export const getGroupMessages = async (groupId: string): Promise<any[]> => {
+  try {
+    console.log(`Obteniendo mensajes del grupo ${groupId}`);
+
+    const { data, error } = await supabase
+      .from('group_messages')
+      .select('*')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error obteniendo mensajes del grupo:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error inesperado obteniendo mensajes del grupo:', error);
+    throw error;
+  }
+};
+
+// Función para marcar mensajes de grupo como leídos
+export const markGroupMessagesAsRead = async (groupId: string, userId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('group_messages')
+      .update({ read: true })
+      .eq('group_id', groupId)
+      .eq('read', false);
+
+    if (error) {
+      console.error('Error marcando mensajes como leídos:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error inesperado marcando mensajes como leídos:', error);
     throw error;
   }
 }; 

@@ -113,4 +113,20 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
         console.error('Error al actualizar perfil de usuario:', error);
         return false;
     }
+}
+
+export async function getUserInfoById(userId: string): Promise<{ username: string } | null> {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('username')
+            .eq('id', userId)
+            .single();
+
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error('Error al obtener información del usuario:', error);
+        return null;
+    }
 } 

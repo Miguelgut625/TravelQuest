@@ -20,7 +20,7 @@ export const getMissionHint = async (userId: string, missionId: string): Promise
   try {
     // Verificar si hay puntos suficientes
     await deductPointsFromUser(userId, HINT_COST);
-    
+
     // Obtener información de la misión para generar una pista contextualizada
     const { data: missionData, error: missionError } = await supabase
       .from('journeys_missions')
@@ -61,7 +61,7 @@ export const getMissionHint = async (userId: string, missionId: string): Promise
       hint = 'Lleva contigo agua y protección solar. Los mejores momentos para visitar son temprano en la mañana o al atardecer.';
     } else {
       // Pistas genéricas según dificultad
-      switch(difficulty) {
+      switch (difficulty) {
         case 'easy':
           hint = `Para completar "${missionTitle}", observa cuidadosamente los detalles en la descripción de la misión.`;
           break;

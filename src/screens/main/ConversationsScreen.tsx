@@ -43,10 +43,12 @@ const ConversationsScreen = () => {
         "No autenticado",
         "Por favor inicia sesión para acceder a los mensajes",
         [
-          { text: "OK", onPress: () => navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }]
-          })}
+          {
+            text: "OK", onPress: () => navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }]
+            })
+          }
         ]
       );
       return;
@@ -120,36 +122,36 @@ const ConversationsScreen = () => {
     // Formatear la fecha para mostrar
     const messageDate = new Date(item.created_at);
     const now = new Date();
-    
+
     // Si es hoy, mostrar la hora
     const formattedDate = messageDate.toDateString() === now.toDateString()
       ? messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : messageDate.toLocaleDateString();
 
     // Avatar placeholder seguro cuando no hay username
-    const avatarLetter = item.username && item.username.length > 0 
-      ? item.username.charAt(0).toUpperCase() 
+    const avatarLetter = item.username && item.username.length > 0
+      ? item.username.charAt(0).toUpperCase()
       : '?';
 
     return (
       <TouchableOpacity
         style={styles.conversationItem}
-        onPress={() => openChat(item.conversation_user_id, item.username )}
+        onPress={() => openChat(item.conversation_user_id, item.username)}
       >
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
             {avatarLetter}
           </Text>
         </View>
-        
+
         <View style={styles.messageInfo}>
           <View style={styles.headerRow}>
-            <Text style={styles.username}>{item.username }</Text>
+            <Text style={styles.username}>{item.username}</Text>
             <Text style={styles.timestamp}>{formattedDate}</Text>
           </View>
-          
+
           <View style={styles.messageRow}>
-            <Text 
+            <Text
               style={[
                 styles.lastMessage,
                 item.unread_count > 0 ? styles.unreadMessage : null
@@ -159,7 +161,7 @@ const ConversationsScreen = () => {
             >
               {item.last_message || 'No hay mensajes'}
             </Text>
-            
+
             {item.unread_count > 0 && (
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>
@@ -183,8 +185,14 @@ const ConversationsScreen = () => {
           <Ionicons name="arrow-back" size={28} color="#7F5AF0" />
         </TouchableOpacity>
         <Text style={styles.title}>Mensajes</Text>
+        <TouchableOpacity
+          style={styles.groupsButton}
+          onPress={() => navigation.navigate('Groups')}
+        >
+          <Ionicons name="people" size={28} color="#7F5AF0" />
+        </TouchableOpacity>
       </View>
-      
+
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubble-outline" size={60} color="#7F5AF0" />
@@ -326,6 +334,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  groupsButton: {
+    position: 'absolute',
+    right: 10,
+    padding: 4,
   },
 });
 

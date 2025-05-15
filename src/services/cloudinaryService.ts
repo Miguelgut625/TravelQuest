@@ -20,7 +20,7 @@ export const isCloudinaryConfigured = () => {
  */
 export const getCloudinaryConfigInfo = () => {
   const isConfigured = isCloudinaryConfigured();
-  
+
   return {
     isConfigured,
     usingFallback: __DEV__ && !isConfigured,
@@ -34,6 +34,15 @@ export const getCloudinaryConfigInfo = () => {
  */
 const isBase64Image = (uri: string): boolean => {
   return uri.startsWith('data:image');
+};
+
+/**
+ * Sube una imagen a Cloudinary (versión simplificada para ChatScreen)
+ * @param imageUri URI de la imagen local
+ * @returns URL de la imagen subida a Cloudinary
+ */
+export const uploadImage = async (imageUri: string): Promise<string> => {
+  return await uploadImageToCloudinary(imageUri, `chat_${Date.now()}`);
 };
 
 /**
@@ -55,33 +64,33 @@ export const uploadImageToCloudinary = async (imageUri: string, missionId: strin
   try {
     // Convertir URI a base64 para plataformas web
     let formData = new FormData();
-    
+
     // En web, el URI puede ser una cadena base64
     if (imageUri.startsWith('data:image')) {
       formData.append('file', imageUri);
     } else {
       // En dispositivos móviles, creamos un objeto de archivo
       const filename = imageUri.split('/').pop() || `mission_${missionId}_${Date.now()}`;
-      
+
       // Crear un objeto de archivo para supabase
       const file = {
         uri: imageUri,
         type: 'image/jpeg',
         name: filename
       };
-      
+
       // @ts-ignore - TypeScript no reconoce correctamente el tipo para React Native
       formData.append('file', file);
     }
-    
+
     // Añadir parámetros para Cloudinary
     formData.append('upload_preset', CLOUDINARY_CONFIG.UPLOAD_PRESET);
-    
+
     // Añadir carpeta si está configurada
     if (CLOUDINARY_CONFIG.FOLDER) {
       formData.append('folder', CLOUDINARY_CONFIG.FOLDER);
     }
-    
+
     // Añadir transformaciones si están configuradas
     if (CLOUDINARY_CONFIG.TRANSFORMATION) {
       if (CLOUDINARY_CONFIG.TRANSFORMATION.WIDTH) {
@@ -94,35 +103,35 @@ export const uploadImageToCloudinary = async (imageUri: string, missionId: strin
         formData.append('quality', CLOUDINARY_CONFIG.TRANSFORMATION.QUALITY.toString());
       }
     }
-    
+
     // Crear URL para la subida a Cloudinary
     const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.CLOUD_NAME}/upload`;
     console.log('Intentando subir imagen a:', cloudinaryUrl);
-    
+
     // Realizar la solicitud
     const response = await fetch(cloudinaryUrl, {
       method: 'POST',
       body: formData
     });
-    
+
     // Verificar respuesta
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Error en la respuesta de Cloudinary (${response.status}): ${errorText}`);
     }
-    
+
     const data = await response.json();
     console.log('Imagen subida exitosamente a Cloudinary:', data.secure_url);
-    
+
     return data.secure_url;
   } catch (error: any) {
     console.error('Error subiendo imagen a Cloudinary:', error);
-    
+
     if (__DEV__) {
       console.warn('En modo desarrollo, retornando URI local como fallback.');
       return imageUri;
     }
-    
+
     throw error;
   }
 }; 

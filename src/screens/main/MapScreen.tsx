@@ -1,6 +1,6 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text, Dimensions, Platform, Modal, ActivityIndicator, ScrollView, Alert, FlatList, Animated } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import * as Location from 'expo-location';
@@ -16,19 +16,28 @@ import { searchCities } from '../../services/supabase';
 import GlobeView from '../../components/GlobeView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MissionResponse } from '../../hooks/useFetchMissions';
-import { FlatList } from 'react-native-web';
 import { FontAwesome } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import FallbackView from '../../components/FallbackView';
 import { GlobeViewRef } from '../../components/GlobeView';
 import { shareJourney } from '../../services/shareService';
+import { supabase } from '../../services/supabase';
+import * as Notifications from 'expo-notifications';
+import NotificationService from '../../services/NotificationService';
 import { getFriends } from '../../services/friendService';
+import WeatherWidget from '../../components/WeatherWidget';
 
 interface City {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
+}
+
+interface Friend {
+  user2Id: string;
+  username: string;
+  points: number;
 }
 
 type RootStackParamList = {
@@ -65,6 +74,10 @@ const DateRangePickerMobile: React.FC<{
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [markedDates, setMarkedDates] = useState<any>({});
+  // Fecha mínima: hoy (evitar seleccionar fechas pasadas)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
+  const minDate = today;
 
   useEffect(() => {
     if (startDateProp !== startDate) {
@@ -129,6 +142,16 @@ const DateRangePickerMobile: React.FC<{
     const date = new Date(day.dateString);
     date.setHours(12, 0, 0, 0); // Mediodía para evitar problemas de zona horaria
 
+    // Validar que la fecha no sea pasada
+    if (date < today) {
+      Alert.alert(
+        "Fecha no válida",
+        "No puedes seleccionar fechas en el pasado. Por favor, elige una fecha futura.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     if (!startDate || (startDate && endDate)) {
       // Si no hay fecha de inicio o ambas fechas están establecidas, empezar de nuevo
       setStartDate(date);
@@ -176,10 +199,15 @@ const DateRangePickerMobile: React.FC<{
         style={styles.datePickerButton}
         onPress={onToggleCalendar}
       >
-        <View style={styles.datePickerContent}>
-          <Text style={styles.datePickerText}>{formatDateRange()}</Text>
-          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="#F5D90A" />
-        </View>
+        <Ionicons name="calendar" size={20} color="#666" style={styles.calendarIcon} />
+        <Text style={styles.datePickerText}>
+          {formatDateRange() || "Selecciona fechas"}
+        </Text>
+        <Ionicons
+          name={showCalendar ? "chevron-up" : "chevron-down"}
+          size={20}
+          color="#666"
+        />
       </TouchableOpacity>
 
       {showCalendar && (
@@ -194,7 +222,7 @@ const DateRangePickerMobile: React.FC<{
               <View style={styles.calendarHeader}>
                 <Text style={styles.calendarTitle}>Selecciona fechas</Text>
                 <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                  <Ionicons name="close" size={24} color="#F5D90A" />
+                  <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
 
@@ -206,32 +234,25 @@ const DateRangePickerMobile: React.FC<{
                 hideExtraDays={true}
                 firstDay={1}
                 enableSwipeMonths={true}
+                minDate={minDate}
                 theme={{
-                  calendarBackground: '#232634',
-                  textSectionTitleColor: '#7F5AF0',
-                  selectedDayBackgroundColor: '#7F5AF0',
-                  selectedDayTextColor: '#2CB67D',
-                  todayTextColor: '#F5D90A',
-                  dayTextColor: '#2CB67D',
-                  textDisabledColor: '#393552',
-                  dotColor: '#2CB67D',
-                  selectedDotColor: '#F5D90A',
-                  arrowColor: '#F5D90A',
-                  monthTextColor: '#F5D90A',
-                  indicatorColor: '#2CB67D',
-                  textDayFontWeight: '500',
-                  textDayHeaderFontWeight: '700',
-                  textDayFontSize: 15,
-                  textMonthFontSize: 16,
-                  textDayHeaderFontSize: 13,
-                  'stylesheet.calendar.header': {
-                    week: {
-                      marginTop: 6,
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      backgroundColor: '#232634',
-                    }
-                  }
+                  calendarBackground: '#ffffff',
+                  textSectionTitleColor: '#b6c1cd',
+                  selectedDayBackgroundColor: '#005F9E',
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: '#005F9E',
+                  dayTextColor: '#2d4150',
+                  textDisabledColor: '#d9e1e8',
+                  dotColor: '#005F9E',
+                  selectedDotColor: '#ffffff',
+                  arrowColor: '#005F9E',
+                  monthTextColor: '#005F9E',
+                  indicatorColor: '#005F9E',
+                  textDayFontWeight: '300',
+                  textDayHeaderFontWeight: '300',
+                  textDayFontSize: 14,
+                  textMonthFontSize: 14,
+                  textDayHeaderFontSize: 12
                 }}
               />
 
@@ -264,6 +285,11 @@ const DateRangePickerWeb: React.FC<{
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  // Obtener fecha de hoy para validación
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
 
   useEffect(() => {
     if (startDateProp !== startDate) {
@@ -292,6 +318,15 @@ const DateRangePickerWeb: React.FC<{
   };
 
   const handleDateClick = (date: Date) => {
+    // Validar que no sea una fecha pasada
+    if (date < today) {
+      // En web usamos una alerta nativa
+      if (typeof window !== 'undefined') {
+        window.alert("No puedes seleccionar fechas en el pasado. Por favor, elige una fecha futura.");
+      }
+      return;
+    }
+
     if (!startDate || (startDate && endDate)) {
       setStartDate(date);
       setEndDate(null);
@@ -320,7 +355,7 @@ const DateRangePickerWeb: React.FC<{
       >
         <View style={styles.datePickerContent}>
           <Text style={styles.datePickerText}>{formatDateRange()}</Text>
-          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="#F5D90A" />
+          <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={16} color="white" />
         </View>
       </TouchableOpacity>
 
@@ -344,7 +379,7 @@ const DateRangePickerWeb: React.FC<{
               <View style={styles.calendarHeader}>
                 <Text style={styles.calendarTitle}>Selecciona fechas</Text>
                 <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                  <Ionicons name="close" size={24} color="#F5D90A" />
+                  <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
 
@@ -370,13 +405,13 @@ const DateRangePickerWeb: React.FC<{
                 }}
                 markingType={'period'}
                 theme={{
-                  calendarBackground: '#232634',
-                  selectedDayBackgroundColor: '#7F5AF0',
-                  selectedDayTextColor: '#FFF',
-                  todayTextColor: '#F5D90A',
-                  dayTextColor: '#FFF',
-                  textDisabledColor: '#393552',
-                  arrowColor: '#F5D90A',
+                  calendarBackground: '#ffffff',
+                  selectedDayBackgroundColor: '#005F9E',
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: '#005F9E',
+                  dayTextColor: '#2d4150',
+                  textDisabledColor: '#d9e1e8',
+                  arrowColor: '#005F9E',
                 }}
               />
 
@@ -395,115 +430,6 @@ const DateRangePickerWeb: React.FC<{
         </Modal>
       )}
     </View>
-  );
-};
-
-interface Friend {
-  user2Id: string;
-  username: string;
-  points: number;
-}
-
-const FriendSelectionModal = ({ visible, onClose, onSelect }: {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (friend: Friend) => void;
-}) => {
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const user = useSelector((state: RootState) => state.auth.user);
-
-  useEffect(() => {
-    if (visible) {
-      const fetchFriends = async () => {
-        if (!user) {
-          setLoading(false);
-          setError('Debes iniciar sesión para compartir viajes');
-          return;
-        }
-        try {
-          setLoading(true);
-          setError(null);
-
-          const friendsList = await getFriends(user.id);
-
-          if (!friendsList || friendsList.length === 0) {
-            setError('No tienes amigos agregados para compartir');
-            setFriends([]);
-            return;
-          }
-
-          setFriends(friendsList);
-        } catch (error) {
-          console.error('Error fetching friends:', error);
-          setError('Error al cargar la lista de amigos');
-          setFriends([]);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchFriends();
-    }
-  }, [visible, user]);
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>¿Quieres compartir tu aventura?</Text>
-          <Text style={styles.modalSubtitle}>Selecciona un amigo para compartir este viaje</Text>
-
-          {error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4CAF50" />
-              <Text style={styles.loadingText}>Cargando amigos...</Text>
-            </View>
-          ) : (
-            <ScrollView style={styles.friendsList}>
-              {friends.map((friend) => (
-                <TouchableOpacity
-                  key={friend.user2Id}
-                  style={styles.friendItem}
-                  onPress={() => onSelect(friend)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{friend.username}</Text>
-                    <Text style={styles.friendPoints}>Puntos: {friend.points}</Text>
-                  </View>
-                  <Ionicons name="arrow-forward" size={20} color="#005F9E" />
-                </TouchableOpacity>
-              ))}
-              {friends.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="people-outline" size={40} color="#666" />
-                  <Text style={styles.emptyText}>No tienes amigos agregados</Text>
-                </View>
-              )}
-            </ScrollView>
-          )}
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelButtonText}>No compartir</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 };
 
@@ -547,6 +473,8 @@ const MapScreen = () => {
   const [changingView, setChangingView] = useState(false);
   // Nuevo estado para controlar si el formulario está colapsado
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
+  // Nueva animación para el formulario
+  const formAnimation = useRef(new Animated.Value(1)).current;
   const isSmallScreen = width < 768 || height < 600;
 
   // Definir los tags disponibles
@@ -578,6 +506,7 @@ const MapScreen = () => {
 
     // Indicar que estamos cargando
     setChangingView(true);
+    setCurrentStep("Inicializando globo 3D...");
 
     // Recargar el componente forzando una re-renderización
     // Esto es más efectivo que simplemente esperar
@@ -594,9 +523,12 @@ const MapScreen = () => {
     }
 
     // Como respaldo, establecer un timeout para quitar el indicador de carga
+    // Incrementamos el timeout para dispositivos más lentos
     setTimeout(() => {
+      console.log("Timeout para quitar indicador de carga");
       setChangingView(false);
-    }, 3000);
+      setCurrentStep("");
+    }, 8000);
   };
 
   useEffect(() => {
@@ -752,84 +684,132 @@ const MapScreen = () => {
       return;
     }
 
-    const missionCountNum = parseInt(missionCount) || 3; // Usar 3 como valor por defecto si no hay número
-
-    if (!duration || duration <= 0) {
-      setErrorMsg('Por favor, selecciona fechas válidas para crear un viaje');
-      return;
-    }
-
-    if (!startDate || !endDate) {
-      setErrorMsg('Selecciona fechas de inicio y fin');
-      return;
-    }
-
-    if (!searchCity) {
-      setErrorMsg('Por favor, ingresa una ciudad de destino');
-      return;
-    }
-
     try {
-      const validStartDate = new Date(startDate.getTime());
-      const validEndDate = new Date(endDate.getTime());
-
-      if (validEndDate < validStartDate) {
-        setErrorMsg('La fecha de fin no puede ser anterior a la fecha de inicio');
-        return;
-      }
-
-      // Iniciar el proceso de generación
       setIsLoading(true);
       setErrorMsg(null);
 
-      // Paso 1: Preparando el viaje
-      setCurrentStep(`Preparando tu viaje a ${searchCity}...`);
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Validar fechas
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
 
-      // Paso 2: Buscando lugares
-      setCurrentStep(`Buscando lugares interesantes en ${searchCity}...`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      let needsDateAdjustment = false;
+      let newStartDate = startDate;
+      let newEndDate = endDate;
 
-      // Paso 3: Creando misiones
-      setCurrentStep(`Creando ${missionCountNum} misiones emocionantes...`);
+      if (startDate && startDate < today) {
+        // Si la fecha de inicio es pasada, ajustarla a hoy
+        console.log('Ajustando fecha de inicio pasada a la fecha actual');
+        newStartDate = new Date(today);
+        needsDateAdjustment = true;
 
-      // Obtener la ciudad seleccionada del filtro de ciudades
-      let selectedCity = filteredCities.find(city => city.name.toUpperCase() === searchCity);
-
-      // Si no se encuentra una coincidencia exacta, usar la ciudad escrita por el usuario
-      const cityName = selectedCity ? selectedCity.name : searchCity;
-
-      // Llamar a la API para generar las misiones con el nombre real de la ciudad
-      const result = await generateMission(
-        cityName,
-        duration,
-        missionCountNum,
-        user.id,
-        validStartDate,
-        validEndDate,
-        selectedTags // Pasar los tags seleccionados
-      );
-
-      if (!result.journeyId) {
-        throw new Error('No se recibió el ID del journey');
+        if (endDate && (endDate < today || endDate < newStartDate)) {
+          // Si la fecha de fin también es inválida, avanzarla 3 días desde hoy
+          newEndDate = new Date(today);
+          newEndDate.setDate(today.getDate() + 3);
+        }
       }
 
-      // Paso final: Completado
-      setCurrentStep('¡Aventura generada con éxito!');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Aplicar los cambios de fecha si es necesario
+      if (needsDateAdjustment) {
+        setStartDate(newStartDate);
+        setEndDate(newEndDate);
+        onDatesChange([newStartDate, newEndDate]);
 
-      // Guardar el ID del journey generado
-      setGeneratedJourneyId(result.journeyId);
+        // Mostrar alerta informando al usuario
+        Alert.alert(
+          "Fechas ajustadas",
+          "Las fechas seleccionadas eran pasadas y han sido ajustadas a fechas futuras.",
+          [{ text: "OK" }]
+        );
+      }
 
-      // Mostrar el modal de compartir
-      setShowShareModal(true);
+      if (!user?.id) {
+        setErrorMsg('Debes iniciar sesión para generar misiones');
+        return;
+      }
 
-    } catch (error) {
-      console.error('Error generando misiones:', error);
-      setErrorMsg('Error al generar las misiones. Por favor, intenta de nuevo.');
-    } finally {
+      // Calcular duración actualizada por si acaba de cambiar
+      const updatedDuration = newStartDate && newEndDate
+        ? calculateDuration(newStartDate, newEndDate)
+        : duration;
+
+      if (!updatedDuration || updatedDuration <= 0) {
+        setErrorMsg('Por favor, selecciona fechas válidas para crear un viaje');
+        return;
+      }
+
+      if (!newStartDate || !newEndDate) {
+        setErrorMsg('Selecciona fechas de inicio y fin');
+        return;
+      }
+
+      if (!searchCity) {
+        setErrorMsg('Por favor, ingresa una ciudad de destino');
+        return;
+      }
+
+      try {
+        // Iniciar el proceso de generación
+        setCurrentStep(`Preparando tu viaje a ${searchCity}...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Paso 2: Buscando lugares
+        setCurrentStep(`Buscando lugares interesantes en ${searchCity}...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Paso 3: Creando misiones
+        const missionCountNum = parseInt(missionCount) || 3; // Usar 3 como valor por defecto si no hay número
+        setCurrentStep(`Creando ${missionCountNum} misiones emocionantes...`);
+
+        // Obtener la ciudad seleccionada del filtro de ciudades
+        let selectedCityObj = filteredCities.find(city => city.name.toUpperCase() === searchCity);
+
+        // Si no se encuentra una coincidencia exacta, usar la ciudad escrita por el usuario
+        const cityName = selectedCityObj ? selectedCityObj.name : searchCity;
+
+        // Llamar a la API para generar las misiones con el nombre real de la ciudad
+        const result = await generateMission(
+          cityName,
+          updatedDuration, // Usar la duración actualizada
+          missionCountNum,
+          user.id,
+          newStartDate, // Usar las fechas ajustadas
+          newEndDate,
+          selectedTags // Pasar los tags seleccionados
+        );
+
+        if (!result.journeyId) {
+          throw new Error('No se recibió el ID del journey');
+        }
+
+        // Guardar el ID del journey generado
+        setGeneratedJourneyId(result.journeyId);
+
+        // Mostrar notificación de viaje generado
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "¡Nuevo viaje creado!",
+            body: `Tu viaje a ${cityName} ha sido generado con éxito con ${missionCountNum} misiones.`,
+            data: { journeyId: result.journeyId },
+            sound: 'default',
+          },
+          trigger: null, // Mostrar inmediatamente
+        });
+
+        // Mostrar el modal de compartir
+        setShowShareModal(true);
+
+      } catch (error) {
+        console.error('Error generando misiones:', error);
+        setErrorMsg('Error al generar las misiones. Por favor, intenta de nuevo.');
+      } finally {
+        setIsLoading(false);
+        setCurrentStep('');
+      }
+    } catch (error: any) {
+      console.error('Error al buscar misiones:', error);
+      setErrorMsg(error.message || 'Error al buscar misiones');
       setIsLoading(false);
-      setCurrentStep('');
     }
   };
 
@@ -856,6 +836,12 @@ const MapScreen = () => {
 
   // Función para alternar la visibilidad del formulario
   const toggleFormCollapse = () => {
+    const toValue = isFormCollapsed ? 1 : 0;
+    Animated.timing(formAnimation, {
+      toValue,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
     setIsFormCollapsed(!isFormCollapsed);
   };
 
@@ -865,117 +851,86 @@ const MapScreen = () => {
     setErrorLocationMsg(`Error al cargar el Globo Terráqueo: ${error}`);
   };
 
-  // Función para reintentar cargar el globo terráqueo
-  const retryLoadGlobe = () => {
-    setErrorLocationMsg(null);
-    loadCesiumGlobe();
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Barra superior con botón para expandir/colapsar */}
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>TravelQuest</Text>
         <TouchableOpacity onPress={toggleFormCollapse} style={styles.collapseButton}>
-          <Ionicons name={isFormCollapsed ? "chevron-down" : "chevron-up"} size={24} color="#7F5AF0" />
+          <Ionicons name={isFormCollapsed ? "menu" : "close"} size={24} color="white" />
         </TouchableOpacity>
       </View>
 
-      {/* Mapa debajo de todo */}
-      <View style={[
-        styles.mapContainer,
-        isFormCollapsed && styles.mapContainerExpanded
-      ]}>
-        {/* Mostrar la duración del viaje en días encima del mapa */}
-        {startDate && endDate && (
-          <View style={styles.durationOverlay}>
-            <Text style={styles.durationOverlayText}>
-              <Ionicons name="calendar" size={16} color="#F5D90A" /> {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
-            </Text>
-            <Text style={styles.durationOverlayText}>
-              <Ionicons name="time" size={16} color="#F5D90A" /> Duración: {calculateDuration(startDate, endDate)} días
-            </Text>
-          </View>
-        )}
-
-        {isLoadingLocation ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#7F5AF0" />
-            <Text style={styles.loadingText}>Cargando ubicación...</Text>
-          </View>
-        ) : errorLocationMsg ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorLocationMsg}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={getLocation}>
-              <Text style={styles.retryButtonText}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Globo terráqueo */}
-            <GlobeView
-              ref={globeRef}
-              region={region}
-              onRegionChange={(reg) => {
-                // Actualizamos la región
-                setRegion(reg);
-              }}
-              showsUserLocation={true}
-              style={styles.map}
-              onLoadingChange={(loading) => {
-                console.log("Cambio de estado de carga del mapa:", loading);
-                setChangingView(loading);
-              }}
-              onError={handleGlobeError}
-            />
-
-            {/* Botón flotante para recargar el globo */}
-            <TouchableOpacity
-              style={styles.floatingButton}
-              onPress={retryLoadGlobe}
-            >
-              <Ionicons name="refresh" size={20} color="#F5D90A" style={{ marginRight: 5 }} />
-              <Text style={{ color: '#F5D90A', fontWeight: 'bold' }}>Recargar Globo 3D</Text>
-            </TouchableOpacity>
-          </>
-        )}
+      {/* Widget del clima arriba del mapa */}
+      <View style={{ padding: 10 }}>
+        <WeatherWidget
+          cityName={searchCity || undefined}
+          latitude={region.latitude}
+          longitude={region.longitude}
+          compact={true}
+        />
       </View>
 
-      {/* Contenedor del formulario, que puede estar colapsado - colocado al final para que se muestre encima */}
-      {!isFormCollapsed && (
-        <ScrollView
-          style={styles.searchContainer}
-          contentContainerStyle={{ flexGrow: 1 }}
-          showsVerticalScrollIndicator={false}
-        >
+      {/* Formulario de búsqueda */}
+      <Animated.View
+        style={[
+          styles.searchContainer,
+          isSmallScreen && styles.searchContainerSmall,
+          {
+            opacity: formAnimation,
+            transform: [{
+              translateY: formAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-50, 0]
+              })
+            }],
+            display: isFormCollapsed ? 'none' : 'flex'
+          }
+        ]}
+      >
+        {/* Campo de búsqueda de ciudad - puesto primero para que sea lo más visible */}
+        <View style={styles.cityInputContainer}>
+          <Ionicons name="search" size={24} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Buscar ciudad"
+            placeholder="¿Qué ciudad quieres visitar?"
+            placeholderTextColor="#666"
             value={searchCity}
             onChangeText={handleCitySearch}
           />
-          {showSuggestions && filteredCities.length > 0 && (
-            <View style={styles.suggestionsList}>
-              {filteredCities.map((city) => (
-                <TouchableOpacity
-                  key={city.id}
-                  style={styles.suggestionItem}
-                  onPress={() => handleCitySelect(city)}
-                >
-                  <Text style={styles.suggestionText}>{city.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+        </View>
 
+        {/* Sugerencias de ciudades */}
+        {showSuggestions && filteredCities.length > 0 && (
+          <View style={styles.suggestionsList}>
+            {filteredCities.map((city) => (
+              <TouchableOpacity
+                key={city.id}
+                style={styles.suggestionItem}
+                onPress={() => handleCitySelect(city)}
+              >
+                <Ionicons name="location" size={18} color="#005F9E" style={styles.locationIcon} />
+                <Text style={styles.suggestionText}>{city.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.formRow}>
-            <TextInput
-              style={[styles.input, styles.smallInput]}
-              placeholder="Nº misiones"
-              value={missionCount}
-              onChangeText={setMissionCount}
-              keyboardType="numeric"
-            />
+            <View style={styles.missionInputContainer}>
+              <Ionicons name="list" size={20} color="#666" style={styles.missionIcon} />
+              <TextInput
+                style={styles.smallInput}
+                placeholder="Nº misiones"
+                placeholderTextColor="#666"
+                value={missionCount}
+                onChangeText={setMissionCount}
+                keyboardType="numeric"
+              />
+            </View>
 
             <DateRangePicker
               startDateProp={startDate}
@@ -1016,6 +971,7 @@ const MapScreen = () => {
             onPress={handleSearch}
             disabled={!searchCity || !startDate || !endDate}
           >
+            <Ionicons name="rocket" size={20} color="white" style={{ marginRight: 8 }} />
             <Text style={styles.buttonText}>
               Generar Misiones
             </Text>
@@ -1023,19 +979,75 @@ const MapScreen = () => {
 
           {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
         </ScrollView>
-      )}
+      </Animated.View>
+
+      {/* Mapa debajo de todo */}
+      <View style={[
+        styles.mapContainer,
+        isFormCollapsed && styles.mapContainerExpanded
+      ]}>
+        {/* Mostrar la duración del viaje en días encima del mapa */}
+        {startDate && endDate && (
+          <View style={styles.durationOverlay}>
+            <Text style={styles.durationOverlayText}>
+              <Ionicons name="calendar" size={16} color="white" /> {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
+            </Text>
+            <Text style={styles.durationOverlayText}>
+              <Ionicons name="time" size={16} color="white" /> Duración: {calculateDuration(startDate, endDate)} días
+            </Text>
+          </View>
+        )}
+
+        {isLoadingLocation ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#005F9E" />
+            <Text style={styles.loadingText}>Cargando ubicación...</Text>
+          </View>
+        ) : errorLocationMsg ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorLocationMsg}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={getLocation}>
+              <Text style={styles.retryButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* Globo terráqueo */}
+            <GlobeView
+              ref={globeRef}
+              region={region}
+              onRegionChange={(reg) => {
+                // Actualizamos la región
+                setRegion(reg);
+              }}
+              showsUserLocation={true}
+              style={styles.map}
+              onLoadingChange={(loading) => {
+                console.log("Cambio de estado de carga del mapa:", loading);
+                // Si el loading es false, asegurarnos de quitar el indicador de carga
+                if (!loading) {
+                  // Pequeño retraso para asegurar que el globo esté completamente renderizado
+                  setTimeout(() => {
+                    setChangingView(false);
+                  }, 500);
+                } else {
+                  setChangingView(true);
+                }
+              }}
+              onLoadEnd={() => {
+                // Cuando la carga termine completamente
+                console.log("Carga del globo completada");
+                setChangingView(false);
+              }}
+              onError={handleGlobeError}
+            />
+          </>
+        )}
+      </View>
 
       <LoadingModal visible={isLoading} currentStep={currentStep} />
 
-      {/* Overlay para cambiar entre vistas */}
-      {changingView && (
-        <View style={styles.changingViewOverlay}>
-          <ActivityIndicator size="large" color="#F5D90A" />
-          <Text style={styles.loadingText}>Cargando vista...</Text>
-        </View>
-      )}
-
-      <FriendSelectionModal
+      <FriendSingleSelectionModal
         visible={showShareModal}
         onClose={() => {
           setShowShareModal(false);
@@ -1050,306 +1062,507 @@ const MapScreen = () => {
         }}
         onSelect={handleShareJourney}
       />
+
+      {/* Overlay para cambiar entre vistas */}
+      {changingView && (
+        <View style={styles.changingViewOverlay}>
+          <ActivityIndicator size="small" color="#FFF" />
+          <Text style={styles.loadingText}>
+            {currentStep || "Cargando globo terrestre..."}
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
+  );
+};
+
+// Añadir el componente FriendSelectionModal
+const FriendSelectionModal = ({ visible, onClose, onSelect }: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (friends: Friend[]) => void;
+}) => {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  // Limpiar la selección cuando se abre el modal
+  useEffect(() => {
+    if (visible) {
+      setSelectedFriends([]);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (visible) {
+      const fetchFriends = async () => {
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+        try {
+          setLoading(true);
+          const { data: friendData, error } = await supabase
+            .from('friends')
+            .select('user2Id')
+            .eq('user1Id', user.id);
+          if (error) throw error;
+
+          const friendDetails = await Promise.all(
+            friendData.map(async (friend: { user2Id: string }) => {
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('username, points')
+                .eq('id', friend.user2Id)
+                .single();
+              if (userError) return null;
+              return {
+                user2Id: friend.user2Id,
+                username: userData.username,
+                points: userData.points,
+              };
+            })
+          );
+
+          setFriends(friendDetails.filter((f) => f !== null) as Friend[]);
+        } catch (error) {
+          console.error('Error fetching friends:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchFriends();
+    }
+  }, [visible, user]);
+
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriends(current => {
+      if (current.includes(friendId)) {
+        return current.filter(id => id !== friendId);
+      } else {
+        return [...current, friendId];
+      }
+    });
+  };
+
+  const selectAllFriends = () => {
+    if (selectedFriends.length === friends.length) {
+      // Si todos están seleccionados, deseleccionar todos
+      setSelectedFriends([]);
+    } else {
+      // Seleccionar todos
+      setSelectedFriends(friends.map(friend => friend.user2Id));
+    }
+  };
+
+  const handleShareWithSelected = () => {
+    if (selectedFriends.length === 0) {
+      Alert.alert('Selección vacía', 'Por favor, selecciona al menos un amigo para compartir el viaje.');
+      return;
+    }
+
+    const selectedFriendsObjects = friends.filter(friend =>
+      selectedFriends.includes(friend.user2Id)
+    );
+
+    onSelect(selectedFriendsObjects);
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      transparent
+    >
+      <View style={styles.shareModalOverlay}>
+        <View style={styles.shareModalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.shareModalTitle}>Compartir Aventura</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.shareModalSubtitle}>
+            Selecciona a los amigos con los que quieres compartir este viaje
+          </Text>
+
+          {!loading && friends.length > 0 && (
+            <TouchableOpacity
+              style={styles.selectAllButton}
+              onPress={selectAllFriends}
+            >
+              <Text style={styles.selectAllText}>
+                {selectedFriends.length === friends.length
+                  ? "Deseleccionar todos"
+                  : "Seleccionar todos"}
+              </Text>
+              <Ionicons
+                name={selectedFriends.length === friends.length
+                  ? "checkmark-circle"
+                  : "checkmark-circle-outline"}
+                size={20}
+                color="#005F9E"
+              />
+            </TouchableOpacity>
+          )}
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#005F9E" />
+              <Text style={styles.loadingText}>Cargando amigos...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={friends}
+              keyExtractor={(item) => item.user2Id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.friendItem,
+                    selectedFriends.includes(item.user2Id) && styles.friendItemSelected
+                  ]}
+                  onPress={() => toggleFriendSelection(item.user2Id)}
+                >
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{item.username}</Text>
+                    <Text style={styles.friendPoints}>Puntos: {item.points}</Text>
+                  </View>
+                  <Ionicons
+                    name={selectedFriends.includes(item.user2Id)
+                      ? "checkmark-circle"
+                      : "ellipse-outline"}
+                    size={24}
+                    color={selectedFriends.includes(item.user2Id) ? "#005F9E" : "#ccc"}
+                  />
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people" size={50} color="#ccc" />
+                  <Text style={styles.emptyText}>No tienes amigos agregados</Text>
+                  <Text style={styles.emptySubtext}>Agrega amigos para poder compartir tus viajes</Text>
+                </View>
+              }
+            />
+          )}
+
+          <View style={styles.footerContainer}>
+            {selectedFriends.length > 0 && (
+              <Text style={styles.selectedCountText}>
+                {selectedFriends.length} {selectedFriends.length === 1 ? 'amigo seleccionado' : 'amigos seleccionados'}
+              </Text>
+            )}
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.shareButton, selectedFriends.length === 0 && styles.disabledButton]}
+                onPress={handleShareWithSelected}
+                disabled={selectedFriends.length === 0}
+              >
+                <Text style={styles.shareButtonText}>
+                  {selectedFriends.length === 0
+                    ? "Selecciona amigos"
+                    : `Compartir (${selectedFriends.length})`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// Renombrar segunda definición 
+const FriendSingleSelectionModal = ({ visible, onClose, onSelect }: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (friend: Friend) => void;
+}) => {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  useEffect(() => {
+    if (visible) {
+      const fetchFriends = async () => {
+        if (!user) {
+          setLoading(false);
+          setError('Debes iniciar sesión para compartir viajes');
+          return;
+        }
+        try {
+          setLoading(true);
+          setError(null);
+
+          const friendsList = await getFriends(user.id);
+
+          if (!friendsList || friendsList.length === 0) {
+            setError('No tienes amigos agregados para compartir');
+            setFriends([]);
+            return;
+          }
+
+          setFriends(friendsList);
+        } catch (error) {
+          console.error('Error fetching friends:', error);
+          setError('Error al cargar la lista de amigos');
+          setFriends([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchFriends();
+    }
+  }, [visible, user]);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      transparent
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>¿Quieres compartir tu aventura?</Text>
+          <Text style={styles.modalSubtitle}>Selecciona un amigo para compartir este viaje</Text>
+
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#4CAF50" />
+              <Text style={styles.loadingText}>Cargando amigos...</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.friendsList}>
+              {friends.map((friend) => (
+                <TouchableOpacity
+                  key={friend.user2Id}
+                  style={styles.friendItem}
+                  onPress={() => onSelect(friend)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{friend.username}</Text>
+                    <Text style={styles.friendPoints}>Puntos: {friend.points}</Text>
+                  </View>
+                  <Ionicons name="arrow-forward" size={20} color="#005F9E" />
+                </TouchableOpacity>
+              ))}
+              {friends.length === 0 && (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="people-outline" size={40} color="#666" />
+                  <Text style={styles.emptyText}>No tienes amigos agregados</Text>
+                </View>
+              )}
+            </ScrollView>
+          )}
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={onClose}
+            >
+              <Text style={styles.cancelButtonText}>No compartir</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181A20', // Fondo oscuro misterioso
+    backgroundColor: '#f5f5f5',
   },
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#232634', // Fondo header oscuro
-    paddingHorizontal: 15,
+    backgroundColor: '#005F9E',
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#393552',
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    zIndex: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#F5D90A', // Amarillo misterioso
-    fontFamily: 'System', // Puedes cambiar por una fuente custom si la tienes
-    letterSpacing: 2,
-    textShadowColor: '#7F5AF0',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    color: 'white',
   },
   collapseButton: {
-    padding: 5,
+    padding: 8,
   },
   searchContainer: {
-    backgroundColor: '#232634', // Fondo oscuro
-    padding: 15,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 100 : 80,
+    left: 16,
+    right: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    maxHeight: '70%',
+    zIndex: 1000,
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
-    position: 'absolute',
-    top: 90,
-    left: 0,
-    right: 0,
-    zIndex: 9,
-    maxHeight: '60%',
   },
   searchContainerSmall: {
-    padding: 12,
     maxHeight: '50%',
+  },
+  cityInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+    color: '#333',
+  },
+  suggestionsList: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginBottom: 12,
+    maxHeight: 200,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  locationIcon: {
+    marginRight: 8,
+  },
+  suggestionText: {
+    fontSize: 16,
+    color: '#333',
   },
   formRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  input: {
-    backgroundColor: '#6f627f', // Fondo input oscuro
+  missionInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#7F5AF0', // Borde violeta
-    color: '#FFFFFF', // Texto blanco
-    fontSize: 16,
-    fontFamily: 'System',
-    letterSpacing: 1,
+    paddingHorizontal: 12,
+    flex: 0.3,
+  },
+  missionIcon: {
+    marginRight: 8,
   },
   smallInput: {
-    flex: 0.4,
+    height: 48,
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+    gap: 8,
+  },
+  tagButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  tagButtonSelected: {
+    backgroundColor: '#005F9E',
+    borderColor: '#005F9E',
+  },
+  tagText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  tagTextSelected: {
+    color: 'white',
+  },
+  button: {
+    backgroundColor: '#005F9E',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#dc3545',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   mapContainer: {
     flex: 1,
     position: 'relative',
-    zIndex: 1,
-    backgroundColor: '#232634', // Fondo oscuro detrás del mapa
   },
   mapContainerExpanded: {
-    flex: 1,
+    marginTop: 0,
   },
-  tagButtonSmall: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    margin: 2,
-  },
-  tagTextSmall: {
-    fontSize: 10,
-  },
-  map: {
-    width: '100%',
-    height: '100%',
+  durationOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  button: {
-    backgroundColor: '#7F5AF0', // Botón violeta
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-    width: '100%',
-  },
-  buttonDisabled: {
-    backgroundColor: '#393552',
-  },
-  buttonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-    fontFamily: 'System',
-    letterSpacing: 1,
-  },
-  errorText: {
-    color: '#F5D90A', // Amarillo misterioso para errores
-    marginTop: 10,
-    fontWeight: 'bold',
-    fontFamily: 'System',
-    letterSpacing: 1,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  loadingCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 15,
-    alignItems: 'center',
-    width: '80%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  loadingTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  loadingStep: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  datePickersRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 2,
-  },
-  datePickerContainer: {
-    flex: 0.55,
-    position: 'relative',
-    zIndex: 999,
-  },
-  datePickerButton: {
-    backgroundColor: '#232634',
+    top: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 95, 158, 0.9)',
     borderRadius: 8,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#7F5AF0',
+    zIndex: 1000,
   },
-  datePickerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-  },
-  datePickerText: {
-    color: '#F5D90A',
-    fontSize: 15,
-    fontWeight: 'bold',
-    fontFamily: 'System',
-    letterSpacing: 1,
-  },
-  calendarOverlay: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    zIndex: 9999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 10,
-    maxHeight: '70%',
-  },
-  calendarContainer: {
-    backgroundColor: '#232634',
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 5,
-    width: '100%',
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-    backgroundColor: '#232634',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    padding: 10,
-  },
-  calendarTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#F5D90A',
-    fontFamily: 'System',
-    letterSpacing: 1,
-  },
-  calendarSubtitle: {
-    fontSize: 16,
-    color: '#7F5AF0',
-    textAlign: 'center',
-    marginVertical: 10,
-    fontFamily: 'System',
-  },
-  calendarControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  calendarArrow: {
-    padding: 5,
-  },
-  calendarCloseButton: {
-    backgroundColor: '#005F9E',
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  calendarCloseButtonText: {
+  durationOverlayText: {
     color: 'white',
-    fontWeight: 'bold',
     fontSize: 14,
-  },
-  durationText: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  suggestionsList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#232634',
-    borderRadius: 10,
-    maxHeight: 200,
-    zIndex: 2,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-  },
-  suggestionItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#393552',
-  },
-  suggestionText: {
-    fontSize: 16,
-    color: '#FFF',
+    marginBottom: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -1357,177 +1570,133 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
-    color: '#333',
-  },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  retryButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  errorOverlay: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    right: 10,
-    backgroundColor: 'rgba(244, 67, 54, 0.9)',
-    padding: 10,
-    borderRadius: 5,
-  },
-  progressBar: {
-    height: 8,
-    width: '100%',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-  },
-  tagsTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 5,
-    marginBottom: 5,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 15,
-    marginTop: 5,
-    justifyContent: 'center',
-  },
-  tagButton: {
-    borderWidth: 1.5,
-    borderColor: '#7F5AF0',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    margin: 5,
-    backgroundColor: '#232634',
-    minWidth: 95,
-  },
-  tagButtonSelected: {
-    backgroundColor: '#7F5AF0',
-  },
-  tagText: {
-    color: '#F5D90A',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  tagTextSelected: {
-    color: '#FFFFFF',
+    color: '#666',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
-  floatingButton: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
+  retryButton: {
+    marginTop: 16,
     backgroundColor: '#005F9E',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 30,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    zIndex: 999,
-  },
-  changingViewOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  durationOverlay: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    right: 10,
-    backgroundColor: 'rgba(0, 95, 158, 0.8)',
-    padding: 10,
     borderRadius: 8,
-    zIndex: 1000,
-    alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
-  durationOverlayText: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  retryButtonText: {
     color: 'white',
-    marginVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  calendarStyle: {
-    height: 300,
-    maxHeight: '50vh',
-  },
-  durationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 5,
-    paddingHorizontal: 5,
+  map: {
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
     width: '90%',
     maxWidth: 400,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  calendarTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  calendarSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  calendarControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  calendarArrow: {
+    padding: 8,
+  },
+  durationContainer: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  durationText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+  },
+  calendarCloseButton: {
+    backgroundColor: '#005F9E',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignSelf: 'stretch',
+  },
+  calendarCloseButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  changingViewOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  datePickerContainer: {
+    flex: 0.7,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  calendarIcon: {
+    marginRight: 8,
+  },
+  datePickerText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
     backgroundColor: 'white',
-    borderRadius: 15,
+    borderRadius: 12,
     padding: 20,
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    width: '90%',
+    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 22,
@@ -1588,6 +1757,92 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 10,
     fontSize: 16
+  },
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  shareModalContent: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+    backgroundColor: '#232634',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    padding: 10,
+  },
+  shareModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#F5D90A',
+    fontFamily: 'System',
+    letterSpacing: 1,
+  },
+  closeButton: {
+    padding: 5,
+  },
+  shareModalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 10,
+    fontFamily: 'System',
+  },
+  selectAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#7F5AF0',
+    borderRadius: 8,
+  },
+  selectAllText: {
+    color: '#F5D90A',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginRight: 10,
+  },
+  selectedCountText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  shareButton: {
+    backgroundColor: '#7F5AF0',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+    width: '100%',
+  },
+  disabledButton: {
+    backgroundColor: '#393552',
+  },
+  shareButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+    fontFamily: 'System',
+    letterSpacing: 1,
   },
 });
 

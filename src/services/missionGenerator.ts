@@ -87,17 +87,17 @@ const getOrCreateCity = async (cityName: string, userId?: string) => {
     if (userId) {
       try {
         const { awardSpecificBadges, checkNewCityBadgeAndAwardPoints } = await import('./badgeService');
-        
+
         // Verificar si el usuario ya tiene la insignia y otorgar puntos extra si es así
         const badgeResult = await checkNewCityBadgeAndAwardPoints(userId);
         console.log("Resultado de comprobación de insignia:", badgeResult);
-        
+
         if (!badgeResult.alreadyHasBadge) {
           // Si no tiene la insignia, otorgarla
           console.log(`Otorgando insignia de nueva ciudad al usuario ${userId}`);
           await awardSpecificBadges(userId, 'visitNewCity');
         }
-        
+
         // Si dio puntos extra, mostrar mensaje (opcional)
         if (badgeResult.pointsAwarded > 0) {
           console.log(`Se otorgaron ${badgeResult.pointsAwarded} puntos extra al usuario por la nueva ciudad`);
@@ -288,7 +288,7 @@ Devuelve un objeto JSON con la siguiente estructura exacta:
   "misiones": [
     {
       "Título": "Título de la misión",
-      "Descripción": "Descripción detallada de la misión incluyendo qué foto tomar",
+      "Descripción": "Descripción muy detallada y muy descriptiva de la misión incluyendo qué foto tomar y recomendaciones de que hacer por la zona, pide solo una foto y que sea relativamente facil de conseguir es decir no pidas una fota en una hora del dia o no pidas una foto de un sitio que es iliegal la entrada",
       "Dificultad": "Fácil|Media|Difícil",
       "Puntos": 25|50|100
     }

@@ -1,5 +1,5 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,17 +12,44 @@ import {
   Platform,
   Alert,
   Image,
-  Modal
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { getConversation, sendMessage, markMessagesAsRead, subscribeToMessages, Message, sendImageMessage } from '../../services/messageService';
+import {
+  getConversation,
+  sendMessage,
+  markMessagesAsRead,
+  subscribeToMessages,
+  Message,
+  sendImageMessage,
+  getGroupMessages,
+  sendGroupMessage,
+  subscribeToGroupMessages,
+  markGroupMessagesAsRead
+} from '../../services/messageService';
+import {
+  getGroupById,
+  renameGroup,
+  deleteGroup,
+  leaveGroup,
+  getUsersNotInGroup,
+  inviteUserToGroup,
+  removeGroupAdmin,
+  makeGroupAdmin,
+  removeUserFromGroup
+} from '../../services/groupService';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { uploadImage } from '../../services/cloudinaryService';
+import NotificationService from '../../services/NotificationService';
+import { getUserInfoById as getUserInfo } from '../../services/userService';
 
 const ChatScreen = () => {
   const route = useRoute();
@@ -42,19 +69,18 @@ const ChatScreen = () => {
   const subscriptionRef = React.useRef(null);
   const initialLoadRef = React.useRef(true);
   const messageCountRef = React.useRef(0);
-  const insets = useSafeAreaInsets();
 
   // Manejador para nuevos mensajes recibidos
   const handleNewMessage = React.useCallback((newMessage: Message) => {
     console.log('Mensaje recibido en handleNewMessage:', newMessage);
-    
+
     // Doble verificación para asegurarnos que el mensaje pertenece a esta conversación
     if (
       (newMessage.sender_id === friendId && newMessage.receiver_id === user?.id) ||
       (newMessage.sender_id === user?.id && newMessage.receiver_id === friendId)
     ) {
       console.log('Mensaje corresponde a esta conversación, actualizando estado...');
-      
+
       setMessages(prevMessages => {
         // Verificar si el mensaje ya existe para evitar duplicados
         const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
@@ -63,13 +89,13 @@ const ChatScreen = () => {
           return prevMessages;
         }
         console.log('Añadiendo nuevo mensaje a la conversación:', newMessage.id, 'Total ahora:', prevMessages.length + 1);
-        
+
         // Actualizar contador de referencia
         messageCountRef.current = prevMessages.length + 1;
-        
+
         return [...prevMessages, newMessage];
       });
-      
+
       // Marcar como leído si somos el receptor
       if (newMessage.receiver_id === user?.id) {
         console.log('Marcando mensaje como leído');
@@ -83,14 +109,14 @@ const ChatScreen = () => {
   // Función para cargar mensajes
   const loadMessages = React.useCallback(async () => {
     if (!user?.id) return;
-    
+
     console.log('Cargando mensajes entre', user.id, 'y', friendId);
     setRefreshing(true);
-    
+
     try {
       const conversationMessages = await getConversation(user.id, friendId);
       console.log('Mensajes obtenidos:', conversationMessages.length);
-      
+
       // Verificar si hay cambios en los mensajes
       if (conversationMessages.length !== messageCountRef.current) {
         console.log('Actualizando lista de mensajes. Antes:', messageCountRef.current, 'Ahora:', conversationMessages.length);
@@ -99,7 +125,7 @@ const ChatScreen = () => {
       } else {
         console.log('No hay nuevos mensajes para actualizar');
       }
-      
+
       await markMessagesAsRead(user.id, friendId);
     } catch (error) {
       console.error('Error cargando mensajes:', error);
@@ -114,7 +140,7 @@ const ChatScreen = () => {
   // Configurar suscripción a mensajes - separado para mayor claridad
   const setupMessageSubscription = React.useCallback(() => {
     if (!user?.id || !friendId) return;
-    
+
     console.log('Configurando suscripción a mensajes entre', user.id, 'y', friendId);
 
     // Limpiar suscripción anterior si existe
@@ -123,7 +149,7 @@ const ChatScreen = () => {
       subscriptionRef.current.unsubscribe();
       // Asegurarse de que la referencia se limpie completamente
       subscriptionRef.current = null;
-      
+
       // Añadir un pequeño retraso para asegurar que la limpieza se complete
       setTimeout(() => {
         // Verificar que no se haya recreado la suscripción en el intervalo
@@ -143,7 +169,7 @@ const ChatScreen = () => {
   // Efecto para configurar la suscripción y limpiarla al desmontar
   React.useEffect(() => {
     setupMessageSubscription();
-    
+
     return () => {
       if (subscriptionRef.current) {
         console.log('Limpiando suscripción al desmontar');
@@ -156,7 +182,7 @@ const ChatScreen = () => {
   React.useEffect(() => {
     console.log('Efecto de inicialización del chat');
     checkUserAuth();
-    
+
     navigation.setOptions({
       title: friendName || 'Chat',
     });
@@ -180,8 +206,8 @@ const ChatScreen = () => {
         "No autenticado",
         "Por favor inicia sesión para acceder al chat",
         [
-          { 
-            text: "OK", 
+          {
+            text: "OK",
             onPress: () => navigation.reset({
               index: 0,
               routes: [{ name: 'Login' }] as never[]
@@ -203,8 +229,8 @@ const ChatScreen = () => {
         "Correo no verificado",
         "Por favor verifica tu correo electrónico para acceder al chat. Revisa tu bandeja de entrada.",
         [
-          { 
-            text: "OK", 
+          {
+            text: "OK",
             onPress: () => {
               navigation.navigate('VerifyEmail', { email: data.user?.email });
             }
@@ -237,7 +263,7 @@ const ChatScreen = () => {
         allowsEditing: true,
         quality: 0.7,
       });
-      
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setSelectedImage(result.assets[0].uri);
         setImagePreviewVisible(true);
@@ -247,22 +273,22 @@ const ChatScreen = () => {
       Alert.alert('Error', 'No se pudo seleccionar la imagen');
     }
   };
-  
+
   // Función para tomar una foto con la cámara
   const takePhoto = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      
+
       if (status !== 'granted') {
         Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara para tomar fotos');
         return;
       }
-      
+
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         quality: 0.7,
       });
-      
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setSelectedImage(result.assets[0].uri);
         setImagePreviewVisible(true);
@@ -272,14 +298,14 @@ const ChatScreen = () => {
       Alert.alert('Error', 'No se pudo tomar la foto');
     }
   };
-  
+
   // Función para enviar la imagen seleccionada
   const sendSelectedImage = async () => {
     if (!selectedImage || !user?.id || sending) return;
-    
+
     setSending(true);
     setImagePreviewVisible(false);
-    
+
     try {
       const newMessage = await sendImageMessage(user.id, friendId, selectedImage);
       if (newMessage) {
@@ -303,13 +329,13 @@ const ChatScreen = () => {
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !user?.id || sending) return;
-    
+
     setSending(true);
     const trimmedMessage = inputText.trim();
     setInputText('');
-    
+
     console.log('Enviando mensaje a', friendId);
-    
+
     try {
       const newMessage = await sendMessage(user.id, friendId, trimmedMessage);
       if (newMessage) {
@@ -336,13 +362,13 @@ const ChatScreen = () => {
   // Renderizar un mensaje individual
   const renderMessageItem = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender_id === user?.id;
-    const isImageMessage = item.content.startsWith('http') && 
-      (item.content.includes('.jpg') || 
-       item.content.includes('.jpeg') || 
-       item.content.includes('.png') || 
-       item.content.includes('.gif') ||
-       item.content.includes('cloudinary.com'));
-    
+    const isImageMessage = item.content.startsWith('http') &&
+      (item.content.includes('.jpg') ||
+        item.content.includes('.jpeg') ||
+        item.content.includes('.png') ||
+        item.content.includes('.gif') ||
+        item.content.includes('cloudinary.com'));
+
     return (
       <View style={[
         styles.messageContainer,
@@ -350,7 +376,7 @@ const ChatScreen = () => {
       ]}>
         {isImageMessage ? (
           <TouchableOpacity onPress={() => viewFullImage(item.content)}>
-            <Image 
+            <Image
               source={{ uri: item.content }}
               style={styles.messageImage}
               resizeMode="cover"
@@ -368,7 +394,7 @@ const ChatScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top + 16 }]}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
@@ -380,6 +406,12 @@ const ChatScreen = () => {
           <Ionicons name="arrow-back" size={28} color="#7F5AF0" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{friendName || 'Usuario'}</Text>
+        <TouchableOpacity
+          style={styles.groupsButton}
+          onPress={() => navigation.navigate('Groups')}
+        >
+          <Ionicons name="people" size={28} color="#7F5AF0" />
+        </TouchableOpacity>
       </View>
       <FlatList
         ref={flatListRef}
@@ -390,24 +422,24 @@ const ChatScreen = () => {
         onRefresh={loadMessages}
         refreshing={refreshing}
       />
-      
+
       <View style={styles.inputContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.attachButton}
           onPress={pickImage}
         >
           {/* @ts-ignore */}
           <Ionicons name="image-outline" size={24} color="#005F9E" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.attachButton}
           onPress={takePhoto}
         >
           {/* @ts-ignore */}
           <Ionicons name="camera-outline" size={24} color="#005F9E" />
         </TouchableOpacity>
-        
+
         <TextInput
           style={styles.input}
           value={inputText}
@@ -415,7 +447,7 @@ const ChatScreen = () => {
           placeholder="Escribe un mensaje..."
           multiline
         />
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.sendButton,
             (!inputText.trim() || sending) ? styles.sendButtonDisabled : null
@@ -431,7 +463,7 @@ const ChatScreen = () => {
           )}
         </TouchableOpacity>
       </View>
-      
+
       {/* Modal de vista previa de imagen */}
       <Modal
         visible={imagePreviewVisible}
@@ -473,7 +505,7 @@ const ChatScreen = () => {
           </View>
         </View>
       </Modal>
-      
+
       {/* Modal para ver imagen completa */}
       <Modal
         visible={fullImageViewVisible}
@@ -659,6 +691,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#F5D90A', // Amarillo misterioso
     letterSpacing: 1,
+  },
+  groupsButton: {
+    position: 'absolute',
+    right: 10,
+    padding: 4,
   },
 });
 
