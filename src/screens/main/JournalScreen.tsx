@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert, Animated, Dimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert, Animated, Dimensions, SafeAreaView, ScrollView, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
@@ -205,7 +205,21 @@ const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJourn
       <View style={styles.textContainer}>
         <Ionicons name="location" size={32} color="#fff" />
         <Text style={styles.cityName}>{city}</Text>
-        <Text style={styles.viewMissionsText}>Ver misiones ({entries.length})</Text>
+        <Text style={{
+          color: '#FFF',
+          fontWeight: 'bold',
+          fontSize: 16,
+          marginTop: 8,
+          textAlign: 'center',
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          paddingHorizontal: 12,
+          paddingVertical: 4,
+          borderRadius: 8,
+          overflow: 'hidden',
+          alignSelf: 'center',
+        }}>
+          Ver misiones ({entries.length})
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -228,6 +242,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   const CARD_WIDTH = windowWidth - 60; // Reducimos el margen total (30px a cada lado)
 
   const insets = useSafeAreaInsets();
+  const HEADER_HEIGHT = 64 + (insets?.top || 0);
 
   useEffect(() => {
     fetchJournalEntries();
@@ -325,21 +340,41 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size={40} color="#005F9E" />
-        <Text style={styles.loadingText}>Cargando diario de viaje...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#005F9E" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Diario de Viaje</Text>
+          </View>
+        </SafeAreaView>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size={40} color="#005F9E" />
+          <Text style={styles.loadingText}>Cargando diario de viaje...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchJournalEntries}>
-          <Text style={styles.retryButtonText}>Reintentar</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#005F9E" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Diario de Viaje</Text>
+          </View>
+        </SafeAreaView>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchJournalEntries}>
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -347,126 +382,212 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
 
   if (cities.length === 0) {
     return (
-      <View style={styles.container}>
-        <Text
-          style={[
-            styles.title,
-            { marginTop: insets.top + 24 }
-          ]}
-        >
-          Diario de Viaje
-        </Text>
+      <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#005F9E" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Diario de Viaje</Text>
+          </View>
+        </SafeAreaView>
         <EmptyState message="Aún no tienes entradas en tu diario. Completa misiones para añadir fotos a tu diario de viaje." />
-      </View>
+      </SafeAreaView>
     );
   }
 
-  const renderCityCard = ({ item }: { item: string }) => (
-    <View style={[styles.cityCardContainer, { width: windowWidth }]}>
-      <CityCard
-        city={item}
-        entries={entriesByCity[item]}
-        onPress={() => {
-          const index = cities.indexOf(item);
-          setSelectedCity(item);
-          setCurrentCityIndex(index);
-          flatListRef.current?.scrollToOffset({
-            offset: index * windowWidth,
-            animated: true
-          });
-        }}
-      />
-    </View>
-  );
+  // --- NUEVA ESTRUCTURA ---
+  // Imagen de ciudad y carousel (usando la ciudad seleccionada)
+  const selectedCityName = cities[currentCityIndex] || cities[0];
+  const selectedCityEntries = entriesByCity[selectedCityName] || [];
+  const firstPhoto = selectedCityEntries.find(e => e.photos && e.photos.length > 0)?.photos[0];
 
   return (
-    <View style={styles.container}>
-      <Text
-        style={[
-          styles.title,
-          { marginTop: insets.top + 20 }
-        ]}
-      >
-        Diario de Viaje
-      </Text>
-      <View style={styles.cityCarouselContainer}>
-        <TouchableOpacity
-          style={[styles.navButton, styles.navButtonLeft]}
-          onPress={handlePrevCity}
-          disabled={currentCityIndex === 0}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={30}
-            color={currentCityIndex === 0 ? '#ccc' : '#005F9E'}
-          />
-        </TouchableOpacity>
-
-        <FlatList
-          ref={flatListRef}
-          horizontal
-          data={cities}
-          renderItem={renderCityCard}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          pagingEnabled
-          snapToInterval={windowWidth}
-          decelerationRate="fast"
-          snapToAlignment="center"
-          onMomentumScrollEnd={(event) => {
-            const offset = event.nativeEvent.contentOffset.x;
-            const index = Math.round(offset / windowWidth);
-            setCurrentCityIndex(index);
-            setSelectedCity(cities[index]);
-          }}
-        />
-
-        <TouchableOpacity
-          style={[styles.navButton, styles.navButtonRight]}
-          onPress={handleNextCity}
-          disabled={currentCityIndex === cities.length - 1}
-        >
-          <Ionicons
-            name="chevron-forward"
-            size={30}
-            color={currentCityIndex === cities.length - 1 ? '#ccc' : '#005F9E'}
-          />
-        </TouchableOpacity>
+    <SafeAreaView style={styles.container}>
+      {/* Header fijo y separado */}
+      <View style={styles.headerSafeArea}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color="#005F9E" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Diario de Viaje</Text>
+          <View style={styles.headerRight} />
+        </View>
       </View>
 
-      {selectedCity ? (
-        entriesByCity[selectedCity].length > 0 ? (
-          <FlatList
-            data={entriesByCity[selectedCity]}
-            renderItem={({ item }) => <JournalEntryCard entry={item} />}
-            keyExtractor={(item) => item.id}
-            style={styles.entriesList}
-          />
+      {/* Imagen de ciudad y overlay */}
+      <View style={styles.cityImageContainer}>
+        {firstPhoto ? (
+          <Image source={{ uri: firstPhoto }} style={styles.cityImage} resizeMode="cover" />
         ) : (
-          <EmptyState message={`No hay entradas de diario para ${selectedCity}`} />
-        )
-      ) : null}
-    </View>
+          <View style={styles.cityImagePlaceholder}>
+            <Ionicons name="image-outline" size={48} color="#ccc" />
+          </View>
+        )}
+        {/* Overlay de controles y texto */}
+        <View style={styles.cityOverlay}>
+          <Ionicons name="location" size={32} color="#fff" />
+          <Text style={styles.cityName}>{selectedCityName}</Text>
+          <Text style={styles.cityMissionsButton}>
+            Ver misiones ({selectedCityEntries.length})
+          </Text>
+        </View>
+        {/* Flechas carousel (opcional, si tienes varias ciudades) */}
+        {cities.length > 1 && (
+          <>
+            <TouchableOpacity style={styles.carouselLeft} onPress={handlePrevCity} disabled={currentCityIndex === 0}>
+              <Ionicons name="chevron-back" size={32} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.carouselRight} onPress={handleNextCity} disabled={currentCityIndex === cities.length - 1}>
+              <Ionicons name="chevron-forward" size={32} color="#fff" />
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      {/* Scroll principal */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+        {/* Contenido principal */}
+        <View style={styles.contentContainer}>
+          {selectedCityEntries.length > 0 ? (
+            selectedCityEntries.map(entry => (
+              <JournalEntryCard key={entry.id} entry={entry} />
+            ))
+          ) : (
+            <EmptyState message={`No hay entradas de diario para ${selectedCityName}`} />
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181A20',
+    backgroundColor: '#F5F5F5',
   },
-  title: {
-    fontSize: 24,
+  headerSafeArea: {
+    backgroundColor: '#005F9E',
+    zIndex: 10,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: Platform.OS === 'ios' ? 60 : 72,
+    paddingTop: Platform.OS === 'ios' ? 8 : 16,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#FFF',
     fontWeight: 'bold',
-    marginVertical: 15,
-    marginHorizontal: 15,
-    color: '#F5D90A',
-    letterSpacing: 1,
+    fontSize: 20,
+    marginHorizontal: 10,
   },
-  cityCarouselContainer: {
-    height: 220,
+  backButton: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cityImageContainer: {
+    width: '100%',
+    height: 180,
     position: 'relative',
-    marginBottom: 15,
+    marginBottom: 12,
+    backgroundColor: '#EEE',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
+  },
+  cityImage: {
+    width: '100%',
+    height: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+  cityImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EEE',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+  cityOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+    paddingTop: 24,
+  },
+  cityName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+    marginTop: 8,
+  },
+  cityMissionsButton: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+    alignSelf: 'center',
+  },
+  carouselLeft: {
+    position: 'absolute',
+    left: 8,
+    top: '50%',
+    transform: [{ translateY: -16 }],
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 20,
+    padding: 4,
+    zIndex: 3,
+  },
+  carouselRight: {
+    position: 'absolute',
+    right: 8,
+    top: '50%',
+    transform: [{ translateY: -16 }],
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 20,
+    padding: 4,
+    zIndex: 3,
+  },
+  contentContainer: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   cityCardContainer: {
     flex: 1,
@@ -481,7 +602,12 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 15,
     overflow: 'hidden',
-    backgroundColor: '#232634',
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 4,
+    elevation: 3,
   },
   entriesList: {
     flex: 1,
@@ -491,7 +617,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   card: {
-    backgroundColor: '#232634',
+    backgroundColor: '#FFF',
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
@@ -514,30 +640,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     flex: 1,
-    color: '#F5D90A',
+    color: '#005F9E',
     letterSpacing: 1,
   },
   detailButton: {
     padding: 5,
   },
   cardDate: {
-    color: '#A1A1AA',
+    color: '#666',
     fontSize: 12,
     marginBottom: 10,
   },
   cardContent: {
-    color: '#FFF',
+    color: '#333',
     marginBottom: 10,
     lineHeight: 20,
   },
   expandText: {
-    color: '#7F5AF0',
+    color: '#005F9E',
     fontStyle: 'italic',
     marginBottom: 10,
     fontSize: 12,
   },
   collapseText: {
-    color: '#7F5AF0',
+    color: '#005F9E',
     fontStyle: 'italic',
     fontSize: 12,
   },
@@ -548,7 +674,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   viewDetailButton: {
-    backgroundColor: '#7F5AF0',
+    backgroundColor: '#005F9E',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 4,
@@ -571,7 +697,7 @@ const styles = StyleSheet.create({
   morePhotos: {
     width: 80,
     height: 80,
-    backgroundColor: '#7F5AF0',
+    backgroundColor: '#005F9E',
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
@@ -586,7 +712,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tag: {
-    color: '#2CB67D',
+    color: '#005F9E',
     marginRight: 10,
     fontSize: 12,
   },
@@ -594,27 +720,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#181A20',
+    backgroundColor: '#F5F5F5',
   },
   loadingText: {
     marginTop: 10,
-    color: '#F5D90A',
+    color: '#005F9E',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#181A20',
+    backgroundColor: '#F5F5F5',
   },
   errorText: {
-    color: '#F5D90A',
+    color: '#D32F2F',
     marginBottom: 20,
     textAlign: 'center',
     fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: '#7F5AF0',
+    backgroundColor: '#005F9E',
     padding: 10,
     borderRadius: 5,
   },
@@ -628,7 +754,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: '#A1A1AA',
+    color: '#666',
     marginTop: 10,
     textAlign: 'center',
     fontSize: 16,
@@ -666,48 +792,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 2,
   },
-  cityName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFF',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  viewMissionsText: {
-    color: '#F5D90A',
-    marginTop: 8,
-    fontSize: 16,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  navButton: {
-    position: 'absolute',
-    top: '50%',
-    transform: [{ translateY: -25 }],
-    zIndex: 1,
-    backgroundColor: '#232634',
-    borderRadius: 25,
-    padding: 10,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  navButtonLeft: {
-    left: 15,
-  },
-  navButtonRight: {
-    right: 15,
-  },
-  noImageBackground: {
-    flex: 1,
-    backgroundColor: '#232634',
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerRight: {
+    width: 24,
+    height: 24,
   },
 });
 

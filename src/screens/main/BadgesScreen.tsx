@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { Badge, UserBadge, getUserBadges, checkAllBadges } from '../../services/badgeService';
@@ -8,10 +8,28 @@ import BadgeDetailModal from '../../components/BadgeDetailModal';
 import { Ionicons } from '@expo/vector-icons';
 import { setUser } from '../../features/auth/authSlice';
 import { supabase } from '../../services/supabase';
+import { SafeAreaView, Platform, StatusBar } from 'react-native';
 
 interface BadgesScreenProps {
   navigation: any;
 }
+
+const { width, height } = Dimensions.get('window');
+
+const colors = {
+  primary: '#005F9E',
+  secondary: '#7F5AF0',
+  background: '#F5F5F5',
+  white: '#FFFFFF',
+  text: {
+    primary: '#333333',
+    secondary: '#666666',
+    light: '#999999',
+  },
+  border: '#EEEEEE',
+  success: '#4CAF50',
+  error: '#D32F2F',
+};
 
 const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -99,36 +117,55 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#7F5AF0" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Mis Insignias</Text>
-        <View style={styles.rightPlaceholder} />
-      </View>
-
+      <SafeAreaView style={styles.safeHeader}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={32} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Mis Insignias</Text>
+          <View style={styles.rightPlaceholder} />
+        </View>
+      </SafeAreaView>
       <ScrollView style={styles.content}>
         <View style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{userBadges.length}</Text>
-            <Text style={styles.summaryLabel}>Insignias Conseguidas</Text>
+            <Text
+              style={styles.summaryLabel}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {width < 350 ? 'Conseguidas' : 'Insignias Conseguidas'}
+            </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>
               {userBadges.filter(b => b.badges?.category === 'missions').length}
             </Text>
-            <Text style={styles.summaryLabel}>Insignias de Misiones</Text>
+            <Text
+              style={styles.summaryLabel}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {width < 350 ? 'Misiones' : 'Insignias de Misiones'}
+            </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>
               {userBadges.filter(b => b.badges?.category === 'level').length}
             </Text>
-            <Text style={styles.summaryLabel}>Insignias de Nivel</Text>
+            <Text
+              style={styles.summaryLabel}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {width < 350 ? 'Nivel' : 'Insignias de Nivel'}
+            </Text>
           </View>
         </View>
 
@@ -153,78 +190,161 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181A20',
+    backgroundColor: colors.background,
+  },
+  safeHeader: {
+    backgroundColor: colors.primary,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 0,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    minHeight: 56,
   },
   backButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#2D2F3A',
-  },
-  rightPlaceholder: {
-    width: 40,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#F5D90A',
-    flex: 1,
-    textAlign: 'center',
-  },
-  refreshButton: {
-    padding: 5,
-  },
-  content: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingVertical: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 10,
-    color: '#A0A0A0',
+  rightPlaceholder: {
+    width: 32,
+  },
+  title: {
+    fontSize: width < 400 ? 20 : 24,
+    fontWeight: 'bold',
+    color: colors.white,
+    textAlign: 'center',
+  },
+  content: {
+    flex: 1,
+    marginTop: 8,
   },
   summaryContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 15,
-    backgroundColor: '#2D2F3A',
-    borderRadius: 10,
-    margin: 10,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FB',
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 0,
+    marginTop: 20,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 1.5,
+    elevation: 1,
   },
   summaryItem: {
-    alignItems: 'center',
     flex: 1,
+    alignItems: 'center',
+    minWidth: 0,
+    paddingHorizontal: 2,
   },
   summaryValue: {
-    fontSize: 24,
+    fontSize: width < 350 ? 18 : 22,
     fontWeight: 'bold',
-    color: '#F5D90A',
+    color: colors.primary,
   },
   summaryLabel: {
-    fontSize: 12,
-    color: '#A0A0A0',
+    fontSize: width < 350 ? 11 : 14,
+    color: colors.text.secondary,
+    marginTop: 2,
     textAlign: 'center',
-    marginTop: 5,
+    width: '100%',
   },
   divider: {
     width: 1,
-    height: '80%',
-    backgroundColor: '#2D2F3A',
+    height: 32,
+    backgroundColor: colors.border,
+    marginHorizontal: 4,
+  },
+  badgeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  badgeItem: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    width: '48%',
+    alignItems: 'center',
+    marginVertical: 8,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  badgeIcon: {
+    width: 60,
+    height: 60,
+    marginBottom: 8,
+  },
+  badgeName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  badgeDescription: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: colors.text.secondary,
+    marginTop: 10,
+    fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.primary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 8,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

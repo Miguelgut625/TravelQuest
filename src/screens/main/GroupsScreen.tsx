@@ -12,7 +12,8 @@ import {
     Modal,
     Image,
     TextInput,
-    ScrollView
+    ScrollView,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -36,6 +37,22 @@ import {
     acceptJourneyInvitation,
     rejectJourneyInvitation
 } from '../../services/shareService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const colors = {
+    primary: '#005F9E',
+    secondary: '#7F5AF0',
+    background: '#F5F5F5',
+    white: '#FFFFFF',
+    text: {
+        primary: '#333333',
+        secondary: '#666666',
+        light: '#999999',
+    },
+    border: '#EEEEEE',
+    success: '#4CAF50',
+    error: '#D32F2F',
+};
 
 const GroupsScreen = () => {
     const [groups, setGroups] = useState<GroupWithMembers[]>([]);
@@ -464,7 +481,7 @@ const GroupsScreen = () => {
                 onPress={() => navigation.navigate('GroupChat', { groupId: item.id })}
             >
                 <View style={styles.groupAvatar}>
-                    <Ionicons name="people" size={28} color="#005F9E" />
+                    <Ionicons name="people" size={28} color={colors.primary} />
                 </View>
 
                 <View style={styles.groupInfo}>
@@ -479,7 +496,7 @@ const GroupsScreen = () => {
                             style={styles.settingsButton}
                             activeOpacity={0.6}
                         >
-                            <Ionicons name="ellipsis-horizontal" size={20} color="#005F9E" />
+                            <Ionicons name="ellipsis-horizontal" size={20} color={colors.primary} />
                         </TouchableOpacity>
                     </View>
 
@@ -489,7 +506,7 @@ const GroupsScreen = () => {
 
                     {item.journey_id && (
                         <View style={styles.tripBadge}>
-                            <Ionicons name="airplane-outline" size={12} color="white" />
+                            <Ionicons name="airplane-outline" size={12} color={colors.white} />
                             <Text style={styles.tripBadgeText}>Viaje</Text>
                         </View>
                     )}
@@ -526,17 +543,26 @@ const GroupsScreen = () => {
     if (loading && !refreshing) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size={40} color="#005F9E" />
+                <ActivityIndicator size={40} color={colors.primary} />
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Chats Grupales</Text>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.headerContainer}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Ionicons name="arrow-back" size={22} color={colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Chats Grupales</Text>
+                <View style={styles.headerRight} />
+            </View>
 
             {pendingInvitations.length > 0 && (
-                <>
+                <View style={styles.invitationsContainer}>
                     <Text style={styles.sectionTitle}>Invitaciones Pendientes</Text>
                     <FlatList
                         data={pendingInvitations}
@@ -544,16 +570,21 @@ const GroupsScreen = () => {
                         keyExtractor={item => item.id}
                         style={styles.invitationsList}
                         ListEmptyComponent={null}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
                     />
-                </>
+                </View>
             )}
 
             <View style={styles.groupsContainer}>
                 {groups.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <Ionicons name="chatbubbles-outline" size={50} color="#ccc" />
+                        <Ionicons name="chatbubbles-outline" size={60} color={colors.secondary} />
                         <Text style={styles.emptyText}>
-                            No tienes grupos de chat. Cuando compartas o te compartan un viaje, se crearán grupos de chat automáticamente.
+                            No tienes grupos de chat
+                        </Text>
+                        <Text style={styles.emptySubtext}>
+                            Cuando compartas o te compartan un viaje, se crearán grupos de chat automáticamente
                         </Text>
                     </View>
                 ) : (
@@ -562,6 +593,7 @@ const GroupsScreen = () => {
                         renderItem={renderGroupItem}
                         keyExtractor={item => item.id}
                         style={styles.groupsList}
+                        contentContainerStyle={styles.groupsListContent}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
@@ -569,6 +601,8 @@ const GroupsScreen = () => {
                                     setRefreshing(true);
                                     loadData();
                                 }}
+                                colors={[colors.primary]}
+                                tintColor={colors.primary}
                             />
                         }
                     />
@@ -592,7 +626,7 @@ const GroupsScreen = () => {
                             style={styles.optionItem}
                             onPress={openRenameModal}
                         >
-                            <Ionicons name="create-outline" size={22} color="#005F9E" />
+                            <Ionicons name="create-outline" size={22} color={colors.primary} />
                             <Text style={styles.optionText}>Renombrar grupo</Text>
                         </TouchableOpacity>
 
@@ -600,7 +634,7 @@ const GroupsScreen = () => {
                             style={styles.optionItem}
                             onPress={openMembersModal}
                         >
-                            <Ionicons name="people-outline" size={22} color="#005F9E" />
+                            <Ionicons name="people-outline" size={22} color={colors.primary} />
                             <Text style={styles.optionText}>Gestionar miembros</Text>
                         </TouchableOpacity>
 
@@ -608,7 +642,7 @@ const GroupsScreen = () => {
                             style={styles.optionItem}
                             onPress={openInviteModal}
                         >
-                            <Ionicons name="person-add-outline" size={22} color="#005F9E" />
+                            <Ionicons name="person-add-outline" size={22} color={colors.primary} />
                             <Text style={styles.optionText}>Invitar amigos</Text>
                         </TouchableOpacity>
 
@@ -616,15 +650,15 @@ const GroupsScreen = () => {
                             style={styles.optionItem}
                             onPress={handleLeaveGroup}
                         >
-                            <Ionicons name="exit-outline" size={22} color="#ff9800" />
-                            <Text style={[styles.optionText, { color: '#ff9800' }]}>Salir del grupo</Text>
+                            <Ionicons name="exit-outline" size={22} color={colors.secondary} />
+                            <Text style={[styles.optionText, { color: colors.secondary }]}>Salir del grupo</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={[styles.optionItem, styles.deleteOption]}
                             onPress={handleDeleteGroup}
                         >
-                            <Ionicons name="trash-outline" size={22} color="#f44336" />
+                            <Ionicons name="trash-outline" size={22} color={colors.error} />
                             <Text style={[styles.optionText, styles.deleteText]}>Eliminar grupo</Text>
                         </TouchableOpacity>
                     </View>
@@ -686,7 +720,7 @@ const GroupsScreen = () => {
                                 {/* Mostrar mensaje informativo para usuarios que no son administradores */}
                                 {!selectedGroup.members.some(m => m.userId === user?.id && m.role === 'admin') && (
                                     <View style={styles.infoMessage}>
-                                        <Ionicons name="information-circle" size={20} color="#005F9E" />
+                                        <Ionicons name="information-circle" size={20} color={colors.primary} />
                                         <Text style={styles.infoMessageText}>
                                             Solo puedes ver los miembros. Para gestionar el grupo debes ser administrador.
                                         </Text>
@@ -721,7 +755,7 @@ const GroupsScreen = () => {
                                                                 style={styles.memberAction}
                                                                 onPress={() => handleMakeAdmin(member.userId)}
                                                             >
-                                                                <Ionicons name="shield-outline" size={18} color="#005F9E" />
+                                                                <Ionicons name="shield-outline" size={18} color={colors.primary} />
                                                             </TouchableOpacity>
                                                         )}
 
@@ -729,7 +763,7 @@ const GroupsScreen = () => {
                                                             style={styles.memberAction}
                                                             onPress={() => handleRemoveMember(member.userId)}
                                                         >
-                                                            <Ionicons name="remove-circle-outline" size={18} color="#f44336" />
+                                                            <Ionicons name="remove-circle-outline" size={18} color={colors.error} />
                                                         </TouchableOpacity>
                                                     </View>
                                                 )}
@@ -760,7 +794,7 @@ const GroupsScreen = () => {
                         </View>
 
                         {inviteLoading ? (
-                            <ActivityIndicator size={24} color="#005F9E" style={{ padding: 20 }} />
+                            <ActivityIndicator size={24} color={colors.primary} style={{ padding: 20 }} />
                         ) : availableFriends.length > 0 ? (
                             <ScrollView style={{ width: '100%' }}>
                                 {availableFriends.map((friend) => (
@@ -777,7 +811,7 @@ const GroupsScreen = () => {
                             </ScrollView>
                         ) : (
                             <View style={styles.emptyFriends}>
-                                <Ionicons name="people-outline" size={50} color="#ccc" />
+                                <Ionicons name="people-outline" size={50} color={colors.secondary} />
                                 <Text style={styles.emptyFriendsText}>
                                     No hay amigos disponibles para invitar. Todos tus amigos ya están en el grupo o han sido invitados.
                                 </Text>
@@ -786,69 +820,154 @@ const GroupsScreen = () => {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    safeArea: {
         flex: 1,
-        padding: 16,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: colors.background,
     },
-    title: {
-        fontSize: 24,
+    headerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: colors.white,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+        minHeight: Platform.OS === 'ios' ? 60 : 72,
+        paddingTop: Platform.OS === 'ios' ? 8 : 16,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+    },
+    backButton: {
+        backgroundColor: colors.white,
+        borderRadius: 20,
+        width: 36,
+        height: 36,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
+        elevation: 2,
+        marginBottom: Platform.OS === 'ios' ? 0 : 4,
+    },
+    headerTitle: {
+        fontSize: 20,
         fontWeight: 'bold',
-        color: '#005F9E',
-        marginBottom: 16,
+        color: colors.primary,
         textAlign: 'center',
+        flex: 1,
+        marginHorizontal: 10,
+    },
+    headerRight: {
+        width: 36,
+    },
+    invitationsContainer: {
+        paddingTop: 16,
+        paddingBottom: 8,
+        backgroundColor: colors.white,
+        marginBottom: 8,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginVertical: 8,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emptyContainer: {
-        flex: 1,
-        padding: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyText: {
         fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginTop: 20,
+        fontWeight: '600',
+        color: colors.text.primary,
+        marginBottom: 12,
+        paddingHorizontal: 16,
+    },
+    invitationsList: {
+        paddingLeft: 16,
+    },
+    invitationCard: {
+        backgroundColor: colors.white,
+        borderRadius: 12,
+        padding: 16,
+        marginRight: 12,
+        width: 280,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    invitationTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 4,
+    },
+    invitationDescription: {
+        fontSize: 14,
+        color: colors.text.primary,
+        marginBottom: 8,
+    },
+    invitationDetails: {
+        fontSize: 14,
+        color: colors.text.secondary,
+        marginTop: 4,
+    },
+    invitationButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: 12,
+    },
+    invitationButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        marginLeft: 8,
+    },
+    acceptButton: {
+        backgroundColor: colors.success,
+    },
+    rejectButton: {
+        backgroundColor: colors.error,
+    },
+    buttonText: {
+        color: colors.white,
+        fontWeight: '600',
+        fontSize: 14,
     },
     groupsContainer: {
         flex: 1,
+        backgroundColor: colors.background,
     },
     groupsList: {
         flex: 1,
     },
-    invitationsList: {
-        maxHeight: 200, // Limitar altura para las invitaciones
+    groupsListContent: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 16,
     },
-    // Estilos para el chat
     chatGroup: {
         flexDirection: 'row',
-        backgroundColor: 'white',
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        alignItems: 'center',
+        backgroundColor: colors.white,
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
     },
     groupAvatar: {
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: '#e6f7ff',
+        backgroundColor: `${colors.primary}15`,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -860,134 +979,68 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 4,
-    },
-    groupNameContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-        backgroundColor: '#f0f7ff',
-        paddingVertical: 5,
-        paddingHorizontal: 8,
-        borderRadius: 15,
+        marginBottom: 6,
     },
     groupName: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
+        color: colors.text.primary,
         flex: 1,
+        marginRight: 8,
     },
     settingsButton: {
-        width: 36,
-        height: 36,
+        width: 32,
+        height: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 18,
-        backgroundColor: '#e6f7ff',
-        borderWidth: 1,
-        borderColor: '#c1e0ff',
-        marginLeft: 8,
+        borderRadius: 16,
+        backgroundColor: `${colors.primary}10`,
     },
     lastMessage: {
         fontSize: 14,
-        color: '#777',
-        marginBottom: 2,
+        color: colors.text.secondary,
+        marginBottom: 8,
     },
     tripBadge: {
         flexDirection: 'row',
-        backgroundColor: '#005F9E',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 10,
+        backgroundColor: colors.primary,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
         alignItems: 'center',
         alignSelf: 'flex-start',
     },
     tripBadgeText: {
-        color: 'white',
-        fontSize: 10,
-        marginLeft: 2,
+        color: colors.white,
+        fontSize: 12,
+        marginLeft: 4,
+        fontWeight: '500',
     },
-    editButton: {
-        padding: 5,
-    },
-    // Estilos para invitaciones
-    invitationCard: {
-        backgroundColor: '#e6f7ff',
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#b3e0ff',
-    },
-    invitationTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#005F9E',
-    },
-    invitationDescription: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginTop: 4,
-    },
-    invitationDetails: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 4,
-    },
-    invitationButtons: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        marginTop: 12,
-    },
-    invitationButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 4,
-        marginLeft: 8,
-    },
-    acceptButton: {
-        backgroundColor: '#4CAF50',
-    },
-    rejectButton: {
-        backgroundColor: '#f44336',
-    },
-    buttonText: {
-        color: 'white',
-        fontWeight: '600',
-    },
-    // Estilos para modal de opciones
-    optionsModalContent: {
-        backgroundColor: 'white',
-        borderRadius: 12,
-        padding: 16,
-        width: '80%',
-        marginTop: 'auto',
-        marginBottom: 20,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-    },
-    optionItem: {
-        flexDirection: 'row',
-        paddingVertical: 12,
+    emptyContainer: {
+        flex: 1,
         alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        justifyContent: 'center',
+        padding: 32,
     },
-    deleteOption: {
-        borderBottomWidth: 0,
+    emptyText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: colors.text.primary,
+        textAlign: 'center',
+        marginTop: 16,
+        marginBottom: 8,
     },
-    optionText: {
-        fontSize: 16,
-        marginLeft: 10,
-        color: '#333',
+    emptySubtext: {
+        fontSize: 14,
+        color: colors.text.secondary,
+        textAlign: 'center',
+        paddingHorizontal: 32,
     },
-    deleteText: {
-        color: '#f44336',
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    // Estilos para modal de renombrar
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1032,7 +1085,6 @@ const styles = StyleSheet.create({
     confirmButton: {
         backgroundColor: '#005F9E',
     },
-    // Nuevos estilos
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1124,6 +1176,37 @@ const styles = StyleSheet.create({
         color: '#333',
         marginLeft: 8,
         flex: 1,
+    },
+    optionsModalContent: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 16,
+        width: '80%',
+        marginTop: 'auto',
+        marginBottom: 20,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    optionItem: {
+        flexDirection: 'row',
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    deleteOption: {
+        borderBottomWidth: 0,
+    },
+    optionText: {
+        fontSize: 16,
+        marginLeft: 10,
+        color: '#333',
+    },
+    deleteText: {
+        color: '#f44336',
     },
 });
 

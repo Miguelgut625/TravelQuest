@@ -1,6 +1,6 @@
 // src/screens/main/LeaderboardScreen.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native'; // Importa el hook de navegación
 import { Ionicons } from '@expo/vector-icons'; // Importa los íconos de Ionicons
@@ -12,6 +12,23 @@ interface LeaderboardItem {
   username: string; // Cambia 'username' si el campo tiene otro nombre
   points: number;
 }
+
+const { width, height } = Dimensions.get('window');
+
+const colors = {
+  primary: '#005F9E',
+  secondary: '#7F5AF0',
+  background: '#F5F5F5',
+  white: '#FFFFFF',
+  text: {
+    primary: '#333333',
+    secondary: '#666666',
+    light: '#999999',
+  },
+  border: '#EEEEEE',
+  success: '#4CAF50',
+  error: '#D32F2F',
+};
 
 const LeaderboardScreen = () => {
   const navigation = useNavigation(); // Obtén el objeto de navegación
@@ -46,7 +63,7 @@ const LeaderboardScreen = () => {
     <View style={styles.itemContainer}>
       <View style={styles.rankContainer}>
         <Text style={styles.rankText}>{index + 1}.</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             if (user && item.id === user.id) {
               navigation.navigate('Profile');
@@ -102,37 +119,48 @@ const LeaderboardScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5', // Mismo color de fondo que en FriendProfileScreen
+    backgroundColor: colors.background,
+    paddingHorizontal: width < 400 ? 6 : 16,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 10,
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   backButtonText: {
-    marginLeft: 8,
     fontSize: 16,
-    color: '#005F9E', // Consistente con el color de la app
+    marginLeft: 5,
+    color: colors.primary,
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: width < 400 ? 22 : 28,
     fontWeight: 'bold',
-    marginBottom: 16,
+    color: colors.primary,
     textAlign: 'center',
-    color: '#005F9E', // Consistente con el color de la app
+    marginVertical: 16,
   },
   itemContainer: {
-    padding: 16,
-    marginVertical: 10,
-    borderRadius: 10,
-    backgroundColor: 'white',
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: width < 400 ? 10 : 16,
+    marginHorizontal: width < 400 ? 4 : 16,
+    marginVertical: 4,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 3,
     elevation: 3,
   },
   rankContainer: {
@@ -141,23 +169,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   rankText: {
-    fontSize: 24,
+    fontSize: width < 400 ? 18 : 24,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: colors.primary,
     marginRight: 8,
   },
   usernameContainer: {
     flex: 1,
   },
   usernameText: {
-    fontSize: 20,
+    fontSize: width < 400 ? 16 : 20,
     fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
+    color: colors.text.primary,
   },
   pointsText: {
-    fontSize: 18,
-    color: '#666',
+    fontSize: width < 400 ? 14 : 18,
+    color: colors.text.secondary,
     marginBottom: 4,
   },
   firstPlaceText: {
@@ -178,10 +205,10 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: colors.primary,
   },
   errorText: {
-    color: '#D32F2F',
+    color: colors.error,
     textAlign: 'center',
     marginTop: 20,
   },

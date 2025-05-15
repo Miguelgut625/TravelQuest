@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert
+  Alert,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,6 +18,24 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { getRecentConversations } from '../../services/messageService';
 import { supabase } from '../../services/supabase';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const { width, height } = Dimensions.get('window');
+
+const colors = {
+  primary: '#005F9E',
+  secondary: '#7F5AF0',
+  background: '#F5F5F5',
+  white: '#FFFFFF',
+  text: {
+    primary: '#333333',
+    secondary: '#666666',
+    light: '#999999',
+  },
+  border: '#EEEEEE',
+  success: '#4CAF50',
+  error: '#D32F2F',
+};
 
 interface Conversation {
   conversation_user_id: string;
@@ -112,23 +132,22 @@ const ConversationsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size={40} color="#F5D90A" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size={40} color={colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   const renderConversationItem = ({ item }: { item: Conversation }) => {
-    // Formatear la fecha para mostrar
     const messageDate = new Date(item.created_at);
     const now = new Date();
 
-    // Si es hoy, mostrar la hora
     const formattedDate = messageDate.toDateString() === now.toDateString()
       ? messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : messageDate.toLocaleDateString();
 
-    // Avatar placeholder seguro cuando no hay username
     const avatarLetter = item.username && item.username.length > 0
       ? item.username.charAt(0).toUpperCase()
       : '?';
@@ -144,7 +163,7 @@ const ConversationsScreen = () => {
           </Text>
         </View>
 
-        <View style={styles.messageInfo}>
+        <View style={styles.conversationInfo}>
           <View style={styles.headerRow}>
             <Text style={styles.username}>{item.username}</Text>
             <Text style={styles.timestamp}>{formattedDate}</Text>
@@ -154,7 +173,7 @@ const ConversationsScreen = () => {
             <Text
               style={[
                 styles.lastMessage,
-                item.unread_count > 0 ? styles.unreadMessage : null
+                item.unread_count > 0 && styles.unreadMessage
               ]}
               numberOfLines={1}
               ellipsizeMode="tail"
@@ -176,31 +195,31 @@ const ConversationsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.headerRowCustom}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.navigate('Profile')}
         >
-          <Ionicons name="arrow-back" size={28} color="#7F5AF0" />
+          <Ionicons name="arrow-back" size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Mensajes</Text>
         <TouchableOpacity
           style={styles.groupsButton}
           onPress={() => navigation.navigate('Groups')}
         >
-          <Ionicons name="people" size={28} color="#7F5AF0" />
+          <Ionicons name="people" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubble-outline" size={60} color="#7F5AF0" />
+          <Ionicons name="chatbubble-outline" size={60} color={colors.secondary} />
           <Text style={styles.emptyText}>
-            No tienes conversaciones aún.
+            No tienes conversaciones aún
           </Text>
           <Text style={styles.emptySubtext}>
-            Ve a la pantalla de amigos para iniciar un chat.
+            Ve a la pantalla de amigos para iniciar un chat
           </Text>
         </View>
       ) : (
@@ -212,116 +231,146 @@ const ConversationsScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#F5D90A']}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
             />
           }
-          contentContainerStyle={{ paddingVertical: 10 }}
+          contentContainerStyle={styles.listContainer}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181A20',
-    paddingTop: 56,
+    backgroundColor: colors.background,
   },
   headerRowCustom: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    marginHorizontal: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    height: Platform.OS === 'ios' ? 44 : 56,
+    paddingTop: Platform.OS === 'ios' ? 0 : 8,
   },
   backButton: {
-    marginRight: 10,
-    padding: 4,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+    position: 'absolute',
+    left: 16,
+    zIndex: 1,
+  },
+  groupsButton: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+    position: 'absolute',
+    right: 16,
+    zIndex: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#F5D90A',
-    letterSpacing: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#A0A0A0',
-    marginTop: 20,
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#A0A0A0',
+    color: colors.primary,
     textAlign: 'center',
-    marginTop: 10,
+    flex: 1,
+  },
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   conversationItem: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: width < 400 ? 10 : 16,
+    marginHorizontal: width < 400 ? 4 : 8,
+    marginVertical: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
     flexDirection: 'row',
-    padding: 15,
-    backgroundColor: '#2D2F3A',
-    borderBottomWidth: 1,
-    borderBottomColor: '#181A20',
     alignItems: 'center',
   },
   avatar: {
-    width: 50,
-    height: 50,
+    width: width < 400 ? 40 : 50,
+    height: width < 400 ? 40 : 50,
     borderRadius: 25,
-    backgroundColor: '#7F5AF0',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 12,
   },
   avatarText: {
-    color: '#FFFFFF',
-    fontSize: 20,
+    color: colors.white,
+    fontSize: width < 400 ? 16 : 20,
     fontWeight: 'bold',
   },
-  messageInfo: {
+  conversationInfo: {
     flex: 1,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   username: {
-    fontWeight: '600',
-    fontSize: 16,
-    color: '#F5D90A',
+    fontSize: width < 400 ? 14 : 16,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+  lastMessage: {
+    fontSize: width < 400 ? 12 : 14,
+    color: colors.text.secondary,
+    flex: 1,
+    marginRight: 8,
   },
   timestamp: {
-    color: '#A0A0A0',
     fontSize: 12,
+    color: colors.text.light,
   },
   messageRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  lastMessage: {
-    color: '#A0A0A0',
-    fontSize: 14,
-    flex: 1,
-  },
   unreadMessage: {
-    color: '#F5D90A',
+    color: colors.primary,
     fontWeight: '500',
   },
   badgeContainer: {
-    backgroundColor: '#7F5AF0',
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -331,14 +380,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: 'bold',
   },
-  groupsButton: {
-    position: 'absolute',
-    right: 10,
-    padding: 4,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: colors.background,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: colors.text.light,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

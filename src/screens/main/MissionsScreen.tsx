@@ -890,7 +890,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181A20',
+    backgroundColor: '#F5F5F5',
     paddingHorizontal: 6,
   },
   header: {
@@ -904,7 +904,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     marginRight: 10,
-    backgroundColor: '#232634',
+    backgroundColor: '#FFF',
     borderRadius: 8,
     minWidth: 100,
     justifyContent: 'center'
@@ -912,14 +912,14 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     marginLeft: 5,
-    color: '#F5D90A',
+    color: '#005F9E',
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   cityTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#F5D90A',
+    color: '#005F9E',
     marginBottom: 20,
     letterSpacing: 1,
   },
@@ -927,20 +927,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#181A20',
+    backgroundColor: '#F5F5F5',
   },
   loadingText: {
     marginTop: 10,
-    color: '#FFF',
+    color: '#333',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#181A20',
+    backgroundColor: '#F5F5F5',
   },
   errorText: {
-    color: '#F5D90A',
+    color: '#D32F2F',
     textAlign: 'center',
     padding: 20,
     fontWeight: 'bold',
@@ -948,20 +948,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#F5D90A',
+    color: '#005F9E',
     letterSpacing: 1,
     marginTop: 30,
   },
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2CB67D',
+    color: '#005F9E',
   },
   citiesList: {
     flex: 1,
   },
   cityCard: {
-    backgroundColor: '#232634',
+    backgroundColor: '#FFF',
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
@@ -983,23 +983,23 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#005F9E',
     marginBottom: 5,
     letterSpacing: 1,
   },
   missionCount: {
     fontSize: 14,
-    color: '#A1A1AA',
+    color: '#666',
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#393552',
+    backgroundColor: '#EEEEEE',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#7F5AF0',
+    backgroundColor: '#005F9E',
   },
   missionsList: {
     flex: 1,
@@ -1019,17 +1019,17 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#393552',
+    backgroundColor: '#EEEEEE',
   },
   completedText: {
-    color: '#2CB67D',
+    color: '#4CAF50',
     fontWeight: 'bold',
     marginHorizontal: 10,
     fontSize: 16,
     letterSpacing: 1,
   },
   card: {
-    backgroundColor: '#232634',
+    backgroundColor: '#FFF',
     borderRadius: 10,
     padding: 15,
     marginBottom: 10,
@@ -1052,7 +1052,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     flex: 1,
-    color: '#F5D90A',
+    color: '#005F9E',
     letterSpacing: 1,
   },
   badge: {
@@ -1070,7 +1070,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   cardDescription: {
-    color: '#FFF',
+    color: '#333',
     marginBottom: 10,
   },
   cardFooter: {
@@ -1079,11 +1079,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   difficulty: {
-    color: '#A1A1AA',
+    color: '#666',
     fontSize: 12,
   },
   points: {
-    color: '#2CB67D',
+    color: '#7F5AF0',
     fontWeight: 'bold',
   },
   retryButton: {
@@ -1098,16 +1098,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   expiredCard: {
-    borderColor: '#f44336',
+    borderColor: '#D32F2F',
     borderWidth: 1,
   },
   timeRemaining: {
     fontSize: 12,
-    color: '#A1A1AA',
+    color: '#666',
     marginTop: 4,
   },
   expiredTime: {
-    color: '#f44336',
+    color: '#D32F2F',
   },
   generatingLoaderOverlay: {
     position: 'absolute',
@@ -1121,7 +1121,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   generatingLoaderContainer: {
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    backgroundColor: 'rgba(127, 90, 240, 0.95)',
     padding: 20,
     borderRadius: 10,
     width: '80%',
@@ -1159,7 +1159,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '80%',
-    backgroundColor: '#232634',
+    backgroundColor: 'white',
     borderRadius: 10,
     padding: 20,
     maxHeight: '80%'
@@ -1168,20 +1168,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#F5D90A',
+    color: '#005F9E',
   },
   friendItem: {
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#393552'
+    borderBottomColor: '#ccc'
   },
   friendName: {
     fontSize: 16,
-    color: '#FFF',
+    color: '#005F9E',
   },
   friendPoints: {
     fontSize: 14,
-    color: '#2CB67D',
+    color: '#005F9E',
   },
   cancelButton: {
     marginTop: 10,
@@ -1196,14 +1196,14 @@ const styles = StyleSheet.create({
   },
   levelUpContainer: {
     marginTop: 15,
-    backgroundColor: '#F5D90A',
+    backgroundColor: '#7F5AF0',
     padding: 10,
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
   },
   levelUpText: {
-    color: '#7F5AF0',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
   },

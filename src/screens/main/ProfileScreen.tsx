@@ -612,23 +612,34 @@ const ProfileScreen = () => {
         {/* Social */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Social</Text>
-          <View style={styles.socialContainer}>
+          <View style={styles.privacyContainer}>
             <TouchableOpacity
               style={styles.socialButton}
               onPress={() => navigation.navigate('Friends')}
             >
-              <Ionicons name="people" size={24} color="white" />
-              <Text style={styles.socialButtonText}>Amigos</Text>
+              <View style={styles.socialButtonContent}>
+                <Ionicons name="people" size={24} color="white" />
+                <Text style={styles.socialButtonText}>Amigos</Text>
+                <Ionicons name="chevron-forward" size={20} color="white" />
+              </View>
             </TouchableOpacity>
-            <Text style={styles.socialDescription}>Conéctate con tus amigos</Text>
+            <Text style={[styles.privacyDescription, styles.socialDescription]}>
+              Conéctate con tus amigos
+            </Text>
+
             <TouchableOpacity
-              style={styles.socialButton}
+              style={[styles.socialButton, styles.secondSocialButton]}
               onPress={() => navigation.navigate('Leaderboard')}
             >
-              <Ionicons name="trophy" size={24} color="white" />
-              <Text style={styles.socialButtonText}>Leaderboard</Text>
+              <View style={styles.socialButtonContent}>
+                <Ionicons name="trophy" size={24} color="white" />
+                <Text style={styles.socialButtonText}>Leaderboard</Text>
+                <Ionicons name="chevron-forward" size={20} color="white" />
+              </View>
             </TouchableOpacity>
-            <Text style={styles.socialDescription}>Mira el ranking de puntos</Text>
+            <Text style={[styles.privacyDescription, styles.socialDescription]}>
+              Mira el ranking de puntos
+            </Text>
           </View>
         </View>
 
@@ -943,109 +954,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: '#333',
   },
-  socialContainer: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  socialButton: {
-    backgroundColor: '#005F9E',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginBottom: 10,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  socialButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  socialDescription: {
-    fontSize: 12,
-    color: 'black',
-    textAlign: 'center',
-  },
-  logoutButton: {
-    margin: 20,
-    backgroundColor: '#f44336',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  logoutButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#f44336',
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-  },
-  modalButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  messageText: {
-    textAlign: 'center',
-    marginBottom: 15,
-    padding: 10,
-    borderRadius: 5,
-  },
-  errorMessage: {
-    backgroundColor: '#ffebee',
-    color: '#c62828',
-  },
-  successMessage: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
   privacyContainer: {
     backgroundColor: 'white',
     borderRadius: 10,
@@ -1154,6 +1062,115 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#7F5AF0',
     marginBottom: 2,
+  },
+  socialButton: {
+    backgroundColor: '#005F9E',
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 4,
+  },
+  secondSocialButton: {
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  socialButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  socialButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    flex: 1,
+    marginLeft: 10,
+  },
+  socialDescription: {
+    marginTop: 4,
+    marginBottom: 0,
+    fontSize: 13,
+    color: '#666',
+  },
+  logoutButton: {
+    margin: 20,
+    backgroundColor: '#f44336',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#f44336',
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  messageText: {
+    textAlign: 'center',
+    marginBottom: 15,
+    padding: 10,
+    borderRadius: 5,
+  },
+  errorMessage: {
+    backgroundColor: '#ffebee',
+    color: '#c62828',
+  },
+  successMessage: {
+    backgroundColor: '#e8f5e9',
+    color: '#2e7d32',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
 });
 

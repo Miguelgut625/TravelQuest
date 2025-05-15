@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerBackground: {
-        backgroundColor: '#64B5F6',
+        backgroundColor: '#005F9E',
         padding: 20,
     },
     header: {

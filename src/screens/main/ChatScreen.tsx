@@ -13,9 +13,9 @@ import {
   Alert,
   Image,
   Modal,
-  SafeAreaView,
   ScrollView,
-  StatusBar
+  StatusBar,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
@@ -50,6 +50,25 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '../../services/cloudinaryService';
 import NotificationService from '../../services/NotificationService';
 import { getUserInfoById as getUserInfo } from '../../services/userService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const colors = {
+  primary: '#005F9E',
+  secondary: '#7F5AF0',
+  background: '#F5F5F5',
+  white: '#FFFFFF',
+  text: {
+    primary: '#333333',
+    secondary: '#666666',
+    light: '#999999',
+  },
+  border: '#EEEEEE',
+  success: '#4CAF50',
+  error: '#D32F2F',
+  message: {
+    background: '#F0F2F5',
+  }
+};
 
 const ChatScreen = () => {
   const route = useRoute();
@@ -69,6 +88,13 @@ const ChatScreen = () => {
   const subscriptionRef = React.useRef(null);
   const initialLoadRef = React.useRef(true);
   const messageCountRef = React.useRef(0);
+
+  // Añadir configuración del StatusBar
+  useEffect(() => {
+    StatusBar.setBarStyle('light-content');
+    StatusBar.setBackgroundColor('transparent');
+    StatusBar.setTranslucent(true);
+  }, []);
 
   // Manejador para nuevos mensajes recibidos
   const handleNewMessage = React.useCallback((newMessage: Message) => {
@@ -369,10 +395,14 @@ const ChatScreen = () => {
         item.content.includes('.gif') ||
         item.content.includes('cloudinary.com'));
 
+    const messageStyle = isMyMessage ? styles.myMessage : styles.friendMessage;
+    const textColor = isMyMessage ? colors.white : colors.text.primary;
+    const timeColor = isMyMessage ? colors.white : colors.text.light;
+
     return (
       <View style={[
         styles.messageContainer,
-        isMyMessage ? styles.myMessage : styles.friendMessage,
+        messageStyle,
       ]}>
         {isImageMessage ? (
           <TouchableOpacity onPress={() => viewFullImage(item.content)}>
@@ -383,9 +413,11 @@ const ChatScreen = () => {
             />
           </TouchableOpacity>
         ) : (
-          <Text style={styles.messageText}>{item.content}</Text>
+          <Text style={[styles.messageText, { color: textColor }]}>
+            {item.content}
+          </Text>
         )}
-        <Text style={styles.messageTime}>
+        <Text style={[styles.messageTime, { color: timeColor }]}>
           {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
       </View>
@@ -393,213 +425,282 @@ const ChatScreen = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <View style={styles.headerContainer}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={28} color="#7F5AF0" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{friendName || 'Usuario'}</Text>
-        <TouchableOpacity
-          style={styles.groupsButton}
-          onPress={() => navigation.navigate('Groups')}
-        >
-          <Ionicons name="people" size={28} color="#7F5AF0" />
-        </TouchableOpacity>
-      </View>
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessageItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messagesContainer}
-        onRefresh={loadMessages}
-        refreshing={refreshing}
-      />
-
-      <View style={styles.inputContainer}>
-        <TouchableOpacity
-          style={styles.attachButton}
-          onPress={pickImage}
-        >
-          {/* @ts-ignore */}
-          <Ionicons name="image-outline" size={24} color="#005F9E" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.attachButton}
-          onPress={takePhoto}
-        >
-          {/* @ts-ignore */}
-          <Ionicons name="camera-outline" size={24} color="#005F9E" />
-        </TouchableOpacity>
-
-        <TextInput
-          style={styles.input}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Escribe un mensaje..."
-          multiline
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!inputText.trim() || sending) ? styles.sendButtonDisabled : null
-          ]}
-          onPress={handleSendMessage}
-          disabled={!inputText.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            // @ts-ignore
-            <Ionicons name="send" size={24} color="white" />
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Modal de vista previa de imagen */}
-      <Modal
-        visible={imagePreviewVisible}
-        transparent={true}
-        animationType="slide"
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.imagePreviewContainer}>
-            <Text style={styles.previewTitle}>Vista Previa</Text>
-            {selectedImage && (
-              <Image
-                source={{ uri: selectedImage }}
-                style={styles.previewImage}
-                resizeMode="contain"
-              />
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{friendName || 'Chat'}</Text>
+          <TouchableOpacity
+            style={styles.groupsButton}
+            onPress={() => navigation.navigate('Groups')}
+          >
+            <Ionicons name="people" size={22} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessageItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.messagesContainer}
+          onRefresh={loadMessages}
+          refreshing={refreshing}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={loadMessages}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+        />
+
+        <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={pickImage}
+          >
+            <Ionicons name="image-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={takePhoto}
+          >
+            <Ionicons name="camera-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+
+          <TextInput
+            style={styles.input}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Escribe un mensaje..."
+            placeholderTextColor={colors.text.light}
+            multiline
+          />
+
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!inputText.trim() || sending) && styles.sendButtonDisabled
+            ]}
+            onPress={handleSendMessage}
+            disabled={!inputText.trim() || sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Ionicons name="send" size={22} color={colors.white} />
             )}
-            <View style={styles.previewButtons}>
-              <TouchableOpacity
-                style={[styles.previewButton, styles.cancelButton]}
-                onPress={() => {
-                  setImagePreviewVisible(false);
-                  setSelectedImage(null);
-                }}
-              >
-                <Text style={styles.previewButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.previewButton, styles.sendButton]}
-                onPress={sendSelectedImage}
-                disabled={sending}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.previewButtonText}>Enviar</Text>
-                )}
-              </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal de vista previa de imagen */}
+        <Modal
+          visible={imagePreviewVisible}
+          transparent={true}
+          animationType="fade"
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.imagePreviewContainer}>
+              <Text style={styles.previewTitle}>Vista Previa</Text>
+              {selectedImage && (
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                />
+              )}
+              <View style={styles.previewButtons}>
+                <TouchableOpacity
+                  style={[styles.previewButton, styles.cancelButton]}
+                  onPress={() => {
+                    setImagePreviewVisible(false);
+                    setSelectedImage(null);
+                  }}
+                >
+                  <Text style={styles.previewButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.previewButton, { backgroundColor: colors.primary }]}
+                  onPress={sendSelectedImage}
+                  disabled={sending}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.previewButtonText}>Enviar</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Modal para ver imagen completa */}
-      <Modal
-        visible={fullImageViewVisible}
-        transparent={true}
-        animationType="fade"
-      >
-        <View style={styles.fullImageContainer}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setFullImageViewVisible(false)}
-          >
-            {/* @ts-ignore */}
-            <Ionicons name="close" size={30} color="white" />
-          </TouchableOpacity>
-          <Image
-            source={{ uri: currentFullImage }}
-            style={styles.fullImage}
-            resizeMode="contain"
-          />
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+        {/* Modal para ver imagen completa */}
+        <Modal
+          visible={fullImageViewVisible}
+          transparent={true}
+          animationType="fade"
+        >
+          <View style={styles.fullImageContainer}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setFullImageViewVisible(false)}
+            >
+              <Ionicons name="close" size={24} color={colors.primary} />
+            </TouchableOpacity>
+            <Image
+              source={{ uri: currentFullImage }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#181A20',
-    paddingTop: 24, // <-- margen superior general
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#181A20',
+    backgroundColor: colors.background,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    height: Platform.OS === 'ios' ? 44 : 56,
+    paddingTop: Platform.OS === 'ios' ? 0 : 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  backButton: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+    position: 'absolute',
+    left: 16,
+    zIndex: 1,
+  },
+  groupsButton: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+    position: 'absolute',
+    right: 16,
+    zIndex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.primary,
+    textAlign: 'center',
+    flex: 1,
   },
   messagesContainer: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    paddingTop: 32, // <-- margen superior solo para los mensajes
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   messageContainer: {
     maxWidth: '80%',
-    padding: 10,
-    marginVertical: 5,
-    borderRadius: 10,
+    padding: 12,
+    marginVertical: 4,
+    borderRadius: 16,
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#7F5AF0', // Violeta misterioso
+    backgroundColor: colors.primary,
   },
   friendMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#232634', // Fondo misterioso
+    backgroundColor: colors.message.background,
+    borderWidth: 0,
   },
   messageText: {
     fontSize: 16,
-    color: '#FFF',
+    color: props => props.style.backgroundColor === colors.primary ? colors.white : colors.text.primary,
   },
   messageImage: {
     width: 200,
     height: 200,
-    borderRadius: 5,
-    marginBottom: 5,
+    borderRadius: 12,
+    marginBottom: 4,
   },
   messageTime: {
     fontSize: 12,
-    color: '#A1A1AA',
-    marginTop: 5,
+    color: props => props.style.backgroundColor === colors.primary ? colors.white : colors.text.light,
+    marginTop: 4,
     textAlign: 'right',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#232634', // Fondo misterioso
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   attachButton: {
     padding: 8,
-    marginRight: 5,
+    marginRight: 8,
   },
   input: {
     flex: 1,
     padding: 10,
-    backgroundColor: '#393552', // Input misterioso
+    backgroundColor: colors.background,
     borderRadius: 20,
     maxHeight: 100,
-    color: '#FFF',
+    color: colors.text.primary,
+    marginRight: 8,
   },
   sendButton: {
-    marginLeft: 10,
-    backgroundColor: '#2CB67D', // Verde neón misterioso
+    backgroundColor: colors.primary,
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -607,32 +708,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#393552',
+    backgroundColor: colors.text.light,
   },
-  // Estilos para vista previa de imagen
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(24,26,32,0.95)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   imagePreviewContainer: {
     width: '90%',
-    backgroundColor: '#232634',
-    borderRadius: 10,
+    backgroundColor: colors.white,
+    borderRadius: 16,
     padding: 20,
     alignItems: 'center',
   },
   previewTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#F5D90A',
+    color: colors.primary,
     marginBottom: 15,
   },
   previewImage: {
     width: '100%',
     height: 300,
-    borderRadius: 5,
+    borderRadius: 12,
   },
   previewButtons: {
     flexDirection: 'row',
@@ -643,18 +743,17 @@ const styles = StyleSheet.create({
   previewButton: {
     flex: 1,
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
     marginHorizontal: 5,
   },
   previewButtonText: {
-    color: '#FFF',
+    color: colors.white,
     fontWeight: 'bold',
   },
   cancelButton: {
-    backgroundColor: '#7F5AF0',
+    backgroundColor: colors.error,
   },
-  // Estilos para imagen a pantalla completa
   fullImageContainer: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.9)',
@@ -670,32 +769,12 @@ const styles = StyleSheet.create({
     top: 40,
     right: 20,
     zIndex: 10,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#2D2F3A', // Gris oscuro
-    borderBottomWidth: 1,
-    borderBottomColor: '#181A20', // Fondo oscuro
-  },
-  backButton: {
-    position: 'absolute',
-    left: 10,
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#F5D90A', // Amarillo misterioso
-    letterSpacing: 1,
-  },
-  groupsButton: {
-    position: 'absolute',
-    right: 10,
-    padding: 4,
+    alignItems: 'center',
   },
 });
 

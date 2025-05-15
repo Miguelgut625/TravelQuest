@@ -179,30 +179,29 @@ const TabNavigator = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: any = 'help-circle';
+          let iconName: any;
 
           if (route.name === 'Map') {
-            iconName = focused ? 'map' : 'map-outline';
+            iconName = focused ? 'compass' : 'compass-outline';
           } else if (route.name === 'Missions') {
-            iconName = focused ? 'list' : 'list-outline';
+            iconName = focused ? 'flag' : 'flag-outline';
           } else if (route.name === 'Journal') {
-            iconName = focused ? 'book' : 'book-outline';
+            iconName = focused ? 'reader' : 'reader-outline';
+          } else if (route.name === 'Conversations') {
+            iconName = focused ? 'chatbox' : 'chatbox-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'Conversations') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           }
 
-          // @ts-ignore
-          return <Ionicons name={iconName} size={size || 24} color={color} />;
+          return <Ionicons name={iconName} size={26} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: 'gray',
+        tabBarInactiveTintColor: '#999999',
         headerShown: false,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 80 : 56,
-          paddingBottom: Platform.OS === 'ios' ? 25 : 7,
-          paddingTop: 7,
+          height: Platform.OS === 'ios' ? 90 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+          paddingTop: 12,
           backgroundColor: 'white',
           borderTopWidth: 1,
           borderTopColor: '#e5e5e5',
@@ -212,20 +211,25 @@ const TabNavigator = () => {
           shadowOpacity: 0.1,
           shadowRadius: 3,
         },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+          marginTop: 4,
+        },
       })}
     >
       <Tab.Screen
         name="Map"
         component={MapScreen}
         options={{
-          title: 'Mapa'
+          title: 'Mapa',
         }}
       />
       <Tab.Screen
         name="Missions"
         component={MissionsScreen}
         options={{
-          title: 'Misiones'
+          title: 'Misiones',
         }}
       />
       <Tab.Screen
@@ -233,21 +237,21 @@ const TabNavigator = () => {
         component={JournalScreen}
         initialParams={{ refresh: false }}
         options={{
-          title: 'Diario'
+          title: 'Diario',
         }}
       />
       <Tab.Screen
         name="Conversations"
         component={ConversationsScreen}
         options={{
-          title: 'Mensajes'
+          title: 'Mensajes',
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: 'Perfil'
+          title: 'Perfil',
         }}
       />
     </Tab.Navigator>
