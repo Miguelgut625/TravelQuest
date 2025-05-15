@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerBackground: {
-        backgroundColor: '#005F9E',
+        backgroundColor: '#64B5F6',
         padding: 20,
     },
     header: {
@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
         height: 100,
         borderRadius: 50,
         marginBottom: 10,
-        backgroundColor: '#005F9E',
+        backgroundColor: '#90CAF9',
         justifyContent: 'center',
         alignItems: 'center',
     },

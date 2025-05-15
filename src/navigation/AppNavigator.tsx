@@ -27,6 +27,7 @@ import ChatScreen from '../screens/main/ChatScreen';
 import ConversationsScreen from '../screens/main/ConversationsScreen';
 import { linking } from './linking';
 import FriendProfileScreen from '../screens/main/FriendProfileScreen';
+import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
 
 // Define los parámetros para las pestañas principales
 export type TabParamList = {
@@ -59,6 +60,9 @@ type RootStackParamList = {
     friendId: string;
     friendName: string;
     rankIndex?: number;
+  };
+  JournalEntryDetail: {
+    entry: any;
   };
 };
 
@@ -132,6 +136,11 @@ const MainFlow = () => {
         component={FriendProfileScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="JournalEntryDetail"
+        component={JournalEntryDetailScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };
@@ -155,8 +164,8 @@ const TabNavigator = () => {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'Leaderboard') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
+          } else if (route.name === 'Conversations') {
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           }
 
           // @ts-ignore
@@ -181,6 +190,11 @@ const TabNavigator = () => {
       <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Missions" component={MissionsScreen} />
       <Tab.Screen name="Journal" component={JournalScreen} />
+      <Tab.Screen 
+        name="Conversations" 
+        component={ConversationsScreen} 
+        options={{ tabBarLabel: 'Chat' }}
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
