@@ -282,4 +282,45 @@ export const getWeatherByCity = async (cityName: string, apiKey: string) => {
     console.error('Error obteniendo datos del clima por ciudad:', error);
     throw error;
   }
+};
+
+export const getCityIdByName = async (cityName: string): Promise<string> => {
+  try {
+    // Primero intentamos encontrar la ciudad exacta
+    const { data, error } = await supabase
+      .from('cities')
+      .select('id')
+      .ilike('name', cityName)
+      .single();
+
+    if (!error && data) {
+      return data.id;
+    }
+
+    // Si no encontramos la ciudad, intentamos una búsqueda más flexible
+    const { data: fuzzyData, error: fuzzyError } = await supabase
+      .from('cities')
+      .select('id')
+      .ilike('name', `%${cityName}%`)
+      .single();
+
+    if (!fuzzyError && fuzzyData) {
+      return fuzzyData.id;
+    }
+
+    // Si aún no encontramos la ciudad, la creamos
+    const { data: newCity, error: insertError } = await supabase
+      .from('cities')
+      .insert([{ name: cityName }])
+      .select('id')
+      .single();
+
+    if (insertError) throw insertError;
+    if (!newCity) throw new Error('No se pudo crear la ciudad');
+
+    return newCity.id;
+  } catch (error) {
+    console.error('Error en getCityIdByName:', error);
+    throw error;
+  }
 }; 

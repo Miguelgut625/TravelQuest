@@ -76,6 +76,7 @@ const ProfileScreen = () => {
   const [badges, setBadges] = useState<any[]>([]);
   const [selectedTitle, setSelectedTitle] = useState<string>('');
   const [savingTitle, setSavingTitle] = useState(false);
+  const [realPoints, setRealPoints] = useState(0);
 
   // Manejador global de errores no capturados para este componente
   useEffect(() => {
@@ -156,6 +157,8 @@ const ProfileScreen = () => {
           }
         });
       });
+
+      setRealPoints(userPointsData?.points || 0);
 
       setStats({
         totalPoints: userPointsData?.points || 0,
@@ -591,7 +594,7 @@ const ProfileScreen = () => {
           ) : (
             <>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.totalPoints}</Text>
+                <Text style={styles.statValue}>{realPoints}</Text>
                 <Text style={styles.statLabel}>Puntos</Text>
               </View>
               <View style={styles.statItem}>

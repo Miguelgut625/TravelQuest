@@ -24,14 +24,14 @@ export interface CityJournalEntry extends JournalEntryDB {
  * Verifica si existe la tabla journal_entries o journey_diary en la base de datos
  * @returns objeto con la información de qué tablas existen
  */
-export const checkJournalTables = async (): Promise<{journalEntriesExists: boolean, journeyDiaryExists: boolean}> => {
+export const checkJournalTables = async (): Promise<{ journalEntriesExists: boolean, journeyDiaryExists: boolean }> => {
   try {
     // Probamos si las tablas existen obteniendo solo una fila de cada una
     const [journalEntriesResult, journeyDiaryResult] = await Promise.allSettled([
       supabase.from('journal_entries').select('id').limit(1),
       supabase.from('journey_diary').select('id').limit(1)
     ]);
-    
+
     return {
       journalEntriesExists: journalEntriesResult.status === 'fulfilled' && !journalEntriesResult.value.error,
       journeyDiaryExists: journeyDiaryResult.status === 'fulfilled' && !journeyDiaryResult.value.error
@@ -54,7 +54,7 @@ export const getUserJournalEntries = async (userId: string): Promise<{ [cityName
   try {
     // Verificar qué tablas existen
     const { journalEntriesExists, journeyDiaryExists } = await checkJournalTables();
-    
+
     if (!journalEntriesExists && !journeyDiaryExists) {
       console.warn('No se encontraron tablas para el diario (journal_entries o journey_diary)');
       return {}; // Devolvemos un objeto vacío
@@ -81,12 +81,12 @@ export const getUserJournalEntries = async (userId: string): Promise<{ [cityName
         if (!entriesError) {
           entriesData = data;
         } else if (entriesError.message && (
-          entriesError.message.includes('cityid') || 
-          entriesError.message.includes('cityId') || 
+          entriesError.message.includes('cityid') ||
+          entriesError.message.includes('cityId') ||
           entriesError.message.includes('relationship') ||
           entriesError.code === 'PGRST200' ||
           entriesError.code === '42703')) {
-          
+
           // Si hay error de relación, intentamos sin la relación y con nombres alternativos
           try {
             const { data: basicData, error: basicError } = await supabase
@@ -94,7 +94,7 @@ export const getUserJournalEntries = async (userId: string): Promise<{ [cityName
               .select('*')
               .eq('userid', userId)
               .order('created_at', { ascending: false });
-            
+
             if (!basicError) {
               entriesData = basicData;
             } else {
@@ -104,7 +104,7 @@ export const getUserJournalEntries = async (userId: string): Promise<{ [cityName
                 .select('*')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
-              
+
               if (!altError) {
                 entriesData = altData;
               } else {
@@ -132,7 +132,7 @@ export const getUserJournalEntries = async (userId: string): Promise<{ [cityName
           // Versión 2: Underscore
           supabase.from('journey_diary').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         ];
-        
+
         for (const query of possibleQueries) {
           try {
             const { data: diaryData, error: diaryError } = await query;
@@ -159,7 +159,7 @@ export const getUserJournalEntries = async (userId: string): Promise<{ [cityName
     if (!entriesData) {
       return {};
     }
-    
+
     // Organizar las entradas por ciudad
     return organizeCityEntries(entriesData, true);
   } catch (error) {
@@ -175,20 +175,20 @@ export const getUserJournalEntries = async (userId: string): Promise<{ [cityName
  * @returns Entradas organizadas por ciudad
  */
 const organizeCityEntries = (
-  data: any[] | null, 
+  data: any[] | null,
   missingCityRelation: boolean = false
 ): { [cityName: string]: CityJournalEntry[] } => {
   const entriesByCity: { [cityName: string]: CityJournalEntry[] } = {};
-  
+
   if (!data || data.length === 0) {
     return entriesByCity;
   }
-  
+
   data.forEach((entry: any) => {
     // Intentar todas las posibles formas del nombre de la ciudad
     // Nota: Se usa el nombre de ciudad corregido siempre que esté disponible
     let cityName = 'Ciudad Desconocida';
-    
+
     // Orden de prioridad para obtener el nombre de la ciudad
     if (!missingCityRelation && entry.cities?.name) {
       cityName = entry.cities.name;
@@ -209,16 +209,16 @@ const organizeCityEntries = (
       if (entry.tags && Array.isArray(entry.tags)) {
         // Filtrar tags comunes que no son ciudades
         const commonTags = ['misión', 'mission', 'viaje', 'travel', 'foto', 'photo'];
-        const possibleCityTag = entry.tags.find((tag: string) => 
-          !commonTags.includes(tag.toLowerCase()) && 
+        const possibleCityTag = entry.tags.find((tag: string) =>
+          !commonTags.includes(tag.toLowerCase()) &&
           tag.charAt(0).toUpperCase() === tag.charAt(0) // Primera letra mayúscula
         );
-        
+
         if (possibleCityTag) {
           cityName = possibleCityTag;
         }
       }
-      
+
       // Buscar en el contenido de la entrada
       if (cityName === 'Ciudad Desconocida' && entry.content) {
         const contentMatch = entry.content.match(/(?:en|in) ([A-Za-z\s]+)\.$/);
@@ -227,11 +227,11 @@ const organizeCityEntries = (
         }
       }
     }
-    
+
     if (!entriesByCity[cityName]) {
       entriesByCity[cityName] = [];
     }
-    
+
     // Nos aseguramos de que todos los campos necesarios existan
     const processedEntry: CityJournalEntry = {
       id: entry.id || `generated-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -240,14 +240,14 @@ const organizeCityEntries = (
       missionId: entry.missionId || entry.mission_id || entry.missionid || undefined,
       title: entry.title || 'Entrada sin título',
       content: entry.content || '',
-      photos: Array.isArray(entry.photos) ? entry.photos : 
-              (entry.photos ? [entry.photos] : []),
+      photos: Array.isArray(entry.photos) ? entry.photos :
+        (entry.photos ? [entry.photos] : []),
       location: entry.location || null,
       created_at: entry.created_at || new Date().toISOString(),
       tags: Array.isArray(entry.tags) ? entry.tags : [],
       city_name: cityName
     };
-    
+
     entriesByCity[cityName].push(processedEntry);
   });
 
@@ -264,7 +264,7 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
   try {
     // Verificar qué tablas existen
     const { journalEntriesExists, journeyDiaryExists } = await checkJournalTables();
-    
+
     if (!journalEntriesExists && !journeyDiaryExists) {
       console.warn('No se encontraron tablas para el diario (journal_entries o journey_diary)');
       return []; // Devolvemos un array vacío
@@ -292,10 +292,10 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
         if (!entriesError) {
           entriesData = data;
         } else if (entriesError.message && (
-          entriesError.message.includes('cityId') || 
+          entriesError.message.includes('cityId') ||
           entriesError.message.includes('relationship') ||
           entriesError.code === 'PGRST200')) {
-          
+
           // Si hay error de relación, intentamos sin la relación
           const { data: basicData, error: basicError } = await supabase
             .from('journal_entries')
@@ -303,7 +303,7 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
             .eq('userId', userId)
             .eq('missionId', missionId)
             .order('created_at', { ascending: false });
-          
+
           if (!basicError) {
             entriesData = basicData;
           } else {
@@ -336,10 +336,10 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
         if (!diaryError) {
           entriesData = data;
         } else if (diaryError.message && (
-          diaryError.message.includes('cityId') || 
+          diaryError.message.includes('cityId') ||
           diaryError.message.includes('relationship') ||
           diaryError.code === 'PGRST200')) {
-          
+
           // Si hay error de relación, intentamos sin la relación
           const { data: basicData, error: basicError } = await supabase
             .from('journey_diary')
@@ -347,7 +347,7 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
             .eq('userId', userId)
             .eq('missionId', missionId)
             .order('created_at', { ascending: false });
-          
+
           if (!basicError) {
             entriesData = basicData;
           } else if (!error) { // Solo guardamos este error si no teníamos uno previo
@@ -370,11 +370,11 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
     if (!entriesData || entriesData.length === 0) {
       return [];
     }
-    
+
     // Procesamos las entradas para asegurar el formato correcto
     return entriesData.map((entry: any) => {
       let cityName = 'Ciudad Desconocida';
-      
+
       if (entry.cities?.name) {
         cityName = entry.cities.name;
       } else if (entry.cityName) {
@@ -382,14 +382,14 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
       } else if (entry.city_name) {
         cityName = entry.city_name;
       } else if (entry.tags && Array.isArray(entry.tags)) {
-        const cityTag = entry.tags.find((tag: string) => 
+        const cityTag = entry.tags.find((tag: string) =>
           tag !== 'misión' && tag !== 'mission' && tag !== 'viaje' && tag !== 'travel'
         );
         if (cityTag) {
           cityName = cityTag.charAt(0).toUpperCase() + cityTag.slice(1); // Capitalizar
         }
       }
-      
+
       return {
         id: entry.id || `generated-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         userId: entry.userId || '',
@@ -397,8 +397,8 @@ export const getMissionJournalEntries = async (userId: string, missionId: string
         missionId: entry.missionId || missionId,
         title: entry.title || 'Entrada sin título',
         content: entry.content || '',
-        photos: Array.isArray(entry.photos) ? entry.photos : 
-                (entry.photos ? [entry.photos] : []),
+        photos: Array.isArray(entry.photos) ? entry.photos :
+          (entry.photos ? [entry.photos] : []),
         location: entry.location || null,
         created_at: entry.created_at || new Date().toISOString(),
         tags: Array.isArray(entry.tags) ? entry.tags : [],
@@ -421,271 +421,48 @@ export const createJournalEntry = async (data: {
   tags?: string[];
 }) => {
   try {
-    console.log('Intentando crear entrada de diario con datos:', data);
-    
-    // Primero, obtener el nombre de la ciudad usando cityId
-    let cityName = null;
-    try {
-      // Consulta directa a la tabla cities
-      const { data: cityData, error: cityError } = await supabase
-        .from('cities')
-        .select('name')
-        .eq('id', data.cityId)
-        .single();
-      
-      if (!cityError && cityData && cityData.name) {
-        cityName = cityData.name;
-        console.log('Nombre de ciudad encontrado:', cityName);
-      } else {
-        console.warn('No se pudo obtener el nombre de la ciudad (1):', cityError);
-        
-        // Intento alternativo: buscar en journeys
-        const { data: journeyData, error: journeyError } = await supabase
-          .from('journeys')
-          .select(`
-            cities (
-              name
-            )
-          `)
-          .eq('cityId', data.cityId)
-          .single();
-        
-        if (!journeyError && journeyData && journeyData.cities && journeyData.cities.name) {
-          cityName = journeyData.cities.name;
-          console.log('Nombre de ciudad encontrado en journeys:', cityName);
-        } else {
-          console.warn('No se pudo obtener el nombre de la ciudad (2):', journeyError);
-        }
-      }
-    } catch (e) {
-      console.warn('Error al buscar el nombre de la ciudad:', e);
+    console.log('📝 Creando entrada de diario con datos:', data);
+
+    // Validar datos requeridos
+    if (!data.userId || !data.missionId) {
+      throw new Error('userId y missionId son requeridos');
     }
-    
-    // Si no pudimos obtener el nombre de la ciudad, vamos a intentar con datos de la misión
-    if (!cityName) {
-      try {
-        // Buscar en la tabla journeys_missions
-        const { data: missionData, error: missionError } = await supabase
-          .from('journeys_missions')
-          .select(`
-            journeyId,
-            journey:journeyId (
-              cityId,
-              cities:cityId (
-                name
-              )
-            )
-          `)
-          .eq('id', data.missionId)
-          .single();
-        
-        if (!missionError && missionData?.journey?.cities?.name) {
-          cityName = missionData.journey.cities.name;
-          console.log('Nombre de ciudad encontrado a través de la misión:', cityName);
-        } else {
-          console.warn('No se pudo obtener el nombre a través de la misión:', missionError);
-        }
-      } catch (e) {
-        console.warn('Error buscando ciudad a través de misión:', e);
-      }
-    }
-    
-    // Si todavía no tenemos nombre, usar algún valor por defecto
-    if (!cityName) {
-      // Último intento: verificar si hay texto en el contenido que indique la ciudad
-      const contentCityMatch = data.content.match(/(?:en|in) ([A-Za-z\s]+)\.$/);
-      if (contentCityMatch && contentCityMatch[1]) {
-        cityName = contentCityMatch[1].trim();
-        console.log('Nombre de ciudad extraído del contenido:', cityName);
-      } else {
-        // Si cityId parece ser un nombre de ciudad, usarlo directamente
-        if (typeof data.cityId === 'string' && data.cityId.length > 2 && !/^[0-9a-f-]+$/.test(data.cityId)) {
-          cityName = data.cityId;
-          console.log('Usando cityId como nombre:', cityName);
-        } else {
-          cityName = 'Ciudad Desconocida';
-          console.warn('Usando nombre de ciudad por defecto');
-        }
-      }
-    }
-    
-    // Añadir el nombre de la ciudad a las etiquetas
-    const updatedTags = [...(data.tags || [])];
-    if (cityName && !updatedTags.includes(cityName)) {
-      updatedTags.push(cityName);
-    }
-    
-    // NUEVO: Primero, obtener estructura de la tabla para conocer las columnas reales
-    try {
-      const { data: tableInfo, error: tableError } = await supabase
-        .from('journal_entries')
-        .select('*')
-        .limit(1);
-      
-      let columnStructure: Record<string, boolean> = {};
-      if (!tableError && tableInfo) {
-        // Si pudimos obtener datos, analizamos el primer registro para ver las columnas
-        if (tableInfo.length > 0) {
-          // Usamos un enfoque tipado más seguro
-          const firstRow = tableInfo[0];
-          if (firstRow && typeof firstRow === 'object') {
-            // Iterar sobre las propiedades del objeto de manera segura
-            Object.keys(firstRow).forEach(key => {
-              columnStructure[key] = true;
-            });
-            console.log("Estructura de columnas detectada:", Object.keys(columnStructure));
-          }
-        }
-      }
-      
-      // Preparamos una estructura básica de datos para la inserción
-      const baseData: Record<string, any> = {
-        title: data.title,
-        content: data.content,
-        photos: data.photos,
-        created_at: new Date().toISOString(),
-        tags: updatedTags
-      };
-      
-      // Añadimos los campos de IDs según las columnas detectadas
-      const insertData: Record<string, any> = { ...baseData };
-      
-      // Usuario
-      if ('user_id' in columnStructure) insertData.user_id = data.userId;
-      else if ('userid' in columnStructure) insertData.userid = data.userId;
-      else if ('userId' in columnStructure) insertData.userId = data.userId;
-      else insertData.userid = data.userId; // Por defecto
-      
-      // Ciudad
-      if ('city_id' in columnStructure) insertData.city_id = data.cityId;
-      else if ('cityid' in columnStructure) insertData.cityid = data.cityId;
-      else if ('cityId' in columnStructure) insertData.cityId = data.cityId;
-      
-      // Nombre de ciudad (si existe columna)
-      if ('city_name' in columnStructure) insertData.city_name = cityName;
-      else if ('cityname' in columnStructure) insertData.cityname = cityName;
-      else if ('cityName' in columnStructure) insertData.cityName = cityName;
-      
-      // Misión
-      if ('mission_id' in columnStructure) insertData.mission_id = data.missionId;
-      else if ('missionid' in columnStructure) insertData.missionid = data.missionId;
-      else if ('missionId' in columnStructure) insertData.missionId = data.missionId;
-      
-      console.log('Intentando insertar con datos adaptados:', insertData);
-      const { error } = await supabase.from('journal_entries').insert(insertData);
-      
-      if (!error) {
-        console.log('Entrada creada exitosamente');
-        return true;
-      }
-      
-      console.warn('Error al insertar con datos adaptados:', error);
-      
-      // Si falló, intentamos con las tres versiones anteriores
-      const insertDataOptions = [
-        // Versión 1: snake_case (formato tradicional PostgreSQL)
-        {
-      user_id: data.userId,
-      city_id: data.cityId,
-      mission_id: data.missionId,
-      title: data.title,
-      content: data.content,
-      photos: data.photos,
-          city_name: cityName,
-          created_at: new Date().toISOString(),
-          tags: updatedTags
-        },
-        // Versión 2: camelCase
-        {
-          userId: data.userId,
-          cityId: data.cityId,
-          missionId: data.missionId,
-          title: data.title,
-          content: data.content,
-          photos: data.photos,
-          cityName: cityName,
-      created_at: new Date().toISOString(),
-          tags: updatedTags
-        },
-        // Versión 3: lowercase
-        {
+
+    // Preparar datos base
+    const baseData = {
       userid: data.userId,
-      cityid: data.cityId,
       missionid: data.missionId,
-          title: data.title,
-          content: data.content,
-          photos: data.photos,
-          cityname: cityName,
-          created_at: new Date().toISOString(),
-          tags: updatedTags
-        },
-        // Versión 4: solo campos obligatorios mínimos
-        {
-          userid: data.userId,
+      cityid: data.cityId === 'unknown' ? null : data.cityId,
       title: data.title,
-      content: data.content,
-      photos: data.photos,
-      created_at: new Date().toISOString(),
-          tags: updatedTags
-        }
-      ];
-      
-      // Intentar cada formato de nombres de columnas
-      for (const insertOption of insertDataOptions) {
-        try {
-          console.log('Intentando insertar con formato alternativo:', insertOption);
-          const { error } = await supabase.from('journal_entries').insert(insertOption);
-          
-          if (!error) {
-            console.log('Entrada creada exitosamente con formato alternativo');
-            return true;
-          }
-          
-          console.warn('Error al insertar con este formato:', error);
-        } catch (e) {
-          console.warn('Excepción al insertar con este formato:', e);
-        }
-      }
-      
-      // Último intento: usar la tabla journey_diary si está disponible
-      try {
-        const { data: checkData, error: checkError } = await supabase
-          .from('journey_diary')
-          .select('id')
-          .limit(1);
-        
-        if (!checkError) {
-          // La tabla journey_diary existe, intentamos insertar ahí
-          console.log('Intentando insertar en journey_diary como alternativa');
-          const { error: diaryError } = await supabase.from('journey_diary').insert({
-            userid: data.userId,
-            title: data.title,
-            content: data.content,
-            photos: data.photos,
-            created_at: new Date().toISOString(),
-            tags: updatedTags
-          });
-          
-          if (!diaryError) {
-          console.log('Entrada creada exitosamente en journey_diary');
-          return true;
-          }
-          
-          console.warn('Error al insertar en journey_diary:', diaryError);
-        }
-      } catch (e) {
-        console.warn('Error comprobando journey_diary:', e);
-      }
-      
-      // Si llegamos aquí, ninguno de los formatos funcionó
-      console.error('No se pudo crear entrada en el diario con ningún formato');
-      return false;
-    } catch (tableErr) {
-      console.error('Error al obtener estructura de tabla:', tableErr);
-    return false;
+      content: data.content || '',
+      photos: Array.isArray(data.photos) ? data.photos : [data.photos],
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      created_at: new Date().toISOString()
+    };
+
+    console.log('🔄 Intentando insertar entrada con datos:', baseData);
+
+    // Intentar insertar la entrada
+    const { data: newEntry, error: insertError } = await supabase
+      .from('journal_entries')
+      .insert(baseData)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('❌ Error al insertar entrada:', insertError);
+      throw insertError;
     }
+
+    if (!newEntry) {
+      throw new Error('No se pudo crear la entrada del diario');
+    }
+
+    console.log('✅ Entrada creada exitosamente:', newEntry);
+    return newEntry;
+
   } catch (error) {
-    console.error('Error inesperado al crear entrada en el diario:', error);
-    return false;
+    console.error('❌ Error en createJournalEntry:', error);
+    throw error;
   }
 }; 

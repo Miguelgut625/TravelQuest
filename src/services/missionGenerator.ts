@@ -57,7 +57,7 @@ const getOrCreateUser = async (userId: string) => {
 };
 
 // Función para obtener o crear una ciudad
-const getOrCreateCity = async (cityName: string, userId?: string) => {
+export const getOrCreateCity = async (cityName: string, userId?: string) => {
   try {
     // Primero intentamos encontrar la ciudad
     const { data: existingCity, error: searchError } = await supabase

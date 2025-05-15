@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-context';
 import { getUserPoints } from '../../services/pointsService';
 import { RouteProp } from '@react-navigation/native';
+import { getOrCreateCity } from '../../services/missionGenerator';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -566,8 +567,15 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           // Si hay imagen, crear entrada de diario y proceso posterior
           if (imageUrl) {
             try {
-              // Intentar obtener el cityId con fallback
-              let cityId = foundMission?.cityId || await getCityIdByName(foundCityName);
+              // Intentar obtener el cityId
+              let cityId;
+              try {
+                cityId = foundMission?.cityId || await getOrCreateCity(foundCityName, user?.id);
+                console.log('🌍 CityId obtenido:', cityId);
+              } catch (cityError) {
+                console.error('❌ Error al obtener/crear cityId:', cityError);
+                cityId = 'unknown';
+              }
 
               // Activar indicador de generación de descripción
               setGeneratingDescription(true);
@@ -579,10 +587,12 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 cityId: cityId,
                 missionId: missionId,
                 title: `Misión completada: ${foundMissionTitle}`,
-                content: '', // Sin descripción inicial
+                content: `He completado la misión "${foundMissionTitle}" en ${foundCityName}. ¡Conseguí ${foundMissionPoints} puntos!`,
                 photos: [imageUrl],
                 tags: [foundCityName || '', 'Misión completada']
               });
+
+              console.log('📔 Entrada de diario creada:', journalEntry);
 
               // Generar descripción con IA
               console.log('🤖 Iniciando generación de descripción con IA...');
@@ -612,37 +622,39 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               FORMATO: Párrafos cortos y claros, en primera persona.`;
 
               try {
-                const aiDescription = await analyzeImage(imageUrl, customPrompt);
+                const aiDescription = await analyzeImage(imageUrl, foundCityName, 'tourist', customPrompt);
 
                 if (aiDescription && aiDescription.length > 20) {
-                  await supabase
+                  const { error: updateError } = await supabase
                     .from('journal_entries')
                     .update({ content: aiDescription })
                     .eq('missionid', missionId)
                     .eq('userid', user?.id || '');
+
+                  if (updateError) {
+                    console.error('❌ Error al actualizar descripción:', updateError);
+                  }
                 }
               } catch (aiError) {
-                console.error('Error en proceso de IA:', aiError);
-                // Usar descripción de respaldo
-                const fallbackDesc = `He completado la misión "${foundMissionTitle}" en ${foundCityName}. Durante mi visita, tuve la oportunidad de capturar esta imagen que muestra un elemento importante de la ciudad. La experiencia fue realmente enriquecedora y me permitió conectar con la historia y cultura local de manera única. ¡Conseguí ${foundMissionPoints} puntos completando esta aventura!`;
-
-                await supabase
-                  .from('journal_entries')
-                  .update({ content: fallbackDesc })
-                  .eq('missionid', missionId)
-                  .eq('userid', user?.id || '');
+                console.error('❌ Error en proceso de IA:', aiError);
+                // No lanzar error, continuar con el flujo
+              } finally {
+                setGeneratingDescription(false);
+                dispatch(setRefreshJournal(true));
               }
             } catch (journalError) {
-              console.error('Error al crear entrada del diario:', journalError);
-            } finally {
-              setGeneratingDescription(false);
-              dispatch(setRefreshJournal(true));
+              console.error('❌ Error al crear entrada del diario:', journalError);
+              // No lanzar error, continuar con el flujo
             }
           }
 
           // Otorgar insignias y experiencia
           await awardSpecificBadges(user.id, 'completeMission');
           const expResult = await addExperienceToUser(user.id, foundMissionPoints);
+
+          // Actualizar los puntos del usuario tras completar la misión
+          const updatedPoints = await getUserPoints(user.id);
+          setUserPoints(updatedPoints);
 
           // Actualizar información de misión completada con datos de experiencia
           setCompletedMissionInfo(prev => ({
