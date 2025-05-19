@@ -3,7 +3,20 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, Image } from 'react-na
 import { Badge } from '../services/badgeService';
 import { Ionicons } from '@expo/vector-icons';
 
-// Importar la imagen local
+const colors = {
+  primary: '#005F9E',
+  secondary: '#7F5AF0',
+  background: '#F5F5F5',
+  white: '#FFFFFF',
+  text: {
+    primary: '#333333',
+    secondary: '#666666',
+    light: '#999999',
+  },
+  border: '#EEEEEE',
+  success: '#4CAF50',
+  error: '#D32F2F',
+};
 
 interface BadgeDetailModalProps {
   visible: boolean;
@@ -48,7 +61,7 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#7F5AF0" />
+            <Ionicons name="close" size={24} color={colors.primary} />
           </TouchableOpacity>
           
           <View style={styles.badgeHeader}>
@@ -63,7 +76,7 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
                 <Ionicons 
                   name={getBadgeIconByCategory(badge.category)} 
                   size={80} 
-                  color="#F5D90A" 
+                  color={colors.primary} 
                 />
               )}
             </View>
@@ -106,12 +119,12 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: '#2D2F3A',
+    backgroundColor: colors.white,
     borderRadius: 15,
     padding: 20,
     width: '85%',
@@ -138,11 +151,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 60,
-    backgroundColor: '#181A20',
+    backgroundColor: colors.background,
     marginBottom: 15,
     overflow: 'hidden',
     borderWidth: 3,
-    borderColor: '#7F5AF0',
+    borderColor: colors.primary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -156,7 +169,7 @@ const styles = StyleSheet.create({
   badgeName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#F5D90A',
+    color: colors.primary,
     textAlign: 'center',
   },
   categoryContainer: {
@@ -166,12 +179,12 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#A0A0A0',
+    color: colors.text.secondary,
     marginRight: 5,
   },
   categoryValue: {
     fontSize: 16,
-    color: '#7F5AF0',
+    color: colors.primary,
   },
   descriptionContainer: {
     marginBottom: 15,
@@ -179,12 +192,12 @@ const styles = StyleSheet.create({
   descriptionLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#A0A0A0',
+    color: colors.text.secondary,
     marginBottom: 5,
   },
   descriptionText: {
     fontSize: 16,
-    color: '#A0A0A0',
+    color: colors.text.primary,
     lineHeight: 22,
   },
   thresholdContainer: {
@@ -193,12 +206,12 @@ const styles = StyleSheet.create({
   thresholdLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#A0A0A0',
+    color: colors.text.secondary,
     marginBottom: 5,
   },
   thresholdText: {
     fontSize: 16,
-    color: '#A0A0A0',
+    color: colors.text.primary,
     lineHeight: 22,
   },
   shareButton: {

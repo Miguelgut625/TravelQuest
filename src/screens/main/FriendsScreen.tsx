@@ -11,8 +11,7 @@ import {
   TextInput,
   Alert,
   Image,
-  SafeAreaView,
-  Dimensions
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -40,23 +39,6 @@ interface FriendRequest {
   type: string;
   receiverId: string;
 }
-
-const { width, height } = Dimensions.get('window');
-
-const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
-  text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
-  },
-  border: '#EEEEEE',
-  success: '#4CAF50',
-  error: '#D32F2F',
-};
 
 const FriendsScreen = () => {
   const navigation = useNavigation();
@@ -409,7 +391,7 @@ const FriendsScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.headerBar, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={28} color="#fff" />
+          <Ionicons name="arrow-back" size={28} color="#005F9E" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.title}>Amigos</Text>
@@ -506,106 +488,109 @@ const FriendsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    paddingHorizontal: width < 400 ? 6 : 16,
-  },
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#f9f9f9',
   },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingHorizontal: width < 400 ? 8 : 16,
-    paddingVertical: 12,
+    minHeight: 56,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#eee',
+    backgroundColor: '#f9f9f9',
+  },
+  backButton: {
+    padding: 4,
+    borderRadius: 20,
+    marginRight: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 40,
+    width: 40,
   },
   headerTitleContainer: {
     flex: 1,
     alignItems: 'center',
-  },
-  title: {
-    fontSize: width < 400 ? 20 : 24,
-    fontWeight: 'bold',
-    color: colors.white,
-    textAlign: 'center',
-  },
-  backButton: {
-    padding: 8,
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   rightSpace: {
-    width: 32,
+    width: 40,
+    height: 40,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#005F9E',
+    textAlign: 'center',
   },
   searchInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 4,
-    marginHorizontal: width < 400 ? 8 : 16,
+    marginBottom: 8,
+    marginTop: 4,
+    paddingHorizontal: 2,
   },
   searchInfoText: {
-    color: colors.text.secondary,
-    fontSize: width < 400 ? 12 : 14,
+    color: '#005F9E',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#f9f9f9',
   },
   searchContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: width < 400 ? 10 : 16,
-    margin: width < 400 ? 8 : 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-    marginBottom: 16,
+    marginBottom: 15,
+    position: 'relative',
+    zIndex: 1,
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    marginBottom: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 45,
   },
   searchIcon: {
-    marginRight: 8,
-    color: colors.text.secondary,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    fontSize: 16,
-    color: colors.text.primary,
-    paddingVertical: 10,
+    height: 40,
+    color: '#333',
   },
   clearButton: {
-    marginLeft: 8,
+    padding: 5,
   },
   searchResultsContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    marginTop: 8,
-    elevation: 3,
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    padding: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+    maxHeight: 300,
   },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#eee',
   },
   searchResultContent: {
     flex: 1,
@@ -613,110 +598,125 @@ const styles = StyleSheet.create({
   searchResultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    gap: 8,
   },
   searchResultUsername: {
     fontSize: 16,
-    color: colors.text.primary,
     fontWeight: 'bold',
-  },
-  friendBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  friendBadgeText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: '#333',
   },
   searchResultPoints: {
     fontSize: 14,
-    color: colors.text.secondary,
+    color: '#666',
+    marginTop: 2,
   },
   addFriendButton: {
-    marginLeft: 8,
+    padding: 8,
   },
   noResultsText: {
-    color: colors.text.secondary,
-    fontSize: 14,
+    padding: 15,
     textAlign: 'center',
-    marginTop: 8,
+    color: '#666',
+  },
+  friendBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  friendBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: width < 400 ? 10 : 16,
-    marginHorizontal: width < 400 ? 8 : 16,
-    marginVertical: 8,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   statItem: {
     alignItems: 'center',
   },
   statValue: {
-    fontSize: width < 400 ? 18 : 24,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: '#005F9E',
   },
   statLabel: {
-    fontSize: width < 400 ? 12 : 14,
-    color: colors.text.secondary,
+    fontSize: 14,
+    color: '#666',
     marginTop: 4,
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    padding: 4,
-    marginHorizontal: width < 400 ? 8 : 16,
-    marginBottom: 16,
+    marginBottom: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   activeTab: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#005F9E',
   },
   tabText: {
     fontSize: 16,
-    color: colors.text.primary,
+    color: '#666',
   },
   activeTabText: {
-    color: colors.white,
+    color: 'white',
+    fontWeight: 'bold',
   },
   friendItem: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: width < 400 ? 10 : 16,
-    marginHorizontal: width < 400 ? 4 : 16,
-    marginVertical: 4,
+    padding: 15,
+    marginVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   friendInfo: {
     flex: 1,
   },
   friendName: {
-    fontSize: width < 400 ? 14 : 16,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '600',
   },
   friendPoints: {
-    fontSize: 14,
-    color: colors.text.secondary,
+    fontSize: 16,
+    color: '#666',
   },
   actionsContainer: {
     flexDirection: 'row',
@@ -724,19 +724,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: 8,
-    borderRadius: 8,
     marginLeft: 8,
-  },
-  acceptButton: {
-    backgroundColor: colors.success,
-  },
-  rejectButton: {
-    backgroundColor: colors.error,
-  },
-  actionButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
   },
   badgeContainer: {
     position: 'absolute',
@@ -756,12 +744,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   requestItem: {
-    padding: width < 400 ? 10 : 15,
+    padding: 15,
     marginVertical: 8,
     borderRadius: 8,
-    backgroundColor: colors.white,
+    backgroundColor: '#ffffff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
@@ -792,6 +783,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+  },
+  rejectButton: {
+    backgroundColor: '#FF5252',
+  },
   cancelButton: {
     backgroundColor: '#FFA000',
   },
@@ -817,7 +814,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,

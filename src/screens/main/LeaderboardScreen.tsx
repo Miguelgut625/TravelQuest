@@ -1,19 +1,20 @@
 // src/screens/main/LeaderboardScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { supabase } from '../../services/supabase';
-import { useNavigation } from '@react-navigation/native'; // Importa el hook de navegación
-import { Ionicons } from '@expo/vector-icons'; // Importa los íconos de Ionicons
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
+import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface LeaderboardItem {
-  id: string; // Asegúrate de que este campo exista en tu tabla
-  username: string; // Cambia 'username' si el campo tiene otro nombre
+  id: string;
+  username: string;
   points: number;
 }
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 const colors = {
   primary: '#005F9E',
@@ -31,7 +32,7 @@ const colors = {
 };
 
 const LeaderboardScreen = () => {
-  const navigation = useNavigation(); // Obtén el objeto de navegación
+  const navigation = useNavigation();
   const { user } = useSelector((state: RootState) => state.auth);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,17 +41,16 @@ const LeaderboardScreen = () => {
   useEffect(() => {
     const fetchLeaderboardData = async () => {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('id, username, points') // Asegúrate de incluir el campo id
-          .order('points', { ascending: false });
-
-        if (error) throw error;
-
-        // Limitar a los 10 primeros usuarios
-        setLeaderboardData(data.slice(0, 10));
-      } catch (err: any) { // Especifica el tipo de 'err' como 'any'
-        setError(err.message);
+        const response = await axios.get(`${API_URL}/leaderboard`);
+        
+        if (response.data.success) {
+          setLeaderboardData(response.data.data);
+        } else {
+          throw new Error(response.data.error || 'Error al obtener el leaderboard');
+        }
+      } catch (err: any) {
+        console.error('Error al obtener el leaderboard:', err);
+        setError(err.response?.data?.error || err.message || 'Error al obtener el leaderboard');
       } finally {
         setLoading(false);
       }
@@ -87,7 +87,7 @@ const LeaderboardScreen = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size={50} color="#005F9E" />
+        <ActivityIndicator size={50} color={colors.primary} />
       </View>
     );
   }
@@ -103,7 +103,7 @@ const LeaderboardScreen = () => {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color="#005F9E" />
+        <Ionicons name="arrow-back" size={24} color={colors.primary} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Tabla de clasificación</Text>

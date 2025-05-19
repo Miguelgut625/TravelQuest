@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setUser, setToken } from '../../features/authSlice';
-import { supabase } from '../../services/supabase';
+import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 const RegisterScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -13,53 +14,53 @@ const RegisterScreen = ({ navigation }: any) => {
   const dispatch = useDispatch();
 
   const handleRegister = async () => {
+    if (!email || !password || !username) {
+      setError('Todos los campos son obligatorios');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      // Crear un nuevo usuario en Supabase
-      const { data: authData, error: signupError } = await supabase.auth.signUp({
+      // Llamada a la API para registrar el usuario
+      const response = await axios.post(`${API_URL}/users`, {
         email,
         password,
-        options: {
-          data: {
-            username: username
-          }
-        }
+        username
       });
-
-      if (signupError) throw signupError;
-
-      if (!authData.user) {
-        throw new Error('No se pudo crear el usuario');
-      }
-
-      // Insertar el usuario en la tabla 'users' con la contraseña
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: authData.user.id,
-            email,
-            username,
-            password,
-            created_at: new Date().toISOString()
-          }
-        ]);
-
-      if (insertError) throw insertError;
 
       // Guardar el usuario en Redux
       dispatch(setUser({
-        id: authData.user.id,
-        email: authData.user.email!,
-        username: username,
+        id: response.data.user.id,
+        email: response.data.user.email,
+        username: response.data.user.username,
       }));
 
-      // Redirigir a la pantalla de verificación de email
-      navigation.replace('VerifyEmail', { email });
-    } catch (error: any) {
-      setError(error.message);
+      // Mostrar mensaje de éxito
+      Alert.alert(
+        'Registro exitoso',
+        'Tu cuenta ha sido creada. Por favor, verifica tu correo electrónico para activarla.',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => navigation.replace('VerifyEmail', { email }) 
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error al registrar usuario:', error);
+      
+      if (error.response) {
+        // Error de respuesta del servidor
+        setError(error.response.data.error || 'Error al crear la cuenta');
+      } else if (error.request) {
+        // Error de red o servidor no disponible
+        setError('No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+      } else {
+        // Error inesperado
+        setError('Error inesperado al crear la cuenta');
+      }
     } finally {
       setLoading(false);
     }
@@ -80,6 +81,7 @@ const RegisterScreen = ({ navigation }: any) => {
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
+        keyboardType="email-address"
       />
       <TextInput
         style={styles.input}

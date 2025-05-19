@@ -61,7 +61,7 @@ SUPABASE_URL=tu_url_de_supabase
 SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
 GOOGLE_MAPS_API_KEY=tu_clave_de_google_maps
 OPENAI_API_KEY=tu_clave_de_openai
-\`\`\`
+_\`\`\`_
 
 4. Inicia la aplicación:
 \`\`\`bash

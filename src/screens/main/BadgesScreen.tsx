@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Text, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, ActivityIndicator, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { Badge, UserBadge, getUserBadges, checkAllBadges } from '../../services/badgeService';
+import { Badge, UserBadge, getUserBadges, checkAllBadges, updateUserTitle, getUserTitle } from '../../services/badgeService';
 import BadgesList from '../../components/BadgesList';
 import BadgeDetailModal from '../../components/BadgeDetailModal';
 import { Ionicons } from '@expo/vector-icons';
 import { setUser } from '../../features/auth/authSlice';
-import { supabase } from '../../services/supabase';
 import { SafeAreaView, Platform, StatusBar } from 'react-native';
 
 interface BadgesScreenProps {
@@ -63,14 +62,8 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 
   const fetchCurrentTitle = async () => {
     if (!user?.id) return;
-    const { data, error } = await supabase
-      .from('users')
-      .select('custom_title')
-      .eq('id', user.id)
-      .single();
-    if (!error && data?.custom_title) {
-      setCurrentTitle(data.custom_title);
-    }
+    const title = await getUserTitle(user.id);
+    setCurrentTitle(title);
   };
 
   useEffect(() => {
@@ -94,22 +87,32 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
 
   const handleSetTitle = async (title: string) => {
     if (!user?.id) return;
-    const { error } = await supabase
-      .from('users')
-      .update({ custom_title: title })
-      .eq('id', user.id);
-    if (!error) {
-      setCurrentTitle(title);
-      dispatch(setUser({ ...user, custom_title: title }));
-    } else {
-      alert('No se pudo actualizar el título');
+    
+    try {
+      const result = await updateUserTitle(user.id, title);
+      
+      if (result.success && result.user) {
+        setCurrentTitle(title);
+        // Actualizar el estado global de Redux
+        dispatch(setUser({
+          ...user,
+          custom_title: title
+        }));
+        // Cerrar el modal después de actualizar
+        setModalVisible(false);
+      } else {
+        Alert.alert('Error', result.error || 'No se pudo actualizar el título');
+      }
+    } catch (error) {
+      console.error('Error al actualizar título:', error);
+      Alert.alert('Error', 'No se pudo actualizar el título');
     }
   };
 
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Cargando insignias...</Text>
       </View>
     );
@@ -123,7 +126,7 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={32} color="#fff" />
+            <Ionicons name="arrow-back" size={32} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.title}>Mis Insignias</Text>
           <View style={styles.rightPlaceholder} />
@@ -231,10 +234,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 12,
-    marginHorizontal: 0,
+    marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 12,
     shadowColor: '#000',
@@ -267,42 +270,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginHorizontal: 4,
   },
-  badgeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  badgeItem: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    width: '48%',
-    alignItems: 'center',
-    marginVertical: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  badgeIcon: {
-    width: 60,
-    height: 60,
-    marginBottom: 8,
-  },
-  badgeName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  badgeDescription: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
@@ -312,39 +279,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 10,
     fontSize: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.primary,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 8,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
   },
 });
 

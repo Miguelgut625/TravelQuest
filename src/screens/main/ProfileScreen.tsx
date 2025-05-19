@@ -570,8 +570,8 @@ const ProfileScreen = () => {
               </View>
             </TouchableOpacity>
             <View style={styles.userInfo}>
-              {selectedTitle ? (
-                <Text style={styles.customTitle}>{selectedTitle}</Text>
+              {user?.custom_title ? (
+                <Text style={styles.customTitle}>{user.custom_title}</Text>
               ) : null}
               <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
               <Text style={styles.email}>{user?.email}</Text>
@@ -1007,11 +1007,6 @@ const styles = StyleSheet.create({
   xpText: {
     color: '#fff',
     fontSize: 12,
-  },
-  badgesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   badgesButton: {
     backgroundColor: '#005F9E',
