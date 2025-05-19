@@ -17,7 +17,7 @@ export const getFriends = async (userId: string) => {
         // Obtener datos del usuario
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('username, points')
+          .select('username, points, avatar_url')
           .eq('id', friend.user2Id)
           .single();
 
@@ -37,6 +37,7 @@ export const getFriends = async (userId: string) => {
           user2Id: friend.user2Id,
           username: userData.username,
           points: userData.points,
+          avatarUrl: userData.avatar_url,
           rankIndex: rankError ? undefined : rankData.rank
         };
       })

@@ -33,6 +33,16 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Detectar si la descripción es generada por IA
+  const isAIGenerated = entry.content && (
+    entry.content.includes("nombre científico") || 
+    entry.content.includes("año de construcción") || 
+    entry.content.includes("estilo arquitectónico") ||
+    entry.content.includes("CURIOSIDADES") ||
+    entry.content.includes("curiosidades") ||
+    entry.content.includes("Hoy he visitado")
+  );
+
   // Función para refrescar la entrada actual desde la base de datos
   const refreshEntry = async () => {
     try {
@@ -270,72 +280,52 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
           </TouchableOpacity>
         </View>
         
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Fecha */}
-          <Text style={styles.dateText}>{formatDate(entry.created_at)}</Text>
+        <ScrollView 
+          style={styles.scrollContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={refreshEntry} />
+          }
+        >
+          {/* Fecha de la entrada */}
+          <Text style={styles.date}>{formatDate(entry.created_at)}</Text>
           
-          {/* Imágenes */}
-          {entry.photos && entry.photos.length > 0 ? (
+          {/* Carrusel de fotos */}
+          {entry.photos && entry.photos.length > 0 && (
             <View style={styles.photoContainer}>
               <Image
                 source={{ uri: entry.photos[currentPhotoIndex] }}
-                style={[styles.mainPhoto, { width: Dimensions.get('window').width - 32 }]}
+                style={styles.photo}
                 resizeMode="cover"
               />
               
-              {/* Indicadores de foto (dots) */}
+              {/* Navegación del carrusel */}
               {entry.photos.length > 1 && (
-                <View style={styles.photoDots}>
-                  {entry.photos.map((_, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.dot,
-                        index === currentPhotoIndex && styles.activeDot
-                      ]}
-                    />
-                  ))}
-                </View>
-              )}
-              
-              {/* Botones para navegar entre fotos */}
-              {entry.photos.length > 1 && (
-                <View style={styles.photoNavButtons}>
+                <View style={styles.photoNavigation}>
                   <TouchableOpacity
+                    style={[styles.navButton, currentPhotoIndex === 0 && styles.disabledButton]}
                     onPress={goToPrevPhoto}
-                    style={[styles.photoNavButton, styles.prevButton]}
                     disabled={currentPhotoIndex === 0}
                   >
-                    <Ionicons
-                      name="chevron-back"
-                      size={24}
-                      color="white"
-                      style={{ opacity: currentPhotoIndex === 0 ? 0.5 : 1 }}
-                    />
+                    <Ionicons name="chevron-back" size={24} color="#fff" />
                   </TouchableOpacity>
+                  
+                  <Text style={styles.photoCounter}>
+                    {currentPhotoIndex + 1} / {entry.photos.length}
+                  </Text>
+                  
                   <TouchableOpacity
+                    style={[styles.navButton, currentPhotoIndex === entry.photos.length - 1 && styles.disabledButton]}
                     onPress={goToNextPhoto}
-                    style={[styles.photoNavButton, styles.nextButton]}
                     disabled={currentPhotoIndex === entry.photos.length - 1}
                   >
-                    <Ionicons
-                      name="chevron-forward"
-                      size={24}
-                      color="white"
-                      style={{ opacity: currentPhotoIndex === entry.photos.length - 1 ? 0.5 : 1 }}
-                    />
+                    <Ionicons name="chevron-forward" size={24} color="#fff" />
                   </TouchableOpacity>
                 </View>
               )}
-            </View>
-          ) : (
-            <View style={styles.noPhotoContainer}>
-              <Ionicons name="image-outline" size={64} color="#ccc" />
-              <Text style={styles.noPhotoText}>Sin imágenes</Text>
             </View>
           )}
           
-          {/* Botón para añadir imágenes */}
+          {/* Botón para añadir foto */}
           <TouchableOpacity 
             style={styles.addPhotoButton} 
             onPress={handleAddPhoto}
@@ -351,21 +341,42 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
             )}
           </TouchableOpacity>
           
-          {/* Contenido principal */}
-          <View style={styles.contentContainer}>
-            <Text style={styles.content}>
-              {entry.content.split('\n').map((paragraph, index) => (
-                <React.Fragment key={index}>
-                  {paragraph.trim() !== '' && (
-                    <Text>
-                      {paragraph}
-                      {index < entry.content.split('\n').length - 1 && '\n\n'}
-                    </Text>
-                  )}
-                </React.Fragment>
-              ))}
-            </Text>
-          </View>
+          {/* Contenido principal con indicador de IA si corresponde */}
+          {isAIGenerated ? (
+            <View style={styles.aiGeneratedContainer}>
+              <View style={styles.aiGeneratedHeader}>
+                <Ionicons name="sparkles" size={20} color="#7F5AF0" />
+                <Text style={styles.aiGeneratedTitle}>Descripción generada por IA</Text>
+              </View>
+              <Text style={styles.aiGeneratedContent}>
+                {entry.content.split('\n').map((paragraph, index) => (
+                  <React.Fragment key={index}>
+                    {paragraph.trim() !== '' && (
+                      <Text>
+                        {paragraph}
+                        {index < entry.content.split('\n').length - 1 && '\n\n'}
+                      </Text>
+                    )}
+                  </React.Fragment>
+                ))}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.contentContainer}>
+              <Text style={styles.content}>
+                {entry.content.split('\n').map((paragraph, index) => (
+                  <React.Fragment key={index}>
+                    {paragraph.trim() !== '' && (
+                      <Text>
+                        {paragraph}
+                        {index < entry.content.split('\n').length - 1 && '\n\n'}
+                      </Text>
+                    )}
+                  </React.Fragment>
+                ))}
+              </Text>
+            </View>
+          )}
           
           {/* Etiquetas */}
           {entry.tags && entry.tags.length > 0 && (
@@ -454,10 +465,10 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
   },
-  scrollContent: {
+  scrollContainer: {
     padding: 16,
   },
-  dateText: {
+  date: {
     fontSize: 14,
     color: '#666',
     marginBottom: 16,
@@ -468,32 +479,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
   },
-  mainPhoto: {
+  photo: {
     height: 250,
     borderRadius: 10,
   },
-  photoDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    position: 'absolute',
-    bottom: 15,
-    left: 0,
-    right: 0,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: '#FFFFFF',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  photoNavButtons: {
+  photoNavigation: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -503,7 +493,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  photoNavButton: {
+  navButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -511,23 +501,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  prevButton: {
-    marginLeft: 10,
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
-  nextButton: {
-    marginRight: 10,
-  },
-  noPhotoContainer: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-  noPhotoText: {
-    color: '#999',
-    marginTop: 10,
+  photoCounter: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   addPhotoButton: {
     backgroundColor: '#005F9E',
@@ -649,8 +629,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  disabledButton: {
-    backgroundColor: '#ccc',
+  aiGeneratedContainer: {
+    backgroundColor: '#f8f5ff',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#7F5AF0',
+  },
+  aiGeneratedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  aiGeneratedTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#7F5AF0',
+    marginLeft: 8,
+  },
+  aiGeneratedContent: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
   },
   refreshButton: {
     padding: 5,

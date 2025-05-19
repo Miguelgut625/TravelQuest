@@ -31,11 +31,20 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
     navigation.navigate('JournalEntryDetail', { entry });
   };
 
+  // Determinar si la descripción es detallada (generada por IA)
   const isDetailedDescription = entry.content && entry.content.length > 150;
+  const isAIGenerated = entry.content && (
+    entry.content.includes("nombre científico") || 
+    entry.content.includes("año de construcción") || 
+    entry.content.includes("estilo arquitectónico") ||
+    entry.content.includes("CURIOSIDADES") ||
+    entry.content.includes("curiosidades") ||
+    entry.content.includes("Hoy he visitado")
+  );
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, isAIGenerated && styles.aiGeneratedCard]}
       onPress={handlePress}
       onLongPress={handleLongPress}
       delayLongPress={500}
@@ -51,9 +60,16 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
       </View>
       <Text style={styles.cardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
 
+      {isAIGenerated && (
+        <View style={styles.aiGeneratedBadge}>
+          <Ionicons name="sparkles" size={14} color="#FFF" />
+          <Text style={styles.aiGeneratedText}>Descripción detallada</Text>
+        </View>
+      )}
+
       {isDetailedDescription ? (
         <>
-          <Text style={styles.cardContent} numberOfLines={expanded ? undefined : 3}>
+          <Text style={[styles.cardContent, isAIGenerated && styles.aiGeneratedContent]} numberOfLines={expanded ? undefined : 3}>
             {entry.content}
           </Text>
           {!expanded && (
@@ -795,6 +811,31 @@ const styles = StyleSheet.create({
   headerRight: {
     width: 24,
     height: 24,
+  },
+  aiGeneratedCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#7F5AF0',
+  },
+  aiGeneratedContent: {
+    fontStyle: 'normal',
+    color: '#333',
+    lineHeight: 22,
+  },
+  aiGeneratedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7F5AF0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  aiGeneratedText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
 });
 

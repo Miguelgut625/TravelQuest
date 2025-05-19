@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, Image } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -20,6 +20,8 @@ import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-cont
 import { getUserPoints } from '../../services/pointsService';
 import { RouteProp } from '@react-navigation/native';
 import { getOrCreateCity } from '../../services/missionGenerator';
+import { shareJourney, getJourneySharedUsers, isJourneyShared } from '../../services/shareService';
+import { getFriends } from '../../services/friendService';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -45,7 +47,10 @@ interface JourneyMission {
   id: string;
   completed: boolean;
   cityName: string;
+  journeyId: string;
   end_date: string;
+  isOwn?: boolean;
+  isShared?: boolean;
   challenge: {
     title: string;
     description: string;
@@ -80,6 +85,24 @@ interface Journey {
       points: number;
     };
   }[];
+}
+
+interface City {
+  cityName: string;
+  journeyId: string;
+  totalMissions: number;
+  completedMissions: number;
+  expiredMissions?: number;
+  sharedUsers?: Array<{
+    id: string;
+    username: string;
+    avatarUrl?: string;
+    status?: string;  // Estado de la invitación: 'accepted' o 'pending'
+  }>;
+  isShared?: boolean;
+  hasAcceptedShares?: boolean;  // Si tiene compartidos que aceptaron
+  hasPendingShares?: boolean;   // Si tiene compartidos pendientes
+  ownerId?: string;             // Propietario del viaje
 }
 
 const getTimeRemaining = (endDate: string) => {
@@ -188,21 +211,107 @@ const MissionCard = ({ mission, onComplete, onShare }: {
   );
 };
 
-const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress }: {
+const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, sharedUsers, isShared, hasAcceptedShares, hasPendingShares, onPress }: {
   cityName: string;
   totalMissions: number;
   completedMissions: number;
   expiredMissions?: number;
+  sharedUsers?: Array<{
+    id: string;
+    username: string;
+    avatarUrl?: string;
+    status?: string;
+  }>;
+  isShared?: boolean;
+  hasAcceptedShares?: boolean; 
+  hasPendingShares?: boolean;
   onPress: () => void;
 }) => (
   <TouchableOpacity style={styles.cityCard} onPress={onPress}>
     <View style={styles.cityCardContent}>
       <View style={styles.cityInfo}>
-        <Text style={styles.cityName}>{cityName}</Text>
+        <View style={styles.cityHeader}>
+          <Text style={styles.cityName}>{cityName || 'Ciudad'}</Text>
+          
+          {/* Indicador de viaje compartido */}
+          {isShared && (
+            <View style={[
+              styles.sharedIndicator,
+              hasAcceptedShares ? styles.acceptedShareIndicator : hasPendingShares ? styles.pendingShareIndicator : {}
+            ]}>
+              <Ionicons 
+                name={hasAcceptedShares ? "people" : "people-outline"} 
+                size={16} 
+                color={hasAcceptedShares ? "#005F9E" : "#FF9800"} 
+              />
+              <Text style={[
+                styles.sharedText,
+                { color: hasAcceptedShares ? "#005F9E" : "#FF9800" }
+              ]}>
+                {hasAcceptedShares 
+                  ? "Compartido" 
+                  : hasPendingShares ? "Pendiente" : "Compartido"}
+              </Text>
+            </View>
+          )}
+        </View>
+        
         <Text style={styles.missionCount}>
-          {completedMissions}/{totalMissions} misiones completadas
+          {completedMissions || 0}/{totalMissions || 0} misiones completadas
         </Text>
+        
+        {/* Avatares de usuarios con los que se comparte */}
+        {isShared && sharedUsers && sharedUsers.length > 0 && (
+          <View style={styles.avatarsContainer}>
+            {sharedUsers.slice(0, 3).map((user, index) => (
+              <View 
+                key={user?.id || index} 
+                style={[
+                  styles.avatarWrapper,
+                  { marginLeft: index > 0 ? -10 : 0, zIndex: 10 - index },
+                  user?.status === 'pending' && styles.pendingAvatarWrapper
+                ]}
+              >
+                {user?.avatarUrl ? (
+                  <Image
+                    source={{ uri: user.avatarUrl }}
+                    style={[
+                      styles.avatar,
+                      user?.status === 'pending' && { opacity: 0.6 }
+                    ]}
+                  />
+                ) : (
+                  <View style={[
+                    styles.defaultAvatar,
+                    user?.status === 'pending' && styles.pendingDefaultAvatar
+                  ]}>
+                    <Text style={styles.avatarText}>
+                      {user?.username ? user.username.substring(0, 1).toUpperCase() : 'U'}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Indicador de estado pendiente */}
+                {user?.status === 'pending' && (
+                  <View style={styles.pendingIndicator}>
+                    <Ionicons name="time-outline" size={12} color="#FF9800" />
+                  </View>
+                )}
+              </View>
+            ))}
+            
+            {/* Indicador de más usuarios */}
+            {sharedUsers.length > 3 && (
+              <View style={[styles.avatarWrapper, { marginLeft: -10, zIndex: 7 }]}>
+                <View style={styles.moreUsersAvatar}>
+                  <Text style={styles.moreUsersText}>+{sharedUsers.length - 3}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
       </View>
+      
       {/* @ts-ignore */}
       <Ionicons name="chevron-forward" size={24} color="#666" />
     </View>
@@ -210,7 +319,7 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
       <View
         style={[
           styles.progressFill,
-          { width: `${(completedMissions / totalMissions) * 100}%` }
+          { width: `${(completedMissions / (totalMissions || 1)) * 100}%` }
         ]}
       />
     </View>
@@ -220,11 +329,13 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
 const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   visible: boolean;
   onClose: () => void;
-  onSelect: (friend: Friend) => void;
+  onSelect: (friends: Friend[] | Friend) => void;
 }) => {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
   const user = useSelector((state: RootState) => state.auth.user);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -235,44 +346,108 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
         }
         try {
           setLoading(true);
-          const { data: friendData, error } = await supabase
-            .from('friends')
-            .select('user2Id')
-            .eq('user1Id', user.id);
-          if (error) throw error;
-
-          const friendDetails = await Promise.all(
-            friendData.map(async (friend: { user2Id: string }) => {
-              const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('username, points')
-                .eq('id', friend.user2Id)
-                .single();
-              if (userError) return null;
-              return {
-                user2Id: friend.user2Id,
-                username: userData.username,
-                points: userData.points,
-              };
-            })
-          );
-
-          setFriends(friendDetails.filter((f) => f !== null) as Friend[]);
+          const friendsList = await getFriends(user.id);
+          setFriends(friendsList || []);
         } catch (error) {
           console.error('Error fetching friends:', error);
+          setFriends([]);
         } finally {
           setLoading(false);
         }
       };
       fetchFriends();
+      // Reiniciar selecciones y estado de compartir al abrir el modal
+      setSelectedFriends([]);
+      setIsSharing(false);
     }
   }, [visible, user]);
 
+  const toggleFriendSelection = (friendId: string) => {
+    if (isSharing) return; // No permitir cambios si está compartiendo
+    
+    setSelectedFriends(current => {
+      if (current.includes(friendId)) {
+        return current.filter(id => id !== friendId);
+      } else {
+        return [...current, friendId];
+      }
+    });
+  };
+
+  const selectAllFriends = () => {
+    if (isSharing) return; // No permitir cambios si está compartiendo
+    
+    if (selectedFriends.length === friends.length) {
+      // Si todos están seleccionados, deseleccionar todos
+      setSelectedFriends([]);
+    } else {
+      // Seleccionar todos
+      setSelectedFriends(friends.map(friend => friend.user2Id));
+    }
+  };
+
+  const handleShareWithSelected = async () => {
+    if (selectedFriends.length === 0) {
+      Alert.alert('Selección vacía', 'Por favor, selecciona al menos un amigo para compartir el viaje.');
+      return;
+    }
+
+    // Prevenir múltiples envíos
+    if (isSharing) return;
+    
+    setIsSharing(true);
+
+    const selectedFriendsObjects = friends.filter(friend =>
+      selectedFriends.includes(friend.user2Id)
+    );
+
+    try {
+      await onSelect(selectedFriendsObjects);
+    } catch (error) {
+      console.error('Error al compartir viaje:', error);
+      // Si hay un error, permitir que el usuario intente de nuevo
+      setIsSharing(false);
+      Alert.alert('Error', 'Ocurrió un error al compartir el viaje. Inténtalo de nuevo.');
+    }
+    // No reseteamos isSharing aquí porque onSelect cerrará el modal
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      onRequestClose={() => !isSharing && onClose()} 
+      transparent
+    >
       <View style={modalStyles.modalOverlay}>
         <View style={modalStyles.modalContent}>
-          <Text style={modalStyles.modalTitle}>Selecciona un amigo</Text>
+          <Text style={modalStyles.modalTitle}>Compartir Viaje</Text>
+          <Text style={modalStyles.modalSubtitle}>Selecciona a los amigos con los que quieres compartir este viaje</Text>
+          
+          {!loading && friends.length > 0 && (
+            <TouchableOpacity
+              style={[
+                modalStyles.selectAllButton,
+                isSharing && modalStyles.disabledButton
+              ]}
+              onPress={selectAllFriends}
+              disabled={isSharing}
+            >
+              <Text style={modalStyles.selectAllText}>
+                {selectedFriends.length === friends.length
+                  ? "Deseleccionar todos"
+                  : "Seleccionar todos"}
+              </Text>
+              <Ionicons
+                name={selectedFriends.length === friends.length
+                  ? "checkmark-circle"
+                  : "checkmark-circle-outline"}
+                size={20}
+                color="#005F9E"
+              />
+            </TouchableOpacity>
+          )}
+          
           {loading ? (
             <ActivityIndicator size={40} color="#4CAF50" />
           ) : (
@@ -280,16 +455,73 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
               data={friends}
               keyExtractor={(item) => item.user2Id}
               renderItem={({ item }) => (
-                <TouchableOpacity style={modalStyles.friendItem} onPress={() => onSelect(item)}>
-                  <Text style={modalStyles.friendName}>{item.username}</Text>
-                  <Text style={modalStyles.friendPoints}>Puntos: {item.points}</Text>
+                <TouchableOpacity 
+                  style={[
+                    modalStyles.friendItem,
+                    selectedFriends.includes(item.user2Id) && modalStyles.friendItemSelected,
+                    isSharing && modalStyles.disabledItem
+                  ]} 
+                  onPress={() => toggleFriendSelection(item.user2Id)}
+                  disabled={isSharing}
+                >
+                  <View style={modalStyles.friendInfo}>
+                    <Text style={modalStyles.friendName}>{item.username}</Text>
+                    <Text style={modalStyles.friendPoints}>Puntos: {item.points}</Text>
+                  </View>
+                  <Ionicons
+                    name={selectedFriends.includes(item.user2Id) 
+                      ? "checkmark-circle" 
+                      : "checkmark-circle-outline"}
+                    size={24}
+                    color={selectedFriends.includes(item.user2Id) ? "#4CAF50" : "#999"}
+                  />
                 </TouchableOpacity>
               )}
             />
           )}
-          <TouchableOpacity style={modalStyles.cancelButton} onPress={onClose}>
-            <Text style={modalStyles.cancelButtonText}>Cancelar</Text>
-          </TouchableOpacity>
+          
+          <View style={modalStyles.buttonRow}>
+            <TouchableOpacity 
+              style={[
+                modalStyles.cancelButton,
+                isSharing && modalStyles.disabledButton
+              ]} 
+              onPress={onClose}
+              disabled={isSharing}
+            >
+              <Text style={modalStyles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                modalStyles.shareButton, 
+                (selectedFriends.length === 0 || isSharing) && modalStyles.disabledButton
+              ]} 
+              onPress={handleShareWithSelected}
+              disabled={selectedFriends.length === 0 || isSharing}
+            >
+              {isSharing ? (
+                <View style={modalStyles.sharingButtonContent}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={[modalStyles.shareButtonText, {marginLeft: 8}]}>Compartiendo...</Text>
+                </View>
+              ) : (
+                <Text style={modalStyles.shareButtonText}>
+                  {selectedFriends.length === 0 
+                    ? "Selecciona amigos" 
+                    : `Compartir (${selectedFriends.length})`}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {/* Overlay para bloquear interacciones mientras se comparte */}
+          {isSharing && (
+            <View style={modalStyles.sharingOverlay}>
+              <ActivityIndicator size="large" color="#005F9E" />
+              <Text style={modalStyles.sharingText}>Compartiendo viaje...</Text>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -304,7 +536,7 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center'
   },
   modalContent: {
-    width: '80%',
+    width: '90%',
     backgroundColor: 'white',
     borderRadius: 10,
     padding: 20,
@@ -315,29 +547,105 @@ const modalStyles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10
   },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15
+  },
+  selectAllButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 10
+  },
+  selectAllText: {
+    fontWeight: '500',
+    color: '#005F9E'
+  },
   friendItem: {
-    padding: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc'
+    borderBottomColor: '#eee'
+  },
+  friendItemSelected: {
+    backgroundColor: '#e6f7ff'
+  },
+  friendInfo: {
+    flex: 1
   },
   friendName: {
-    fontSize: 16
+    fontSize: 16,
+    fontWeight: '500'
   },
   friendPoints: {
     fontSize: 14,
     color: '#666'
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15
+  },
   cancelButton: {
-    marginTop: 10,
+    flex: 1,
     backgroundColor: '#f44336',
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center'
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginRight: 8
   },
   cancelButtonText: {
     color: 'white',
     fontWeight: 'bold'
-  }
+  },
+  shareButton: {
+    flex: 1.5,
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginLeft: 8
+  },
+  shareButtonText: {
+    color: 'white',
+    fontWeight: 'bold'
+  },
+  disabledButton: {
+    backgroundColor: '#ccc'
+  },
+  disabledItem: {
+    opacity: 0.6,
+  },
+  sharingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sharingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
+    zIndex: 10,
+  },
+  sharingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#005F9E',
+  },
 });
 
 const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => {
@@ -367,6 +675,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const [userPoints, setUserPoints] = useState(0);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [missionToShare, setMissionToShare] = useState<JourneyMission | null>(null);
+  const [citiesData, setCitiesData] = useState<City[]>([]);
   const dispatch = useDispatch();
   const theme = useTheme();
 
@@ -451,8 +760,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       // Combinar viajes propios y compartidos
       const allJourneys = [
-        ...(ownJourneys || []),
-        ...(sharedJourneys?.map(shared => shared.journeys) || [])
+        ...(ownJourneys || []).map(journey => ({ ...journey, isOwn: true })),
+        ...(sharedJourneys?.map(shared => ({ ...shared.journeys, isShared: true })) || [])
       ];
 
       if (allJourneys.length === 0) {
@@ -461,12 +770,15 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         return;
       }
 
-      const allMissions = allJourneys.flatMap((journey: Journey) =>
+      const allMissions = allJourneys.flatMap((journey) =>
         journey.journeys_missions.map((jm) => ({
           id: jm.id,
           completed: jm.completed,
           cityName: journey.cities?.name || 'Ciudad Desconocida',
+          journeyId: journey.id,
           end_date: jm.end_date,
+          isOwn: journey.isOwn,
+          isShared: journey.isShared,
           challenge: {
             title: jm.challenges.title,
             description: jm.challenges.description,
@@ -494,6 +806,62 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       });
 
       setCityMissions(missionsByCity);
+
+      // Preparar datos de ciudades con información de usuarios compartidos
+      const citiesWithSharing = await Promise.all(
+        Object.entries(missionsByCity).map(async ([cityName, missions]) => {
+          // Tomar el primer journeyId de cualquier misión de esta ciudad
+          const allCityMissions = [...missions.completed, ...missions.pending];
+          const firstMission = allCityMissions[0];
+          
+          if (!firstMission) {
+            return {
+              cityName,
+              totalMissions: 0,
+              completedMissions: 0,
+              journeyId: '',
+              isShared: false,
+              hasAcceptedShares: false,
+              hasPendingShares: false,
+              sharedUsers: []
+            };
+          }
+          
+          const journeyId = firstMission.journeyId;
+          
+          // Obtener datos de compartidos, incluyendo pendientes
+          let sharedUsers = [];
+          try {
+            sharedUsers = await getJourneySharedUsers(journeyId, true);
+          } catch (error) {
+            console.error(`Error al obtener usuarios compartidos para ${cityName}:`, error);
+            // Si hay error, continuamos con un array vacío
+          }
+          
+          // Determinar si hay compartidos aceptados o pendientes
+          const hasAcceptedShares = sharedUsers.some(user => user.status === 'accepted');
+          const hasPendingShares = sharedUsers.some(user => user.status === 'pending');
+          
+          // Si hay cualquier tipo de compartido, es un viaje compartido
+          const isShared = sharedUsers.length > 0;
+          
+          return {
+            cityName,
+            journeyId,
+            totalMissions: missions.completed.length + missions.pending.length,
+            completedMissions: missions.completed.length,
+            expiredMissions: missions.expired ? missions.expired.length : 0,
+            isShared,
+            hasAcceptedShares,
+            hasPendingShares,
+            sharedUsers,
+            ownerId: user.id // Suponemos que si estamos viendo el viaje, somos dueños o fue compartido con nosotros
+          };
+        })
+      );
+      
+      setCitiesData(citiesWithSharing);
+
     } catch (error) {
       console.error('Error fetching missions:', error);
       setError('Error al cargar las misiones');
@@ -601,25 +969,31 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               
               CONTEXTO: La misión consistía en ${foundMission?.challenge?.description || foundMissionTitle}
               
-              Escribe una entrada de diario como si fueses un guía turístico explicando lo que se ve en la imagen (máximo 200 palabras) que DEBE incluir:
+              Escribe una entrada de diario detallada como si fueses un guía turístico o historiador explicando lo que se ve en la imagen (máximo 300 palabras) que DEBE incluir:
               
-              1. IDENTIFICACIÓN DEL CONTENIDO DE LA IMAGEN:
-                 - Si es un monumento: su nombre exacto y estilo arquitectónico
-                 - Si es una planta o animal: su especie y características
-                 - Si es una obra de arte: su nombre y autor
-                 - Si es un lugar: su nombre completo y función
+              1. IDENTIFICACIÓN PRECISA DEL CONTENIDO DE LA IMAGEN:
+                 - Si es un monumento: su nombre exacto, estilo arquitectónico, año de construcción y arquitecto
+                 - Si es una planta o animal: su nombre científico, especie, características distintivas y hábitat
+                 - Si es una obra de arte: su nombre completo, autor, año de creación y estilo artístico
+                 - Si es un lugar: su nombre oficial, función histórica y actual, e importancia cultural
               
-              2. INFORMACIÓN HISTÓRICA SOBRE LO MOSTRADO EN LA IMAGEN:
-                 - Año de construcción/creación/fundación del elemento principal
+              2. INFORMACIÓN HISTÓRICA DETALLADA:
+                 - Año exacto de construcción/creación/fundación del elemento principal
+                 - Contexto histórico en el que surgió (época, movimiento cultural, etc.)
                  - Origen histórico o etimológico del nombre
-                 - Un hecho importante en su historia
+                 - Evolución histórica o transformaciones importantes que ha sufrido
               
-              3. DOS CURIOSIDADES INTERESANTES sobre el elemento principal que aparece en la imagen
+              3. TRES CURIOSIDADES INTERESANTES que la mayoría de turistas no conocen sobre el elemento principal que aparece en la imagen
               
-              4. Una breve REFLEXIÓN PERSONAL como si yo hubiera tomado la foto durante mi visita
+              4. DATOS TÉCNICOS RELEVANTES:
+                 - Para monumentos: materiales, dimensiones, técnicas constructivas
+                 - Para especies: clasificación taxonómica, características biológicas únicas
+                 - Para obras de arte: técnica utilizada, materiales, dimensiones
               
-              ESTILO: Reflexivo, personal, emocionante, como un diario de viaje auténtico.
-              FORMATO: Párrafos cortos y claros, en primera persona.`;
+              5. Una breve REFLEXIÓN PERSONAL como si yo hubiera tomado la foto durante mi visita, mencionando la experiencia sensorial (olores, sonidos, sensaciones)
+              
+              ESTILO: Informativo pero accesible, combinando datos históricos precisos con un tono personal de diario de viaje.
+              FORMATO: Párrafos cortos y claros, en primera persona, con datos específicos integrados naturalmente en la narración.`;
 
               try {
                 const aiDescription = await analyzeImage(imageUrl, foundCityName, 'tourist', customPrompt);
@@ -695,25 +1069,21 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     }
   }, [missionCompleted, navigation]);
 
-  const handleShareJourney = async (friend: Friend) => {
-    if (!journeyId) {
-      Alert.alert('Error', 'No se pudo compartir el journey porque no se encontró el ID del viaje.');
+  const handleShareJourney = async (friends: Friend[] | Friend) => {
+    if (!journeyId || !user?.id) {
+      Alert.alert('Error', 'No se pudo compartir el viaje porque no se encontró el ID del viaje o no estás autenticado.');
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('journeys_shared')
-        .insert({
-          journeyId: journeyId,
-          ownerId: user?.id || '',
-          sharedWithUserId: friend.user2Id
-        });
-      if (error) throw error;
-      Alert.alert('Éxito', `Journey compartido con ${friend.username}`);
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'No se pudo compartir el journey');
+      const success = await shareJourney(journeyId, user.id, friends);
+      if (success) {
+        // Si el proceso fue exitoso, no necesitamos hacer nada más
+        // ya que la función shareJourney muestra sus propias alertas
+      }
+    } catch (error) {
+      console.error('Error al compartir viaje:', error);
+      Alert.alert('Error', 'No se pudo compartir el viaje');
     } finally {
       setIsShareModalVisible(false);
     }
@@ -766,23 +1136,18 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           style={styles.citiesList}
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          {Object.entries(cityMissions).map(([cityName, missions]) => (
+          {citiesData.map((city) => (
             <CityCard
-              key={cityName}
-              cityName={cityName}
-              totalMissions={
-                // @ts-ignore - TypeScript no puede inferir la estructura
-                missions.completed.length + missions.pending.length
-              }
-              completedMissions={
-                // @ts-ignore - TypeScript no puede inferir la estructura
-                missions.completed.length
-              }
-              expiredMissions={
-                // @ts-ignore - TypeScript no puede inferir la estructura
-                missions.expired.length
-              }
-              onPress={() => setSelectedCity(cityName)}
+              key={city.cityName}
+              cityName={city.cityName}
+              totalMissions={city.totalMissions}
+              completedMissions={city.completedMissions}
+              expiredMissions={city.expiredMissions}
+              isShared={city.isShared}
+              hasAcceptedShares={city.hasAcceptedShares}
+              hasPendingShares={city.hasPendingShares}
+              sharedUsers={city.sharedUsers}
+              onPress={() => setSelectedCity(city.cityName)}
             />
           ))}
         </ScrollView>
@@ -791,6 +1156,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   }
 
   const cityData = cityMissions[selectedCity];
+  const selectedCityData = citiesData.find(city => city.cityName === selectedCity);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -807,7 +1173,69 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
       </View>
 
-      <Text style={styles.cityTitle}>{selectedCity}</Text>
+      <View style={styles.cityTitleContainer}>
+        <Text style={styles.cityTitle}>{selectedCity}</Text>
+        
+        {/* Mostrar los avatares de los usuarios compartidos en la pantalla de detalle */}
+        {selectedCityData?.isShared && (
+          <View style={styles.cityDetailSharedContainer}>
+            <View style={[
+              styles.sharedBadge,
+              selectedCityData.hasAcceptedShares ? styles.acceptedBadge : selectedCityData.hasPendingShares ? styles.pendingBadge : {}
+            ]}>
+              <Ionicons 
+                name={selectedCityData.hasAcceptedShares ? "people" : "people-outline"} 
+                size={16} 
+                color="#FFF" 
+              />
+              <Text style={styles.sharedBadgeText}>
+                {selectedCityData.hasAcceptedShares 
+                  ? "Compartido" 
+                  : selectedCityData.hasPendingShares ? "Pendiente" : "Compartido"}
+              </Text>
+            </View>
+            
+            <View style={styles.cityDetailAvatars}>
+              {selectedCityData?.sharedUsers?.map((user, index) => (
+                <View 
+                  key={user?.id || index} 
+                  style={[
+                    styles.detailAvatarWrapper,
+                    { marginLeft: index > 0 ? -8 : 0, zIndex: 10 - index },
+                    user?.status === 'pending' && styles.detailPendingAvatarWrapper
+                  ]}
+                >
+                  {user?.avatarUrl ? (
+                    <Image
+                      source={{ uri: user.avatarUrl }}
+                      style={[
+                        styles.detailAvatar,
+                        user?.status === 'pending' && { opacity: 0.6 }
+                      ]}
+                    />
+                  ) : (
+                    <View style={[
+                      styles.detailDefaultAvatar,
+                      user?.status === 'pending' && styles.detailPendingDefaultAvatar
+                    ]}>
+                      <Text style={styles.detailAvatarText}>
+                        {user?.username ? user.username.substring(0, 1).toUpperCase() : 'U'}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* Indicador de estado pendiente */}
+                  {user?.status === 'pending' && (
+                    <View style={styles.detailPendingIndicator}>
+                      <Ionicons name="time-outline" size={12} color="#FF9800" />
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
 
       <ScrollView style={styles.missionsList}>
         {cityData.pending.length > 0 && (
@@ -916,11 +1344,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 1,
   },
+  cityTitleContainer: {
+    marginBottom: 20,
+  },
   cityTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#005F9E',
-    marginBottom: 20,
+    marginBottom: 8,
     letterSpacing: 1,
   },
   loadingContainer: {
@@ -979,6 +1410,12 @@ const styles = StyleSheet.create({
   },
   cityInfo: {
     flex: 1,
+  },
+  cityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
   },
   cityName: {
     fontSize: 20,
@@ -1167,8 +1604,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#005F9E',
+    marginBottom: 10
   },
   friendItem: {
     padding: 10,
@@ -1176,16 +1612,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ccc'
   },
   friendName: {
-    fontSize: 16,
-    color: '#005F9E',
+    fontSize: 16
   },
   friendPoints: {
     fontSize: 14,
-    color: '#005F9E',
+    color: '#666'
   },
   cancelButton: {
     marginTop: 10,
-    backgroundColor: '#D32F2F',
+    backgroundColor: '#f44336',
     padding: 10,
     borderRadius: 5,
     alignItems: 'center'
@@ -1206,6 +1641,170 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  sharedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 95, 158, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  pendingShareIndicator: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+  },
+  acceptedShareIndicator: {
+    backgroundColor: 'rgba(0, 95, 158, 0.1)',
+  },
+  sharedText: {
+    fontSize: 12,
+    color: '#005F9E',
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  avatarsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  avatarWrapper: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#fff',
+    overflow: 'hidden',
+  },
+  avatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 15,
+  },
+  defaultAvatar: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#7F5AF0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  moreUsersAvatar: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#005F9E',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moreUsersText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  cityDetailSharedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sharedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#005F9E',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 10,
+  },
+  acceptedBadge: {
+    backgroundColor: '#005F9E',
+  },
+  pendingBadge: {
+    backgroundColor: '#FF9800',
+  },
+  sharedBadgeText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  cityDetailAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailAvatarWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+  detailPendingAvatarWrapper: {
+    borderColor: '#FF9800',
+    opacity: 0.8,
+  },
+  detailAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  detailDefaultAvatar: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#7F5AF0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailPendingDefaultAvatar: {
+    backgroundColor: '#FF9800',
+  },
+  detailAvatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  detailPendingIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF9800',
+  },
+  pendingAvatarWrapper: {
+    borderColor: '#FF9800',
+    borderWidth: 2,
+    opacity: 0.8,
+  },
+  pendingDefaultAvatar: {
+    backgroundColor: '#FF9800',
+  },
+  pendingIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF9800',
   },
 });
 

@@ -34,6 +34,9 @@ const MissionCompletedModal = memo(({ visible, info, onFinished }: MissionComple
 
   // Calcular porcentaje de XP para la barra de progreso
   const xpPercentage = Math.min(100, Math.max(0, (info.remainingXP / info.xpNext) * 100));
+  
+  // Estado para mostrar la descripción completa
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   return (
     <Modal
@@ -67,6 +70,23 @@ const MissionCompletedModal = memo(({ visible, info, onFinished }: MissionComple
                   style={styles.missionImage}
                   resizeMode="cover"
                 />
+              </View>
+            )}
+            
+            {/* Descripción de la imagen si existe */}
+            {journalContent && (
+              <View style={styles.descriptionContainer}>
+                <Text style={styles.descriptionTitle}>Sobre esta imagen:</Text>
+                <Text style={styles.descriptionContent}>
+                  {showFullDescription ? journalContent : shortContent}
+                </Text>
+                {hasLongContent && (
+                  <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
+                    <Text style={styles.readMoreText}>
+                      {showFullDescription ? 'Mostrar menos' : 'Leer más'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -219,12 +239,17 @@ const styles = StyleSheet.create({
   },
   rewardsContainer: {
     marginVertical: 15,
+    backgroundColor: '#f0f8ff',
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0f0ff',
   },
   rewardsTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#333',
+    color: '#005F9E',
   },
   rewardItem: {
     flexDirection: 'row',
@@ -237,6 +262,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   levelContainer: {
+    alignItems: 'center',
     marginVertical: 15,
   },
   levelUpText: {
@@ -244,34 +270,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4CAF50',
     marginBottom: 10,
-    textAlign: 'center',
   },
   levelText: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 10,
   },
   xpProgressBackground: {
-    height: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
-    marginBottom: 5,
+    width: '100%',
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   xpProgressFill: {
-    backgroundColor: '#4CAF50',
     height: '100%',
-    borderRadius: 5,
+    backgroundColor: '#4CAF50',
   },
   xpText: {
     fontSize: 12,
     color: '#666',
-    textAlign: 'right',
+    marginTop: 5,
   },
   continueButton: {
     backgroundColor: '#005F9E',
-    padding: 15,
-    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
     alignItems: 'center',
     marginTop: 15,
   },
