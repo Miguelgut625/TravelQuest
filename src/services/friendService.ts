@@ -17,7 +17,7 @@ export const getFriends = async (userId: string) => {
         // Obtener datos del usuario
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('username, points')
+          .select('username, points, profile_pic_url')
           .eq('id', friend.user2Id)
           .single();
 
@@ -37,6 +37,7 @@ export const getFriends = async (userId: string) => {
           user2Id: friend.user2Id,
           username: userData.username,
           points: userData.points,
+          avatarUrl: userData.profile_pic_url,
           rankIndex: rankError ? undefined : rankData.rank
         };
       })
@@ -366,5 +367,30 @@ export const getMutualFriends = async (userId1: string, userId2: string) => {
   } catch (error) {
     console.error('Error al obtener amigos en común:', error);
     return [];
+  }
+};
+
+// Función para obtener datos de usuario por ID (incluyendo avatar)
+export const getUserData = async (userId: string) => {
+  try {
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('username, points, profile_pic_url')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user data:', error);
+      throw error;
+    }
+
+    return {
+      username: userData.username,
+      points: userData.points,
+      avatarUrl: userData.profile_pic_url,
+    };
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    throw error;
   }
 }; 

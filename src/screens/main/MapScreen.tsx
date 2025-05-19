@@ -25,7 +25,6 @@ import { supabase } from '../../services/supabase';
 import * as Notifications from 'expo-notifications';
 import NotificationService from '../../services/NotificationService';
 import { getFriends } from '../../services/friendService';
-import WeatherWidget from '../../components/WeatherWidget';
 
 interface City {
   id: string;
@@ -655,14 +654,14 @@ const MapScreen = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [generatedJourneyId, setGeneratedJourneyId] = useState<string | null>(null);
 
-  const handleShareJourney = async (friend: Friend) => {
+  const handleShareJourney = async (friends: Friend[] | Friend) => {
     if (!generatedJourneyId || !user?.id) {
-      Alert.alert('Error', 'No se pudo compartir el viaje');
+      Alert.alert('Error', 'No se pudo compartir el viaje porque no se encontró el ID del viaje o no estás autenticado.');
       return;
     }
 
     try {
-      const success = await shareJourney(generatedJourneyId, user.id, friend);
+      const success = await shareJourney(generatedJourneyId, user.id, friends);
       if (success) {
         navigation.navigate('Missions', {
           journeyId: generatedJourneyId,
@@ -671,7 +670,7 @@ const MapScreen = () => {
       }
     } catch (error) {
       console.error('Error al compartir viaje:', error);
-      Alert.alert('Error', 'No se pudo compartir el viaje');
+      Alert.alert('Error', 'No se pudo compartir el viaje. Por favor intenta de nuevo.');
     } finally {
       setShowShareModal(false);
       setGeneratedJourneyId(null);
@@ -861,16 +860,6 @@ const MapScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Widget del clima arriba del mapa */}
-      <View style={{ padding: 10 }}>
-        <WeatherWidget
-          cityName={searchCity || undefined}
-          latitude={region.latitude}
-          longitude={region.longitude}
-          compact={true}
-        />
-      </View>
-
       {/* Formulario de búsqueda */}
       <Animated.View
         style={[
@@ -1050,7 +1039,7 @@ const MapScreen = () => {
 
       <LoadingModal visible={isLoading} currentStep={currentStep} />
 
-      <FriendSingleSelectionModal
+      <FriendSelectionModal
         visible={showShareModal}
         onClose={() => {
           setShowShareModal(false);
@@ -1088,12 +1077,14 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSharing, setIsSharing] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
 
   // Limpiar la selección cuando se abre el modal
   useEffect(() => {
     if (visible) {
       setSelectedFriends([]);
+      setIsSharing(false);
     }
   }, [visible]);
 
@@ -1106,31 +1097,11 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
         }
         try {
           setLoading(true);
-          const { data: friendData, error } = await supabase
-            .from('friends')
-            .select('user2Id')
-            .eq('user1Id', user.id);
-          if (error) throw error;
-
-          const friendDetails = await Promise.all(
-            friendData.map(async (friend: { user2Id: string }) => {
-              const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('username, points')
-                .eq('id', friend.user2Id)
-                .single();
-              if (userError) return null;
-              return {
-                user2Id: friend.user2Id,
-                username: userData.username,
-                points: userData.points,
-              };
-            })
-          );
-
-          setFriends(friendDetails.filter((f) => f !== null) as Friend[]);
+          const friendsList = await getFriends(user.id);
+          setFriends(friendsList || []);
         } catch (error) {
           console.error('Error fetching friends:', error);
+          setFriends([]);
         } finally {
           setLoading(false);
         }
@@ -1140,6 +1111,8 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   }, [visible, user]);
 
   const toggleFriendSelection = (friendId: string) => {
+    if (isSharing) return; // No permitir cambios durante el proceso de compartir
+    
     setSelectedFriends(current => {
       if (current.includes(friendId)) {
         return current.filter(id => id !== friendId);
@@ -1150,6 +1123,8 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   };
 
   const selectAllFriends = () => {
+    if (isSharing) return; // No permitir cambios durante el proceso de compartir
+    
     if (selectedFriends.length === friends.length) {
       // Si todos están seleccionados, deseleccionar todos
       setSelectedFriends([]);
@@ -1159,33 +1134,49 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
     }
   };
 
-  const handleShareWithSelected = () => {
+  const handleShareWithSelected = async () => {
     if (selectedFriends.length === 0) {
       Alert.alert('Selección vacía', 'Por favor, selecciona al menos un amigo para compartir el viaje.');
       return;
     }
 
+    // Prevenir múltiples envíos
+    if (isSharing) return;
+    
+    setIsSharing(true);
+
     const selectedFriendsObjects = friends.filter(friend =>
       selectedFriends.includes(friend.user2Id)
     );
 
-    onSelect(selectedFriendsObjects);
+    try {
+      await onSelect(selectedFriendsObjects);
+    } catch (error) {
+      console.error('Error al compartir viaje:', error);
+      // Si hay un error, permitir que el usuario intente de nuevo
+      setIsSharing(false);
+      Alert.alert('Error', 'Ocurrió un error al compartir el viaje. Inténtalo de nuevo.');
+    }
+    // No reseteamos isSharing aquí porque onSelect cerrará el modal y visible cambiará,
+    // lo que reseteará isSharing en el useEffect
   };
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={() => !isSharing && onClose()}
       transparent
     >
       <View style={styles.shareModalOverlay}>
         <View style={styles.shareModalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.shareModalTitle}>Compartir Aventura</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
+            {!isSharing && (
+              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            )}
           </View>
 
           <Text style={styles.shareModalSubtitle}>
@@ -1194,8 +1185,12 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
 
           {!loading && friends.length > 0 && (
             <TouchableOpacity
-              style={styles.selectAllButton}
+              style={[
+                styles.selectAllButton,
+                isSharing && styles.disabledButton
+              ]}
               onPress={selectAllFriends}
+              disabled={isSharing}
             >
               <Text style={styles.selectAllText}>
                 {selectedFriends.length === friends.length
@@ -1218,16 +1213,20 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
               <Text style={styles.loadingText}>Cargando amigos...</Text>
             </View>
           ) : (
-            <FlatList
-              data={friends}
-              keyExtractor={(item) => item.user2Id}
-              renderItem={({ item }) => (
+            <ScrollView 
+              style={styles.friendsListContainer}
+              contentContainerStyle={friends.length === 0 ? styles.emptyListContent : null}
+            >
+              {friends.map((item) => (
                 <TouchableOpacity
+                  key={item.user2Id}
                   style={[
                     styles.friendItem,
-                    selectedFriends.includes(item.user2Id) && styles.friendItemSelected
+                    selectedFriends.includes(item.user2Id) && styles.friendItemSelected,
+                    isSharing && styles.disabledItem
                   ]}
                   onPress={() => toggleFriendSelection(item.user2Id)}
+                  disabled={isSharing}
                 >
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{item.username}</Text>
@@ -1241,15 +1240,15 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
                     color={selectedFriends.includes(item.user2Id) ? "#005F9E" : "#ccc"}
                   />
                 </TouchableOpacity>
-              )}
-              ListEmptyComponent={
+              ))}
+              {friends.length === 0 && (
                 <View style={styles.emptyContainer}>
                   <Ionicons name="people" size={50} color="#ccc" />
                   <Text style={styles.emptyText}>No tienes amigos agregados</Text>
                   <Text style={styles.emptySubtext}>Agrega amigos para poder compartir tus viajes</Text>
                 </View>
-              }
-            />
+              )}
+            </ScrollView>
           )}
 
           <View style={styles.footerContainer}>
@@ -1260,127 +1259,48 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
             )}
 
             <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <TouchableOpacity 
+                style={[
+                  styles.cancelButton,
+                  isSharing && styles.disabledButton
+                ]} 
+                onPress={onClose}
+                disabled={isSharing}
+              >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.shareButton, selectedFriends.length === 0 && styles.disabledButton]}
+                style={[
+                  styles.shareButton, 
+                  (selectedFriends.length === 0 || isSharing) && styles.disabledButton
+                ]}
                 onPress={handleShareWithSelected}
-                disabled={selectedFriends.length === 0}
+                disabled={selectedFriends.length === 0 || isSharing}
               >
-                <Text style={styles.shareButtonText}>
-                  {selectedFriends.length === 0
-                    ? "Selecciona amigos"
-                    : `Compartir (${selectedFriends.length})`}
-                </Text>
+                {isSharing ? (
+                  <View style={styles.sharingButtonContent}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={[styles.shareButtonText, {marginLeft: 8}]}>Compartiendo...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.shareButtonText}>
+                    {selectedFriends.length === 0
+                      ? "Selecciona amigos"
+                      : `Compartir (${selectedFriends.length})`}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
 
-// Renombrar segunda definición 
-const FriendSingleSelectionModal = ({ visible, onClose, onSelect }: {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (friend: Friend) => void;
-}) => {
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const user = useSelector((state: RootState) => state.auth.user);
-
-  useEffect(() => {
-    if (visible) {
-      const fetchFriends = async () => {
-        if (!user) {
-          setLoading(false);
-          setError('Debes iniciar sesión para compartir viajes');
-          return;
-        }
-        try {
-          setLoading(true);
-          setError(null);
-
-          const friendsList = await getFriends(user.id);
-
-          if (!friendsList || friendsList.length === 0) {
-            setError('No tienes amigos agregados para compartir');
-            setFriends([]);
-            return;
-          }
-
-          setFriends(friendsList);
-        } catch (error) {
-          console.error('Error fetching friends:', error);
-          setError('Error al cargar la lista de amigos');
-          setFriends([]);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchFriends();
-    }
-  }, [visible, user]);
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>¿Quieres compartir tu aventura?</Text>
-          <Text style={styles.modalSubtitle}>Selecciona un amigo para compartir este viaje</Text>
-
-          {error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+          {/* Overlay para bloquear interacciones mientras se comparte */}
+          {isSharing && (
+            <View style={styles.sharingOverlay}>
+              <ActivityIndicator size="large" color="#005F9E" />
+              <Text style={styles.sharingText}>Compartiendo viaje...</Text>
             </View>
-          ) : loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4CAF50" />
-              <Text style={styles.loadingText}>Cargando amigos...</Text>
-            </View>
-          ) : (
-            <ScrollView style={styles.friendsList}>
-              {friends.map((friend) => (
-                <TouchableOpacity
-                  key={friend.user2Id}
-                  style={styles.friendItem}
-                  onPress={() => onSelect(friend)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{friend.username}</Text>
-                    <Text style={styles.friendPoints}>Puntos: {friend.points}</Text>
-                  </View>
-                  <Ionicons name="arrow-forward" size={20} color="#005F9E" />
-                </TouchableOpacity>
-              ))}
-              {friends.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="people-outline" size={40} color="#666" />
-                  <Text style={styles.emptyText}>No tienes amigos agregados</Text>
-                </View>
-              )}
-            </ScrollView>
           )}
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelButtonText}>No compartir</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </Modal>
@@ -1762,47 +1682,106 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  friendsList: {
-    maxHeight: 200,
-    width: '100%',
+  friendsListContainer: {
+    maxHeight: 300,
+    marginVertical: 10,
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 200,
   },
   friendItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    alignItems: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  friendItemSelected: {
+    backgroundColor: '#e6f7ff',
   },
   friendInfo: {
     flex: 1,
   },
   friendName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
     color: colors.text.primary,
+    marginBottom: 4,
   },
   friendPoints: {
     fontSize: 14,
+    color: colors.text.secondary,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text.secondary,
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: colors.text.light,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  footerContainer: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 16,
+  },
+  selectedCountText: {
+    fontSize: 14,
+    fontWeight: '500',
     color: colors.primary,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
+    justifyContent: 'space-between',
   },
   cancelButton: {
-    backgroundColor: colors.error,
+    flex: 1,
+    backgroundColor: '#f44336',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    marginLeft: 8,
+    marginRight: 8,
+    alignItems: 'center',
   },
   cancelButtonText: {
-    color: colors.white,
+    color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
+  },
+  shareButton: {
+    flex: 1.5,
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  disabledButton: {
+    backgroundColor: colors.border,
+  },
+  closeButton: {
+    padding: 8,
   },
   shareModalOverlay: {
     flex: 1,
@@ -1816,7 +1795,7 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '90%',
     maxWidth: 400,
-    alignItems: 'center',
+    maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1824,8 +1803,59 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  shareModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  shareModalSubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginBottom: 16,
+  },
+  selectAllButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.primary,
+  },
   buttonTextDisabled: {
     color: '#666',
+  },
+  disabledItem: {
+    opacity: 0.6,
+  },
+  sharingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sharingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  sharingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.primary,
   },
 });
 

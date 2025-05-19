@@ -198,50 +198,79 @@ export const subscribeToMessages = (
 
     console.log(`Creando suscripción a canal: ${channelName}`);
 
-    // Definir el filtro de forma directa para evitar problemas con caracteres especiales
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          // No usar filter para evitar problemas, hacemos el filtrado manual
-          filter: ''
-        },
-        (payload: { new: Message }) => {
-          const message = payload.new;
-          console.log('Mensaje recibido en canal:', message);
+    // Verificar si ya existe un canal con este nombre y eliminarlo primero
+    try {
+      const existingChannels = supabase.getChannels();
+      const existingChannel = existingChannels.find(ch => ch.topic === channelName);
+      if (existingChannel) {
+        console.log(`Canal existente encontrado, limpiando primero: ${channelName}`);
+        supabase.removeChannel(existingChannel);
+      }
+    } catch (error) {
+      console.warn('Error al verificar canales existentes:', error);
+    }
 
-          // Verificar si el mensaje pertenece a la conversación que nos interesa
-          const isRelevantMessage = friendId
-            ? (message.sender_id === userId && message.receiver_id === friendId) ||
-            (message.sender_id === friendId && message.receiver_id === userId)
-            : message.sender_id === userId || message.receiver_id === userId;
+    // Crear un nuevo canal con un pequeño retraso para asegurar limpieza
+    setTimeout(() => {
+      // Definir el filtro de forma directa para evitar problemas con caracteres especiales
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            // No usar filter para evitar problemas, hacemos el filtrado manual
+            filter: ''
+          },
+          (payload: { new: Message }) => {
+            const message = payload.new;
+            console.log('Mensaje recibido en canal:', message);
 
-          console.log(`¿Mensaje relevante para ${userId}? ${isRelevantMessage}`);
+            // Verificar si el mensaje pertenece a la conversación que nos interesa
+            const isRelevantMessage = friendId
+              ? (message.sender_id === userId && message.receiver_id === friendId) ||
+                (message.sender_id === friendId && message.receiver_id === userId)
+              : message.sender_id === userId || message.receiver_id === userId;
 
-          if (isRelevantMessage) {
-            onNewMessage(message);
+            console.log(`¿Mensaje relevante para ${userId}? ${isRelevantMessage}`);
+
+            if (isRelevantMessage) {
+              onNewMessage(message);
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log(`Estado de suscripción a canal ${channelName}:`, status);
+
+          if (status === 'SUBSCRIBED') {
+            console.log(`✅ Canal ${channelName} suscrito correctamente`);
+          }
+
+          if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            console.error(`❌ Error en canal ${channelName}, intentando reconectar...`);
+            // No intentamos reconectar aquí para evitar bucles
+          }
+        });
+
+      // Devolver un objeto con método unsubscribe que limpia correctamente
+      return {
+        unsubscribe: () => {
+          try {
+            console.log(`Limpiando suscripción a canal: ${channelName}`);
+            supabase.removeChannel(channel);
+          } catch (cleanupError) {
+            console.error('Error al limpiar canal:', cleanupError);
           }
         }
-      )
-      .subscribe((status) => {
-        console.log(`Estado de suscripción a canal ${channelName}:`, status);
+      };
+    }, 100);
 
-        if (status === 'SUBSCRIBED') {
-          console.log(`✅ Canal ${channelName} suscrito correctamente`);
-        }
-
-        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          console.error(`❌ Error en canal ${channelName}, intentando reconectar...`);
-          // Eliminamos el intento de reconexión automática ya que puede causar el error
-          // "tried to subscribe multiple times"
-        }
-      });
-
-    return channel;
+    // Devolver un objeto temporal hasta que se complete la creación real
+    return {
+      unsubscribe: () => console.log(`Limpiando suscripción temporal a canal: ${channelName}`)
+    };
   } catch (error) {
     console.error('Error al configurar suscripción:', error);
     // Retornar un objeto con método unsubscribe para evitar errores

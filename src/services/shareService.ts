@@ -218,4 +218,81 @@ export const rejectJourneyInvitation = async (
         console.error('Error al rechazar invitación de viaje:', error);
         return false;
     }
+};
+
+// Función para obtener los usuarios con los que se comparte un viaje
+export const getJourneySharedUsers = async (journeyId: string, includeAllStatuses: boolean = true): Promise<any[]> => {
+  try {
+    // Prepara la consulta básica
+    let query = supabase
+      .from('journeys_shared')
+      .select(`
+        id,
+        sharedWithUserId,
+        status,
+        users:sharedWithUserId (
+          id,
+          username,
+          profile_pic_url
+        )
+      `)
+      .eq('journeyId', journeyId);
+
+    // Si solo queremos los aceptados, filtramos por estado
+    if (!includeAllStatuses) {
+      query = query.eq('status', 'accepted');
+    }
+    
+    // Ejecutar la consulta
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error al obtener usuarios compartidos:', error);
+      return [];
+    }
+
+    // Filtrar usuarios válidos y formatear la respuesta
+    const sharedUsers = data
+      .filter(item => item.users)
+      .map(item => ({
+        id: item.users.id,
+        username: item.users.username,
+        avatarUrl: item.users.profile_pic_url,
+        status: item.status
+      }));
+
+    return sharedUsers;
+  } catch (error) {
+    console.error('Error al obtener usuarios que comparten el viaje:', error);
+    return [];
+  }
+};
+
+// Función para verificar si un viaje es compartido o tiene invitaciones pendientes
+export const isJourneyShared = async (journeyId: string, includeAllStatuses: boolean = true): Promise<boolean> => {
+  try {
+    // Prepara la consulta básica
+    let query = supabase
+      .from('journeys_shared')
+      .select('id', { count: 'exact', head: true })
+      .eq('journeyId', journeyId);
+
+    // Si solo queremos los aceptados, filtramos por estado
+    if (!includeAllStatuses) {
+      query = query.eq('status', 'accepted');
+    }
+    
+    // Ejecutar la consulta
+    const { count, error } = await query;
+
+    if (error) {
+      console.error('Error al verificar si el viaje es compartido:', error);
+      return false;
+    }
+
+    return count > 0;
+  } catch (error) {
+    console.error('Error al verificar si el viaje es compartido:', error);
+    return false;
+  }
 }; 

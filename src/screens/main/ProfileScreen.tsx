@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { updateProfilePicture, getProfilePictureUrl } from '../../services/profileService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserBadges } from '../../services/badgeService';
+import { getAdvancedMissionStats, AdvancedMissionStats } from '../../services/statisticsService';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -77,6 +78,9 @@ const ProfileScreen = () => {
   const [selectedTitle, setSelectedTitle] = useState<string>('');
   const [savingTitle, setSavingTitle] = useState(false);
   const [realPoints, setRealPoints] = useState(0);
+  const [advancedStats, setAdvancedStats] = useState<AdvancedMissionStats | null>(null);
+  const [loadingAdvancedStats, setLoadingAdvancedStats] = useState(false);
+  const [showAdvancedStats, setShowAdvancedStats] = useState(false);
 
   // Manejador global de errores no capturados para este componente
   useEffect(() => {
@@ -101,6 +105,7 @@ const ProfileScreen = () => {
     fetchProfileVisibility();
     fetchBadges();
     fetchCurrentTitle();
+    fetchAdvancedStats();
   }, [user?.id]);
 
   const fetchUserStats = async () => {
@@ -548,6 +553,21 @@ const ProfileScreen = () => {
     }
   };
 
+  const fetchAdvancedStats = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoadingAdvancedStats(true);
+      const stats = await getAdvancedMissionStats(user.id);
+      setAdvancedStats(stats);
+    } catch (error) {
+      console.error('Error al obtener estadísticas avanzadas:', error);
+      // No mostrar alerta para evitar interrumpir la experiencia del usuario
+    } finally {
+      setLoadingAdvancedStats(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView>
@@ -606,6 +626,127 @@ const ProfileScreen = () => {
                 <Text style={styles.statLabel}>Ciudades</Text>
               </View>
             </>
+          )}
+        </View>
+
+        {/* Estadísticas avanzadas */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.sectionHeader} 
+            onPress={() => setShowAdvancedStats(!showAdvancedStats)}
+          >
+            <Text style={styles.sectionTitle}>Estadísticas Avanzadas</Text>
+            <Ionicons 
+              name={showAdvancedStats ? "chevron-up" : "chevron-down"} 
+              size={20} 
+              color="#333" 
+            />
+          </TouchableOpacity>
+          
+          {showAdvancedStats && (
+            <View style={styles.advancedStatsContainer}>
+              {loadingAdvancedStats ? (
+                <ActivityIndicator size="large" color="#005F9E" style={styles.loader} />
+              ) : advancedStats ? (
+                <>
+                  {/* Información de estado de misiones */}
+                  <View style={styles.missionStatusSection}>
+                    <View style={styles.missionStatusRow}>
+                      <View style={styles.missionStatusItem}>
+                        <View style={[styles.colorBox, { backgroundColor: '#4CAF50' }]} />
+                        <Text style={styles.missionStatusCount}>{advancedStats.completedMissions}</Text>
+                        <Text style={styles.missionStatusLabel}>Completadas</Text>
+                      </View>
+                      
+                      <View style={styles.missionStatusItem}>
+                        <View style={[styles.colorBox, { backgroundColor: '#FF9800' }]} />
+                        <Text style={styles.missionStatusCount}>{advancedStats.pendingMissions}</Text>
+                        <Text style={styles.missionStatusLabel}>Pendientes</Text>
+                      </View>
+                      
+                      <View style={styles.missionStatusItem}>
+                        <View style={[styles.colorBox, { backgroundColor: '#F44336' }]} />
+                        <Text style={styles.missionStatusCount}>{advancedStats.expiredMissions}</Text>
+                        <Text style={styles.missionStatusLabel}>Expiradas</Text>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  {/* Top 3 ciudades con más misiones */}
+                  {advancedStats.topCities && advancedStats.topCities.length > 0 && (
+                    <View style={styles.topCitiesSection}>
+                      <Text style={styles.topCitiesTitle}>Top Ciudades</Text>
+                      
+                      {advancedStats.topCities.map((city, index) => (
+                        <View key={city.name} style={styles.topCityItem}>
+                          <View style={[
+                            styles.topCityRank,
+                            { backgroundColor: index === 0 ? '#005F9E' : index === 1 ? '#0277BD' : '#0288D1' }
+                          ]}>
+                            <Text style={styles.topCityRankText}>{index + 1}</Text>
+                          </View>
+                          <View style={styles.topCityInfo}>
+                            <Text style={styles.topCityName}>{city.name}</Text>
+                            <View style={styles.topCityBarContainer}>
+                              <View 
+                                style={[
+                                  styles.topCityBar,
+                                  {
+                                    width: `${Math.min(100, (city.count / (advancedStats.topCities[0]?.count || 1)) * 100)}%`,
+                                    backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : '#CD7F32'
+                                  }
+                                ]}
+                              />
+                            </View>
+                            <Text style={styles.topCityCount}>{city.count} misiones</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {/* Estadísticas detalladas */}
+                  <View style={styles.detailedStats}>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statTitle}>Puntos ganados en misiones:</Text>
+                      <Text style={styles.statDetail}>{advancedStats.pointsEarned}</Text>
+                    </View>
+                    
+                    <View style={styles.statRow}>
+                      <Text style={styles.statTitle}>Tiempo promedio para completar:</Text>
+                      <Text style={styles.statDetail}>{advancedStats.averageTimeToComplete} días</Text>
+                    </View>
+                    
+                    <View style={styles.statRow}>
+                      <Text style={styles.statTitle}>Categoría más completada:</Text>
+                      <Text style={styles.statDetail}>{advancedStats.mostCompletedCategory}</Text>
+                    </View>
+                    
+                    {/* Resumen por categorías */}
+                    <Text style={styles.categoryTitle}>Misiones completadas por categoría:</Text>
+                    {Object.entries(advancedStats.completedByCategory).map(([category, count]) => (
+                      <View key={category} style={styles.categoryRow}>
+                        <Text style={styles.categoryName}>{category}</Text>
+                        <View style={styles.categoryBar}>
+                          <View 
+                            style={[
+                              styles.categoryFill, 
+                              { 
+                                width: `${(count / advancedStats.completedMissions) * 100}%`,
+                                backgroundColor: getCategoryColor(category)
+                              }
+                            ]} 
+                          />
+                        </View>
+                        <Text style={styles.categoryCount}>{count}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.noStatsText}>No hay suficientes datos para mostrar estadísticas avanzadas.</Text>
+              )}
+            </View>
           )}
         </View>
 
@@ -826,6 +967,25 @@ const ProfileScreen = () => {
       </ScrollView>
     </SafeAreaView>
   );
+};
+
+// Función para obtener colores para las categorías
+const getCategoryColor = (category: string): string => {
+  const colors: Record<string, string> = {
+    'cultura': '#8E44AD',     // Morado
+    'arte': '#9B59B6',        // Púrpura
+    'food': '#2ECC71',        // Verde
+    'gastronomía': '#27AE60', // Verde oscuro
+    'naturaleza': '#27AE60',  // Verde oscuro
+    'aventura': '#E74C3C',    // Rojo
+    'historia': '#D35400',    // Naranja oscuro
+    'arquitectura': '#3498DB', // Azul
+    'fotografía': '#1ABC9C',   // Verde agua
+    'compras': '#F39C12',     // Ámbar
+    'social': '#16A085',      // Verde azulado
+  };
+  
+  return colors[category.toLowerCase()] || '#F39C12'; // Naranja por defecto
 };
 
 const styles = StyleSheet.create({
@@ -1171,6 +1331,182 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.7,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: 10,
+  },
+  advancedStatsContainer: {
+    marginTop: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    padding: 15,
+  },
+  loader: {
+    marginVertical: 20,
+  },
+  noStatsText: {
+    fontStyle: 'italic',
+    textAlign: 'center',
+    color: '#666',
+    marginVertical: 20,
+  },
+  missionStatusSection: {
+    marginBottom: 25,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    padding: 15,
+  },
+  missionStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  missionStatusItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  missionStatusCount: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  missionStatusLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  colorBox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  topCitiesSection: {
+    marginTop: 25,
+    marginBottom: 25,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  topCitiesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  topCityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  topCityRank: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#005F9E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  topCityRankText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  topCityInfo: {
+    flex: 1,
+  },
+  topCityName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#333',
+  },
+  topCityBarContainer: {
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  topCityBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  topCityCount: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+  },
+  detailedStats: {
+    marginTop: 10,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingBottom: 8,
+  },
+  statTitle: {
+    fontSize: 14,
+    color: '#333',
+    flex: 3,
+  },
+  statDetail: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#005F9E',
+    flex: 1,
+    textAlign: 'right',
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 12,
+    color: '#333',
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  categoryName: {
+    width: 100,
+    fontSize: 14,
+    color: '#333',
+  },
+  categoryBar: {
+    flex: 1,
+    height: 12,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 6,
+    marginHorizontal: 10,
+    overflow: 'hidden',
+  },
+  categoryFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  categoryCount: {
+    width: 30,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'right',
   },
 });
 
