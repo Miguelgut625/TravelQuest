@@ -56,45 +56,53 @@ interface FriendProfileScreenProps {
 const { width } = Dimensions.get('window');
 const JOURNEY_IMAGE_WIDTH = width - 40; // 20 de padding en cada lado
 
-const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => (
-    <TouchableOpacity style={styles.journalCard}>
-        <Text style={styles.journalCardTitle}>{entry.title}</Text>
-        <Text style={styles.journalCardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
-        {entry.missionId && (
-            <View style={styles.journalMissionBadge}>
-                <Ionicons name="trophy" size={16} color="#4CAF50" />
-                <Text style={styles.journalMissionBadgeText}>Misión Completada</Text>
-            </View>
-        )}
-        <Text style={styles.journalCardContent} numberOfLines={3}>
-            {entry.content}
-        </Text>
-        {entry.photos && entry.photos.length > 0 && (
-            <View style={styles.journalPhotoGrid}>
-                {entry.photos.slice(0, 3).map((photo, index) => (
-                    <Image
-                        key={index}
-                        source={{ uri: photo }}
-                        style={styles.journalThumbnail}
-                        resizeMode="cover"
-                    />
+const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
+    const navigation = useNavigation<any>();
+    
+    const handleEntryPress = () => {
+        navigation.navigate('JournalEntryDetail', { entry });
+    };
+    
+    return (
+        <TouchableOpacity style={styles.journalCard} onPress={handleEntryPress}>
+            <Text style={styles.journalCardTitle}>{entry.title}</Text>
+            <Text style={styles.journalCardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+            {entry.missionId && (
+                <View style={styles.journalMissionBadge}>
+                    <Ionicons name="trophy" size={16} color="#4CAF50" />
+                    <Text style={styles.journalMissionBadgeText}>Misión Completada</Text>
+                </View>
+            )}
+            <Text style={styles.journalCardContent} numberOfLines={3}>
+                {entry.content}
+            </Text>
+            {entry.photos && entry.photos.length > 0 && (
+                <View style={styles.journalPhotoGrid}>
+                    {entry.photos.slice(0, 3).map((photo, index) => (
+                        <Image
+                            key={index}
+                            source={{ uri: photo }}
+                            style={styles.journalThumbnail}
+                            resizeMode="cover"
+                        />
+                    ))}
+                    {entry.photos.length > 3 && (
+                        <View style={styles.journalMorePhotos}>
+                            <Text style={styles.journalMorePhotosText}>+{entry.photos.length - 3}</Text>
+                        </View>
+                    )}
+                </View>
+            )}
+            <View style={styles.journalTags}>
+                {entry.tags && entry.tags.map((tag, index) => (
+                    <Text key={index} style={styles.journalTag}>
+                        #{tag}
+                    </Text>
                 ))}
-                {entry.photos.length > 3 && (
-                    <View style={styles.journalMorePhotos}>
-                        <Text style={styles.journalMorePhotosText}>+{entry.photos.length - 3}</Text>
-                    </View>
-                )}
             </View>
-        )}
-        <View style={styles.journalTags}>
-            {entry.tags && entry.tags.map((tag, index) => (
-                <Text key={index} style={styles.journalTag}>
-                    #{tag}
-                </Text>
-            ))}
-        </View>
-    </TouchableOpacity>
-);
+        </TouchableOpacity>
+    );
+};
 
 const EmptyState = ({ message }: { message: string }) => (
     <View style={styles.journalEmptyContainer}>
@@ -671,7 +679,15 @@ const FriendProfileScreen = () => {
                         <Text style={styles.emptyText}>No hay viajes completados</Text>
                     ) : (
                         Object.values(entriesByCity).map((cityEntries, index) => (
-                            <View key={index} style={styles.journeyItem}>
+                            <TouchableOpacity 
+                                key={index} 
+                                style={styles.journeyItem}
+                                onPress={() => {
+                                    if (cityEntries.length > 0) {
+                                        navigation.navigate('JournalEntryDetail', { entry: cityEntries[0] });
+                                    }
+                                }}
+                            >
                                 <View style={styles.journeyImagesContainer}>
                                     {cityEntries.length > 0 && cityEntries[0].photos && cityEntries[0].photos.length > 0 ? (
                                         <Image
@@ -700,7 +716,7 @@ const FriendProfileScreen = () => {
                                         </Text>
                                     </View>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                         ))
                     )}
                 </View>
