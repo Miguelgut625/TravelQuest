@@ -199,7 +199,7 @@ const DateRangePickerMobile: React.FC<{
         style={styles.datePickerButton}
         onPress={onToggleCalendar}
       >
-        <Ionicons name="calendar" size={20} color="#666" style={styles.calendarIcon} />
+        <Ionicons name="calendar" size={20} color="#EDF6F9" style={styles.calendarIcon} />
         <Text style={styles.datePickerText}>
           {formatDateRange() || "Selecciona fechas"}
         </Text>
@@ -252,13 +252,14 @@ const DateRangePickerMobile: React.FC<{
                   textDayHeaderFontWeight: '300',
                   textDayFontSize: 14,
                   textMonthFontSize: 14,
-                  textDayHeaderFontSize: 12
+                  textDayHeaderFontSize: 12,
+                  width: 300,
                 }}
               />
 
               <View style={styles.durationContainer}>
                 <Text style={styles.durationText}>
-                  Duración: {calculateDuration(startDate, endDate)} días
+                  Duración: {calculateDuration(startDate, endDate)} días    
                 </Text>
                 <TouchableOpacity
                   style={styles.calendarCloseButton}
@@ -374,12 +375,11 @@ const DateRangePickerWeb: React.FC<{
             <TouchableOpacity
               activeOpacity={1}
               onPress={e => e.stopPropagation()}
-              style={styles.calendarContainer}
             >
               <View style={styles.calendarHeader}>
                 <Text style={styles.calendarTitle}>Selecciona fechas</Text>
                 <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                  <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={22} color="#secondary" />
                 </TouchableOpacity>
               </View>
 
@@ -894,7 +894,7 @@ const MapScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="¿Qué ciudad quieres visitar?"
-            placeholderTextColor="#666"
+            placeholderTextColor="#EDF6F9"
             value={searchCity}
             onChangeText={handleCitySearch}
           />
@@ -925,7 +925,7 @@ const MapScreen = () => {
               <TextInput
                 style={styles.smallInput}
                 placeholder="Nº misiones"
-                placeholderTextColor="#666"
+                placeholderTextColor="#EDF6F9"
                 value={missionCount}
                 onChangeText={setMissionCount}
                 keyboardType="numeric"
@@ -971,7 +971,7 @@ const MapScreen = () => {
             onPress={handleSearch}
             disabled={!searchCity || !startDate || !endDate}
           >
-            <Ionicons name="rocket" size={20} color={(!searchCity || !startDate || !endDate) ? "#666" : "white"} style={{ marginRight: 8 }} />
+            <Ionicons name="rocket" size={20} color={(!searchCity || !startDate || !endDate) ? "#EDF6F9" : "white"} style={{ marginRight: 8 }} />
             <Text style={[
               styles.buttonText,
               (!searchCity || !startDate || !endDate) && styles.buttonTextDisabled
@@ -1387,21 +1387,23 @@ const FriendSingleSelectionModal = ({ visible, onClose, onSelect }: {
   );
 };
 
-// Definir paleta local
 const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
+  primary: '#274472',
+  secondary: '#669BBC',
+  background: '#0D1B2A',
+  white: '#0D1B2A',
   text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
+    primary: '#EDF6F9',
+    secondary: '#D7EFFF',
+    light: '#D7EFFF',
   },
-  border: '#EEEEEE',
+  border: '#41729F',
   success: '#4CAF50',
   error: '#D32F2F',
 };
+
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -1448,7 +1450,7 @@ const styles = StyleSheet.create({
   cityInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1500,7 +1502,7 @@ const styles = StyleSheet.create({
   missionInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1527,7 +1529,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagButton: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.secondary,
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 14,
@@ -1537,15 +1539,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   tagButtonSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.white,
+    borderColor: colors.secondary,
   },
   tagText: {
-    color: colors.text.secondary,
+    color: colors.white,
     fontSize: 14,
   },
   tagTextSelected: {
-    color: colors.white,
+    color: colors.secondary,
     fontWeight: 'bold',
   },
   button: {
@@ -1653,7 +1655,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   loadingCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
@@ -1679,28 +1681,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     padding: 20,
     width: '90%',
     maxWidth: 400,
     alignItems: 'center',
-  },
+  }, 
   calendarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    width: '90%',
+    marginBottom: 10,
+    backgroundColor: colors.secondary,
   },
   calendarTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.primary,
+    width: '90%',
+    color: colors.text.primary,
   },
   calendarSubtitle: {
     fontSize: 14,
-    color: colors.text.secondary,
+    color: colors.text.primary,
     marginBottom: 8,
+    width: '90%',
   },
   calendarControls: {
     flexDirection: 'row',
@@ -1747,7 +1753,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   calendarCloseButtonText: {
-    color: colors.white,
+    color: colors.text.light,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -1756,6 +1762,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 12,
+    width:300 
   },
   durationText: {
     color: colors.primary,
@@ -1825,7 +1832,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   buttonTextDisabled: {
-    color: '#666',
+    color: '#EDF6F9',
   },
 });
 

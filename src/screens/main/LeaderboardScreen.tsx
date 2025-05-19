@@ -16,16 +16,16 @@ interface LeaderboardItem {
 const { width, height } = Dimensions.get('window');
 
 const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
+  primary: '#274472',
+  secondary: '#669BBC',
+  background: '#0D1B2A',
+  white: '#0D1B2A',
   text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
+    primary: '#EDF6F9',
+    secondary: '#D7EFFF',
+    light: '#D7EFFF',
   },
-  border: '#EEEEEE',
+  border: '#41729F',
   success: '#4CAF50',
   error: '#D32F2F',
 };
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    marginTop: 10,
+    marginTop: 40,
     marginBottom: 10,
     backgroundColor: colors.white,
     borderRadius: 8,
@@ -140,14 +140,14 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     marginLeft: 5,
-    color: colors.primary,
+    color: colors.secondary,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   title: {
     fontSize: width < 400 ? 22 : 28,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.secondary,
     textAlign: 'center',
     marginVertical: 16,
   },
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: width < 400 ? 18 : 24,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.secondary,
     marginRight: 8,
   },
   usernameContainer: {
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.text.primary,
   },
   errorText: {
     color: colors.error,
