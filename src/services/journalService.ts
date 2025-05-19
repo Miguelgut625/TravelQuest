@@ -20,6 +20,15 @@ export interface CityJournalEntry extends JournalEntryDB {
   city_name: string;
 }
 
+export interface JournalComment {
+  id: string;
+  entry_id: string;
+  user_id: string;
+  comment: string;
+  created_at: string;
+  username?: string;
+}
+
 /**
  * Verifica si existe la tabla journal_entries o journey_diary en la base de datos
  * @returns objeto con la información de qué tablas existen
@@ -465,4 +474,38 @@ export const createJournalEntry = async (data: {
     console.error('❌ Error en createJournalEntry:', error);
     throw error;
   }
-}; 
+};
+
+// Obtener comentarios de una entrada
+export async function getCommentsByEntryId(entryId: string): Promise<JournalComment[]> {
+  try {
+    const { data, error } = await supabase
+      .from('journal_comments')
+      .select('*, users: user_id (username)')
+      .eq('entry_id', entryId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    // Mapear para incluir username
+    return (data || []).map((c: any) => ({
+      ...c,
+      username: c.users?.username || 'Usuario',
+    }));
+  } catch (error) {
+    console.error('Error al obtener comentarios:', error);
+    return [];
+  }
+}
+
+// Insertar comentario en la tabla
+export async function addCommentToEntryTable(entryId: string, userId: string, comment: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('journal_comments')
+      .insert({ entry_id: entryId, user_id: userId, comment });
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error al insertar comentario:', error);
+    return false;
+  }
+} 

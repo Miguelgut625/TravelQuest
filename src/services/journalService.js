@@ -56,7 +56,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
     return to.concat(ar || Array.prototype.slice.call(from));
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createJournalEntry = exports.getMissionJournalEntries = exports.getUserJournalEntries = exports.checkJournalTables = exports.addPhotoToEntry = exports.addCommentToEntry = exports.getJournalEntryById = void 0;
+exports.createJournalEntry = exports.getMissionJournalEntries = exports.getUserJournalEntries = exports.checkJournalTables = exports.addPhotoToEntry = exports.addCommentToEntry = exports.getJournalEntryById = exports.getCommentsByEntryId = exports.addCommentToEntryTable = void 0;
 var supabase_1 = require("./supabase");
 /**
  * Verifica si existe la tabla journal_entries o journey_diary en la base de datos
@@ -821,83 +821,20 @@ exports.addPhotoToEntry = addPhotoToEntry;
  */
 var addCommentToEntry = function (entryId, userId, comment) {
     return __awaiter(void 0, void 0, void 0, function () {
-        var tableExists, result, error_1, newComment, entryContent, contentUpdate, updateResult, error_2;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
-                case 0:
-                    _b.trys.push([0, 7, , 8]);
-                    tableExists = false;
-                    _b.label = 1;
-                case 1:
-                    _b.trys.push([1, 3, , 4]);
-                    return [4 /*yield*/, supabase_1.supabase
-                        .from('journal_comments')
-                        .select('id')
-                        .limit(1)];
-                case 2:
-                    result = _b.sent();
-                    if (result && !result.error) {
-                        tableExists = true;
-                    }
-                    return [3 /*break*/, 4];
-                case 3:
-                    error_1 = _b.sent();
-                    console.log('La tabla journal_comments no existe o no es accesible:', error_1);
-                    return [3 /*break*/, 4];
-                case 4:
-                    if (!tableExists) return [3 /*break*/, 5];
-                    try {
-                        console.log('Intentando insertar en tabla journal_comments');
-                        return [4 /*yield*/, supabase_1.supabase
-                            .from('journal_comments')
-                            .insert({
-                                entry_id: entryId,
-                                user_id: userId,
-                                comment: comment,
-                                created_at: new Date().toISOString()
-                            })];
-                    } catch (error) {
-                        console.error('Error inesperado al insertar en journal_comments:', error);
-                        tableExists = false;
-                    }
-                    _b.label = 5;
-                case 5:
-                    if (!!tableExists) return [3 /*break*/, 6];
-                    console.log('Usando método alternativo: añadir comentario al contenido de la entrada');
-                    newComment = "\n\n[Comentario de Usuario - " + new Date().toLocaleString() + "]\n" + comment;
-                    return [4 /*yield*/, supabase_1.supabase
-                        .from('journal_entries')
-                        .select('content')
-                        .eq('id', entryId)
-                        .single()];
-                case 6:
-                    entryContent = _b.sent();
-                    if (entryContent.error) {
-                        console.error('Error al obtener contenido de la entrada:', entryContent.error);
-                        return [2 /*return*/, false];
-                    }
-                    contentUpdate = {
-                        content: (entryContent.data.content || '') + newComment
-                    };
-                    console.log('Actualizando contenido con el comentario añadido');
-                    return [4 /*yield*/, supabase_1.supabase
-                        .from('journal_entries')
-                        .update(contentUpdate)
-                        .eq('id', entryId)];
-                case 7:
-                    updateResult = _b.sent();
-                    if (updateResult.error) {
-                        console.error('Error al actualizar la entrada con el comentario:', updateResult.error);
-                        return [2 /*return*/, false];
-                    }
-                    console.log('Comentario añadido exitosamente al contenido de la entrada');
-                    return [2 /*return*/, true];
-                case 8:
-                    error_2 = _b.sent();
-                    console.error('Error general al añadir comentario:', error_2);
-                    return [2 /*return*/, false];
-            }
-        });
+        try {
+            // Insertar siempre en la tabla journal_comments
+            return [4 /*yield*/, supabase_1.supabase
+                .from('journal_comments')
+                .insert({
+                    entry_id: entryId,
+                    user_id: userId,
+                    comment: comment,
+                    created_at: new Date().toISOString()
+                })];
+        } catch (error) {
+            console.error('Error al insertar comentario en journal_comments:', error);
+            return [2 /*return*/, false];
+        }
     });
 };
 exports.addCommentToEntry = addCommentToEntry;
@@ -984,3 +921,59 @@ var getJournalEntryById = function (entryId) {
     });
 };
 exports.getJournalEntryById = getJournalEntryById;
+// Obtener comentarios de una entrada
+var getCommentsByEntryId = function (entryId) {
+    return __awaiter(void 0, void 0, void 0, function () {
+        var _a, data, error;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    _b.trys.push([0, 2, , 3]);
+                    return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_comments')
+                        .select('*, users: user_id (username)')
+                        .eq('entry_id', entryId)
+                        .order('created_at', { ascending: true })];
+                case 1:
+                    _a = _b.sent(), data = _a.data, error = _a.error;
+                    if (error) throw error;
+                    // Mapear para incluir username
+                    return [2 /*return*/, (data || []).map((c) => ({
+                        ...c,
+                        username: c.users?.username || 'Usuario',
+                    }))];
+                case 2:
+                    error = _b.sent();
+                    console.error('Error al obtener comentarios:', error);
+                    return [2 /*return*/, []];
+                case 3: return [2 /*return*/];
+            }
+        });
+    });
+};
+exports.getCommentsByEntryId = getCommentsByEntryId;
+// Insertar comentario en la tabla
+var addCommentToEntryTable = function (entryId, userId, comment) {
+    return __awaiter(void 0, void 0, void 0, function () {
+        var _a, error;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    _b.trys.push([0, 2, , 3]);
+                    return [4 /*yield*/, supabase_1.supabase
+                        .from('journal_comments')
+                        .insert({ entry_id: entryId, user_id: userId, comment })];
+                case 1:
+                    _a = _b.sent(), error = _a.error;
+                    if (error) throw error;
+                    return [2 /*return*/, true];
+                case 2:
+                    error = _b.sent();
+                    console.error('Error al insertar comentario:', error);
+                    return [2 /*return*/, false];
+                case 3: return [2 /*return*/];
+            }
+        });
+    });
+};
+exports.addCommentToEntryTable = addCommentToEntryTable;

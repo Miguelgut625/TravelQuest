@@ -5,8 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinary } from '../../services/cloudinaryService';
-import { addPhotoToEntry, addCommentToEntry } from '../../services/journalService';
-import { getJournalEntryById } from '../../services/journalService.js';
+import { 
+  addPhotoToEntry, 
+  getJournalEntryById, 
+  getCommentsByEntryId, 
+  addCommentToEntryTable 
+} from '../../services/journalService';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 
@@ -16,7 +20,7 @@ interface JournalEntryDetailScreenProps {
 
 interface Comment {
   id: string;
-  userId: string;
+  user_id: string;
   comment: string;
   created_at: string;
   username?: string;
@@ -33,62 +37,14 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Función para refrescar la entrada actual desde la base de datos
-  const refreshEntry = async () => {
+  const fetchComments = async () => {
     try {
-      setRefreshing(true);
-      // Obtener la entrada actualizada de la base de datos
-      const updatedEntry = await getJournalEntryById(entry.id);
-      if (updatedEntry) {
-        // Actualizar la entrada en los parámetros de la ruta
-        route.params.entry = updatedEntry;
-        
-        // Inicializar comentarios desde la entrada actualizada
-        if (updatedEntry.comments && Array.isArray(updatedEntry.comments)) {
-          setComments(updatedEntry.comments);
-        } else {
-          // Extraer comentarios del contenido actualizado
-          extractCommentsFromContent(updatedEntry.content);
-        }
-      }
+      const data = await getCommentsByEntryId(entry.id);
+      console.log('Comentarios obtenidos:', data); // Para debug
+      setComments(data);
     } catch (error) {
-      console.error('Error al refrescar la entrada:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    // Inicializar comentarios desde la entrada si existen
-    if (entry.comments && Array.isArray(entry.comments)) {
-      setComments(entry.comments);
-    } else {
-      // Extraer comentarios del contenido si están en formato [Comentario de...]
-      extractCommentsFromContent();
-    }
-  }, [entry]);
-
-  // Función para extraer comentarios del contenido
-  const extractCommentsFromContent = (content = entry.content) => {
-    if (!content) return;
-    
-    // Buscar todos los comentarios en el formato [Comentario de Usuario - fecha]
-    const commentRegex = /\[Comentario de (.*?) - (.*?)\]\n([\s\S]*?)(?=\n\[Comentario de|$)/g;
-    const extractedComments: Comment[] = [];
-    let match;
-    
-    while ((match = commentRegex.exec(content)) !== null) {
-      extractedComments.push({
-        id: Date.now().toString() + extractedComments.length,
-        userId: 'extracted', // No tenemos el userId real
-        username: match[1],
-        comment: match[3].trim(),
-        created_at: match[2]
-      });
-    }
-    
-    if (extractedComments.length > 0) {
-      setComments(extractedComments);
+      console.error('Error al obtener comentarios:', error);
+      Alert.alert('Error', 'No se pudieron cargar los comentarios');
     }
   };
 
@@ -107,14 +63,39 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   };
 
   const formatCommentDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    // Intentar parsear como ISO
+    let date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      return date.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+    // Intentar parsear formato dd/mm/yyyy hh:mm:ss a. m./p. m.
+    const match = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}):(\d{2}) (a\. m\.|p\. m\.)/);
+    if (match) {
+      let [_, d, m, y, h, min, s, ap] = match;
+      d = parseInt(d, 10);
+      m = parseInt(m, 10) - 1;
+      y = parseInt(y, 10);
+      h = parseInt(h, 10);
+      min = parseInt(min, 10);
+      s = parseInt(s, 10);
+      if (ap === 'p. m.' && h < 12) h += 12;
+      if (ap === 'a. m.' && h === 12) h = 0;
+      date = new Date(y, m, d, h, min, s);
+      return date.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+    return 'Sin fecha';
   };
 
   const goToNextPhoto = () => {
@@ -178,53 +159,47 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
-    
     try {
       setIsAddingComment(true);
-      
       if (!user || !user.id) {
         Alert.alert('Error', 'Debes iniciar sesión para comentar');
         return;
       }
-
-      console.log('Intentando añadir comentario a la entrada:', entry.id);
-      console.log('Usuario ID:', user.id);
-      console.log('Comentario:', newComment);
-      
-      // Añadir directamente el comentario en memoria
-      const newCommentObj: Comment = {
-        id: Date.now().toString(),
-        userId: user.id,
-        comment: newComment,
-        created_at: new Date().toISOString(),
-        username: user.username || 'Usuario'
-      };
-      
-      // Actualizar estado local primero para mejor UX
-      setComments([...comments, newCommentObj]);
-      setNewComment('');
-      
-      // Actualizar entrada local para mantener coherencia con el servidor
-      // El formato de comentario que se agregará al contenido
-      const commentToAdd = `\n\n[Comentario de ${user.username || 'Usuario'} - ${new Date().toLocaleString()}]\n${newComment}`;
-      entry.content = entry.content + commentToAdd;
-      
-      // Finalmente guardar en el servidor (pero ya hemos actualizado la UI)
-      const success = await addCommentToEntry(entry.id, user.id, newComment);
-      
-      if (!success) {
-        console.warn('El comentario se guardó localmente pero no en el servidor');
-        // No mostramos error al usuario porque ya vió su comentario en pantalla
+      const success = await addCommentToEntryTable(entry.id, user.id, newComment);
+      if (success) {
+        setNewComment('');
+        // Refrescar los comentarios inmediatamente después de añadir uno nuevo
+        await fetchComments();
       } else {
-        console.log('Comentario guardado exitosamente en el servidor');
-        // Ya no intentamos refrescar automáticamente, en su lugar actualizamos el modelo local
-        // que ya se actualizó arriba cuando añadimos el comentario a comments y a entry.content
+        Alert.alert('Error', 'No se pudo guardar el comentario');
       }
     } catch (error) {
       console.error('Error al añadir comentario:', error);
-      Alert.alert('Error', 'Ocurrió un error al añadir el comentario, pero se guardó localmente');
+      Alert.alert('Error', 'Ocurrió un error al añadir el comentario');
     } finally {
       setIsAddingComment(false);
+    }
+  };
+
+  // Asegurarnos de que los comentarios se cargan al montar el componente
+  useEffect(() => {
+    fetchComments();
+  }, [entry.id]); // Solo se ejecuta cuando cambia el ID de la entrada
+
+  // Eliminar la lógica antigua de extraer comentarios del contenido
+  const refreshEntry = async () => {
+    try {
+      setRefreshing(true);
+      const updatedEntry = await getJournalEntryById(entry.id);
+      if (updatedEntry) {
+        route.params.entry = updatedEntry;
+        // Solo refrescar los comentarios
+        await fetchComments();
+      }
+    } catch (error) {
+      console.error('Error al refrescar la entrada:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 

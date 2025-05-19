@@ -18,6 +18,7 @@ interface JournalScreenProps {
 const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
   const [expanded, setExpanded] = useState(false);
   const navigation = useNavigation<any>();
+  const { user } = useSelector((state: RootState) => state.auth);
 
   const handlePress = () => {
     setExpanded(!expanded);
@@ -32,6 +33,20 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
   };
 
   const isDetailedDescription = entry.content && entry.content.length > 150;
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error al formatear la fecha:', error);
+      return 'Fecha no disponible';
+    }
+  };
 
   return (
     <TouchableOpacity
@@ -49,7 +64,8 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
           <Ionicons name="expand-outline" size={20} color="#005F9E" />
         </TouchableOpacity>
       </View>
-      <Text style={styles.cardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+      <Text style={styles.cardDate}>{formatDate(entry.created_at)}</Text>
+      <Text style={styles.cardAuthor}>{user?.username || 'Usuario'}</Text>
 
       {isDetailedDescription ? (
         <>
@@ -650,6 +666,12 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 12,
     marginBottom: 10,
+  },
+  cardAuthor: {
+    color: '#666',
+    fontSize: 12,
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
   cardContent: {
     color: '#333',
