@@ -92,7 +92,7 @@ const ChatScreen = () => {
   // Añadir configuración del StatusBar
   useEffect(() => {
     StatusBar.setBarStyle('light-content');
-    StatusBar.setBackgroundColor('transparent');
+    StatusBar.setBackgroundColor(colors.primary);
     StatusBar.setTranslucent(true);
   }, []);
 
@@ -172,24 +172,22 @@ const ChatScreen = () => {
     // Limpiar suscripción anterior si existe
     if (subscriptionRef.current) {
       console.log('Limpiando suscripción anterior');
-      subscriptionRef.current.unsubscribe();
+      try {
+        subscriptionRef.current.unsubscribe();
+      } catch (error) {
+        console.error('Error al limpiar suscripción anterior:', error);
+      }
       // Asegurarse de que la referencia se limpie completamente
       subscriptionRef.current = null;
-
-      // Añadir un pequeño retraso para asegurar que la limpieza se complete
-      setTimeout(() => {
-        // Verificar que no se haya recreado la suscripción en el intervalo
-        if (!subscriptionRef.current) {
-          // Crear nueva suscripción
-          subscriptionRef.current = subscribeToMessages(user.id, handleNewMessage, friendId);
-          console.log('Nueva suscripción creada');
-        }
-      }, 300);
-    } else {
-      // Si no hay suscripción previa, crear una nueva inmediatamente
-      subscriptionRef.current = subscribeToMessages(user.id, handleNewMessage, friendId);
-      console.log('Nueva suscripción creada');
     }
+    
+    // Crear nueva suscripción después de un pequeño retraso para asegurar limpieza
+    setTimeout(() => {
+      if (!subscriptionRef.current) {
+        subscriptionRef.current = subscribeToMessages(user.id, handleNewMessage, friendId);
+        console.log('Nueva suscripción creada');
+      }
+    }, 300);
   }, [user?.id, friendId, handleNewMessage]);
 
   // Efecto para configurar la suscripción y limpiarla al desmontar
@@ -199,7 +197,12 @@ const ChatScreen = () => {
     return () => {
       if (subscriptionRef.current) {
         console.log('Limpiando suscripción al desmontar');
-        subscriptionRef.current.unsubscribe();
+        try {
+          subscriptionRef.current.unsubscribe();
+          subscriptionRef.current = null;
+        } catch (error) {
+          console.error('Error al limpiar suscripción al desmontar:', error);
+        }
       }
     };
   }, [setupMessageSubscription]);
@@ -425,7 +428,7 @@ const ChatScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.primary }]} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -435,14 +438,14 @@ const ChatScreen = () => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.primary} />
+            <Ionicons name="arrow-back" size={22} color={colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{friendName || 'Chat'}</Text>
           <TouchableOpacity
             style={styles.groupsButton}
             onPress={() => navigation.navigate('Groups')}
           >
-            <Ionicons name="people" size={22} color={colors.primary} />
+            <Ionicons name="people" size={22} color={colors.white} />
           </TouchableOpacity>
         </View>
 
@@ -592,9 +595,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
     height: Platform.OS === 'ios' ? 44 : 56,
     paddingTop: Platform.OS === 'ios' ? 0 : 8,
     elevation: 2,
@@ -604,7 +607,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   backButton: {
-    backgroundColor: colors.white,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -620,7 +623,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   groupsButton: {
-    backgroundColor: colors.white,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -638,7 +641,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.white,
     textAlign: 'center',
     flex: 1,
   },

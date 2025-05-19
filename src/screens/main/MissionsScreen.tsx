@@ -1070,13 +1070,24 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   }, [missionCompleted, navigation]);
 
   const handleShareJourney = async (friends: Friend[] | Friend) => {
-    if (!journeyId || !user?.id) {
+    // Usar el ID del viaje de la misión específica si existe, de lo contrario usar el general
+    const missionJourneyId = missionToShare ? missionToShare.journeyId : journeyId;
+    
+    if (!missionJourneyId || !user?.id) {
+      // Cerrar el modal de compartir antes de mostrar el error
+      setIsShareModalVisible(false);
+      setMissionToShare(null);
+      
       Alert.alert('Error', 'No se pudo compartir el viaje porque no se encontró el ID del viaje o no estás autenticado.');
+      console.log('JourneyId:', missionJourneyId, 'UserId:', user?.id);
+      // Navegar al MapScreen cuando ocurre este error específico
+      navigation.navigate('Map');
       return;
     }
 
     try {
-      const success = await shareJourney(journeyId, user.id, friends);
+      console.log('Intentando compartir viaje:', missionJourneyId, 'con amigos:', friends);
+      const success = await shareJourney(missionJourneyId, user.id, friends);
       if (success) {
         // Si el proceso fue exitoso, no necesitamos hacer nada más
         // ya que la función shareJourney muestra sus propias alertas
@@ -1086,6 +1097,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       Alert.alert('Error', 'No se pudo compartir el viaje');
     } finally {
       setIsShareModalVisible(false);
+      setMissionToShare(null); // Limpiar la misión seleccionada
     }
   };
 
@@ -1246,7 +1258,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 key={mission.id}
                 mission={mission}
                 onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
-                onShare={() => setIsShareModalVisible(true)}
+                onShare={() => {
+                  setMissionToShare(mission);
+                  setIsShareModalVisible(true);
+                }}
               />
             ))}
           </>
@@ -1264,7 +1279,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 key={mission.id}
                 mission={mission}
                 onComplete={() => { }}
-                onShare={() => setIsShareModalVisible(true)}
+                onShare={() => {
+                  setMissionToShare(mission);
+                  setIsShareModalVisible(true);
+                }}
               />
             ))}
           </>
@@ -1282,7 +1300,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 key={mission.id}
                 mission={mission}
                 onComplete={() => { }}
-                onShare={() => setIsShareModalVisible(true)}
+                onShare={() => {
+                  setMissionToShare(mission);
+                  setIsShareModalVisible(true);
+                }}
               />
             ))}
           </>
@@ -1306,7 +1327,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       <FriendSelectionModal
         visible={isShareModalVisible}
-        onClose={() => setIsShareModalVisible(false)}
+        onClose={() => {
+          setIsShareModalVisible(false);
+          setMissionToShare(null);
+        }}
         onSelect={handleShareJourney}
       />
 

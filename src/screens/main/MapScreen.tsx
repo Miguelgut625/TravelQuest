@@ -656,7 +656,7 @@ const MapScreen = () => {
 
   const handleShareJourney = async (friends: Friend[] | Friend) => {
     if (!generatedJourneyId || !user?.id) {
-      Alert.alert('Error', 'No se pudo compartir el viaje');
+      Alert.alert('Error', 'No se pudo compartir el viaje porque no se encontró el ID del viaje o no estás autenticado.');
       return;
     }
 
@@ -670,7 +670,7 @@ const MapScreen = () => {
       }
     } catch (error) {
       console.error('Error al compartir viaje:', error);
-      Alert.alert('Error', 'No se pudo compartir el viaje');
+      Alert.alert('Error', 'No se pudo compartir el viaje. Por favor intenta de nuevo.');
     } finally {
       setShowShareModal(false);
       setGeneratedJourneyId(null);
