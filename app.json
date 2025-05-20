@@ -36,7 +36,8 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.travelquest.app",
       "googleServicesFile": "./google-services.json",
@@ -75,13 +76,15 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#005F9E",
-          "sounds": ["./assets/notification-sound.wav"]
+          "sounds": [
+            "./assets/notification-sound.wav"
+          ]
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "0429d65c-b7a7-4d60-98aa-8db998569729"
       }
     },
     "newArchEnabled": false

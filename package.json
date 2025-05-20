@@ -4,8 +4,8 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
@@ -66,9 +66,11 @@
     "redux": "^4.2.1",
     "redux-persist": "^6.0.0",
     "semver": "^7.5.2",
-    "shell-quote": "^1.7.3"
+    "shell-quote": "^1.7.3",
+    "expo-updates": "~0.27.4"
   },
   "devDependencies": {
+    "@react-native-community/cli": "latest",
     "@babel/core": "^7.24.0",
     "@babel/plugin-transform-async-generator-functions": "^7.24.0",
     "@babel/plugin-transform-class-properties": "^7.24.0",
