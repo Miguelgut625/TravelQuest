@@ -14,6 +14,7 @@ export interface JournalEntryDB {
   } | null;
   created_at: string;
   tags: string[];
+  comments_visibility?: 'public' | 'friends' | 'private';
 }
 
 export interface CityJournalEntry extends JournalEntryDB {
@@ -428,6 +429,7 @@ export const createJournalEntry = async (data: {
   content: string;
   photos: string[];
   tags?: string[];
+  comments_visibility?: 'public' | 'friends' | 'private';
 }) => {
   try {
     console.log('📝 Creando entrada de diario con datos:', data);
@@ -446,7 +448,8 @@ export const createJournalEntry = async (data: {
       content: data.content || '',
       photos: Array.isArray(data.photos) ? data.photos : [data.photos],
       tags: Array.isArray(data.tags) ? data.tags : [],
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      comments_visibility: data.comments_visibility || 'public'
     };
 
     console.log('🔄 Intentando insertar entrada con datos:', baseData);
@@ -508,4 +511,40 @@ export async function addCommentToEntryTable(entryId: string, userId: string, co
     console.error('Error al insertar comentario:', error);
     return false;
   }
-} 
+}
+
+export const getJournalEntryById = async (entryId: string, currentUserId?: string): Promise<any> => {
+  try {
+    let query = supabase
+      .from('journal_entries')
+      .select(`
+        *,
+        cities:cityid (
+          name
+        )
+      `)
+      .eq('id', entryId)
+      .single();
+
+    const { data: entry, error } = await query;
+
+    if (error) throw error;
+    if (!entry) return null;
+
+    // Si hay un usuario actual, verificar si es amigo del autor
+    if (currentUserId && entry.userid !== currentUserId) {
+      const { data: friendship } = await supabase
+        .from('friends')
+        .select('id')
+        .or(`and(user1Id.eq.${currentUserId},user2Id.eq.${entry.userid}),and(user1Id.eq.${entry.userid},user2Id.eq.${currentUserId})`)
+        .single();
+
+      entry.is_friend = !!friendship;
+    }
+
+    return entry;
+  } catch (error) {
+    console.error('Error al obtener entrada del diario:', error);
+    throw error;
+  }
+}; 

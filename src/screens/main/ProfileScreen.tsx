@@ -74,6 +74,7 @@ const ProfileScreen = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'friends' | 'private'>('public');
   const [friendsVisibility, setFriendsVisibility] = useState<'public' | 'friends' | 'private'>('public');
+  const [commentsVisibility, setCommentsVisibility] = useState<'public' | 'friends' | 'private'>('public');
   const [badges, setBadges] = useState<any[]>([]);
   const [selectedTitle, setSelectedTitle] = useState<string>('');
   const [savingTitle, setSavingTitle] = useState(false);
@@ -200,13 +201,14 @@ const ProfileScreen = () => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('profile_visibility, friends_visibility')
+        .select('profile_visibility, friends_visibility, comments_visibility')
         .eq('id', user.id)
         .single();
 
       if (error) throw error;
       setProfileVisibility(data?.profile_visibility || 'public');
       setFriendsVisibility(data?.friends_visibility || 'public');
+      setCommentsVisibility(data?.comments_visibility || 'public');
     } catch (error) {
       console.error('Error al obtener configuración de privacidad:', error);
     }
@@ -241,6 +243,22 @@ const ProfileScreen = () => {
     } catch (error) {
       console.error('Error al actualizar configuración de privacidad de amigos:', error);
       Alert.alert('Error', 'No se pudo actualizar la configuración de privacidad de amigos');
+    }
+  };
+
+  const updateCommentsVisibility = async (visibility: 'public' | 'friends' | 'private') => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ comments_visibility: visibility })
+        .eq('id', user.id);
+      if (error) throw error;
+      setCommentsVisibility(visibility);
+      Alert.alert('Éxito', 'Configuración de privacidad de comentarios actualizada');
+    } catch (error) {
+      console.error('Error al actualizar configuración de privacidad de comentarios:', error);
+      Alert.alert('Error', 'No se pudo actualizar la configuración de privacidad de comentarios');
     }
   };
 
@@ -857,6 +875,33 @@ const ProfileScreen = () => {
               >
                 <Ionicons name="lock-closed-outline" size={20} color={friendsVisibility === 'private' ? 'white' : '#005F9E'} />
                 <Text style={[styles.privacyRadioText, friendsVisibility === 'private' && styles.privacyRadioTextSelected]}>Solo tú</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          {/* Visibilidad de comentarios por defecto */}
+          <View style={[styles.privacyContainer, { marginTop: 16 }]}> 
+            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede comentar en tus entradas por defecto</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <TouchableOpacity
+                style={[styles.privacyRadio, commentsVisibility === 'public' && styles.privacyRadioSelected]}
+                onPress={() => updateCommentsVisibility('public')}
+              >
+                <Ionicons name="globe-outline" size={20} color={commentsVisibility === 'public' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, commentsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.privacyRadio, commentsVisibility === 'friends' && styles.privacyRadioSelected]}
+                onPress={() => updateCommentsVisibility('friends')}
+              >
+                <Ionicons name="people-outline" size={20} color={commentsVisibility === 'friends' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, commentsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.privacyRadio, commentsVisibility === 'private' && styles.privacyRadioSelected]}
+                onPress={() => updateCommentsVisibility('private')}
+              >
+                <Ionicons name="lock-closed-outline" size={20} color={commentsVisibility === 'private' ? 'white' : '#005F9E'} />
+                <Text style={[styles.privacyRadioText, commentsVisibility === 'private' && styles.privacyRadioTextSelected]}>Nadie</Text>
               </TouchableOpacity>
             </View>
           </View>
