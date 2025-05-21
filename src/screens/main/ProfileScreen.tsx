@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { updateProfilePicture, getProfilePictureUrl } from '../../services/profileService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserBadges } from '../../services/badgeService';
+import { lightBlue100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 import { getAdvancedMissionStats, AdvancedMissionStats } from '../../services/statisticsService';
 
 // Definir interfaces para los tipos de datos
@@ -1054,6 +1055,20 @@ const getCategoryColor = (category: string): string => {
   
   return colors[category.toLowerCase()] || '#F39C12'; // Naranja por defecto
 };
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -1124,7 +1139,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#0D1B2A',
+    color: colors.text.primary,
   },
   userInfo: {
     flex: 1,
@@ -1133,7 +1148,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#EDF6F9',
+    color: colors.text.primary,
     marginBottom: 5,
   },
   email: {
@@ -1190,12 +1205,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   privacyContainer: {
-    backgroundColor: '#1B263B',
     borderRadius: 10,
     padding: 15,
   },
   privacyButton: {
-    backgroundColor: '#274472',
+    backgroundColor: colors.success,
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -1204,11 +1218,11 @@ const styles = StyleSheet.create({
   privacyButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#EDF6F9',
+    color: colors.white,
   },
   privacyDescription: {
     fontSize: 14,
-    color: '#A9D6E5',
+    color: colors.text.primary,
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 15,

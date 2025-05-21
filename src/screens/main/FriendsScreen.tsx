@@ -43,20 +43,6 @@ interface FriendRequest {
 
 const { width, height } = Dimensions.get('window');
 
-const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
-  text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
-  },
-  border: '#EEEEEE',
-  success: '#4CAF50',
-  error: '#D32F2F',
-};
 
 const FriendsScreen = () => {
   const navigation = useNavigation();
@@ -418,7 +404,7 @@ const FriendsScreen = () => {
       </View>
       <View style={styles.container}>
         <View style={styles.searchInfoRow}>
-          <Ionicons name="person-add-outline" size={20} color="#005F9E" style={{ marginRight: 6 }} />
+          <Ionicons name="person-add-outline" size={20} color={colors.text.light} style={{ marginRight: 6 }} />
           <Text style={styles.searchInfoText}>Busca y agrega nuevos amigos usando el buscador</Text>
         </View>
         <View style={styles.searchContainer}>
@@ -505,15 +491,30 @@ const FriendsScreen = () => {
   );
 };
 
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
     paddingHorizontal: width < 400 ? 6 : 16,
   },
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   headerBar: {
     flexDirection: 'row',
@@ -521,9 +522,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.primary,
     paddingHorizontal: width < 400 ? 8 : 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginTop:10,
   },
   headerTitleContainer: {
     flex: 1,
@@ -544,25 +543,20 @@ const styles = StyleSheet.create({
   searchInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent:'center',
     marginTop: 12,
     marginBottom: 4,
     marginHorizontal: width < 400 ? 8 : 16,
   },
   searchInfoText: {
-    color: colors.text.secondary,
+    color: colors.text.light,
     fontSize: width < 400 ? 12 : 14,
   },
   searchContainer: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     padding: width < 400 ? 10 : 16,
     margin: width < 400 ? 8 : 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-    marginBottom: 16,
   },
   searchInputContainer: {
     flexDirection: 'row',
@@ -590,7 +584,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   searchResultsContainer: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 8,
     marginTop: 8,
     elevation: 3,

@@ -185,7 +185,7 @@ const GroupChatScreen = () => {
                         onPress={() => navigation.goBack()}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                        <Ionicons name="arrow-back" size={22} color="#005F9E" />
+                        <Ionicons name="arrow-back" size={22} color={colors.secondary} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle} numberOfLines={1}>{groupName}</Text>
                     <View style={styles.headerRight} />
@@ -306,19 +306,34 @@ const GroupChatScreen = () => {
     );
 };
 
+const colors = {
+    primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+    secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+    background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+    white: '#FFFFFF',        // Blanco neutro
+    text: {
+      primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+      secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+      light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+    },
+    border: '#89C2D9',       // Azul claro (suave y limpio)
+    success: '#06D6A0',      // Verde menta (positivo y moderno)
+    error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+  };
+
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#005F9E',
+        backgroundColor: colors.primary,
     },
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: colors.primary,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#005F9E',
+        backgroundColor: colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 12,
         minHeight: Platform.OS === 'ios' ? 44 : 56,
@@ -327,23 +342,19 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(255,255,255,0.1)',
     },
     backButton: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: colors.primary,
         borderRadius: 20,
         width: 36,
         height: 36,
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
-        shadowRadius: 2,
-        elevation: 2,
     },
     headerTitle: {
         flex: 1,
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: colors.text.light,
         textAlign: 'center',
         marginHorizontal: 16,
     },
@@ -365,10 +376,11 @@ const styles = StyleSheet.create({
         padding: 12,
         marginVertical: 4,
         borderRadius: 16,
+        backgroundColor: colors.background,
     },
     myMessage: {
         alignSelf: 'flex-end',
-        backgroundColor: '#005F9E',
+        color: colors.primary,
         borderTopRightRadius: 4,
     },
     otherMessage: {
@@ -378,40 +390,41 @@ const styles = StyleSheet.create({
     },
     sender: {
         fontSize: 12,
-        color: '#7F5AF0',
+        color: colors.secondary,
         fontWeight: '600',
         marginBottom: 4,
     },
     messageText: {
         fontSize: 15,
-        color: '#333',
+        color: colors.text.primary,
         lineHeight: 20,
     },
     messageTime: {
         fontSize: 11,
-        color: '#666',
+        color: colors.text.primary,
         marginTop: 4,
         textAlign: 'right',
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF',
-        paddingHorizontal: 12,
+        backgroundColor: colors.secondary,
+        paddingHorizontal: 16,
         paddingVertical: 8,
         borderTopWidth: 1,
-        borderTopColor: '#E5E5E5',
-    },
+        borderTopColor: colors.border,
+      },
     input: {
         flex: 1,
-        marginHorizontal: 8,
         padding: 10,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: colors.background,
         borderRadius: 20,
-        fontSize: 15,
-        color: '#333',
         maxHeight: 100,
-    },
+        color: colors.text.primary,
+        marginRight: 8,
+        borderColor: colors.border,
+        borderWidth: 1,
+      },
     sendButton: {
         backgroundColor: '#005F9E',
         width: 36,
@@ -424,11 +437,13 @@ const styles = StyleSheet.create({
         backgroundColor: '#CCC',
     },
     attachButton: {
-        width: 36,
-        height: 36,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+        padding: 8,
+        marginRight: 8,
+        borderRadius: 20,
+        borderColor: colors.border,
+        borderWidth: 1,
+        backgroundColor: colors.background,
+      },
     modalContainer: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',

@@ -39,20 +39,7 @@ import {
 } from '../../services/shareService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const colors = {
-    primary: '#005F9E',
-    secondary: '#7F5AF0',
-    background: '#F5F5F5',
-    white: '#FFFFFF',
-    text: {
-        primary: '#333333',
-        secondary: '#666666',
-        light: '#999999',
-    },
-    border: '#EEEEEE',
-    success: '#4CAF50',
-    error: '#D32F2F',
-};
+
 
 const GroupsScreen = () => {
     const [groups, setGroups] = useState<GroupWithMembers[]>([]);
@@ -555,7 +542,7 @@ const GroupsScreen = () => {
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={22} color={colors.primary} />
+                    <Ionicons name="arrow-back" size={22} color={colors.secondary} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Chats Grupales</Text>
                 <View style={styles.headerRight} />
@@ -824,10 +811,25 @@ const GroupsScreen = () => {
     );
 };
 
+const colors = {
+    primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+    secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+    background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+    white: '#FFFFFF',        // Blanco neutro
+    text: {
+      primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+      secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+      light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+    },
+    border: '#89C2D9',       // Azul claro (suave y limpio)
+    success: '#06D6A0',      // Verde menta (positivo y moderno)
+    error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+  };
+
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.primary,
     },
     headerContainer: {
         flexDirection: 'row',
@@ -835,9 +837,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        backgroundColor: colors.primary,
         minHeight: Platform.OS === 'ios' ? 60 : 72,
         paddingTop: Platform.OS === 'ios' ? 8 : 16,
         elevation: 2,
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
     },
     backButton: {
-        backgroundColor: colors.white,
+        backgroundColor: colors.primary,
         borderRadius: 20,
         width: 36,
         height: 36,
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: colors.primary,
+        color: colors.text.light,
         textAlign: 'center',
         flex: 1,
         marginHorizontal: 10,
@@ -874,7 +874,7 @@ const styles = StyleSheet.create({
     invitationsContainer: {
         paddingTop: 16,
         paddingBottom: 8,
-        backgroundColor: colors.white,
+        backgroundColor: colors.primary,
         marginBottom: 8,
     },
     sectionTitle: {
@@ -888,7 +888,7 @@ const styles = StyleSheet.create({
         paddingLeft: 16,
     },
     invitationCard: {
-        backgroundColor: colors.white,
+        backgroundColor: colors.primary,
         borderRadius: 12,
         padding: 16,
         marginRight: 12,
@@ -904,7 +904,7 @@ const styles = StyleSheet.create({
     invitationTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: colors.primary,
+        color: colors.text.light,
         marginBottom: 4,
     },
     invitationDescription: {
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
     },
     groupsContainer: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: colors.primary,
     },
     groupsList: {
         flex: 1,
@@ -953,7 +953,7 @@ const styles = StyleSheet.create({
     },
     chatGroup: {
         flexDirection: 'row',
-        backgroundColor: colors.white,
+        backgroundColor: colors.background,
         padding: 16,
         borderRadius: 12,
         marginBottom: 8,

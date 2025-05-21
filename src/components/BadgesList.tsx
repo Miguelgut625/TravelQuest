@@ -161,14 +161,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   loadingContainer: {
     ...sharedStyles.loadingContainer,
     backgroundColor: colors.background,
   },
   loadingText: {
-    color: colors.primary,
+    color: colors.text.light,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -180,13 +180,13 @@ const styles = StyleSheet.create({
   emptyText: {
     ...sharedStyles.emptyText,
     fontSize: 18,
-    color: colors.primary,
+    color: colors.text.light,
     marginTop: 12,
     textAlign: 'center',
   },
   tipText: {
     fontSize: 15,
-    color: colors.text.secondary,
+    color: colors.text.light,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.text.light,
     marginLeft: 10,
     letterSpacing: 0.5,
   },
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: colors.secondary,
+    borderColor: colors.text.light,
     shadowColor: colors.secondary,
     shadowOpacity: 0.10,
     shadowRadius: 6,

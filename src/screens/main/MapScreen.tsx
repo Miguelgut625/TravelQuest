@@ -198,7 +198,7 @@ const DateRangePickerMobile: React.FC<{
         style={styles.datePickerButton}
         onPress={onToggleCalendar}
       >
-        <Ionicons name="calendar" size={20} color="#EDF6F9" style={styles.calendarIcon} />
+        <Ionicons name="calendar" size={20} color="#A8DADC" style={styles.calendarIcon} />
         <Text style={styles.datePickerText}>
           {formatDateRange() || "Selecciona fechas"}
         </Text>
@@ -856,7 +856,7 @@ const MapScreen = () => {
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>TravelQuest</Text>
         <TouchableOpacity onPress={toggleFormCollapse} style={styles.collapseButton}>
-          <Ionicons name={isFormCollapsed ? "menu" : "close"} size={24} color="white" />
+          <Ionicons name={isFormCollapsed ? "chevron-down-outline" : "close"} size={24} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -879,11 +879,11 @@ const MapScreen = () => {
       >
         {/* Campo de búsqueda de ciudad - puesto primero para que sea lo más visible */}
         <View style={styles.cityInputContainer}>
-          <Ionicons name="search" size={24} color="#666" style={styles.searchIcon} />
+          <Ionicons name="search" size={24} style={styles.searchIcon} />
           <TextInput
             style={styles.input}
             placeholder="¿Qué ciudad quieres visitar?"
-            placeholderTextColor="#EDF6F9"
+            placeholderTextColor= '#26547C'
             value={searchCity}
             onChangeText={handleCitySearch}
           />
@@ -914,7 +914,7 @@ const MapScreen = () => {
               <TextInput
                 style={styles.smallInput}
                 placeholder="Nº misiones"
-                placeholderTextColor="#EDF6F9"
+                placeholderTextColor="#26547C"
                 value={missionCount}
                 onChangeText={setMissionCount}
                 keyboardType="numeric"
@@ -1308,27 +1308,25 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
 };
 
 const colors = {
-  primary: '#274472',
-  secondary: '#669BBC',
-  background: '#0D1B2A',
-  white: '#0D1B2A',
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
   text: {
-    primary: '#EDF6F9',
-    secondary: '#D7EFFF',
-    light: '#D7EFFF',
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
   },
-  border: '#41729F',
-  success: '#4CAF50',
-  error: '#D32F2F',
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
 };
-
-
 
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   headerBar: {
     flexDirection: 'row',
@@ -1337,23 +1335,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   headerTitle: {
-    color: colors.white,
-    fontSize: 20,
+    color: colors.text.light,
+    fontSize: 24,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   collapseButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
     borderRadius: 20,
     padding: 6,
     marginLeft: 8,
   },
   searchContainer: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     padding: 16,
     margin: 16,
@@ -1386,7 +1382,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 0,
     fontSize: 16,
-    color: colors.text.primary,
+    color: colors.secondary,
     paddingVertical: 10,
   },
   suggestionsList: {
@@ -1449,25 +1445,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.white,
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white,
     marginRight: 8,
     marginBottom: 8,
   },
   tagButtonSelected: {
-    backgroundColor: colors.white,
-    borderColor: colors.secondary,
+    backgroundColor: colors.secondary,
+    borderColor: colors.white,
   },
   tagText: {
-    color: colors.white,
+    color: colors.secondary,
     fontSize: 14,
   },
   tagTextSelected: {
-    color: colors.secondary,
+    color: colors.white,
     fontWeight: 'bold',
   },
   button: {
@@ -1644,7 +1640,7 @@ const styles = StyleSheet.create({
   datePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,

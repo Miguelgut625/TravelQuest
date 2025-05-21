@@ -158,7 +158,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
           <View style={styles.badgeContainer}>
             <Text style={[
               styles.badge,
-              { backgroundColor: mission.completed ? '#005F9E' : isExpired ? '#D32F2F' : '#FFB74D' }
+              { backgroundColor: mission.completed ? colors.success : isExpired ? '#D32F2F' : '#FFB74D' }
             ]}>
               {mission.completed ? 'Completada' : isExpired ? 'Expirada' : 'Pendiente'}
             </Text>
@@ -926,7 +926,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           activeOpacity={0.7}
         >
           {/* @ts-ignore */}
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={20} color="#FFF" />
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
         <View style={styles.headerRight}>
@@ -1026,10 +1026,27 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   );
 };
 
+// Colores definidos
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F9FF',
+    backgroundColor: colors.primary,
     paddingHorizontal: 6,
   },
   header: {
@@ -1037,22 +1054,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    paddingTop: 10,
+    marginTop:10
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
     marginRight: 10,
-    backgroundColor: '#E4EAFF',
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
     minWidth: 100,
     justifyContent: 'center'
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: 20,
     marginLeft: 5,
-    color: '#1B263B',
+    color: colors.white,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
@@ -1073,7 +1090,7 @@ const styles = StyleSheet.create({
   cityTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1B263B',
+    color: colors.secondary,
     marginBottom: 20,
     letterSpacing: 1,
   },
@@ -1081,20 +1098,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F9FF',
+    backgroundColor: colors.background,
   },
   loadingText: {
     marginTop: 10,
-    color: '#1B263B',
+    color: colors.section,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F9FF',
+    backgroundColor: colors.background,
   },
   errorText: {
-    color: '#D32F2F',
+    color: colors.error,
     textAlign: 'center',
     padding: 20,
     fontWeight: 'bold',
@@ -1102,20 +1119,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1B263B',
+    color: colors.background,
     letterSpacing: 1,
-    marginTop: 30,
   },
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1B263B',
+    color: colors.background,
   },
   citiesList: {
     flex: 1,
   },
   cityCard: {
-    backgroundColor: '#E4EAFF',
+    backgroundColor: colors.text.light,
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
@@ -1137,23 +1153,23 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1B263B',
+    color: colors.primary,
     marginBottom: 5,
     letterSpacing: 1,
   },
   missionCount: {
     fontSize: 14,
-    color: '#3F4B6F',
+    color: colors.primary,
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#C8D5FF',
+    backgroundColor: colors.background,
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#41729F',
+    backgroundColor: colors.text.secondary,
   },
   missionsList: {
     flex: 1,
@@ -1161,7 +1177,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1B263B',
+    color: colors.text.light,
     marginBottom: 15,
     letterSpacing: 1,
   },
@@ -1173,19 +1189,19 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#C8D5FF',
+    backgroundColor: colors.text.light,
   },
   completedText: {
-    color: '#4CAF50',
+    color: colors.secondary,
     fontWeight: 'bold',
     marginHorizontal: 10,
     fontSize: 16,
     letterSpacing: 1,
   },
   card: {
-    backgroundColor: '#E4EAFF',
+    backgroundColor: colors.background,
     borderRadius: 10,
-    padding: 15,
+    padding: 15, 
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1206,17 +1222,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     flex: 1,
-    color: '#1B263B',
+    color: colors.section,
     letterSpacing: 1,
   },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 15,
-    color: 'white',
+    color: colors.text.primary,
     fontSize: 12,
     fontWeight: 'bold',
-    backgroundColor: '#669BBC',
+    backgroundColor: colors.secondary,
     overflow: 'hidden',
   },
   badgeContainer: {
@@ -1224,7 +1240,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   cardDescription: {
-    color: '#1B263B',
+    color: colors.section,
     marginBottom: 10,
   },
   cardFooter: {
@@ -1233,15 +1249,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   difficulty: {
-    color: '#3F4B6F',
+    color: colors.primary,
     fontSize: 12,
   },
   points: {
-    color: '#41729F',
+    color: colors.text.secondary,
     fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: '#669BBC',
+    backgroundColor: colors.secondary,
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
@@ -1252,16 +1268,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   expiredCard: {
-    borderColor: '#D32F2F',
+    borderColor: colors.error,
     borderWidth: 1,
   },
   timeRemaining: {
     fontSize: 12,
-    color: '#3F4B6F',
+    color: colors.primary,
     marginTop: 4,
   },
   expiredTime: {
-    color: '#D32F2F',
+    color: colors.error,
   },
   generatingLoaderOverlay: {
     position: 'absolute',
@@ -1275,7 +1291,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   generatingLoaderContainer: {
-    backgroundColor: '#669BBC',
+    backgroundColor: colors.secondary,
     padding: 20,
     borderRadius: 10,
     width: '80%',
@@ -1310,7 +1326,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '80%',
-    backgroundColor: '#E4EAFF',
+    backgroundColor: colors.secondary,
     borderRadius: 10,
     padding: 20,
     maxHeight: '80%'
@@ -1319,24 +1335,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#1B263B',
+    color: colors.section,
   },
   friendItem: {
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#C8D5FF'
+    borderBottomColor: colors.pastel
   },
   friendName: {
     fontSize: 16,
-    color: '#1B263B',
+    color: colors.section,
   },
   friendPoints: {
     fontSize: 14,
-    color: '#3F4B6F',
+    color: colors.primary,
   },
   cancelButton: {
     marginTop: 10,
-    backgroundColor: '#D32F2F',
+    backgroundColor: colors.error,
     padding: 10,
     borderRadius: 5,
     alignItems: 'center'
@@ -1347,7 +1363,7 @@ const styles = StyleSheet.create({
   },
   levelUpContainer: {
     marginTop: 15,
-    backgroundColor: '#669BBC',
+    backgroundColor: colors.secondary,
     padding: 10,
     borderRadius: 8,
     width: '100%',

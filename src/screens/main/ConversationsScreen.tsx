@@ -22,21 +22,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
-const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
-  text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
-  },
-  border: '#EEEEEE',
-  success: '#4CAF50',
-  error: '#D32F2F',
-};
-
 interface Conversation {
   conversation_user_id: string;
   username: string;
@@ -197,18 +182,12 @@ const ConversationsScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.headerRowCustom}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('Profile')}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.primary} />
-        </TouchableOpacity>
         <Text style={styles.title}>Mensajes</Text>
         <TouchableOpacity
           style={styles.groupsButton}
           onPress={() => navigation.navigate('Groups')}
         >
-          <Ionicons name="people" size={22} color={colors.primary} />
+          <Ionicons name="people" size={22} color={colors.text.light} />
         </TouchableOpacity>
       </View>
 
@@ -241,11 +220,25 @@ const ConversationsScreen = () => {
     </SafeAreaView>
   );
 };
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   headerRowCustom: {
     flexDirection: 'row',
@@ -253,9 +246,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.primary,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -264,24 +255,8 @@ const styles = StyleSheet.create({
     height: Platform.OS === 'ios' ? 44 : 56,
     paddingTop: Platform.OS === 'ios' ? 0 : 8,
   },
-  backButton: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    position: 'absolute',
-    left: 16,
-    zIndex: 1,
-  },
   groupsButton: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -297,9 +272,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.text.light,
     textAlign: 'center',
     flex: 1,
   },

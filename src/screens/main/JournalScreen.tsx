@@ -375,9 +375,6 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
       <SafeAreaView style={styles.container}>
         <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
           <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color="#005F9E" />
-            </TouchableOpacity>
             <Text style={styles.headerTitle}>Diario de Viaje</Text>
           </View>
         </SafeAreaView>
@@ -394,9 +391,6 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
       <SafeAreaView style={styles.container}>
         <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
           <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color="#005F9E" />
-            </TouchableOpacity>
             <Text style={styles.headerTitle}>Diario de Viaje</Text>
           </View>
         </SafeAreaView>
@@ -439,9 +433,6 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
       {/* Header fijo y separado */}
       <View style={styles.headerSafeArea}>
         <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={22} color="#005F9E" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Diario de Viaje</Text>
           <View style={styles.headerRight} />
         </View>
@@ -494,34 +485,48 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   );
 };
 
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.primary,
   },
   headerSafeArea: {
-    backgroundColor: '#005F9E',
+    backgroundColor: colors.primary,
     zIndex: 10,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: Platform.OS === 'ios' ? 60 : 72,
-    paddingTop: Platform.OS === 'ios' ? 8 : 16,
+    marginBottom: 15,
+    marginTop: 20
   },
   headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: '#FFF',
+    fontSize: 24,
     fontWeight: 'bold',
-    fontSize: 20,
-    marginHorizontal: 10,
+    color: colors.text.light,
+    letterSpacing: 1,
+    marginTop: 30,
   },
   backButton: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#EDF6F9',
     borderRadius: 20,
     width: 36,
     height: 36,
@@ -538,7 +543,7 @@ const styles = StyleSheet.create({
     height: 180,
     position: 'relative',
     marginBottom: 12,
-    backgroundColor: '#EEE',
+    backgroundColor: '#1B263B',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     overflow: 'hidden',
@@ -556,7 +561,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#EEE',
+    backgroundColor: '#1B263B',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     borderTopLeftRadius: 0,
@@ -576,7 +581,7 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#EDF6F9',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
@@ -584,7 +589,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   cityMissionsButton: {
-    color: '#FFF',
+    color: '#EDF6F9',
     fontWeight: 'bold',
     fontSize: 16,
     marginTop: 8,
@@ -634,7 +639,7 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 15,
     overflow: 'hidden',
-    backgroundColor: '#FFF',
+    backgroundColor: colors.primary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.10,
@@ -649,7 +654,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   card: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.text.light,
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,

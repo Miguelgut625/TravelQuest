@@ -342,7 +342,7 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#005F9E" />
+            <Ionicons name="arrow-back" size={24} color="#A8DADC" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Entrada no encontrada</Text>
         </View>
@@ -365,14 +365,14 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
         {/* Header con botón de regreso */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color="#A8DADC" />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>{entry.title}</Text>
           <TouchableOpacity onPress={refreshEntry} style={styles.refreshButton} disabled={refreshing}>
             {refreshing ? (
-              <ActivityIndicator size="small" color="#333" />
+              <ActivityIndicator size="small" color="#A8DADC" />
             ) : (
-              <Ionicons name="refresh" size={24} color="#333" />
+              <Ionicons name="refresh" size={24} color="#A8DADC" />
             )}
           </TouchableOpacity>
         </View>
@@ -585,28 +585,44 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   );
 };
 
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 15,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    backgroundColor: '#fff',
+    backgroundColor: colors.primary,
+    marginBottom: 15,
+    marginTop: 30,
   },
   backButton: {
     padding: 5,
+    color: colors.text.light,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 10,
-    color: '#333',
+    color: colors.text.light,
     flex: 1,
   },
   scrollContent: {
@@ -614,7 +630,8 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: 'bold',
+    color: colors.text.secondary,
     marginBottom: 16,
   },
   photoContainer: {
@@ -685,7 +702,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   addPhotoButton: {
-    backgroundColor: '#005F9E',
+    backgroundColor: colors.secondary,
     flexDirection: 'row',
     padding: 12,
     borderRadius: 8,
@@ -694,22 +711,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addPhotoText: {
-    color: '#fff',
+    color: colors.white,
     marginLeft: 8,
     fontWeight: 'bold',
   },
   contentContainer: {
     marginBottom: 20,
     padding: 12,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    backgroundColor: colors.primary,
   },
   content: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#333',
+    color: colors.text.light,
     textAlign: 'justify',
   },
   tagsContainer: {
@@ -718,7 +732,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   tag: {
-    color: '#005F9E',
+    color: colors.secondary,
     marginRight: 10,
     marginBottom: 5,
     fontSize: 14,
@@ -735,27 +749,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   commentsSection: {
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
     paddingTop: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
   },
   commentsSectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
-    color: '#333',
+    paddingLeft: 12,
+    color: colors.text.secondary,
   },
   commentsList: {
-    marginBottom: 16,
+    marginBottom: 6,
+    padding: 6,
   },
   commentItem: {
     padding: 12,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
+    backgroundColor: colors.background,
+    borderRadius: 8,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: colors.background,
   },
   commentHeader: {
     flexDirection: 'row',
@@ -827,12 +842,12 @@ const styles = StyleSheet.create({
   addCommentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    margin: 8,
   },
   commentInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.text.light,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -843,12 +858,13 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#005F9E',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 8,
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.text.secondary,
   },
   refreshButton: {
     padding: 5,

@@ -52,23 +52,6 @@ import NotificationService from '../../services/NotificationService';
 import { getUserInfoById as getUserInfo } from '../../services/userService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
-  text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
-  },
-  border: '#EEEEEE',
-  success: '#4CAF50',
-  error: '#D32F2F',
-  message: {
-    background: '#F0F2F5',
-  }
-};
 
 const ChatScreen = () => {
   const route = useRoute();
@@ -438,14 +421,14 @@ const ChatScreen = () => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.white} />
+            <Ionicons name="arrow-back" size={22} color={colors.text.light} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{friendName || 'Chat'}</Text>
           <TouchableOpacity
             style={styles.groupsButton}
             onPress={() => navigation.navigate('Groups')}
           >
-            <Ionicons name="people" size={22} color={colors.white} />
+            <Ionicons name="people" size={22} color={colors.text.light} />
           </TouchableOpacity>
         </View>
 
@@ -574,20 +557,35 @@ const ChatScreen = () => {
   );
 };
 
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -596,8 +594,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     backgroundColor: colors.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
     height: Platform.OS === 'ios' ? 44 : 56,
     paddingTop: Platform.OS === 'ios' ? 0 : 8,
     elevation: 2,
@@ -607,23 +603,19 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   backButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: colors.primary,
     borderRadius: 20,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
     elevation: 2,
     position: 'absolute',
     left: 16,
     zIndex: 1,
   },
   groupsButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: colors.primary,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -641,7 +633,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.white,
+    color: colors.text.light,
     textAlign: 'center',
     flex: 1,
   },
@@ -657,11 +649,11 @@ const styles = StyleSheet.create({
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.secondary,
   },
   friendMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.message.background,
+    backgroundColor: colors.background,
     borderWidth: 0,
   },
   messageText: {
@@ -683,7 +675,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.secondary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderTopWidth: 1,
@@ -692,6 +684,10 @@ const styles = StyleSheet.create({
   attachButton: {
     padding: 8,
     marginRight: 8,
+    borderRadius: 20,
+    borderColor: colors.border,
+    borderWidth: 1,
+    backgroundColor: colors.background,
   },
   input: {
     flex: 1,
@@ -701,6 +697,8 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     color: colors.text.primary,
     marginRight: 8,
+    borderColor: colors.border,
+    borderWidth: 1,
   },
   sendButton: {
     backgroundColor: colors.primary,

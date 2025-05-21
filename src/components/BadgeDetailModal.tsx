@@ -48,7 +48,7 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#7F5AF0" />
+            <Ionicons name="close" size={24} color={colors.primary} />
           </TouchableOpacity>
           
           <View style={styles.badgeHeader}>
@@ -102,6 +102,20 @@ const BadgeDetailModal = ({ visible, badge, onClose }: BadgeDetailModalProps) =>
     </Modal>
   );
 };
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -111,7 +125,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: '#2D2F3A',
+    backgroundColor: colors.background,
     borderRadius: 15,
     padding: 20,
     width: '85%',
@@ -138,11 +152,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 60,
-    backgroundColor: '#181A20',
+    backgroundColor: colors.background,
     marginBottom: 15,
     overflow: 'hidden',
     borderWidth: 3,
-    borderColor: '#7F5AF0',
+    borderColor: colors.secondary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -156,7 +170,7 @@ const styles = StyleSheet.create({
   badgeName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#F5D90A',
+    color: colors.secondary,
     textAlign: 'center',
   },
   categoryContainer: {
@@ -166,12 +180,12 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#A0A0A0',
+    color: colors.primary,
     marginRight: 5,
   },
   categoryValue: {
     fontSize: 16,
-    color: '#7F5AF0',
+    color: colors.text.secondary,
   },
   descriptionContainer: {
     marginBottom: 15,

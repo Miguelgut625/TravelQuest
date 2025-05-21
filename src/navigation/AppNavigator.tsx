@@ -63,16 +63,14 @@ const TabNavigator = () => {
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={26} color={color} />;
         },
-        tabBarActiveTintColor: '#005F9E',
-        tabBarInactiveTintColor: '#999999',
+        tabBarActiveTintColor: '#A8DADC',         // Azul oscuro
+        tabBarInactiveTintColor: '#A8DADC',       // Azul claro pastel
         headerShown: false,
         tabBarStyle: {
           height: Platform.OS === 'ios' ? 90 : 70,
           paddingBottom: Platform.OS === 'ios' ? 30 : 12,
           paddingTop: 12,
-          backgroundColor: 'white',
-          borderTopWidth: 1,
-          borderTopColor: '#e5e5e5',
+          backgroundColor: '#26547C',
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -86,6 +84,7 @@ const TabNavigator = () => {
         },
       })}
     >
+
       <Tab.Screen name="Map" component={MapScreen} options={{ title: 'Mapa' }} />
       <Tab.Screen name="Missions" component={MissionsScreen} options={{ title: 'Misiones' }} />
       <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} options={{ title: 'Diario' }} />

@@ -15,20 +15,6 @@ interface LeaderboardItem {
 
 const { width, height } = Dimensions.get('window');
 
-const colors = {
-  primary: '#274472',
-  secondary: '#669BBC',
-  background: '#0D1B2A',
-  white: '#0D1B2A',
-  text: {
-    primary: '#EDF6F9',
-    secondary: '#D7EFFF',
-    light: '#D7EFFF',
-  },
-  border: '#41729F',
-  success: '#4CAF50',
-  error: '#D32F2F',
-};
 
 const LeaderboardScreen = () => {
   const navigation = useNavigation(); // Obtén el objeto de navegación
@@ -103,7 +89,7 @@ const LeaderboardScreen = () => {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color="#005F9E" />
+        <Ionicons name="arrow-back" size={24} color={colors.secondary} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Tabla de clasificación</Text>
@@ -115,11 +101,25 @@ const LeaderboardScreen = () => {
     </View>
   );
 };
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
     paddingHorizontal: width < 400 ? 6 : 16,
   },
   backButton: {
@@ -128,14 +128,9 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 40,
     marginBottom: 10,
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     borderRadius: 8,
     alignSelf: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
   },
   backButtonText: {
     fontSize: 16,
@@ -149,7 +144,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.secondary,
     textAlign: 'center',
-    marginVertical: 16,
+    marginBottom: 8,
   },
   itemContainer: {
     backgroundColor: colors.white,

@@ -16,20 +16,6 @@ interface BadgesScreenProps {
 
 const { width, height } = Dimensions.get('window');
 
-const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
-  text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
-  },
-  border: '#EEEEEE',
-  success: '#4CAF50',
-  error: '#D32F2F',
-};
 
 const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -187,10 +173,25 @@ const BadgesScreen = ({ navigation }: BadgesScreenProps) => {
   );
 };
 
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primary,
   },
   safeHeader: {
     backgroundColor: colors.primary,
@@ -201,10 +202,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.primary,
-    paddingHorizontal: 0,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
     minHeight: 56,
   },
   backButton: {
@@ -231,12 +228,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 12,
-    marginHorizontal: 0,
-    marginTop: 20,
-    marginBottom: 12,
+    marginHorizontal: 5,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -264,7 +260,7 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 32,
-    backgroundColor: colors.border,
+    backgroundColor: colors.primary,
     marginHorizontal: 4,
   },
   badgeGrid: {
@@ -274,7 +270,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   badgeItem: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     width: '48%',
     alignItems: 'center',
@@ -300,7 +296,7 @@ const styles = StyleSheet.create({
   },
   badgeDescription: {
     fontSize: 14,
-    color: colors.text.secondary,
+    color: colors.text.light,
     textAlign: 'center',
   },
   loadingContainer: {
@@ -320,7 +316,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.secondary,
     borderRadius: 12,
     padding: 20,
     width: '90%',
@@ -330,7 +326,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.secondary,
     textAlign: 'center',
     marginBottom: 16,
   },
