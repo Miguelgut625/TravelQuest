@@ -478,288 +478,85 @@ var getMissionJournalEntries = function (userId, missionId) {
     });
 };
 exports.getMissionJournalEntries = getMissionJournalEntries;
+/**
+ * Crea una nueva entrada en el diario
+ * @param data Datos de la entrada
+ * @returns La entrada creada
+ */
 var createJournalEntry = function (data) {
     return __awaiter(void 0, void 0, void 0, function () {
-        var cityName, _a, cityData, cityError, _b, journeyData, journeyError, e_7, _c, missionData, missionError, e_8, contentCityMatch, updatedTags, _d, tableInfo, tableError, columnStructure_1, firstRow, baseData, insertData, error, insertDataOptions, _i, insertDataOptions_1, insertOption, error_5, e_9, _e, checkData, checkError, diaryError, e_10, tableErr_1, error_4;
-        var _f, _g;
-        return __generator(this, function (_h) {
-            switch (_h.label) {
+        var baseData, _a, newEntry, insertError, updateError, e_2, error_4;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
                 case 0:
-                    _h.trys.push([0, 28, , 29]);
-                    console.log('Intentando crear entrada de diario con datos:', data);
-                    cityName = null;
-                    _h.label = 1;
-                case 1:
-                    _h.trys.push([1, 6, , 7]);
-                    return [4 /*yield*/, supabase_1.supabase
-                        .from('cities')
-                        .select('name')
-                        .eq('id', data.cityId)
-                        .single()];
-                case 2:
-                    _a = _h.sent(), cityData = _a.data, cityError = _a.error;
-                    if (!(!cityError && cityData && cityData.name)) return [3 /*break*/, 3];
-                    cityName = cityData.name;
-                    console.log('Nombre de ciudad encontrado:', cityName);
-                    return [3 /*break*/, 5];
-                case 3:
-                    console.warn('No se pudo obtener el nombre de la ciudad (1):', cityError);
-                    return [4 /*yield*/, supabase_1.supabase
-                        .from('journeys')
-                        .select("\n            cities (\n              name\n            )\n          ")
-                        .eq('cityId', data.cityId)
-                        .single()];
-                case 4:
-                    _b = _h.sent(), journeyData = _b.data, journeyError = _b.error;
-                    if (!journeyError && journeyData && journeyData.cities && journeyData.cities.name) {
-                        cityName = journeyData.cities.name;
-                        console.log('Nombre de ciudad encontrado en journeys:', cityName);
+                    _b.trys.push([0, 6, , 7]);
+                    console.log('📝 Creando entrada de diario con datos:', data);
+                    // Validar datos requeridos
+                    if (!data.userId || !data.missionId) {
+                        throw new Error('userId y missionId son requeridos');
                     }
-                    else {
-                        console.warn('No se pudo obtener el nombre de la ciudad (2):', journeyError);
-                    }
-                    _h.label = 5;
-                case 5: return [3 /*break*/, 7];
-                case 6:
-                    e_7 = _h.sent();
-                    console.warn('Error al buscar el nombre de la ciudad:', e_7);
-                    return [3 /*break*/, 7];
-                case 7:
-                    if (!!cityName) return [3 /*break*/, 11];
-                    _h.label = 8;
-                case 8:
-                    _h.trys.push([8, 10, , 11]);
-                    return [4 /*yield*/, supabase_1.supabase
-                        .from('journeys_missions')
-                        .select("\n            journeyId,\n            journey:journeyId (\n              cityId,\n              cities:cityId (\n                name\n              )\n            )\n          ")
-                        .eq('id', data.missionId)
-                        .single()];
-                case 9:
-                    _c = _h.sent(), missionData = _c.data, missionError = _c.error;
-                    if (!missionError && ((_g = (_f = missionData === null || missionData === void 0 ? void 0 : missionData.journey) === null || _f === void 0 ? void 0 : _f.cities) === null || _g === void 0 ? void 0 : _g.name)) {
-                        cityName = missionData.journey.cities.name;
-                        console.log('Nombre de ciudad encontrado a través de la misión:', cityName);
-                    }
-                    else {
-                        console.warn('No se pudo obtener el nombre a través de la misión:', missionError);
-                    }
-                    return [3 /*break*/, 11];
-                case 10:
-                    e_8 = _h.sent();
-                    console.warn('Error buscando ciudad a través de misión:', e_8);
-                    return [3 /*break*/, 11];
-                case 11:
-                    // Si todavía no tenemos nombre, usar algún valor por defecto
-                    if (!cityName) {
-                        contentCityMatch = data.content.match(/(?:en|in) ([A-Za-z\s]+)\.$/);
-                        if (contentCityMatch && contentCityMatch[1]) {
-                            cityName = contentCityMatch[1].trim();
-                            console.log('Nombre de ciudad extraído del contenido:', cityName);
-                        }
-                        else {
-                            // Si cityId parece ser un nombre de ciudad, usarlo directamente
-                            if (typeof data.cityId === 'string' && data.cityId.length > 2 && !/^[0-9a-f-]+$/.test(data.cityId)) {
-                                cityName = data.cityId;
-                                console.log('Usando cityId como nombre:', cityName);
-                            }
-                            else {
-                                cityName = 'Ciudad Desconocida';
-                                console.warn('Usando nombre de ciudad por defecto');
-                            }
-                        }
-                    }
-                    updatedTags = __spreadArray([], (data.tags || []), true);
-                    if (cityName && !updatedTags.includes(cityName)) {
-                        updatedTags.push(cityName);
-                    }
-                    _h.label = 12;
-                case 12:
-                    _h.trys.push([12, 26, , 27]);
+                    // Preparar datos base - IMPORTANTE: usar solo las columnas de la definición de tabla
+                    baseData = {
+                        userid: data.userId,
+                        missionid: data.missionId,
+                        cityid: data.cityId === 'unknown' ? null : data.cityId,
+                        title: data.title,
+                        content: data.content || '',
+                        photos: Array.isArray(data.photos) ? data.photos : [data.photos],
+                        tags: Array.isArray(data.tags) ? data.tags : [],
+                        created_at: new Date().toISOString()
+                    };
+                    console.log('🔄 Intentando insertar entrada con datos:', baseData);
                     return [4 /*yield*/, supabase_1.supabase
                         .from('journal_entries')
-                        .select('*')
-                        .limit(1)];
-                case 13:
-                    _d = _h.sent(), tableInfo = _d.data, tableError = _d.error;
-                    columnStructure_1 = {};
-                    if (!tableError && tableInfo) {
-                        // Si pudimos obtener datos, analizamos el primer registro para ver las columnas
-                        if (tableInfo.length > 0) {
-                            firstRow = tableInfo[0];
-                            if (firstRow && typeof firstRow === 'object') {
-                                // Iterar sobre las propiedades del objeto de manera segura
-                                Object.keys(firstRow).forEach(function (key) {
-                                    columnStructure_1[key] = true;
-                                });
-                                console.log("Estructura de columnas detectada:", Object.keys(columnStructure_1));
-                            }
-                        }
+                        .insert(baseData)
+                        .select()
+                        .single()];
+                case 1:
+                    _a = _b.sent(), newEntry = _a.data, insertError = _a.error;
+                    if (insertError) {
+                        console.error('❌ Error al insertar entrada:', insertError);
+                        throw insertError;
                     }
-                    baseData = {
-                        title: data.title,
-                        content: data.content,
-                        photos: data.photos,
-                        created_at: new Date().toISOString(),
-                        tags: updatedTags
-                    };
-                    insertData = __assign({}, baseData);
-                    // Usuario
-                    if ('user_id' in columnStructure_1)
-                        insertData.user_id = data.userId;
-                    else if ('userid' in columnStructure_1)
-                        insertData.userid = data.userId;
-                    else if ('userId' in columnStructure_1)
-                        insertData.userId = data.userId;
-                    else
-                        insertData.userid = data.userId; // Por defecto
-                    // Ciudad
-                    if ('city_id' in columnStructure_1)
-                        insertData.city_id = data.cityId;
-                    else if ('cityid' in columnStructure_1)
-                        insertData.cityid = data.cityId;
-                    else if ('cityId' in columnStructure_1)
-                        insertData.cityId = data.cityId;
-                    // Nombre de ciudad (si existe columna)
-                    if ('city_name' in columnStructure_1)
-                        insertData.city_name = cityName;
-                    else if ('cityname' in columnStructure_1)
-                        insertData.cityname = cityName;
-                    else if ('cityName' in columnStructure_1)
-                        insertData.cityName = cityName;
-                    // Misión
-                    if ('mission_id' in columnStructure_1)
-                        insertData.mission_id = data.missionId;
-                    else if ('missionid' in columnStructure_1)
-                        insertData.missionid = data.missionId;
-                    else if ('missionId' in columnStructure_1)
-                        insertData.missionId = data.missionId;
-                    console.log('Intentando insertar con datos adaptados:', insertData);
-                    return [4 /*yield*/, supabase_1.supabase.from('journal_entries').insert(insertData)];
-                case 14:
-                    error = (_h.sent()).error;
-                    if (!error) {
-                        console.log('Entrada creada exitosamente');
-                        return [2 /*return*/, true];
+                    if (!newEntry) {
+                        throw new Error('No se pudo crear la entrada del diario');
                     }
-                    console.warn('Error al insertar con datos adaptados:', error);
-                    insertDataOptions = [
-                        // Versión 1: snake_case (formato tradicional PostgreSQL)
-                        {
-                            user_id: data.userId,
-                            city_id: data.cityId,
-                            mission_id: data.missionId,
-                            title: data.title,
-                            content: data.content,
-                            photos: data.photos,
-                            city_name: cityName,
-                            created_at: new Date().toISOString(),
-                            tags: updatedTags
-                        },
-                        // Versión 2: camelCase
-                        {
-                            userId: data.userId,
-                            cityId: data.cityId,
-                            missionId: data.missionId,
-                            title: data.title,
-                            content: data.content,
-                            photos: data.photos,
-                            cityName: cityName,
-                            created_at: new Date().toISOString(),
-                            tags: updatedTags
-                        },
-                        // Versión 3: lowercase
-                        {
-                            userid: data.userId,
-                            cityid: data.cityId,
-                            missionid: data.missionId,
-                            title: data.title,
-                            content: data.content,
-                            photos: data.photos,
-                            cityname: cityName,
-                            created_at: new Date().toISOString(),
-                            tags: updatedTags
-                        },
-                        // Versión 4: solo campos obligatorios mínimos
-                        {
-                            userid: data.userId,
-                            title: data.title,
-                            content: data.content,
-                            photos: data.photos,
-                            created_at: new Date().toISOString(),
-                            tags: updatedTags
-                        }
-                    ];
-                    _i = 0, insertDataOptions_1 = insertDataOptions;
-                    _h.label = 15;
-                case 15:
-                    if (!(_i < insertDataOptions_1.length)) return [3 /*break*/, 20];
-                    insertOption = insertDataOptions_1[_i];
-                    _h.label = 16;
-                case 16:
-                    _h.trys.push([16, 18, , 19]);
-                    console.log('Intentando insertar con formato alternativo:', insertOption);
-                    return [4 /*yield*/, supabase_1.supabase.from('journal_entries').insert(insertOption)];
-                case 17:
-                    error_5 = (_h.sent()).error;
-                    if (!error_5) {
-                        console.log('Entrada creada exitosamente con formato alternativo');
-                        return [2 /*return*/, true];
-                    }
-                    console.warn('Error al insertar con este formato:', error_5);
-                    return [3 /*break*/, 19];
-                case 18:
-                    e_9 = _h.sent();
-                    console.warn('Excepción al insertar con este formato:', e_9);
-                    return [3 /*break*/, 19];
-                case 19:
-                    _i++;
-                    return [3 /*break*/, 15];
-                case 20:
-                    _h.trys.push([20, 24, , 25]);
+                    // Verificar que se guardó correctamente el missionid
+                    console.log('✅ Entrada creada con ID:', newEntry.id);
+                    console.log('📄 Datos de la entrada creada:', {
+                        missionid: newEntry.missionid,
+                        userid: newEntry.userid,
+                        content: newEntry.content ? newEntry.content.substring(0, 50) + '...' : 'sin contenido'
+                    });
+                    if (!(!newEntry.missionid && data.missionId)) return [3 /*break*/, 5];
+                    console.warn('⚠️ El missionid no se guardó correctamente. Intentando actualizar...');
+                    _b.label = 2;
+                case 2:
+                    _b.trys.push([2, 4, , 5]);
                     return [4 /*yield*/, supabase_1.supabase
-                        .from('journey_diary')
-                        .select('id')
-                        .limit(1)];
-                case 21:
-                    _e = _h.sent(), checkData = _e.data, checkError = _e.error;
-                    if (!!checkError) return [3 /*break*/, 23];
-                    // La tabla journey_diary existe, intentamos insertar ahí
-                    console.log('Intentando insertar en journey_diary como alternativa');
-                    return [4 /*yield*/, supabase_1.supabase.from('journey_diary').insert({
-                        userid: data.userId,
-                        title: data.title,
-                        content: data.content,
-                        photos: data.photos,
-                        created_at: new Date().toISOString(),
-                        tags: updatedTags
-                    })];
-                case 22:
-                    diaryError = (_h.sent()).error;
-                    if (!diaryError) {
-                        console.log('Entrada creada exitosamente en journey_diary');
-                        return [2 /*return*/, true];
+                        .from('journal_entries')
+                        .update({ missionid: data.missionId })
+                        .eq('id', newEntry.id)];
+                case 3:
+                    updateError = (_b.sent()).error;
+                    if (!updateError) {
+                        console.log('✅ MissionId actualizado correctamente');
+                        newEntry.missionid = data.missionId;
                     }
-                    console.warn('Error al insertar en journey_diary:', diaryError);
-                    _h.label = 23;
-                case 23: return [3 /*break*/, 25];
-                case 24:
-                    e_10 = _h.sent();
-                    console.warn('Error comprobando journey_diary:', e_10);
-                    return [3 /*break*/, 25];
-                case 25:
-                    // Si llegamos aquí, ninguno de los formatos funcionó
-                    console.error('No se pudo crear entrada en el diario con ningún formato');
-                    return [2 /*return*/, false];
-                case 26:
-                    tableErr_1 = _h.sent();
-                    console.error('Error al obtener estructura de tabla:', tableErr_1);
-                    return [2 /*return*/, false];
-                case 27: return [3 /*break*/, 29];
-                case 28:
-                    error_4 = _h.sent();
-                    console.error('Error inesperado al crear entrada en el diario:', error_4);
-                    return [2 /*return*/, false];
-                case 29: return [2 /*return*/];
+                    else {
+                        console.error('❌ Error al actualizar missionId:', updateError);
+                    }
+                    return [3 /*break*/, 5];
+                case 4:
+                    e_2 = _b.sent();
+                    console.error('❌ Error durante la actualización del missionId:', e_2);
+                    return [3 /*break*/, 5];
+                case 5: return [2 /*return*/, newEntry];
+                case 6:
+                    error_4 = _b.sent();
+                    console.error('❌ Error en createJournalEntry:', error_4);
+                    throw error_4;
+                case 7: return [2 /*return*/];
             }
         });
     });

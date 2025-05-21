@@ -79,7 +79,14 @@ const GroupChatScreen = () => {
         subscriptionRef.current = subscribeToGroupMessages(groupId, (newMsg) => {
             setMessages((prev) => {
                 if (prev.some((m) => m.id === newMsg.id)) return prev;
-                return [...prev, newMsg];
+                const updatedMessages = [...prev, newMsg];
+                
+                // Desplazar al final cuando llegue un nuevo mensaje
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+                
+                return updatedMessages;
             });
         });
     };
@@ -92,12 +99,52 @@ const GroupChatScreen = () => {
             if (selectedImage) {
                 imageUrl = await uploadImageToCloudinary(selectedImage, `group_${groupId}_${user.id}_${Date.now()}`);
             }
-            await sendGroupMessage(groupId, user.id, inputText.trim() || null, imageUrl, user.username);
+            
+            // Crear mensaje temporal para actualización inmediata
+            const tempMessage = {
+                id: `temp_${Date.now()}`,
+                group_id: groupId,
+                sender_id: user.id,
+                text: inputText.trim() || null,
+                image_url: imageUrl,
+                sender_username: user.username,
+                created_at: new Date().toISOString(),
+                read: false,
+                isTemp: true // Marca para identificar que es temporal
+            };
+            
+            // Actualizar UI inmediatamente con el mensaje temporal
+            setMessages(prev => [...prev, tempMessage]);
+            
+            // Desplazar al final para mostrar el nuevo mensaje
+            setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+            
+            // Enviar mensaje a la base de datos
+            const sentMessage = await sendGroupMessage(
+                groupId, 
+                user.id, 
+                inputText.trim() || null, 
+                imageUrl, 
+                user.username
+            );
+            
+            // Reemplazar mensaje temporal con el real
+            setMessages(prev => prev.map(msg => 
+                msg.isTemp ? sentMessage : msg
+            ));
+            
+            // Limpiar entrada
             setInputText('');
             setSelectedImage(null);
             setImagePreviewVisible(false);
         } catch (e) {
+            console.error('Error al enviar mensaje:', e);
             Alert.alert('Error', 'No se pudo enviar el mensaje');
+            
+            // Eliminar mensaje temporal en caso de error
+            setMessages(prev => prev.filter(msg => !msg.isTemp));
         } finally {
             setSending(false);
         }
@@ -106,7 +153,11 @@ const GroupChatScreen = () => {
     const renderMessage = ({ item }) => {
         const isMine = item.sender_id === user.id;
         return (
-            <View style={[styles.messageContainer, isMine ? styles.myMessage : styles.otherMessage]}>
+            <View style={[
+                styles.messageContainer, 
+                isMine ? styles.myMessage : styles.otherMessage,
+                item.isTemp ? styles.tempMessage : {}
+            ]}>
                 <Text style={styles.sender}>{item.sender_username || 'Usuario'}</Text>
                 {item.text ? <Text style={styles.messageText}>{item.text}</Text> : null}
                 {item.image_url ? (
@@ -153,6 +204,7 @@ const GroupChatScreen = () => {
                         keyExtractor={(item) => item.id}
                         contentContainerStyle={styles.messagesContainer}
                         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                     />
                 )}
 
@@ -436,6 +488,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFF',
+    },
+    tempMessage: {
+        opacity: 0.7,
     },
 });
 

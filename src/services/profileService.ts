@@ -1,23 +1,18 @@
 import { supabase } from './supabase';
-import { CLOUDINARY_CONFIG } from '../config/cloudinary';
+import { uploadImageToCloudinary } from './cloudinaryService';
 
 export async function updateProfilePicture(userId: string, imageUri: string): Promise<string> {
     try {
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const fileName = `profile_${userId}_${Date.now()}.jpg`;
+        const cloudinaryUrl = await uploadImageToCloudinary(imageUri, `profile_${userId}`);
 
-        const { data, error } = await supabase.storage
-            .from('profile-pictures')
-            .upload(fileName, blob);
+        const { error } = await supabase
+            .from('users')
+            .update({ profile_pic_url: cloudinaryUrl })
+            .eq('id', userId);
 
         if (error) throw error;
 
-        const { data: { publicUrl } } = supabase.storage
-            .from('profile-pictures')
-            .getPublicUrl(fileName);
-
-        return publicUrl;
+        return cloudinaryUrl;
     } catch (error) {
         console.error('Error al actualizar foto de perfil:', error);
         throw error;
@@ -39,4 +34,4 @@ export const getProfilePictureUrl = async (userId: string): Promise<string | nul
         console.error('Error al obtener la URL de la foto de perfil:', error);
         return null;
     }
-}; 
+};

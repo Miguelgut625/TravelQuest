@@ -37,6 +37,9 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Determinar si la entrada pertenece al usuario actual
+  const isMyEntry = entry.userId === user?.id || entry.user_id === user?.id || entry.userid === user?.id;
+
   const fetchComments = async () => {
     try {
       const data = await getCommentsByEntryId(entry.id);
@@ -310,21 +313,23 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
             </View>
           )}
           
-          {/* Botón para añadir imágenes */}
-          <TouchableOpacity 
-            style={styles.addPhotoButton} 
-            onPress={handleAddPhoto}
-            disabled={isAddingPhoto}
-          >
-            {isAddingPhoto ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="add" size={24} color="#fff" />
-                <Text style={styles.addPhotoText}>Añadir imagen</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Botón para añadir imágenes - solo se muestra si es mi entrada */}
+          {isMyEntry && (
+            <TouchableOpacity 
+              style={styles.addPhotoButton} 
+              onPress={handleAddPhoto}
+              disabled={isAddingPhoto}
+            >
+              {isAddingPhoto ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="add" size={24} color="#fff" />
+                  <Text style={styles.addPhotoText}>Añadir imagen</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
           
           {/* Contenido principal */}
           <View style={styles.contentContainer}>

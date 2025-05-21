@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.completeMission = exports.deductPointsFromUser = exports.addPointsToUser = exports.getUserPoints = void 0;
 var supabase_1 = require("./supabase");
 var journalService_1 = require("./journalService");
+var experienceService_1 = require("./experienceService");
 var getUserPoints = function (userId) {
     return __awaiter(void 0, void 0, void 0, function () {
         var _a, data, error, error_1;
@@ -68,11 +69,11 @@ var getUserPoints = function (userId) {
 exports.getUserPoints = getUserPoints;
 var addPointsToUser = function (userId, points) {
     return __awaiter(void 0, void 0, void 0, function () {
-        var currentPoints, error, error_2;
+        var currentPoints, error, expResult, error_2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    _a.trys.push([0, 3, , 4]);
+                    _a.trys.push([0, 4, , 5]);
                     return [4 /*yield*/, (0, exports.getUserPoints)(userId)];
                 case 1:
                     currentPoints = _a.sent();
@@ -87,12 +88,19 @@ var addPointsToUser = function (userId, points) {
                     error = (_a.sent()).error;
                     if (error)
                         throw error;
-                    return [2 /*return*/, currentPoints + points];
+                    
+                    // Añadir experiencia al usuario (relación 1:1 entre puntos y experiencia)
+                    return [4 /*yield*/, (0, experienceService_1.addExperienceToUser)(userId, points)];
                 case 3:
+                    expResult = _a.sent();
+                    console.log('✨ Experiencia añadida:', expResult);
+                    
+                    return [2 /*return*/, currentPoints + points];
+                case 4:
                     error_2 = _a.sent();
                     console.error('Error añadiendo puntos al usuario:', error_2);
                     throw error_2;
-                case 4: return [2 /*return*/];
+                case 5: return [2 /*return*/];
             }
         });
     });

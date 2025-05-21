@@ -1,25 +1,25 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, RefreshControl } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
 import { completeMission as dispatchCompleteMission } from '../../features/journey/journeySlice';
-import { completeMission } from '../../services/pointsService';
+import { completeMission, getUserPoints } from '../../services/pointsService';
+import { addExperienceToUser } from '../../services/experienceService';
 import ImageUploadModal from '../../components/ImageUploadModal';
 import { setRefreshJournal } from '../../features/journalSlice';
 import { createJournalEntry } from '../../services/journalService';
 import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
-import { addExperienceToUser } from '../../services/experienceService';
 import { awardSpecificBadges } from '../../services/badgeService';
-import { analyzeImage } from '../../services/aiService';
+import { analyzeImage, updateJournalWithAIDescription } from '../../services/aiService';
 import { useTheme } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-context';
-import { getUserPoints } from '../../services/pointsService';
 import { RouteProp } from '@react-navigation/native';
 import { getOrCreateCity } from '../../services/missionGenerator';
+import MissionHintModal from '../../components/MissionHintModal';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -122,6 +122,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
   onShare: () => void;
 }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showHintModal, setShowHintModal] = useState(false);
   const timeRemaining = getTimeRemaining(mission.end_date);
   const isExpired = timeRemaining.isExpired && !mission.completed;
 
@@ -134,6 +135,11 @@ const MissionCard = ({ mission, onComplete, onShare }: {
   const handleUploadSuccess = (imageUrl: string) => {
     setShowUploadModal(false);
     onComplete(imageUrl);
+  };
+
+  const handleShowHint = (e: any) => {
+    e.stopPropagation();
+    setShowHintModal(true);
   };
 
   return (
@@ -168,12 +174,21 @@ const MissionCard = ({ mission, onComplete, onShare }: {
         <View style={styles.cardFooter}>
           <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
           <Text style={styles.points}>{mission.challenge.points} puntos</Text>
-          {(!mission.completed && !timeRemaining.isExpired) && (
-            <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
-              {/* @ts-ignore */}
-              <Ionicons name="share-social" size={20} color="#005F9E" />
-            </TouchableOpacity>
-          )}
+          
+          <View style={styles.actionsContainer}>
+            {(!mission.completed && !timeRemaining.isExpired) && (
+              <>
+                <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
+                  {/* @ts-ignore */}
+                  <Ionicons name="share-social" size={20} color="#005F9E" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleShowHint} style={styles.hintIcon}>
+                  {/* @ts-ignore */}
+                  <Ionicons name="bulb" size={20} color="#FFB900" />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -183,6 +198,13 @@ const MissionCard = ({ mission, onComplete, onShare }: {
         missionTitle={mission.challenge.title}
         onClose={() => setShowUploadModal(false)}
         onSuccess={handleUploadSuccess}
+      />
+      
+      <MissionHintModal
+        visible={showHintModal}
+        missionId={mission.id}
+        missionTitle={mission.challenge.title}
+        onClose={() => setShowHintModal(false)}
       />
     </>
   );
@@ -369,6 +391,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const [missionToShare, setMissionToShare] = useState<JourneyMission | null>(null);
   const dispatch = useDispatch();
   const theme = useTheme();
+  const [refreshing, setRefreshing] = useState(false);
 
   // Cargar puntos del usuario al inicio
   useEffect(() => {
@@ -527,14 +550,16 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       let foundMissionPoints = 0;
       let foundCityName = '';
       let foundMission = null;
+      let foundMissionIndex = -1;
 
       Object.keys(cityMissions).forEach((cityName) => {
         const pending = cityMissions[cityName].pending;
-        const mission = pending.find((m) => m.id === missionId);
-        if (mission) {
-          foundMission = mission;
-          foundMissionTitle = mission.challenge.title;
-          foundMissionPoints = mission.challenge.points;
+        const missionIndex = pending.findIndex((m) => m.id === missionId);
+        if (missionIndex !== -1) {
+          foundMission = pending[missionIndex];
+          foundMissionIndex = missionIndex;
+          foundMissionTitle = foundMission.challenge.title;
+          foundMissionPoints = foundMission.challenge.points;
           foundCityName = cityName;
         }
       });
@@ -597,11 +622,11 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               // Generar descripción con IA
               console.log('🤖 Iniciando generación de descripción con IA...');
 
-              const customPrompt = `Analiza la imagen adjunta tomada durante mi misión "${foundMissionTitle}" en ${foundCityName}.
+              const customPrompt = `Analiza la imagen adjunta tomada durante la misión "${foundMissionTitle}" en ${foundCityName}.
               
               CONTEXTO: La misión consistía en ${foundMission?.challenge?.description || foundMissionTitle}
               
-              Escribe una entrada de diario como si fueses un guía turístico explicando lo que se ve en la imagen (máximo 200 palabras) que DEBE incluir:
+              Escribe una descripción informativa como un guía turístico profesional explicando lo que se ve en la imagen (máximo 200 palabras). La descripción DEBE incluir:
               
               1. IDENTIFICACIÓN DEL CONTENIDO DE LA IMAGEN:
                  - Si es un monumento: su nombre exacto y estilo arquitectónico
@@ -616,24 +641,50 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               
               3. DOS CURIOSIDADES INTERESANTES sobre el elemento principal que aparece en la imagen
               
-              4. Una breve REFLEXIÓN PERSONAL como si yo hubiera tomado la foto durante mi visita
+              4. CONTEXTO TURÍSTICO: Breve mención de por qué este lugar/elemento es importante para los visitantes
               
-              ESTILO: Reflexivo, personal, emocionante, como un diario de viaje auténtico.
-              FORMATO: Párrafos cortos y claros, en primera persona.`;
+              IMPORTANTE:
+              - Escribe en TERCERA PERSONA, como un guía turístico explicando a visitantes
+              - NO uses primera persona ("yo", "mi", "nosotros", etc.)
+              - Usa un tono profesional, informativo y educativo
+              - Organiza la información en párrafos cortos y claros`;
 
+              let aiSuccess = false;
               try {
                 const aiDescription = await analyzeImage(imageUrl, foundCityName, 'tourist', customPrompt);
+                console.log('🤖 Descripción generada por IA:', aiDescription?.substring(0, 50) + '...');
 
                 if (aiDescription && aiDescription.length > 20) {
-                  const { error: updateError } = await supabase
-                    .from('journal_entries')
-                    .update({ content: aiDescription })
-                    .eq('missionid', missionId)
-                    .eq('userid', user?.id || '');
-
-                  if (updateError) {
-                    console.error('❌ Error al actualizar descripción:', updateError);
+                  // Usar la nueva función especializada para actualizar la descripción
+                  const updateResult = await updateJournalWithAIDescription(
+                    missionId,
+                    user?.id || '',
+                    aiDescription
+                  );
+                  
+                  if (updateResult.success) {
+                    console.log('✅ Descripción actualizada exitosamente');
+                    aiSuccess = true;
+                  } else {
+                    console.warn('⚠️ No se pudo actualizar la descripción:', updateResult.message);
+                    
+                    // Intento de respaldo usando el método directo anterior
+                    console.log('🔄 Intentando actualización directa como respaldo...');
+                    const { error: updateError } = await supabase
+                      .from('journal_entries')
+                      .update({ content: aiDescription })
+                      .eq('missionid', missionId)
+                      .eq('userid', user?.id || '');
+                    
+                    if (updateError) {
+                      console.error('❌ Error en actualización de respaldo:', updateError);
+                    } else {
+                      console.log('✅ Actualización de respaldo exitosa');
+                      aiSuccess = true;
+                    }
                   }
+                } else {
+                  console.warn('⚠️ Descripción generada demasiado corta o vacía');
                 }
               } catch (aiError) {
                 console.error('❌ Error en proceso de IA:', aiError);
@@ -641,29 +692,53 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               } finally {
                 setGeneratingDescription(false);
                 dispatch(setRefreshJournal(true));
+                
+                // Actualizar el estado local de las misiones independientemente del éxito o fracaso de la IA
+                updateLocalMissionState(missionId, foundCityName, foundMissionIndex);
               }
             } catch (journalError) {
               console.error('❌ Error al crear entrada del diario:', journalError);
               // No lanzar error, continuar con el flujo
+              
+              // Actualizar el estado local de las misiones incluso si hay error en el diario
+              updateLocalMissionState(missionId, foundCityName, foundMissionIndex);
             }
+          } else {
+            // Si no hay imagen, actualizar el estado local directamente
+            updateLocalMissionState(missionId, foundCityName, foundMissionIndex);
           }
 
           // Otorgar insignias y experiencia
-          await awardSpecificBadges(user.id, 'completeMission');
-          const expResult = await addExperienceToUser(user.id, foundMissionPoints);
+          try {
+            await awardSpecificBadges(user.id, 'completeMission');
+          } catch (badgeError) {
+            console.error('❌ Error al otorgar insignias:', badgeError);
+            // No interrumpir el flujo por error en las insignias
+          }
+          
+          try {
+            const expResult = await addExperienceToUser(user.id, foundMissionPoints);
+            
+            // Actualizar información de misión completada con datos de experiencia
+            setCompletedMissionInfo(prev => ({
+              ...prev!,
+              levelUp: expResult.leveledUp,
+              newLevel: expResult.level,
+              remainingXP: expResult.xp,
+              xpNext: expResult.xpNext
+            }));
+          } catch (expError) {
+            console.error('❌ Error al añadir experiencia:', expError);
+            // No interrumpir el flujo por error en la experiencia
+          }
 
           // Actualizar los puntos del usuario tras completar la misión
-          const updatedPoints = await getUserPoints(user.id);
-          setUserPoints(updatedPoints);
-
-          // Actualizar información de misión completada con datos de experiencia
-          setCompletedMissionInfo(prev => ({
-            ...prev!,
-            levelUp: expResult.leveledUp,
-            newLevel: expResult.level,
-            remainingXP: expResult.xp,
-            xpNext: expResult.xpNext
-          }));
+          try {
+            const updatedPoints = await getUserPoints(user.id);
+            setUserPoints(updatedPoints);
+          } catch (pointsError) {
+            console.error('❌ Error al actualizar puntos:', pointsError);
+          }
 
         } catch (error) {
           console.error('Error en proceso de fondo:', error);
@@ -681,6 +756,37 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
       setCompletingMission(false);
     }
+  };
+
+  // Función para actualizar el estado local de las misiones
+  const updateLocalMissionState = (missionId: string, cityName: string, missionIndex: number) => {
+    if (missionIndex === -1 || !cityName) return;
+    
+    setCityMissions(prevState => {
+      // Crear copia profunda del estado anterior
+      const newState = JSON.parse(JSON.stringify(prevState));
+      
+      if (newState[cityName] && 
+          newState[cityName].pending && 
+          missionIndex < newState[cityName].pending.length) {
+        
+        // Obtener la misión de las pendientes
+        const mission = newState[cityName].pending[missionIndex];
+        
+        // Marcarla como completada
+        mission.completed = true;
+        
+        // Eliminar de pendientes
+        newState[cityName].pending.splice(missionIndex, 1);
+        
+        // Añadir a completadas
+        newState[cityName].completed.push(mission);
+        
+        console.log('🔄 Estado local de misión actualizado: Misión movida de pendiente a completada');
+      }
+      
+      return newState;
+    });
   };
 
   useEffect(() => {
@@ -735,6 +841,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     return null;
   };
 
+  // Función para recargar las misiones
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchMissions();
+    setRefreshing(false);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -760,11 +873,23 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Tus Ciudades</Text>
-          <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+              {refreshing ? (
+                <ActivityIndicator size="small" color="#005F9E" />
+              ) : (
+                <Ionicons name="refresh" size={24} color="#005F9E" />
+              )}
+            </TouchableOpacity>
+            <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
+          </View>
         </View>
         <ScrollView
           style={styles.citiesList}
           contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
         >
           {Object.entries(cityMissions).map(([cityName, missions]) => (
             <CityCard
@@ -804,12 +929,26 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           <Ionicons name="arrow-back" size={24} color="#333" />
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+            {refreshing ? (
+              <ActivityIndicator size="small" color="#005F9E" />
+            ) : (
+              <Ionicons name="refresh" size={24} color="#005F9E" />
+            )}
+          </TouchableOpacity>
+          <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
+        </View>
       </View>
 
       <Text style={styles.cityTitle}>{selectedCity}</Text>
 
-      <ScrollView style={styles.missionsList}>
+      <ScrollView 
+        style={styles.missionsList}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         {cityData.pending.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
@@ -898,6 +1037,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingTop: 10,
   },
   backButton: {
     flexDirection: 'row',
@@ -915,6 +1055,20 @@ const styles = StyleSheet.create({
     color: '#1B263B',
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#E4EAFF',
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cityTitle: {
     fontSize: 28,
@@ -1204,10 +1358,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  hintIcon: {
+    padding: 5,
+    backgroundColor: 'rgba(255, 185, 0, 0.15)',
+    borderRadius: 20,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
-
-
-
 
 const MissionsScreen = (props: any) => {
   return (

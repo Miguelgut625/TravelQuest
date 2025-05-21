@@ -4,9 +4,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Constants from 'expo-constants';
 import axios from 'axios';
+import { supabase } from './supabase';
 
-// Obtener la API key desde las variables de entorno
-const API_KEY = Constants.expoConfig?.extra?.googleAiApiKey || '';
+// Usar la misma API key que se usa en missionGenerator.ts
+const API_KEY = "AIzaSyB4PuDOYXgbH9egme1UCO0CiRcOV4kVfMM";
 
 // Verificar y registrar estado de la API key
 console.log(`Estado de API key de Google AI: ${API_KEY ? 'Configurada (' + API_KEY.substring(0, 5) + '...)' : 'No configurada'}`);
@@ -19,8 +20,8 @@ if (API_KEY) {
   }
 }
 
-// Inicializar la API de Google Generative AI solo si hay una API key válida
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
+// Inicializar la API de Google Generative AI
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Prompts mejorados para diferentes tipos de análisis
 const analysisByType = {
@@ -84,35 +85,34 @@ SECCIÓN FINAL: Concluye con una determinación clara:
 
 Incluso si solo se muestra una parte o sección de una obra famosa, identifícala correctamente.`,
 
-  tourist: `Analiza esta fotografía de un destino o atracción turística en detalle y crea una descripción estilo 'experiencia personal de viaje'.
+  tourist: `Analiza esta fotografía de un destino o atracción turística en detalle y crea una descripción informativa en estilo de guía turístico profesional.
 
-Adopta un estilo de primera persona, como si fueras el viajero que ha visitado este lugar y estás escribiendo en tu diario de viaje. Incluye:
+Utiliza TERCERA PERSONA, con un tono educativo y descriptivo. NO uses primera persona ("yo", "mi", etc.). Incluye:
 
 1. IDENTIFICACIÓN DEL LUGAR:
-   - Identifica el lugar exacto: monumento, paisaje, ciudad, etc.
-   - Si reconoces un lugar famoso (como la Torre Eiffel, Machu Picchu), menciona su nombre completo
+   - Identifica el lugar con precisión: monumento, paisaje, ciudad, etc.
+   - Si es un lugar famoso (como la Torre Eiffel, Machu Picchu), menciona su nombre completo
    - Incluye la ubicación geográfica (ciudad, país)
 
-2. DESCRIPCIÓN ATMOSFÉRICA Y VISUAL:
-   - Describe el ambiente, la luz, los colores y sensaciones
-   - Menciona detalles arquitectónicos, elementos naturales o culturales destacados
-   - Incluye observaciones sobre las personas, actividades o el entorno
+2. DESCRIPCIÓN ARQUITECTÓNICA O PAISAJÍSTICA:
+   - Describe elementos visuales clave, estilos arquitectónicos, materiales
+   - Para monumentos: año de construcción, arquitecto si es conocido
+   - Para paisajes: formaciones geológicas, flora y fauna destacada
 
 3. CONTEXTO HISTÓRICO Y CULTURAL:
-   - Menciona brevemente datos históricos relevantes
-   - Describe la importancia cultural o significado del lugar
-   - Incluye alguna curiosidad o dato interesante
+   - Proporciona 2-3 datos históricos relevantes del lugar
+   - Explica la importancia cultural o el significado histórico
+   - Menciona 1-2 curiosidades interesantes que un guía compartiría
 
-4. EXPERIENCIA PERSONAL:
-   - Expresa emociones o impresiones como viajero (asombro, paz, admiración)
-   - Menciona lo que hiciste allí o lo que has aprendido
-   - Incluye reflexiones o pensamientos inspirados por el lugar
+4. INFORMACIÓN PRÁCTICA:
+   - Describe brevemente lo que los visitantes pueden experimentar en el lugar
+   - Menciona aspectos destacados que los turistas no deberían perderse
+   - Cualquier detalle relevante sobre horarios o mejores momentos para visitar (si es visible)
 
 5. CONCLUSIÓN: 
-   - Cierra con una reflexión final o impresión duradera
-   - Enfatiza el valor del lugar como destino y su impacto en ti
+   - Resume la importancia del lugar en el contexto del patrimonio local o mundial
 
-Escribe en estilo narrativo, personal y evocador, como una entrada detallada de diario de viaje de aproximadamente 50 líneas. Usa un tono contemplativo, reflexivo y apreciativo.`
+Escribe en estilo informativo, claro y educativo, como lo haría un guía turístico experimentado explicando el lugar a un grupo. El texto debe ser objetivo, preciso y en TERCERA PERSONA, sin opiniones personales en primera persona.`
 };
 
 /**
@@ -349,12 +349,6 @@ export const analyzeImage = async (
       return generateFallbackResponse(cityName, missionType);
     }
 
-    // Si no hay API key configurada o genAI no está inicializado
-    if (!API_KEY || !genAI) {
-      console.warn('❌ API key de Google AI no configurada o inválida');
-      return generateFallbackResponse(cityName, missionType);
-    }
-    
     // Implementar un timeout más largo para dar más tiempo a la API
     const timeoutPromise = new Promise<string>((_, reject) => {
       setTimeout(() => {
@@ -511,4 +505,224 @@ const generateFallbackResponse = (cityName?: string, missionType: string = 'tour
 
   const typeResponses = responses[missionType as keyof typeof responses] || responses.standard;
   return typeResponses[Math.floor(Math.random() * typeResponses.length)];
+};
+
+/**
+ * Actualiza una entrada del diario con la descripción generada por IA
+ * @param missionId ID de la misión
+ * @param userId ID del usuario
+ * @param aiDescription Descripción generada por IA
+ * @returns Resultado de la operación
+ */
+export const updateJournalWithAIDescription = async (
+  missionId: string,
+  userId: string,
+  aiDescription: string
+): Promise<{success: boolean; message: string}> => {
+  try {
+    console.log('🔄 Actualizando entrada de diario con descripción de IA');
+    console.log('📝 Descripción: ', aiDescription.substring(0, 50) + '...');
+    console.log('🆔 MissionID:', missionId);
+    console.log('👤 UserID:', userId);
+    
+    if (!aiDescription || aiDescription.trim().length < 20) {
+      return {
+        success: false,
+        message: 'La descripción es demasiado corta o está vacía'
+      };
+    }
+    
+    // Intentar actualizar usando los nombres de columna más probables
+    const updateAttempts = [
+      // 1. Intento: nombres en minúsculas (más común en PostgreSQL)
+      {
+        column: 'content',
+        missionIdColumn: 'missionid',
+        userIdColumn: 'userid'
+      },
+      // 2. Intento: nombres con underscores
+      {
+        column: 'content',
+        missionIdColumn: 'mission_id',
+        userIdColumn: 'user_id'
+      },
+      // 3. Intento: nombres en camelCase
+      {
+        column: 'content',
+        missionIdColumn: 'missionId',
+        userIdColumn: 'userId'
+      }
+    ];
+    
+    let isUpdated = false;
+    let errorDetails = '';
+    
+    for (const attempt of updateAttempts) {
+      try {
+        console.log(`🔄 Intentando actualizar con: ${attempt.missionIdColumn}, ${attempt.userIdColumn}`);
+        
+        const { data, error } = await supabase
+          .from('journal_entries')
+          .update({ [attempt.column]: aiDescription })
+          .eq(attempt.missionIdColumn, missionId)
+          .eq(attempt.userIdColumn, userId)
+          .select();
+        
+        if (error) {
+          errorDetails += `Error con ${attempt.missionIdColumn}: ${error.message}. `;
+          console.warn(`⚠️ Error actualizando con ${attempt.missionIdColumn}:`, error.message);
+          continue;
+        }
+        
+        if (data && data.length > 0) {
+          console.log('✅ Descripción actualizada exitosamente con formato:', attempt);
+          isUpdated = true;
+          break;
+        } else {
+          console.warn(`⚠️ No se encontraron entradas para actualizar con ${attempt.missionIdColumn}`);
+        }
+      } catch (e: any) {
+        errorDetails += `Excepción: ${e.message || e}. `;
+        console.warn('⚠️ Excepción en intento de actualización:', e);
+      }
+    }
+    
+    // Si no se actualizó con los intentos anteriores, intentar buscar por ID de entrada
+    if (!isUpdated) {
+      try {
+        // Intentar encontrar la entrada por missionId y userId
+        const { data: journalEntry } = await supabase
+          .from('journal_entries')
+          .select('id')
+          .or(`missionid.eq.${missionId},mission_id.eq.${missionId},missionId.eq.${missionId}`)
+          .or(`userid.eq.${userId},user_id.eq.${userId},userId.eq.${userId}`)
+          .limit(1);
+          
+        if (journalEntry && journalEntry.length > 0) {
+          const entryId = journalEntry[0].id;
+          console.log('🔍 Entrada encontrada con ID:', entryId);
+          
+          // Actualizar usando el ID de la entrada
+          const { error: updateError } = await supabase
+            .from('journal_entries')
+            .update({ content: aiDescription })
+            .eq('id', entryId);
+            
+          if (!updateError) {
+            console.log('✅ Descripción actualizada exitosamente usando ID de entrada');
+            isUpdated = true;
+          } else {
+            errorDetails += `Error con ID: ${updateError.message}. `;
+            console.warn('⚠️ Error actualizando con ID:', updateError);
+          }
+        } else {
+          console.warn('⚠️ No se encontró la entrada usando búsqueda OR');
+        }
+      } catch (e: any) {
+        errorDetails += `Excepción en búsqueda por ID: ${e.message || e}. `;
+        console.warn('⚠️ Excepción en búsqueda por ID:', e);
+      }
+    }
+    
+    return {
+      success: isUpdated,
+      message: isUpdated 
+        ? 'Descripción actualizada exitosamente'
+        : `No se pudo actualizar la descripción: ${errorDetails}`
+    };
+  } catch (error: any) {
+    console.error('❌ Error en updateJournalWithAIDescription:', error);
+    return {
+      success: false,
+      message: `Error al actualizar la descripción: ${error.message || error}`
+    };
+  }
+};
+
+/**
+ * Genera una pista para una misión basada en su descripción usando IA
+ * @param missionDescription Descripción de la misión
+ * @param missionTitle Título de la misión
+ * @param cityName Nombre de la ciudad (opcional)
+ * @returns Pista generada por IA
+ */
+export const generateMissionHint = async (
+  missionDescription: string, 
+  missionTitle: string,
+  cityName?: string
+): Promise<string> => {
+  try {
+    console.log('Generando pista para misión:', missionTitle);
+    
+    // Verificar la API key
+    if (!API_KEY || API_KEY.length < 10) {
+      console.warn('API key inválida para generación de pistas');
+      return generateFallbackHint(missionDescription, cityName);
+    }
+
+    // Crear un modelo de texto con la API de Google
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    // Construir el prompt para la generación de la pista
+    const prompt = `
+    Actúa como un asistente de viajes experto que proporciona pistas concretas y específicas para ayudar a completar misiones de viaje.
+
+    Para esta misión:
+    - TÍTULO: ${missionTitle}
+    - DESCRIPCIÓN: ${missionDescription}
+    ${cityName ? `- CIUDAD: ${cityName}` : ''}
+
+    Genera UNA ÚNICA PISTA muy específica que ayude al usuario a completar esta misión.
+    
+    La pista debe:
+    1. Proporcionar información CONCRETA y ÚTIL para encontrar el lugar exacto, el punto de vista óptimo para una foto, o el elemento específico que necesitan encontrar.
+    2. Incluir UN detalle muy específico (ubicación exacta, obra específica, plato concreto, rincón particular, etc.) que garantice que el usuario pueda completar la misión.
+    3. Ser directa y breve (máximo 3 frases).
+
+    No uses frases genéricas como "explora" o "busca". En cambio, proporciona información precisa como:
+    - "La mejor vista de la catedral está desde la plaza norte cerca de la puerta principal del castillo, especialmente al atardecer"
+    - "El plato de pasta más tradicional es el 'pici', busca restaurantes en la calle principal que lo elaboren artesanalmente"
+    - "El cuadro 'La Mona Lisa' es la mayor representación del arte de este museo, se encuentra en la sala 3, ala este del museo, junto a otras obras de Picasso"
+    - "La planta tiene flores rojas, suele medir 20cm de alto y se encuentra principalmente en los jardines del parque central"
+    
+    Recuerda: tu pista debe garantizar que el usuario pueda completar la misión correctamente, siendo específica y directa.
+    `;
+
+    // Generar la respuesta
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const responseText = response.text();
+    
+    console.log('Pista generada con éxito');
+    
+    return responseText.trim();
+  } catch (error) {
+    console.error('Error al generar pista con IA:', error);
+    return generateFallbackHint(missionDescription, cityName);
+  }
+};
+
+/**
+ * Genera una pista alternativa si la IA falla
+ * @param missionDescription Descripción de la misión
+ * @param cityName Nombre de la ciudad (opcional)
+ * @returns Pista generada sin IA
+ */
+const generateFallbackHint = (missionDescription: string, cityName?: string): string => {
+  // Generamos pistas por categorías basadas en palabras clave
+  if (missionDescription.includes('foto') || missionDescription.includes('fotografía')) {
+    return 'Busca un punto elevado o con buena iluminación para conseguir la mejor perspectiva. Intenta visitar el lugar al amanecer o atardecer para una iluminación óptima.';
+  } 
+  else if (missionDescription.includes('comida') || missionDescription.includes('gastronomía') || missionDescription.includes('restaurante')) {
+    return 'Pregunta directamente a los residentes locales, no a otros turistas. Busca restaurantes con menú en el idioma local y alejados de las zonas más turísticas.';
+  }
+  else if (missionDescription.includes('museo') || missionDescription.includes('arte') || missionDescription.includes('pintura')) {
+    return 'Revisa el mapa del museo al entrar y pregunta al personal sobre la ubicación exacta. La mayoría de obras importantes suelen estar en salas centrales o especiales.';
+  }
+  else if (missionDescription.includes('parque') || missionDescription.includes('naturaleza') || missionDescription.includes('jardín')) {
+    return 'Consulta el mapa del parque y dirige tu atención a las zonas menos transitadas. Lo más interesante suele estar alejado de la entrada principal.';
+  }
+  else {
+    return `Observa cuidadosamente los detalles en la descripción de la misión. Pregunta a residentes locales por información específica${cityName ? ' sobre ' + cityName : ''}.`;
+  }
 }; 

@@ -437,7 +437,8 @@ export const createJournalEntry = async (data: {
       throw new Error('userId y missionId son requeridos');
     }
 
-    // Preparar datos base
+    // Preparar datos base - IMPORTANTE: usar solo las columnas que existen en la tabla
+    // Según la definición: id, userid, cityid, missionid, title, content, photos, location, created_at, tags
     const baseData = {
       userid: data.userId,
       missionid: data.missionId,
@@ -467,7 +468,34 @@ export const createJournalEntry = async (data: {
       throw new Error('No se pudo crear la entrada del diario');
     }
 
-    console.log('✅ Entrada creada exitosamente:', newEntry);
+    // Verificar que se guardó correctamente el missionid
+    console.log('✅ Entrada creada con ID:', newEntry.id);
+    console.log('📄 Datos de la entrada creada:', {
+      missionid: newEntry.missionid,
+      userid: newEntry.userid,
+      content: newEntry.content?.substring(0, 50) + '...'
+    });
+
+    // Si por alguna razón el missionId no se guardó correctamente, intentamos actualizarlo
+    if (!newEntry.missionid && data.missionId) {
+      console.warn('⚠️ El missionid no se guardó correctamente. Intentando actualizar...');
+      try {
+        const { error: updateError } = await supabase
+          .from('journal_entries')
+          .update({ missionid: data.missionId })
+          .eq('id', newEntry.id);
+          
+        if (!updateError) {
+          console.log('✅ MissionId actualizado correctamente');
+          newEntry.missionid = data.missionId;
+        } else {
+          console.error('❌ Error al actualizar missionId:', updateError);
+        }
+      } catch (e) {
+        console.error('❌ Error durante la actualización del missionId:', e);
+      }
+    }
+
     return newEntry;
 
   } catch (error) {

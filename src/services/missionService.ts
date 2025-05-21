@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { addPointsToUser, deductPointsFromUser } from './pointsService';
+import { generateMissionHint } from './aiService';
 
 // Precio en puntos para obtener una pista
 export const HINT_COST = 15;
@@ -28,6 +29,12 @@ export const getMissionHint = async (userId: string, missionId: string): Promise
         id,
         journeyId,
         challengeId,
+        journeys (
+          id, 
+          cities (
+            name
+          )
+        ),
         challenges (
           id,
           title,
@@ -42,41 +49,19 @@ export const getMissionHint = async (userId: string, missionId: string): Promise
       throw missionError || new Error('No se encontró la misión');
     }
 
-    // Generar pista basada en la descripción de la misión
-    // Aquí podrías tener un conjunto de pistas predefinidas o generarlas dinámicamente
-    // según la dificultad o el tipo de misión
-    let hint = '';
     const missionTitle = missionData.challenges.title;
     const missionDescription = missionData.challenges.description;
-    const difficulty = missionData.challenges.difficulty;
+    // Obtener el nombre de la ciudad a través de la relación con journeys
+    const cityName = missionData.journeys?.cities?.name || 'Ciudad desconocida';
+    
+    // Generar pista utilizando AI
+    const hint = await generateMissionHint(
+      missionDescription,
+      missionTitle,
+      cityName
+    );
 
-    // Generar pista contextualizada
-    if (missionDescription.includes('fotografía') || missionDescription.includes('foto')) {
-      hint = 'Busca un lugar elevado o con buena iluminación para conseguir mejores fotos.';
-    } else if (missionDescription.includes('comida') || missionDescription.includes('restaurante')) {
-      hint = 'Pregunta a los lugareños por los sitios más populares para probar la gastronomía local.';
-    } else if (missionDescription.includes('museo') || missionDescription.includes('monumento')) {
-      hint = 'Revisa el horario de apertura y considera visitar temprano para evitar multitudes.';
-    } else if (missionDescription.includes('parque') || missionDescription.includes('naturaleza')) {
-      hint = 'Lleva contigo agua y protección solar. Los mejores momentos para visitar son temprano en la mañana o al atardecer.';
-    } else {
-      // Pistas genéricas según dificultad
-      switch (difficulty) {
-        case 'easy':
-          hint = `Para completar "${missionTitle}", observa cuidadosamente los detalles en la descripción de la misión.`;
-          break;
-        case 'medium':
-          hint = `Para completar "${missionTitle}", considera explorar zonas menos turísticas o preguntar a los locales.`;
-          break;
-        case 'hard':
-          hint = `Para completar "${missionTitle}", tendrás que ser creativo y pensar fuera de lo común. Considera el momento del día o eventos especiales.`;
-          break;
-        default:
-          hint = `Presta atención a los detalles de la misión y busca elementos únicos que destaquen en tu fotografía.`;
-      }
-    }
-
-    // Registrar el uso de la pista (opcional)
+    // Registrar el uso de la pista
     await supabase
       .from('mission_hints')
       .insert([

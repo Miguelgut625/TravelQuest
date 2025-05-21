@@ -135,6 +135,40 @@ export const completeMission = async (missionId: string, userId: string, imageUr
 };
 
 /**
+ * Resta puntos al usuario
+ * @param userId ID del usuario
+ * @param points Cantidad de puntos a restar
+ * @returns Puntos restantes después de la operación
+ */
+export const deductPointsFromUser = async (userId: string, points: number) => {
+    try {
+        // Primero obtenemos los puntos actuales
+        const currentPoints = await getUserPoints(userId);
+        
+        // Verificar si hay puntos suficientes
+        if (currentPoints < points) {
+            throw new Error(`Puntos insuficientes. Se necesitan ${points} puntos.`);
+        }
+
+        // Restar los puntos
+        const { error } = await supabase
+            .from('users')
+            .update({
+                points: currentPoints - points,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        return currentPoints - points;
+    } catch (error) {
+        console.error('Error restando puntos al usuario:', error);
+        throw error;
+    }
+};
+
+/**
  * Genera una descripción detallada para el diario cuando la IA falla
  * @param cityName Nombre de la ciudad
  * @param missionTitle Título de la misión
