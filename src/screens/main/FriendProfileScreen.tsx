@@ -56,49 +56,64 @@ interface FriendProfileScreenProps {
 const { width } = Dimensions.get('window');
 const JOURNEY_IMAGE_WIDTH = width - 40; // 20 de padding en cada lado
 
-const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
+const JournalEntryCard = ({ entry, friendId, commentsVisibility }: { 
+    entry: CityJournalEntry, 
+    friendId: string,
+    commentsVisibility: 'public' | 'friends' | 'private'
+}) => {
     const navigation = useNavigation<any>();
     
     const handleEntryPress = () => {
-        navigation.navigate('JournalEntryDetail', { entry });
+        navigation.navigate('JournalEntryDetail', { 
+            entry: { 
+                ...entry, 
+                user_id: entry.userId || friendId,
+                comments_visibility: commentsVisibility
+            } 
+        });
     };
     
     return (
         <TouchableOpacity style={styles.journalCard} onPress={handleEntryPress}>
-            <Text style={styles.journalCardTitle}>{entry.title}</Text>
-            <Text style={styles.journalCardDate}>{new Date(entry.created_at).toLocaleDateString()}</Text>
-            {entry.missionId && (
-                <View style={styles.journalMissionBadge}>
-                    <Ionicons name="trophy" size={16} color="#4CAF50" />
-                    <Text style={styles.journalMissionBadgeText}>Misión Completada</Text>
+            {entry.photos && entry.photos.length > 0 ? (
+                <Image
+                    source={{ uri: entry.photos[0] }}
+                    style={styles.journalCardImage}
+                    resizeMode="cover"
+                />
+            ) : (
+                <View style={styles.journalCardNoImage}>
+                    <Ionicons name="image-outline" size={40} color="#ccc" />
                 </View>
             )}
-            <Text style={styles.journalCardContent} numberOfLines={3}>
-                {entry.content}
-            </Text>
-            {entry.photos && entry.photos.length > 0 && (
-                <View style={styles.journalPhotoGrid}>
-                    {entry.photos.slice(0, 3).map((photo, index) => (
-                        <Image
-                            key={index}
-                            source={{ uri: photo }}
-                            style={styles.journalThumbnail}
-                            resizeMode="cover"
-                        />
-                    ))}
-                    {entry.photos.length > 3 && (
-                        <View style={styles.journalMorePhotos}>
-                            <Text style={styles.journalMorePhotosText}>+{entry.photos.length - 3}</Text>
+            <View style={styles.journalCardContent}>
+                <View style={styles.journalCardHeader}>
+                    <Text style={styles.journalCardTitle} numberOfLines={1}>{entry.title}</Text>
+                    {entry.missionId && (
+                        <View style={styles.journalMissionBadge}>
+                            <Ionicons name="trophy" size={16} color="#4CAF50" />
+                            <Text style={styles.journalMissionBadgeText}>Misión</Text>
                         </View>
                     )}
                 </View>
-            )}
-            <View style={styles.journalTags}>
-                {entry.tags && entry.tags.map((tag, index) => (
-                    <Text key={index} style={styles.journalTag}>
-                        #{tag}
-                    </Text>
-                ))}
+                <Text style={styles.journalCardDate}>
+                    <Ionicons name="calendar-outline" size={14} color="#666" /> {new Date(entry.created_at).toLocaleDateString()}
+                </Text>
+                <Text style={styles.journalCardDescription} numberOfLines={2}>
+                    {entry.content}
+                </Text>
+                {entry.tags && entry.tags.length > 0 && (
+                    <View style={styles.journalTags}>
+                        {entry.tags.slice(0, 3).map((tag, index) => (
+                            <Text key={index} style={styles.journalTag}>
+                                #{tag}
+                            </Text>
+                        ))}
+                        {entry.tags.length > 3 && (
+                            <Text style={styles.journalMoreTags}>+{entry.tags.length - 3}</Text>
+                        )}
+                    </View>
+                )}
             </View>
         </TouchableOpacity>
     );
@@ -146,6 +161,7 @@ const FriendProfileScreen = () => {
     const [myFriends, setMyFriends] = useState<any[]>([]);
     const [myPendingRequests, setMyPendingRequests] = useState<string[]>([]);
     const [friendsVisibility, setFriendsVisibility] = useState<'public' | 'friends' | 'private'>('public');
+    const [commentsVisibility, setCommentsVisibility] = useState<'public' | 'friends' | 'private'>('public');
 
     useEffect(() => {
         console.log('FriendProfileScreen - useEffect triggered');
@@ -193,7 +209,7 @@ const FriendProfileScreen = () => {
             // Obtener los puntos, nivel, XP y privacidad del amigo
             const { data: friendData, error: friendError } = await supabase
                 .from('users')
-                .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title, friends_visibility')
+                .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title, friends_visibility, comments_visibility')
                 .eq('id', friendId)
                 .single();
 
@@ -219,6 +235,7 @@ const FriendProfileScreen = () => {
             setProfilePicUrl(friendData.profile_pic_url || null);
             setCustomTitle(friendData.custom_title || null);
             setFriendsVisibility(friendData.friends_visibility || 'public');
+            setCommentsVisibility(friendData.comments_visibility || 'public');
 
             // Obtener las ciudades visitadas del amigo desde journeys
             const { data: journeys, error: journeysError } = await supabase
@@ -679,44 +696,12 @@ const FriendProfileScreen = () => {
                         <Text style={styles.emptyText}>No hay viajes completados</Text>
                     ) : (
                         Object.values(entriesByCity).map((cityEntries, index) => (
-                            <TouchableOpacity 
-                                key={index} 
-                                style={styles.journeyItem}
-                                onPress={() => {
-                                    if (cityEntries.length > 0) {
-                                        navigation.navigate('JournalEntryDetail', { entry: cityEntries[0] });
-                                    }
-                                }}
-                            >
-                                <View style={styles.journeyImagesContainer}>
-                                    {cityEntries.length > 0 && cityEntries[0].photos && cityEntries[0].photos.length > 0 ? (
-                                        <Image
-                                            source={{ uri: cityEntries[0].photos[0] }}
-                                            style={styles.journeyImage}
-                                            resizeMode="cover"
-                                        />
-                                    ) : (
-                                        <View style={[styles.journeyImage, styles.noImageContainer]}>
-                                            <Ionicons name="image-outline" size={40} color="#666" />
-                                        </View>
-                                    )}
-                                </View>
-                                <View style={styles.journeyContent}>
-                                    <Text style={styles.journeyCity}>{cityEntries[0]?.city_name || 'Ciudad Desconocida'}</Text>
-                                    <Text style={styles.journeyDescription} numberOfLines={2}>
-                                        {cityEntries.length > 0 ? cityEntries[0].content : 'Sin descripción'}
-                                    </Text>
-                                    <View style={styles.journeyFooter}>
-                                        <Text style={styles.journeyDate}>
-                                            {cityEntries.length > 0 ? new Date(cityEntries[0].created_at).toLocaleDateString('es-ES', {
-                                                day: 'numeric',
-                                                month: 'long',
-                                                year: 'numeric'
-                                            }) : 'Fecha desconocida'}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
+                            <JournalEntryCard 
+                                key={index}
+                                entry={cityEntries[0]}
+                                friendId={friendId}
+                                commentsVisibility={commentsVisibility}
+                            />
                         ))
                     )}
                 </View>
@@ -938,73 +923,86 @@ const styles = StyleSheet.create({
     },
     journalCard: {
         backgroundColor: 'white',
-        borderRadius: 10,
-        padding: 10,
-        marginBottom: 10,
+        borderRadius: 15,
+        marginBottom: 16,
+        overflow: 'hidden',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    journalCardImage: {
+        width: '100%',
+        height: 180,
+    },
+    journalCardNoImage: {
+        width: '100%',
+        height: 180,
+        backgroundColor: '#f5f5f5',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    journalCardContent: {
+        padding: 16,
+    },
+    journalCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
     },
     journalCardTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
-        marginBottom: 5,
-    },
-    journalCardDate: {
-        fontSize: 12,
-        color: '#999',
+        flex: 1,
+        marginRight: 8,
     },
     journalMissionBadge: {
-        backgroundColor: '#4CAF50',
-        padding: 2,
-        borderRadius: 5,
-        marginBottom: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E8F5E9',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
     journalMissionBadgeText: {
         fontSize: 12,
-        fontWeight: 'bold',
-        color: 'white',
+        color: '#4CAF50',
+        marginLeft: 4,
+        fontWeight: '600',
     },
-    journalCardContent: {
+    journalCardDate: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 8,
+    },
+    journalCardDescription: {
         fontSize: 14,
         color: '#666',
-    },
-    journalPhotoGrid: {
-        flexDirection: 'row',
-        marginTop: 5,
-    },
-    journalThumbnail: {
-        width: 100,
-        height: 100,
-        marginRight: 5,
-        borderRadius: 5,
-    },
-    journalMorePhotos: {
-        backgroundColor: '#f5f5f5',
-        padding: 5,
-        borderRadius: 5,
-    },
-    journalMorePhotosText: {
-        fontSize: 12,
-        fontWeight: 'bold',
+        lineHeight: 20,
+        marginBottom: 12,
     },
     journalTags: {
         flexDirection: 'row',
-        marginTop: 5,
-    },
-    journalTag: {
-        backgroundColor: '#f5f5f5',
-        padding: 2,
-        borderRadius: 5,
-        marginRight: 5,
-    },
-    journalEmptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
+        flexWrap: 'wrap',
         alignItems: 'center',
     },
-    journalEmptyText: {
-        fontSize: 16,
+    journalTag: {
+        fontSize: 12,
+        color: '#005F9E',
+        backgroundColor: '#E3F2FD',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginRight: 6,
+        marginBottom: 4,
+    },
+    journalMoreTags: {
+        fontSize: 12,
         color: '#666',
-        marginTop: 20,
+        marginLeft: 4,
     },
     friendshipDate: {
         fontSize: 14,

@@ -13,6 +13,7 @@ import {
 } from '../../services/journalService';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
+import { supabase } from '../../services/supabase';
 
 interface JournalEntryDetailScreenProps {
   route: RouteProp<{ JournalEntryDetail: { entry: any } }, 'JournalEntryDetail'>;
@@ -24,6 +25,7 @@ interface Comment {
   comment: string;
   created_at: string;
   username?: string;
+  profile_pic_url?: string;
 }
 
 const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
@@ -36,15 +38,140 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   const [isAddingComment, setIsAddingComment] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
   const [refreshing, setRefreshing] = useState(false);
+  const [commentsVisibility, setCommentsVisibility] = useState<'public' | 'friends' | 'private'>('public');
+  const [isFriend, setIsFriend] = useState(false);
+  const [checkingFriendship, setCheckingFriendship] = useState(true);
+
+  const isOwner = user && entry && user.id === entry.user_id;
+
+  useEffect(() => {
+    const fetchAuthorCommentsVisibility = async (authorId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('comments_visibility')
+          .eq('id', authorId)
+          .single();
+        if (!error && data) {
+          setCommentsVisibility(data.comments_visibility || 'public');
+        } else {
+          setCommentsVisibility('public');
+        }
+      } catch (error) {
+        setCommentsVisibility('public');
+        console.error('Error al obtener privacidad de comentarios:', error);
+      }
+    };
+    if (entry?.user_id) {
+      fetchAuthorCommentsVisibility(entry.user_id);
+    }
+  }, [entry]);
+
+  useEffect(() => {
+    const checkFriendship = async () => {
+      setCheckingFriendship(true);
+      if (!user || !entry?.user_id || user.id === entry.user_id) {
+        setIsFriend(false);
+        setCheckingFriendship(false);
+        return;
+      }
+      try {
+        // Primero verificar si el usuario actual es user1Id
+        const { data: user1Data, error: user1Error } = await supabase
+          .from('friends')
+          .select('id')
+          .eq('user1Id', user.id)
+          .eq('user2Id', entry.user_id)
+          .single();
+
+        if (user1Error && user1Error.code !== 'PGRST116') {
+          console.error('Error al verificar amistad (user1):', user1Error);
+        }
+
+        // Luego verificar si el usuario actual es user2Id
+        const { data: user2Data, error: user2Error } = await supabase
+          .from('friends')
+          .select('id')
+          .eq('user1Id', entry.user_id)
+          .eq('user2Id', user.id)
+          .single();
+
+        if (user2Error && user2Error.code !== 'PGRST116') {
+          console.error('Error al verificar amistad (user2):', user2Error);
+        }
+
+        // Si cualquiera de las dos consultas devuelve datos, son amigos
+        setIsFriend(!!user1Data || !!user2Data);
+        
+        console.log('Estado de amistad:', {
+          user1Data,
+          user2Data,
+          isFriend: !!user1Data || !!user2Data
+        });
+      } catch (error) {
+        console.error('Error al verificar amistad:', error);
+        setIsFriend(false);
+      } finally {
+        setCheckingFriendship(false);
+      }
+    };
+    checkFriendship();
+  }, [user, entry]);
+
+  useEffect(() => {
+    if (entry?.comments_visibility) {
+      setCommentsVisibility(entry.comments_visibility);
+    }
+  }, [entry]);
+
+  const canComment = () => {
+    if (!user) return false;
+    if (isOwner) return true;
+    
+    switch (commentsVisibility) {
+      case 'public':
+        return true;
+      case 'friends':
+        return isFriend;
+      case 'private':
+        return false;
+      default:
+        return false;
+    }
+  };
 
   // Determinar si la entrada pertenece al usuario actual
   const isMyEntry = entry.userId === user?.id || entry.user_id === user?.id || entry.userid === user?.id;
 
   const fetchComments = async () => {
     try {
-      const data = await getCommentsByEntryId(entry.id);
-      console.log('Comentarios obtenidos:', data); // Para debug
-      setComments(data);
+      const { data: commentsData, error } = await supabase
+        .from('journal_comments')
+        .select(`
+          id,
+          user_id,
+          comment,
+          created_at,
+          users:user_id (
+            username,
+            profile_pic_url
+          )
+        `)
+        .eq('entry_id', entry.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedComments = commentsData.map(comment => ({
+        id: comment.id,
+        user_id: comment.user_id,
+        comment: comment.comment,
+        created_at: comment.created_at,
+        username: comment.users?.username,
+        profile_pic_url: comment.users?.profile_pic_url
+      }));
+
+      setComments(formattedComments);
     } catch (error) {
       console.error('Error al obtener comentarios:', error);
       Alert.alert('Error', 'No se pudieron cargar los comentarios');
@@ -161,6 +288,10 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   };
 
   const handleAddComment = async () => {
+    if (!canComment()) {
+      Alert.alert('No tienes permiso para comentar en esta entrada.');
+      return;
+    }
     if (!newComment.trim()) return;
     try {
       setIsAddingComment(true);
@@ -237,8 +368,6 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>{entry.title}</Text>
-          
-          {/* Botón de refresco */}
           <TouchableOpacity onPress={refreshEntry} style={styles.refreshButton} disabled={refreshing}>
             {refreshing ? (
               <ActivityIndicator size="small" color="#333" />
@@ -360,49 +489,95 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
           
           {/* Sección de comentarios */}
           <View style={styles.commentsSection}>
-            <Text style={styles.commentsSectionTitle}>Comentarios</Text>
-            
-            {/* Lista de comentarios */}
+            <View style={styles.commentsHeader}>
+              <Text style={styles.commentsSectionTitle}>Comentarios</Text>
+            </View>
+            {checkingFriendship ? (
+              <ActivityIndicator size="small" color="#005F9E" style={{ marginVertical: 10 }} />
+            ) : !canComment() ? (
+              <Text style={styles.noCommentsText}>
+                {commentsVisibility === 'private'
+                  ? 'El autor ha configurado esta entrada para que nadie pueda comentar.'
+                  : commentsVisibility === 'friends'
+                  ? 'Solo los amigos pueden comentar en esta entrada.'
+                  : 'No tienes permiso para comentar en esta entrada.'}
+              </Text>
+            ) : null}
             {comments.length > 0 ? (
               <View style={styles.commentsList}>
                 {comments.map((comment, index) => (
                   <View key={comment.id || index} style={styles.commentItem}>
                     <View style={styles.commentHeader}>
-                      <Text style={styles.commentAuthor}>{comment.username || 'Usuario'}</Text>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (comment.user_id === user?.id) {
+                            navigation.navigate('Profile');
+                          } else {
+                            navigation.navigate('FriendProfile', {
+                              friendId: comment.user_id,
+                              friendName: comment.username || 'Usuario'
+                            });
+                          }
+                        }}
+                        style={styles.commentAuthorContainer}
+                      >
+                        {comment.profile_pic_url ? (
+                          <Image 
+                            source={{ uri: comment.profile_pic_url }} 
+                            style={styles.commentUserAvatar}
+                          />
+                        ) : (
+                          <View style={styles.commentUserAvatarPlaceholder}>
+                            <Text style={styles.commentUserAvatarText}>
+                              {(comment.username || 'U')[0].toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.commentAuthorInfo}>
+                          <Text style={styles.commentAuthor}>{comment.username || 'Usuario'}</Text>
+                          {comment.user_id === user?.id && (
+                            <Text style={styles.youBadge}>Tú</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
                       <Text style={styles.commentDate}>{formatCommentDate(comment.created_at)}</Text>
                     </View>
                     <Text style={styles.commentText}>{comment.comment}</Text>
                   </View>
                 ))}
               </View>
-            ) : (
-              <Text style={styles.noCommentsText}>No hay comentarios aún. ¡Sé el primero en comentar!</Text>
-            )}
+            ) : canComment() ? (
+              <Text style={styles.noCommentsText}>
+                No hay comentarios aún. ¡Sé el primero en comentar!
+              </Text>
+            ) : null}
             
             {/* Añadir comentario */}
-            <View style={styles.addCommentContainer}>
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Escribe un comentario..."
-                value={newComment}
-                onChangeText={setNewComment}
-                multiline
-              />
-              <TouchableOpacity 
-                style={[
-                  styles.sendCommentButton,
-                  (!newComment.trim() || isAddingComment) && styles.disabledButton
-                ]}
-                onPress={handleAddComment}
-                disabled={!newComment.trim() || isAddingComment}
-              >
-                {isAddingComment ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
+            {canComment() && (
+              <View style={styles.addCommentContainer}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Escribe un comentario..."
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  multiline
+                />
+                <TouchableOpacity 
+                  style={[
+                    styles.sendCommentButton,
+                    (!newComment.trim() || isAddingComment) && styles.disabledButton
+                  ]}
+                  onPress={handleAddComment}
+                  disabled={!newComment.trim() || isAddingComment}
+                >
+                  {isAddingComment ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="send" size={20} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -577,7 +752,7 @@ const styles = StyleSheet.create({
   commentItem: {
     padding: 12,
     backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#eee',
@@ -585,20 +760,63 @@ const styles = StyleSheet.create({
   commentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  commentAuthorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  commentUserAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 8,
+  },
+  commentUserAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  commentUserAvatarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#005F9E',
+  },
+  commentAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   commentAuthor: {
     fontWeight: 'bold',
-    color: '#333',
+    color: '#005F9E',
+    fontSize: 14,
+  },
+  youBadge: {
+    fontSize: 12,
+    color: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 6,
   },
   commentDate: {
     fontSize: 12,
     color: '#999',
+    marginLeft: 8,
   },
   commentText: {
     color: '#333',
     fontSize: 14,
     lineHeight: 20,
+    marginLeft: 44, // 36px avatar + 8px margin
   },
   noCommentsText: {
     color: '#999',
@@ -634,6 +852,12 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     padding: 5,
+  },
+  commentsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
 });
 
