@@ -82,6 +82,7 @@ const ProfileScreen = () => {
   const [advancedStats, setAdvancedStats] = useState<AdvancedMissionStats | null>(null);
   const [loadingAdvancedStats, setLoadingAdvancedStats] = useState(false);
   const [showAdvancedStats, setShowAdvancedStats] = useState(false);
+  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
 
   // Manejador global de errores no capturados para este componente
   useEffect(() => {
@@ -589,6 +590,7 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView>
+        {/* Header con foto de perfil y nivel */}
         <View style={styles.headerBackground}>
           <View style={styles.header}>
             <TouchableOpacity style={styles.avatarContainer} onPress={showImageOptions}>
@@ -624,6 +626,7 @@ const ProfileScreen = () => {
           </View>
         </View>
 
+        {/* Estadísticas principales */}
         <View style={styles.stats}>
           {loadingStats ? (
             <View style={styles.loadingContainer}>
@@ -647,7 +650,161 @@ const ProfileScreen = () => {
           )}
         </View>
 
-        {/* Estadísticas avanzadas */}
+        {/* Sección Social */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Social</Text>
+          <View style={styles.privacyContainer}>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => navigation.navigate('Friends')}
+            >
+              <View style={styles.socialButtonContent}>
+                <Ionicons name="people" size={24} color="white" />
+                <Text style={styles.socialButtonText}>Amigos</Text>
+                <Ionicons name="chevron-forward" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.socialDescription}>
+              Conéctate con tus amigos
+            </Text>
+
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => navigation.navigate('Leaderboard')}
+            >
+              <View style={styles.socialButtonContent}>
+                <Ionicons name="trophy" size={24} color="white" />
+                <Text style={styles.socialButtonText}>Leaderboard</Text>
+                <Ionicons name="chevron-forward" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.socialDescription}>
+              Mira el ranking de puntos
+            </Text>
+          </View>
+        </View>
+
+        {/* Sección Logros */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Logros</Text>
+          <View style={styles.privacyContainer}>
+            <TouchableOpacity
+              style={styles.badgesButton}
+              onPress={() => navigation.navigate('BadgesScreen')}
+            >
+              <View style={styles.badgesButtonContent}>
+                <Ionicons name="medal" size={24} color="white" />
+                <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
+                <Ionicons name="chevron-forward" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Sección Privacidad */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.sectionHeader} 
+            onPress={() => setShowPrivacySettings(!showPrivacySettings)}
+          >
+            <Text style={styles.sectionTitle}>Privacidad</Text>
+            <Ionicons 
+              name={showPrivacySettings ? "chevron-up" : "chevron-down"} 
+              size={24} 
+              color="#EDF6F9" 
+            />
+          </TouchableOpacity>
+          
+          {showPrivacySettings && (
+            <View style={styles.privacyContainer}>
+              {/* Visibilidad del perfil */}
+              <View style={styles.privacySection}>
+                <Text style={styles.privacyDescription}>Quién puede ver tu perfil</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, profileVisibility === 'public' && styles.privacyRadioSelected]}
+                    onPress={() => updateProfileVisibility('public')}
+                  >
+                    <Ionicons name="globe-outline" size={20} color={profileVisibility === 'public' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, profileVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, profileVisibility === 'friends' && styles.privacyRadioSelected]}
+                    onPress={() => updateProfileVisibility('friends')}
+                  >
+                    <Ionicons name="people-outline" size={20} color={profileVisibility === 'friends' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, profileVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, profileVisibility === 'private' && styles.privacyRadioSelected]}
+                    onPress={() => updateProfileVisibility('private')}
+                  >
+                    <Ionicons name="lock-closed-outline" size={20} color={profileVisibility === 'private' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, profileVisibility === 'private' && styles.privacyRadioTextSelected]}>Privado</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Visibilidad de amigos */}
+              <View style={[styles.privacySection, { marginTop: 20 }]}>
+                <Text style={styles.privacyDescription}>Quién puede ver tu lista de amigos</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, friendsVisibility === 'public' && styles.privacyRadioSelected]}
+                    onPress={() => updateFriendsVisibility('public')}
+                  >
+                    <Ionicons name="globe-outline" size={20} color={friendsVisibility === 'public' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, friendsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, friendsVisibility === 'friends' && styles.privacyRadioSelected]}
+                    onPress={() => updateFriendsVisibility('friends')}
+                  >
+                    <Ionicons name="people-outline" size={20} color={friendsVisibility === 'friends' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, friendsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, friendsVisibility === 'private' && styles.privacyRadioSelected]}
+                    onPress={() => updateFriendsVisibility('private')}
+                  >
+                    <Ionicons name="lock-closed-outline" size={20} color={friendsVisibility === 'private' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, friendsVisibility === 'private' && styles.privacyRadioTextSelected]}>Solo tú</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Visibilidad de comentarios */}
+              <View style={[styles.privacySection, { marginTop: 20 }]}>
+                <Text style={styles.privacyDescription}>Quién puede comentar en tus entradas</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, commentsVisibility === 'public' && styles.privacyRadioSelected]}
+                    onPress={() => updateCommentsVisibility('public')}
+                  >
+                    <Ionicons name="globe-outline" size={20} color={commentsVisibility === 'public' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, commentsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, commentsVisibility === 'friends' && styles.privacyRadioSelected]}
+                    onPress={() => updateCommentsVisibility('friends')}
+                  >
+                    <Ionicons name="people-outline" size={20} color={commentsVisibility === 'friends' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, commentsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.privacyRadio, commentsVisibility === 'private' && styles.privacyRadioSelected]}
+                    onPress={() => updateCommentsVisibility('private')}
+                  >
+                    <Ionicons name="lock-closed-outline" size={20} color={commentsVisibility === 'private' ? 'white' : '#005F9E'} />
+                    <Text style={[styles.privacyRadioText, commentsVisibility === 'private' && styles.privacyRadioTextSelected]}>Nadie</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Estadísticas Avanzadas */}
         <View style={styles.section}>
           <TouchableOpacity 
             style={styles.sectionHeader} 
@@ -656,8 +813,8 @@ const ProfileScreen = () => {
             <Text style={styles.sectionTitle}>Estadísticas Avanzadas</Text>
             <Ionicons 
               name={showAdvancedStats ? "chevron-up" : "chevron-down"} 
-              size={20} 
-              color="#333" 
+              size={24} 
+              color="#EDF6F9" 
             />
           </TouchableOpacity>
           
@@ -768,154 +925,15 @@ const ProfileScreen = () => {
           )}
         </View>
 
-        {/* Social */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Social</Text>
-          <View style={styles.privacyContainer}>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={() => navigation.navigate('Friends')}
-            >
-              <View style={styles.socialButtonContent}>
-                <Ionicons name="people" size={24} color="white" />
-                <Text style={styles.socialButtonText}>Amigos</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
-              </View>
-            </TouchableOpacity>
-            <Text style={[styles.privacyDescription, styles.socialDescription]}>
-              Conéctate con tus amigos
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.socialButton, styles.secondSocialButton]}
-              onPress={() => navigation.navigate('Leaderboard')}
-            >
-              <View style={styles.socialButtonContent}>
-                <Ionicons name="trophy" size={24} color="white" />
-                <Text style={styles.socialButtonText}>Leaderboard</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
-              </View>
-            </TouchableOpacity>
-            <Text style={[styles.privacyDescription, styles.socialDescription]}>
-              Mira el ranking de puntos
-            </Text>
-          </View>
-        </View>
-
-        {/* Logros/Insignias */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Logros</Text>
-          <View style={styles.badgesContainer}>
-            <TouchableOpacity
-              style={styles.badgesButton}
-              onPress={() => {
-                navigation.navigate('BadgesScreen');
-              }}
-            >
-              <View style={styles.badgesButtonContent}>
-                <Ionicons name="medal" size={24} color="white" />
-                <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Privacidad */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacidad</Text>
-          {/* Visibilidad del perfil */}
-          <View style={[styles.privacyContainer, { marginBottom: 16 }]}>
-            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede ver tu perfil</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={[styles.privacyRadio, profileVisibility === 'public' && styles.privacyRadioSelected]}
-                onPress={() => updateProfileVisibility('public')}
-              >
-                <Ionicons name="globe-outline" size={20} color={profileVisibility === 'public' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, profileVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, profileVisibility === 'friends' && styles.privacyRadioSelected]}
-                onPress={() => updateProfileVisibility('friends')}
-              >
-                <Ionicons name="people-outline" size={20} color={profileVisibility === 'friends' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, profileVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, profileVisibility === 'private' && styles.privacyRadioSelected]}
-                onPress={() => updateProfileVisibility('private')}
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={profileVisibility === 'private' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, profileVisibility === 'private' && styles.privacyRadioTextSelected]}>Privado</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          {/* Visibilidad de amigos */}
-          <View style={styles.privacyContainer}>
-            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede ver tu lista de amigos</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={[styles.privacyRadio, friendsVisibility === 'public' && styles.privacyRadioSelected]}
-                onPress={() => updateFriendsVisibility('public')}
-              >
-                <Ionicons name="globe-outline" size={20} color={friendsVisibility === 'public' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, friendsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, friendsVisibility === 'friends' && styles.privacyRadioSelected]}
-                onPress={() => updateFriendsVisibility('friends')}
-              >
-                <Ionicons name="people-outline" size={20} color={friendsVisibility === 'friends' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, friendsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, friendsVisibility === 'private' && styles.privacyRadioSelected]}
-                onPress={() => updateFriendsVisibility('private')}
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={friendsVisibility === 'private' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, friendsVisibility === 'private' && styles.privacyRadioTextSelected]}>Solo tú</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          {/* Visibilidad de comentarios por defecto */}
-          <View style={[styles.privacyContainer, { marginTop: 16 }]}> 
-            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede comentar en tus entradas por defecto</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={[styles.privacyRadio, commentsVisibility === 'public' && styles.privacyRadioSelected]}
-                onPress={() => updateCommentsVisibility('public')}
-              >
-                <Ionicons name="globe-outline" size={20} color={commentsVisibility === 'public' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, commentsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, commentsVisibility === 'friends' && styles.privacyRadioSelected]}
-                onPress={() => updateCommentsVisibility('friends')}
-              >
-                <Ionicons name="people-outline" size={20} color={commentsVisibility === 'friends' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, commentsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, commentsVisibility === 'private' && styles.privacyRadioSelected]}
-                onPress={() => updateCommentsVisibility('private')}
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={commentsVisibility === 'private' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, commentsVisibility === 'private' && styles.privacyRadioTextSelected]}>Nadie</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Seguridad */}
+        {/* Sección Seguridad */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Seguridad</Text>
           <View style={styles.privacyContainer}>
             <TouchableOpacity
-              style={styles.privacyButton}
+              style={styles.socialButton}
               onPress={() => setIsChangePasswordVisible(true)}
             >
-              <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
+              <Text style={styles.socialButtonText}>Cambiar Contraseña</Text>
             </TouchableOpacity>
             <Text style={styles.privacyDescription}>
               Actualiza tu contraseña para mantener tu cuenta segura
@@ -923,7 +941,7 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        {/* Cerrar sesión */}
+        {/* Botón de cerrar sesión */}
         <TouchableOpacity
           style={[styles.logoutButton, loading && styles.disabledButton]}
           onPress={handleLogout}
@@ -934,6 +952,7 @@ const ProfileScreen = () => {
           </Text>
         </TouchableOpacity>
 
+        {/* Modal de cambio de contraseña */}
         <Modal
           visible={isChangePasswordVisible}
           transparent={true}
@@ -952,6 +971,7 @@ const ProfileScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Contraseña actual"
+                placeholderTextColor="#A9D6E5"
                 secureTextEntry
                 value={currentPassword}
                 onChangeText={(text) => {
@@ -963,6 +983,7 @@ const ProfileScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Nueva contraseña"
+                placeholderTextColor="#A9D6E5"
                 secureTextEntry
                 value={newPassword}
                 onChangeText={(text) => {
@@ -974,6 +995,7 @@ const ProfileScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Confirmar nueva contraseña"
+                placeholderTextColor="#A9D6E5"
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={(text) => {
@@ -1036,35 +1058,46 @@ const getCategoryColor = (category: string): string => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D1B2A', // fondo general oscuro
+    backgroundColor: '#0D1B2A',
   },
   headerBackground: {
     backgroundColor: '#1B263B',
-    padding: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   avatarContainer: {
     position: 'relative',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 15,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginRight: 20,
     backgroundColor: '#A9D6E5',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 10,
+    borderWidth: 3,
+    borderColor: '#EDF6F9',
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#A9D6E5',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1075,16 +1108,21 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#274472',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#EDF6F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
   avatarText: {
-    fontSize: 40,
+    fontSize: 48,
     fontWeight: 'bold',
     color: '#0D1B2A',
   },
@@ -1093,7 +1131,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   name: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#EDF6F9',
     marginBottom: 5,
@@ -1101,39 +1139,55 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 16,
     color: '#A9D6E5',
+    marginBottom: 10,
   },
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 20,
     backgroundColor: '#1B263B',
-    marginTop: -20,
+    marginTop: -30,
     marginHorizontal: 20,
-    borderRadius: 10,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   statItem: {
     alignItems: 'center',
+    padding: 10,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#EDF6F9',
+    marginBottom: 5,
   },
   statLabel: {
     fontSize: 14,
     color: '#A9D6E5',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   section: {
     margin: 20,
     backgroundColor: '#1B263B',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#EDF6F9',
+    letterSpacing: 1,
   },
   privacyContainer: {
     backgroundColor: '#1B263B',
@@ -1156,97 +1210,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#A9D6E5',
     textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 15,
+    letterSpacing: 0.5,
   },
   levelContainer: {
-    marginTop: 5,
+    marginTop: 10,
+    backgroundColor: '#274472',
+    padding: 10,
+    borderRadius: 15,
   },
   levelText: {
     color: '#EDF6F9',
     fontWeight: 'bold',
     fontSize: 16,
+    marginBottom: 5,
   },
   progressBar: {
-    height: 6,
-    backgroundColor: '#274472',
-    borderRadius: 3,
+    height: 8,
+    backgroundColor: '#1B263B',
+    borderRadius: 4,
     marginVertical: 5,
     width: '100%',
+    overflow: 'hidden',
   },
   progress: {
-    height: 6,
+    height: 8,
     backgroundColor: '#41729F',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   xpText: {
-    color: '#EDF6F9',
+    color: '#A9D6E5',
     fontSize: 12,
-  },
-  badgesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgesButton: {
-    backgroundColor: '#274472',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  badgesButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  badgesButtonText: {
-    color: '#EDF6F9',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  privacyRadio: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#41729F',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginHorizontal: 2,
-    backgroundColor: '#1B263B',
-    minWidth: 90,
-    flexGrow: 1,
-    marginVertical: 4,
-    flexBasis: '30%',
-    justifyContent: 'center',
-  },
-  privacyRadioSelected: {
-    backgroundColor: '#41729F',
-  },
-  privacyRadioText: {
-    marginLeft: 6,
-    color: '#41729F',
-    fontWeight: 'bold',
-  },
-  privacyRadioTextSelected: {
-    color: '#EDF6F9',
-  },
-  customTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#669BBC',
-    marginBottom: 2,
+    textAlign: 'right',
   },
   socialButton: {
     backgroundColor: '#274472',
-    borderRadius: 10,
+    borderRadius: 15,
     padding: 15,
     alignItems: 'center',
     width: '100%',
-    marginBottom: 4,
-  },
-  secondSocialButton: {
-    marginTop: 20,
-    marginBottom: 4,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
   socialButtonContent: {
     flexDirection: 'row',
@@ -1261,64 +1270,110 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 10,
   },
-  socialDescription: {
-    marginTop: 4,
-    marginBottom: 0,
-    fontSize: 13,
-    color: '#A9D6E5',
+  privacyRadio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#41729F',
+    borderRadius: 25,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 4,
+    backgroundColor: '#1B263B',
+    minWidth: 100,
+    flexGrow: 1,
+    marginVertical: 6,
+    flexBasis: '30%',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  privacyRadioSelected: {
+    backgroundColor: '#41729F',
+    borderColor: '#EDF6F9',
+  },
+  privacyRadioText: {
+    marginLeft: 8,
+    color: '#41729F',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  privacyRadioTextSelected: {
+    color: '#EDF6F9',
   },
   logoutButton: {
     margin: 20,
     backgroundColor: '#F44336',
-    padding: 15,
-    borderRadius: 10,
+    padding: 18,
+    borderRadius: 15,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   logoutButtonText: {
     color: '#EDF6F9',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    letterSpacing: 1,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContent: {
     backgroundColor: '#1B263B',
-    padding: 20,
-    borderRadius: 10,
+    padding: 25,
+    borderRadius: 20,
     width: '90%',
     maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 25,
     textAlign: 'center',
     color: '#EDF6F9',
+    letterSpacing: 1,
   },
   input: {
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#41729F',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 20,
     backgroundColor: '#274472',
     color: '#EDF6F9',
+    fontSize: 16,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: 20,
   },
   modalButton: {
     flex: 1,
-    padding: 15,
-    borderRadius: 5,
+    padding: 18,
+    borderRadius: 12,
     alignItems: 'center',
-    marginHorizontal: 5,
+    marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
   cancelButton: {
     backgroundColor: '#F44336',
@@ -1330,12 +1385,14 @@ const styles = StyleSheet.create({
     color: '#EDF6F9',
     fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 1,
   },
   messageText: {
     textAlign: 'center',
-    marginBottom: 15,
-    padding: 10,
-    borderRadius: 5,
+    marginBottom: 20,
+    padding: 15,
+    borderRadius: 12,
+    fontSize: 16,
   },
   errorMessage: {
     backgroundColor: '#ffebee',
@@ -1347,6 +1404,46 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.7,
+  },
+  customTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#669BBC',
+    marginBottom: 5,
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  badgesButton: {
+    backgroundColor: '#274472',
+    borderRadius: 15,
+    padding: 18,
+    alignItems: 'center',
+    marginHorizontal: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  badgesButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  badgesButtonText: {
+    color: '#EDF6F9',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 12,
+    letterSpacing: 1,
+  },
+  socialDescription: {
+    marginTop: 6,
+    marginBottom: 0,
+    fontSize: 14,
+    color: '#A9D6E5',
+    letterSpacing: 0.5,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1523,6 +1620,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'right',
+  },
+  privacySection: {
+    backgroundColor: '#274472',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 10,
   },
 });
 
