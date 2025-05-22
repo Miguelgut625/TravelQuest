@@ -6,11 +6,12 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { ActivityIndicator, View, Text, Platform } from 'react-native';
 import { supabase } from './src/services/supabase';
 import { setAuthState, setUser } from './src/features/auth/authSlice';
-import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
+import { Provider as PaperProvider, DefaultTheme, MD3DarkTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
+import { ThemeProvider, useThemeContext } from './src/context/ThemeContext';
 
-const theme = {
+const lightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -24,7 +25,22 @@ const theme = {
   },
 };
 
-const App = () => {
+const darkTheme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: '#41729F',
+    accent: '#FFB74D',
+    background: '#1B263B',
+    text: '#EDF6F9',
+    placeholder: '#A9D6E5',
+    surface: '#274472',
+    error: '#FF6B6B',
+  },
+};
+
+const AppContent = () => {
+  const { isDarkMode } = useThemeContext();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,20 +123,20 @@ const App = () => {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size={24} color="#005F9E" />
-        <Text style={{ marginTop: 10 }}>Cargando TravelQuest...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1B263B' : '#F5F7FA' }}>
+        <ActivityIndicator size={24} color={isDarkMode ? '#41729F' : '#005F9E'} />
+        <Text style={{ marginTop: 10, color: isDarkMode ? '#EDF6F9' : '#333333' }}>Cargando TravelQuest...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: isDarkMode ? '#1B263B' : '#F5F7FA' }}>
         <Text style={{ color: 'red', textAlign: 'center', marginBottom: 10 }}>
           {error}
         </Text>
-        <Text style={{ textAlign: 'center' }}>
+        <Text style={{ textAlign: 'center', color: isDarkMode ? '#EDF6F9' : '#333333' }}>
           Por favor, intenta recargar la aplicación o contacta con soporte.
         </Text>
       </View>
@@ -128,13 +144,21 @@ const App = () => {
   }
 
   return (
+    <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
+      <SafeAreaProvider>
+        <AppNavigator />
+      </SafeAreaProvider>
+    </PaperProvider>
+  );
+};
+
+const App = () => {
+  return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <PaperProvider theme={theme}>
-          <SafeAreaProvider>
-            <AppNavigator />
-          </SafeAreaProvider>
-        </PaperProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
       </PersistGate>
     </Provider>
   );

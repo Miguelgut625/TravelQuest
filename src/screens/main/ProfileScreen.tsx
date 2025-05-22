@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserBadges } from '../../services/badgeService';
 import { lightBlue100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 import { getAdvancedMissionStats, AdvancedMissionStats } from '../../services/statisticsService';
+import { useThemeContext } from '../../context/ThemeContext';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -56,6 +57,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { theme, isDarkMode, toggleTheme } = useThemeContext();
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -589,7 +591,7 @@ const ProfileScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]} edges={['top']}>
       <ScrollView>
         {/* Header con foto de perfil y nivel */}
         <View style={styles.headerBackground}>
@@ -924,6 +926,32 @@ const ProfileScreen = () => {
               )}
             </View>
           )}
+        </View>
+
+        {/* Sección Apariencia */}
+        <View style={[styles.section, isDarkMode && styles.darkSection]}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>Apariencia</Text>
+          <View style={styles.privacyContainer}>
+            <TouchableOpacity
+              style={[styles.socialButton, isDarkMode && styles.darkButton]}
+              onPress={toggleTheme}
+            >
+              <View style={styles.socialButtonContent}>
+                <Ionicons 
+                  name={isDarkMode ? "sunny" : "moon"} 
+                  size={24} 
+                  color={isDarkMode ? "#FFD700" : "#EDF6F9"} 
+                />
+                <Text style={styles.socialButtonText}>
+                  {isDarkMode ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#EDF6F9" />
+              </View>
+            </TouchableOpacity>
+            <Text style={[styles.socialDescription, isDarkMode && styles.darkText]}>
+              Personaliza la apariencia de la aplicación
+            </Text>
+          </View>
         </View>
 
         {/* Sección Seguridad */}
@@ -1628,7 +1656,18 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 10,
   },
+  darkContainer: {
+    backgroundColor: '#1B263B',
+  },
+  darkSection: {
+    backgroundColor: '#274472',
+  },
+  darkButton: {
+    backgroundColor: '#41729F',
+  },
+  darkText: {
+    color: '#EDF6F9',
+  },
 });
-
 
 export default ProfileScreen; 
