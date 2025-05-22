@@ -14,7 +14,13 @@
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "android": {
+        "image": "latest",
+        "env": {
+          "JAVA_HOME": "/usr/lib/jvm/java-17-openjdk"
+        }
+      }
     }
   },
   "submit": {

@@ -6,25 +6,24 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { ActivityIndicator, View, Text, Platform } from 'react-native';
 import { supabase } from './src/services/supabase';
 import { setAuthState, setUser } from './src/features/auth/authSlice';
-import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { PaperProvider } from 'react-native-paper';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
+import { ThemeProvider, useThemeContext } from './src/context/ThemeContext';
+import { lightTheme, darkTheme } from './src/styles/theme';
 
-const theme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: '#005F9E',
-    accent: '#FFB74D',
-    background: '#F5F7FA',
-    text: '#333333',
-    placeholder: '#78909C',
-    surface: '#FFFFFF',
-    error: '#D32F2F',
-  },
+const AppContent = () => {
+  const { isDarkMode } = useThemeContext();
+  const theme = isDarkMode ? darkTheme : lightTheme;
+
+  return (
+    <PaperProvider theme={theme}>
+      <AppNavigator />
+    </PaperProvider>
+  );
 };
 
-const App = () => {
+export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,13 +66,10 @@ const App = () => {
         }
 
       } catch (error) {
-        console.error('Error inicializando la app:', error);
-        setError(`Error al inicializar la aplicación: ${error.message || 'Error desconocido'}`);
-        store.dispatch(setAuthState('unauthenticated'));
+        console.error('Error inicializando la aplicación:', error);
+        setError('Error al inicializar la aplicación');
       } finally {
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 500);
+        setIsLoading(false);
       }
     };
 
@@ -130,14 +126,12 @@ const App = () => {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <PaperProvider theme={theme}>
+        <ThemeProvider>
           <SafeAreaProvider>
-            <AppNavigator />
+            <AppContent />
           </SafeAreaProvider>
-        </PaperProvider>
+        </ThemeProvider>
       </PersistGate>
     </Provider>
   );
-};
-
-export default App; 
+} 

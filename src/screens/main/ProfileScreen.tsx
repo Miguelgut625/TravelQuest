@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Alert, ActivityIndicator, ScrollView, FlatList, Platform } from 'react-native';
-import { Button } from 'react-native-paper';
+import { Button, useTheme } from 'react-native-paper';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { logout, setAuthState, setUser } from '../../features/authSlice';
@@ -15,6 +15,8 @@ import { updateProfilePicture, getProfilePictureUrl } from '../../services/profi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserBadges } from '../../services/badgeService';
 import { getAdvancedMissionStats, AdvancedMissionStats } from '../../services/statisticsService';
+import { useThemeContext } from '../../context/ThemeContext';
+import { commonStyles } from '../../styles/theme';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -82,6 +84,9 @@ const ProfileScreen = () => {
   const [advancedStats, setAdvancedStats] = useState<AdvancedMissionStats | null>(null);
   const [loadingAdvancedStats, setLoadingAdvancedStats] = useState(false);
   const [showAdvancedStats, setShowAdvancedStats] = useState(false);
+  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
+  const theme = useTheme();
+  const { isDarkMode, toggleTheme } = useThemeContext();
 
   // Manejador global de errores no capturados para este componente
   useEffect(() => {
@@ -586,6 +591,543 @@ const ProfileScreen = () => {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    headerBackground: {
+      backgroundColor: theme.colors.primary,
+      paddingTop: commonStyles.spacing.xl,
+      paddingBottom: commonStyles.spacing.xl * 2,
+      borderBottomLeftRadius: commonStyles.borderRadius.large * 2,
+      borderBottomRightRadius: commonStyles.borderRadius.large * 2,
+      ...commonStyles.shadow.light,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: commonStyles.spacing.lg,
+    },
+    avatarContainer: {
+      position: 'relative',
+      marginRight: commonStyles.spacing.lg,
+      borderWidth: 3,
+      borderColor: theme.colors.tertiary,
+      borderRadius: commonStyles.borderRadius.round,
+      ...commonStyles.shadow.medium,
+    },
+    avatar: {
+      width: 120,
+      height: 120,
+      borderRadius: commonStyles.borderRadius.round,
+      backgroundColor: theme.colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    cameraIconContainer: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: theme.colors.secondary,
+      borderRadius: commonStyles.borderRadius.round,
+      width: 36,
+      height: 36,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 3,
+      borderColor: theme.colors.surface,
+      ...commonStyles.shadow.small,
+    },
+    avatarText: {
+      ...commonStyles.typography.h1,
+      color: theme.colors.primary,
+    },
+    userInfo: {
+      flex: 1,
+      padding: commonStyles.spacing.md,
+    },
+    name: {
+      ...commonStyles.typography.h1,
+      color: theme.colors.onPrimary,
+      marginBottom: commonStyles.spacing.xs,
+    },
+    email: {
+      ...commonStyles.typography.body,
+      color: theme.colors.onPrimary,
+      opacity: 0.9,
+      marginBottom: commonStyles.spacing.md,
+    },
+    stats: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      backgroundColor: theme.colors.surface,
+      marginTop: -commonStyles.spacing.xl,
+      marginHorizontal: commonStyles.spacing.lg,
+      borderRadius: commonStyles.borderRadius.large,
+      padding: commonStyles.spacing.lg,
+      ...commonStyles.shadow.medium,
+    },
+    statItem: {
+      alignItems: 'center',
+      padding: commonStyles.spacing.md,
+    },
+    statValue: {
+      ...commonStyles.typography.h2,
+      color: theme.colors.primary,
+      marginBottom: commonStyles.spacing.xs,
+    },
+    statLabel: {
+      ...commonStyles.typography.caption,
+      color: theme.colors.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    section: {
+      ...commonStyles.components.card,
+      backgroundColor: theme.colors.surface,
+      marginTop: commonStyles.spacing.lg,
+    },
+    sectionTitle: {
+      ...commonStyles.typography.h3,
+      color: theme.colors.primary,
+      marginBottom: commonStyles.spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    levelContainer: {
+      marginTop: commonStyles.spacing.md,
+      backgroundColor: theme.colors.tertiary,
+      padding: commonStyles.spacing.md,
+      borderRadius: commonStyles.borderRadius.medium,
+      ...commonStyles.shadow.small,
+    },
+    levelText: {
+      ...commonStyles.typography.body,
+      color: theme.colors.onPrimary,
+      fontWeight: 'bold',
+      marginBottom: commonStyles.spacing.xs,
+    },
+    progressBar: {
+      height: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderRadius: commonStyles.borderRadius.small,
+      marginVertical: commonStyles.spacing.xs,
+      overflow: 'hidden',
+    },
+    progress: {
+      height: 8,
+      backgroundColor: theme.colors.onPrimary,
+      borderRadius: commonStyles.borderRadius.small,
+    },
+    xpText: {
+      ...commonStyles.typography.caption,
+      color: theme.colors.onPrimary,
+      textAlign: 'right',
+      opacity: 0.9,
+    },
+    socialButton: {
+      ...commonStyles.components.button,
+      backgroundColor: theme.colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: commonStyles.spacing.lg,
+    },
+    socialButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    socialButtonText: {
+      ...commonStyles.typography.body,
+      color: theme.colors.onPrimary,
+      marginLeft: commonStyles.spacing.md,
+      fontWeight: '600',
+    },
+    privacyContainer: {
+      marginTop: commonStyles.spacing.md,
+      backgroundColor: theme.colors.surface,
+      borderRadius: commonStyles.borderRadius.medium,
+      padding: commonStyles.spacing.md,
+      ...commonStyles.shadow.small,
+    },
+    privacyButton: {
+      ...commonStyles.components.button,
+      backgroundColor: theme.colors.secondary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    privacyButtonText: {
+      ...commonStyles.typography.body,
+      color: theme.colors.onPrimary,
+      fontWeight: '600',
+    },
+    privacyDescription: {
+      ...commonStyles.typography.caption,
+      color: theme.colors.onSurface,
+      opacity: 0.7,
+      marginTop: commonStyles.spacing.xs,
+      marginBottom: commonStyles.spacing.md,
+    },
+    privacyRadio: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.secondary,
+      borderRadius: commonStyles.borderRadius.medium,
+      paddingVertical: commonStyles.spacing.sm,
+      paddingHorizontal: commonStyles.spacing.md,
+      marginHorizontal: commonStyles.spacing.xs,
+      backgroundColor: theme.colors.surface,
+      minWidth: 90,
+      flexGrow: 1,
+      ...commonStyles.shadow.small,
+    },
+    privacyRadioSelected: {
+      backgroundColor: theme.colors.secondary,
+      borderColor: theme.colors.secondary,
+    },
+    privacyRadioText: {
+      ...commonStyles.typography.caption,
+      color: theme.colors.secondary,
+      fontWeight: '600',
+      marginLeft: commonStyles.spacing.sm,
+    },
+    privacyRadioTextSelected: {
+      color: theme.colors.onPrimary,
+    },
+    privacyOptionsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      gap: commonStyles.spacing.sm,
+      marginTop: commonStyles.spacing.sm,
+    },
+    privacyOption: {
+      flex: 1,
+      minWidth: '30%',
+    },
+    privacyLabel: {
+      ...commonStyles.typography.caption,
+      color: theme.colors.onSurface,
+      marginBottom: commonStyles.spacing.sm,
+      fontWeight: '500',
+    },
+    logoutButton: {
+      ...commonStyles.components.button,
+      backgroundColor: theme.colors.error,
+      marginHorizontal: commonStyles.spacing.lg,
+      marginBottom: commonStyles.spacing.xl,
+    },
+    logoutButtonText: {
+      ...commonStyles.typography.body,
+      color: theme.colors.onPrimary,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    },
+    modalContent: {
+      backgroundColor: '#1B263B',
+      padding: 25,
+      borderRadius: 20,
+      width: '90%',
+      maxWidth: 400,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 10,
+    },
+    modalTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 25,
+      textAlign: 'center',
+      color: '#EDF6F9',
+      letterSpacing: 1,
+    },
+    input: {
+      borderWidth: 2,
+      borderColor: '#41729F',
+      borderRadius: 12,
+      padding: 15,
+      marginBottom: 20,
+      backgroundColor: '#274472',
+      color: '#EDF6F9',
+      fontSize: 16,
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 20,
+    },
+    modalButton: {
+      flex: 1,
+      padding: 18,
+      borderRadius: 12,
+      alignItems: 'center',
+      marginHorizontal: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    cancelButton: {
+      backgroundColor: '#F44336',
+    },
+    saveButton: {
+      backgroundColor: '#669BBC',
+    },
+    modalButtonText: {
+      color: '#EDF6F9',
+      fontSize: 16,
+      fontWeight: 'bold',
+      letterSpacing: 1,
+    },
+    messageText: {
+      textAlign: 'center',
+      marginBottom: 20,
+      padding: 15,
+      borderRadius: 12,
+      fontSize: 16,
+    },
+    errorMessage: {
+      backgroundColor: '#ffebee',
+      color: '#c62828',
+    },
+    successMessage: {
+      backgroundColor: '#e8f5e9',
+      color: '#2e7d32',
+    },
+    disabledButton: {
+      opacity: 0.7,
+    },
+    customTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: '#669BBC',
+      marginBottom: 5,
+      textAlign: 'center',
+      letterSpacing: 1,
+    },
+    badgesButton: {
+      backgroundColor: '#274472',
+      borderRadius: 15,
+      padding: 18,
+      alignItems: 'center',
+      marginHorizontal: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 10,
+    },
+    badgesButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
+    },
+    badgesButtonText: {
+      color: '#EDF6F9',
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginLeft: 12,
+      letterSpacing: 1,
+    },
+    socialDescription: {
+      marginTop: 6,
+      marginBottom: 0,
+      fontSize: 14,
+      color: '#A9D6E5',
+      letterSpacing: 0.5,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingRight: 10,
+    },
+    advancedStatsContainer: {
+      marginTop: 15,
+      backgroundColor: '#f5f5f5',
+      borderRadius: 10,
+      padding: 15,
+    },
+    loader: {
+      marginVertical: 20,
+    },
+    noStatsText: {
+      fontStyle: 'italic',
+      textAlign: 'center',
+      color: '#666',
+      marginVertical: 20,
+    },
+    missionStatusSection: {
+      marginBottom: 1,
+      backgroundColor: '#f5f5f5',
+      borderRadius: 10,
+      padding: 10,
+    },
+    missionStatusRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      width: '100%',
+    },
+    missionStatusItem: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 6,
+    },
+    missionStatusCount: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: '#333',
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    missionStatusLabel: {
+      fontSize: 12,
+      color: '#666',
+    },
+    colorBox: {
+      width: 16,
+      height: 16,
+      borderRadius: 4,
+      marginBottom: 4,
+    },
+    topCitiesSection: {
+      marginTop: 25,
+      marginBottom: 25,
+      backgroundColor: '#fff',
+      padding: 15,
+      borderRadius: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      elevation: 3,
+    },
+    topCitiesTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 15,
+      color: '#333',
+    },
+    topCityItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    topCityRank: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: '#005F9E',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 10,
+    },
+    topCityRankText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    topCityInfo: {
+      flex: 1,
+    },
+    topCityName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 4,
+      color: '#333',
+    },
+    topCityBarContainer: {
+      height: 8,
+      backgroundColor: '#E0E0E0',
+      borderRadius: 4,
+      marginBottom: 4,
+      overflow: 'hidden',
+    },
+    topCityBar: {
+      height: '100%',
+      borderRadius: 4,
+    },
+    topCityCount: {
+      fontSize: 12,
+      color: '#666',
+      textAlign: 'right',
+    },
+    detailedStats: {
+      marginTop: 10,
+    },
+    statRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: '#E0E0E0',
+      paddingBottom: 8,
+    },
+    statTitle: {
+      fontSize: 14,
+      color: '#333',
+      flex: 3,
+    },
+    statDetail: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#005F9E',
+      flex: 1,
+      textAlign: 'right',
+    },
+    categoryTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginTop: 20,
+      marginBottom: 12,
+      color: '#333',
+    },
+    categoryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 6,
+    },
+    categoryName: {
+      width: 100,
+      fontSize: 14,
+      color: '#333',
+    },
+    categoryBar: {
+      flex: 1,
+      height: 12,
+      backgroundColor: '#E0E0E0',
+      borderRadius: 6,
+      marginHorizontal: 10,
+      overflow: 'hidden',
+    },
+    categoryFill: {
+      height: '100%',
+      borderRadius: 6,
+    },
+    categoryCount: {
+      width: 30,
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#333',
+      textAlign: 'right',
+    },
+  });
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView>
@@ -594,22 +1136,26 @@ const ProfileScreen = () => {
             <TouchableOpacity style={styles.avatarContainer} onPress={showImageOptions}>
               {uploadingImage ? (
                 <View style={styles.avatar}>
-                  <ActivityIndicator size="large" color="white" />
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
               ) : profilePicUrl ? (
                 <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
+                  <Text style={[styles.avatarText, { color: theme.colors.primary }]}>
+                    {user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                  </Text>
                 </View>
               )}
               <View style={styles.cameraIconContainer}>
-                <Ionicons name="camera" size={20} color="white" />
+                <Ionicons name="camera" size={20} color={theme.colors.onPrimary} />
               </View>
             </TouchableOpacity>
             <View style={styles.userInfo}>
               {selectedTitle ? (
-                <Text style={styles.customTitle}>{selectedTitle}</Text>
+                <Text style={[styles.customTitle, { color: theme.colors.tertiary }]}>
+                  {selectedTitle}
+                </Text>
               ) : null}
               <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
               <Text style={styles.email}>{user?.email}</Text>
@@ -626,9 +1172,7 @@ const ProfileScreen = () => {
 
         <View style={styles.stats}>
           {loadingStats ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size={40} color="#005F9E" />
-            </View>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
           ) : (
             <>
               <View style={styles.statItem}>
@@ -647,285 +1191,202 @@ const ProfileScreen = () => {
           )}
         </View>
 
-        {/* Estadísticas avanzadas */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
-            onPress={() => setShowAdvancedStats(!showAdvancedStats)}
-          >
-            <Text style={styles.sectionTitle}>Estadísticas Avanzadas</Text>
-            <Ionicons 
-              name={showAdvancedStats ? "chevron-up" : "chevron-down"} 
-              size={20} 
-              color="#333" 
-            />
-          </TouchableOpacity>
-          
-          {showAdvancedStats && (
-            <View style={styles.advancedStatsContainer}>
-              {loadingAdvancedStats ? (
-                <ActivityIndicator size="large" color="#005F9E" style={styles.loader} />
-              ) : advancedStats ? (
-                <>
-                  {/* Información de estado de misiones */}
-                  <View style={styles.missionStatusSection}>
-                    <View style={styles.missionStatusRow}>
-                      <View style={styles.missionStatusItem}>
-                        <View style={[styles.colorBox, { backgroundColor: '#4CAF50' }]} />
-                        <Text style={styles.missionStatusCount}>{advancedStats.completedMissions}</Text>
-                        <Text style={styles.missionStatusLabel}>Completadas</Text>
-                      </View>
-                      
-                      <View style={styles.missionStatusItem}>
-                        <View style={[styles.colorBox, { backgroundColor: '#FF9800' }]} />
-                        <Text style={styles.missionStatusCount}>{advancedStats.pendingMissions}</Text>
-                        <Text style={styles.missionStatusLabel}>Pendientes</Text>
-                      </View>
-                      
-                      <View style={styles.missionStatusItem}>
-                        <View style={[styles.colorBox, { backgroundColor: '#F44336' }]} />
-                        <Text style={styles.missionStatusCount}>{advancedStats.expiredMissions}</Text>
-                        <Text style={styles.missionStatusLabel}>Expiradas</Text>
-                      </View>
-                    </View>
-                  </View>
-                  
-                  {/* Top 3 ciudades con más misiones */}
-                  {advancedStats.topCities && advancedStats.topCities.length > 0 && (
-                    <View style={styles.topCitiesSection}>
-                      <Text style={styles.topCitiesTitle}>Top Ciudades</Text>
-                      
-                      {advancedStats.topCities.map((city, index) => (
-                        <View key={city.name} style={styles.topCityItem}>
-                          <View style={[
-                            styles.topCityRank,
-                            { backgroundColor: index === 0 ? '#005F9E' : index === 1 ? '#0277BD' : '#0288D1' }
-                          ]}>
-                            <Text style={styles.topCityRankText}>{index + 1}</Text>
-                          </View>
-                          <View style={styles.topCityInfo}>
-                            <Text style={styles.topCityName}>{city.name}</Text>
-                            <View style={styles.topCityBarContainer}>
-                              <View 
-                                style={[
-                                  styles.topCityBar,
-                                  {
-                                    width: `${Math.min(100, (city.count / (advancedStats.topCities[0]?.count || 1)) * 100)}%`,
-                                    backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : '#CD7F32'
-                                  }
-                                ]}
-                              />
-                            </View>
-                            <Text style={styles.topCityCount}>{city.count} misiones</Text>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  
-                  {/* Estadísticas detalladas */}
-                  <View style={styles.detailedStats}>
-                    <View style={styles.statRow}>
-                      <Text style={styles.statTitle}>Puntos ganados en misiones:</Text>
-                      <Text style={styles.statDetail}>{advancedStats.pointsEarned}</Text>
-                    </View>
-                    
-                    <View style={styles.statRow}>
-                      <Text style={styles.statTitle}>Tiempo promedio para completar:</Text>
-                      <Text style={styles.statDetail}>{advancedStats.averageTimeToComplete} días</Text>
-                    </View>
-                    
-                    <View style={styles.statRow}>
-                      <Text style={styles.statTitle}>Categoría más completada:</Text>
-                      <Text style={styles.statDetail}>{advancedStats.mostCompletedCategory}</Text>
-                    </View>
-                    
-                    {/* Resumen por categorías */}
-                    <Text style={styles.categoryTitle}>Misiones completadas por categoría:</Text>
-                    {Object.entries(advancedStats.completedByCategory).map(([category, count]) => (
-                      <View key={category} style={styles.categoryRow}>
-                        <Text style={styles.categoryName}>{category}</Text>
-                        <View style={styles.categoryBar}>
-                          <View 
-                            style={[
-                              styles.categoryFill, 
-                              { 
-                                width: `${(count / advancedStats.completedMissions) * 100}%`,
-                                backgroundColor: getCategoryColor(category)
-                              }
-                            ]} 
-                          />
-                        </View>
-                        <Text style={styles.categoryCount}>{count}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </>
-              ) : (
-                <Text style={styles.noStatsText}>No hay suficientes datos para mostrar estadísticas avanzadas.</Text>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Social */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Social</Text>
-          <View style={styles.privacyContainer}>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={() => navigation.navigate('Friends')}
-            >
-              <View style={styles.socialButtonContent}>
-                <Ionicons name="people" size={24} color="white" />
-                <Text style={styles.socialButtonText}>Amigos</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
-              </View>
-            </TouchableOpacity>
-            <Text style={[styles.privacyDescription, styles.socialDescription]}>
-              Conéctate con tus amigos
-            </Text>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('Friends')}
+          >
+            <View style={styles.socialButtonContent}>
+              <Ionicons name="people" size={24} color={theme.colors.onPrimary} />
+              <Text style={styles.socialButtonText}>Amigos</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.onPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.privacyDescription}>
+            Conéctate con tus amigos y comparte tus aventuras
+          </Text>
 
-            <TouchableOpacity
-              style={[styles.socialButton, styles.secondSocialButton]}
-              onPress={() => navigation.navigate('Leaderboard')}
-            >
-              <View style={styles.socialButtonContent}>
-                <Ionicons name="trophy" size={24} color="white" />
-                <Text style={styles.socialButtonText}>Leaderboard</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
-              </View>
-            </TouchableOpacity>
-            <Text style={[styles.privacyDescription, styles.socialDescription]}>
-              Mira el ranking de puntos
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('Leaderboard')}
+          >
+            <View style={styles.socialButtonContent}>
+              <Ionicons name="trophy" size={24} color={theme.colors.onPrimary} />
+              <Text style={styles.socialButtonText}>Leaderboard</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.onPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.privacyDescription}>
+            Mira el ranking de puntos y compite con otros viajeros
+          </Text>
         </View>
 
-        {/* Logros/Insignias */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Logros</Text>
-          <View style={styles.badgesContainer}>
-            <TouchableOpacity
-              style={styles.badgesButton}
-              onPress={() => {
-                navigation.navigate('BadgesScreen');
-              }}
-            >
-              <View style={styles.badgesButtonContent}>
-                <Ionicons name="medal" size={24} color="white" />
-                <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
-              </View>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => navigation.navigate('BadgesScreen')}
+          >
+            <View style={styles.socialButtonContent}>
+              <Ionicons name="medal" size={24} color={theme.colors.onPrimary} />
+              <Text style={styles.socialButtonText}>Ver Mis Insignias</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.onPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.privacyDescription}>
+            Descubre tus logros y colecciona insignias especiales
+          </Text>
         </View>
 
-        {/* Privacidad */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacidad</Text>
-          {/* Visibilidad del perfil */}
-          <View style={[styles.privacyContainer, { marginBottom: 16 }]}>
-            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede ver tu perfil</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={[styles.privacyRadio, profileVisibility === 'public' && styles.privacyRadioSelected]}
-                onPress={() => updateProfileVisibility('public')}
-              >
-                <Ionicons name="globe-outline" size={20} color={profileVisibility === 'public' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, profileVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, profileVisibility === 'friends' && styles.privacyRadioSelected]}
-                onPress={() => updateProfileVisibility('friends')}
-              >
-                <Ionicons name="people-outline" size={20} color={profileVisibility === 'friends' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, profileVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, profileVisibility === 'private' && styles.privacyRadioSelected]}
-                onPress={() => updateProfileVisibility('private')}
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={profileVisibility === 'private' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, profileVisibility === 'private' && styles.privacyRadioTextSelected]}>Privado</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          {/* Visibilidad de amigos */}
+          
           <View style={styles.privacyContainer}>
-            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede ver tu lista de amigos</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={[styles.privacyRadio, friendsVisibility === 'public' && styles.privacyRadioSelected]}
-                onPress={() => updateFriendsVisibility('public')}
-              >
-                <Ionicons name="globe-outline" size={20} color={friendsVisibility === 'public' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, friendsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, friendsVisibility === 'friends' && styles.privacyRadioSelected]}
-                onPress={() => updateFriendsVisibility('friends')}
-              >
-                <Ionicons name="people-outline" size={20} color={friendsVisibility === 'friends' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, friendsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, friendsVisibility === 'private' && styles.privacyRadioSelected]}
-                onPress={() => updateFriendsVisibility('private')}
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={friendsVisibility === 'private' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, friendsVisibility === 'private' && styles.privacyRadioTextSelected]}>Solo tú</Text>
-              </TouchableOpacity>
+            <Text style={styles.privacyLabel}>Visibilidad del perfil</Text>
+            <View style={styles.privacyOptionsContainer}>
+              <View style={styles.privacyOption}>
+                <TouchableOpacity
+                  style={[styles.privacyRadio, profileVisibility === 'public' && styles.privacyRadioSelected]}
+                  onPress={() => updateProfileVisibility('public')}
+                >
+                  <Ionicons 
+                    name="globe-outline" 
+                    size={20} 
+                    color={profileVisibility === 'public' ? theme.colors.onPrimary : theme.colors.secondary} 
+                  />
+                  <Text style={[styles.privacyRadioText, profileVisibility === 'public' && styles.privacyRadioTextSelected]}>
+                    Público
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.privacyOption}>
+                <TouchableOpacity
+                  style={[styles.privacyRadio, profileVisibility === 'friends' && styles.privacyRadioSelected]}
+                  onPress={() => updateProfileVisibility('friends')}
+                >
+                  <Ionicons 
+                    name="people-outline" 
+                    size={20} 
+                    color={profileVisibility === 'friends' ? theme.colors.onPrimary : theme.colors.secondary} 
+                  />
+                  <Text style={[styles.privacyRadioText, profileVisibility === 'friends' && styles.privacyRadioTextSelected]}>
+                    Amigos
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.privacyOption}>
+                <TouchableOpacity
+                  style={[styles.privacyRadio, profileVisibility === 'private' && styles.privacyRadioSelected]}
+                  onPress={() => updateProfileVisibility('private')}
+                >
+                  <Ionicons 
+                    name="lock-closed-outline" 
+                    size={20} 
+                    color={profileVisibility === 'private' ? theme.colors.onPrimary : theme.colors.secondary} 
+                  />
+                  <Text style={[styles.privacyRadioText, profileVisibility === 'private' && styles.privacyRadioTextSelected]}>
+                    Privado
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-          {/* Visibilidad de comentarios por defecto */}
-          <View style={[styles.privacyContainer, { marginTop: 16 }]}> 
-            <Text style={[styles.privacyDescription, { marginBottom: 8 }]}>Quién puede comentar en tus entradas por defecto</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={[styles.privacyRadio, commentsVisibility === 'public' && styles.privacyRadioSelected]}
-                onPress={() => updateCommentsVisibility('public')}
-              >
-                <Ionicons name="globe-outline" size={20} color={commentsVisibility === 'public' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, commentsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, commentsVisibility === 'friends' && styles.privacyRadioSelected]}
-                onPress={() => updateCommentsVisibility('friends')}
-              >
-                <Ionicons name="people-outline" size={20} color={commentsVisibility === 'friends' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, commentsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.privacyRadio, commentsVisibility === 'private' && styles.privacyRadioSelected]}
-                onPress={() => updateCommentsVisibility('private')}
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={commentsVisibility === 'private' ? 'white' : '#005F9E'} />
-                <Text style={[styles.privacyRadioText, commentsVisibility === 'private' && styles.privacyRadioTextSelected]}>Nadie</Text>
-              </TouchableOpacity>
+
+          <View style={styles.privacyContainer}>
+            <Text style={styles.privacyLabel}>Visibilidad de amigos</Text>
+            <View style={styles.privacyOptionsContainer}>
+              <View style={styles.privacyOption}>
+                <TouchableOpacity
+                  style={[styles.privacyRadio, friendsVisibility === 'public' && styles.privacyRadioSelected]}
+                  onPress={() => updateFriendsVisibility('public')}
+                >
+                  <Ionicons 
+                    name="globe-outline" 
+                    size={20} 
+                    color={friendsVisibility === 'public' ? theme.colors.onPrimary : theme.colors.secondary} 
+                  />
+                  <Text style={[styles.privacyRadioText, friendsVisibility === 'public' && styles.privacyRadioTextSelected]}>
+                    Público
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.privacyOption}>
+                <TouchableOpacity
+                  style={[styles.privacyRadio, friendsVisibility === 'friends' && styles.privacyRadioSelected]}
+                  onPress={() => updateFriendsVisibility('friends')}
+                >
+                  <Ionicons 
+                    name="people-outline" 
+                    size={20} 
+                    color={friendsVisibility === 'friends' ? theme.colors.onPrimary : theme.colors.secondary} 
+                  />
+                  <Text style={[styles.privacyRadioText, friendsVisibility === 'friends' && styles.privacyRadioTextSelected]}>
+                    Amigos
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.privacyOption}>
+                <TouchableOpacity
+                  style={[styles.privacyRadio, friendsVisibility === 'private' && styles.privacyRadioSelected]}
+                  onPress={() => updateFriendsVisibility('private')}
+                >
+                  <Ionicons 
+                    name="lock-closed-outline" 
+                    size={20} 
+                    color={friendsVisibility === 'private' ? theme.colors.onPrimary : theme.colors.secondary} 
+                  />
+                  <Text style={[styles.privacyRadioText, friendsVisibility === 'private' && styles.privacyRadioTextSelected]}>
+                    Solo tú
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Seguridad */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Seguridad</Text>
-          <View style={styles.privacyContainer}>
-            <TouchableOpacity
-              style={styles.privacyButton}
-              onPress={() => setIsChangePasswordVisible(true)}
-            >
-              <Text style={styles.privacyButtonText}>Cambiar Contraseña</Text>
-            </TouchableOpacity>
-            <Text style={styles.privacyDescription}>
-              Actualiza tu contraseña para mantener tu cuenta segura
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={() => setIsChangePasswordVisible(true)}
+          >
+            <View style={styles.socialButtonContent}>
+              <Ionicons name="lock-closed" size={24} color={theme.colors.onPrimary} />
+              <Text style={styles.socialButtonText}>Cambiar Contraseña</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.onPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.privacyDescription}>
+            Actualiza tu contraseña para mantener tu cuenta segura
+          </Text>
         </View>
 
-        {/* Cerrar sesión */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Apariencia</Text>
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={toggleTheme}
+          >
+            <View style={styles.socialButtonContent}>
+              <Ionicons 
+                name={isDarkMode ? "moon" : "sunny"} 
+                size={24} 
+                color={theme.colors.onPrimary} 
+              />
+              <Text style={styles.socialButtonText}>
+                {isDarkMode ? "Modo Oscuro" : "Modo Claro"}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.onPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.privacyDescription}>
+            Cambia entre tema claro y oscuro
+          </Text>
+        </View>
+
         <TouchableOpacity
-          style={[styles.logoutButton, loading && styles.disabledButton]}
+          style={styles.logoutButton}
           onPress={handleLogout}
           disabled={loading}
         >
@@ -952,6 +1413,7 @@ const ProfileScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Contraseña actual"
+                placeholderTextColor={theme.colors.onSurface}
                 secureTextEntry
                 value={currentPassword}
                 onChangeText={(text) => {
@@ -963,6 +1425,7 @@ const ProfileScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Nueva contraseña"
+                placeholderTextColor={theme.colors.onSurface}
                 secureTextEntry
                 value={newPassword}
                 onChangeText={(text) => {
@@ -974,6 +1437,7 @@ const ProfileScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Confirmar nueva contraseña"
+                placeholderTextColor={theme.colors.onSurface}
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={(text) => {
@@ -1032,499 +1496,5 @@ const getCategoryColor = (category: string): string => {
   
   return colors[category.toLowerCase()] || '#F39C12'; // Naranja por defecto
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1B2A', // fondo general oscuro
-  },
-  headerBackground: {
-    backgroundColor: '#1B263B',
-    padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 15,
-    backgroundColor: '#A9D6E5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#A9D6E5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  cameraIconContainer: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#274472',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#EDF6F9',
-  },
-  avatarText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#0D1B2A',
-  },
-  userInfo: {
-    flex: 1,
-    padding: 10,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#EDF6F9',
-    marginBottom: 5,
-  },
-  email: {
-    fontSize: 16,
-    color: '#A9D6E5',
-  },
-  stats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 20,
-    backgroundColor: '#1B263B',
-    marginTop: -20,
-    marginHorizontal: 20,
-    borderRadius: 10,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#EDF6F9',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#A9D6E5',
-  },
-  section: {
-    margin: 20,
-    backgroundColor: '#1B263B',
-    borderRadius: 10,
-    padding: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#EDF6F9',
-  },
-  privacyContainer: {
-    backgroundColor: '#1B263B',
-    borderRadius: 10,
-    padding: 15,
-  },
-  privacyButton: {
-    backgroundColor: '#274472',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  privacyButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#EDF6F9',
-  },
-  privacyDescription: {
-    fontSize: 14,
-    color: '#A9D6E5',
-    textAlign: 'center',
-  },
-  levelContainer: {
-    marginTop: 5,
-  },
-  levelText: {
-    color: '#EDF6F9',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#274472',
-    borderRadius: 3,
-    marginVertical: 5,
-    width: '100%',
-  },
-  progress: {
-    height: 6,
-    backgroundColor: '#41729F',
-    borderRadius: 3,
-  },
-  xpText: {
-    color: '#EDF6F9',
-    fontSize: 12,
-  },
-  badgesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgesButton: {
-    backgroundColor: '#274472',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  badgesButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  badgesButtonText: {
-    color: '#EDF6F9',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  privacyRadio: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#41729F',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginHorizontal: 2,
-    backgroundColor: '#1B263B',
-    minWidth: 90,
-    flexGrow: 1,
-    marginVertical: 4,
-    flexBasis: '30%',
-    justifyContent: 'center',
-  },
-  privacyRadioSelected: {
-    backgroundColor: '#41729F',
-  },
-  privacyRadioText: {
-    marginLeft: 6,
-    color: '#41729F',
-    fontWeight: 'bold',
-  },
-  privacyRadioTextSelected: {
-    color: '#EDF6F9',
-  },
-  customTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#669BBC',
-    marginBottom: 2,
-  },
-  socialButton: {
-    backgroundColor: '#274472',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 4,
-  },
-  secondSocialButton: {
-    marginTop: 20,
-    marginBottom: 4,
-  },
-  socialButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  socialButtonText: {
-    color: '#EDF6F9',
-    fontSize: 16,
-    fontWeight: 'bold',
-    flex: 1,
-    marginLeft: 10,
-  },
-  socialDescription: {
-    marginTop: 4,
-    marginBottom: 0,
-    fontSize: 13,
-    color: '#A9D6E5',
-  },
-  logoutButton: {
-    margin: 20,
-    backgroundColor: '#F44336',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  logoutButtonText: {
-    color: '#EDF6F9',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#1B263B',
-    padding: 20,
-    borderRadius: 10,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#EDF6F9',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#41729F',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-    backgroundColor: '#274472',
-    color: '#EDF6F9',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#F44336',
-  },
-  saveButton: {
-    backgroundColor: '#669BBC',
-  },
-  modalButtonText: {
-    color: '#EDF6F9',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  messageText: {
-    textAlign: 'center',
-    marginBottom: 15,
-    padding: 10,
-    borderRadius: 5,
-  },
-  errorMessage: {
-    backgroundColor: '#ffebee',
-    color: '#c62828',
-  },
-  successMessage: {
-    backgroundColor: '#e8f5e9',
-    color: '#2e7d32',
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingRight: 10,
-  },
-  advancedStatsContainer: {
-    marginTop: 15,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 15,
-  },
-  loader: {
-    marginVertical: 20,
-  },
-  noStatsText: {
-    fontStyle: 'italic',
-    textAlign: 'center',
-    color: '#666',
-    marginVertical: 20,
-  },
-  missionStatusSection: {
-    marginBottom: 25,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 15,
-  },
-  missionStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  missionStatusItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  missionStatusCount: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  missionStatusLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  colorBox: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  topCitiesSection: {
-    marginTop: 25,
-    marginBottom: 25,
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  topCitiesTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  topCityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  topCityRank: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#005F9E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  topCityRankText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  topCityInfo: {
-    flex: 1,
-  },
-  topCityName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#333',
-  },
-  topCityBarContainer: {
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    marginBottom: 4,
-    overflow: 'hidden',
-  },
-  topCityBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  topCityCount: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'right',
-  },
-  detailedStats: {
-    marginTop: 10,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    paddingBottom: 8,
-  },
-  statTitle: {
-    fontSize: 14,
-    color: '#333',
-    flex: 3,
-  },
-  statDetail: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#005F9E',
-    flex: 1,
-    textAlign: 'right',
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 12,
-    color: '#333',
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 6,
-  },
-  categoryName: {
-    width: 100,
-    fontSize: 14,
-    color: '#333',
-  },
-  categoryBar: {
-    flex: 1,
-    height: 12,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 6,
-    marginHorizontal: 10,
-    overflow: 'hidden',
-  },
-  categoryFill: {
-    height: '100%',
-    borderRadius: 6,
-  },
-  categoryCount: {
-    width: 30,
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'right',
-  },
-});
-
 
 export default ProfileScreen; 
