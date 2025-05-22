@@ -185,7 +185,8 @@ export const generateMission = async (
   userId: string,
   startDate: Date | null,
   endDate: Date | null,
-  tags: string[] = []
+  tags: string[] = [],
+  useLogicalOrder: boolean = false
 ) => {
   try {
     console.log('generateMission recibió fechas:', {
@@ -195,6 +196,7 @@ export const generateMission = async (
     });
 
     console.log('Tags seleccionados:', tags);
+    console.log('Orden lógico:', useLogicalOrder);
 
     // Crear fechas por defecto si no se proporcionan
     const validStartDate = startDate instanceof Date ? startDate : new Date();
@@ -216,7 +218,8 @@ export const generateMission = async (
       userId,
       startDate,
       endDate,
-      tags
+      tags,
+      useLogicalOrder
     });
 
     // Verificar y crear usuario si no existe
@@ -280,8 +283,14 @@ export const generateMission = async (
         preferencesText = `Las misiones deben basarse en las siguientes preferencias del usuario: ${tags.join(', ')}.`;
       }
 
+      // Añadir instrucción de orden lógico si está activado
+      let orderText = '';
+      if (useLogicalOrder) {
+        orderText = `Las misiones deben seguir un orden lógico de visita, considerando la ubicación y el tiempo de visita de cada lugar. Por ejemplo, en la ciudad de Alicante, puede ser primero el teatro, el ayuntamiento y el castillo luego la explanada y por último el puerto, siguiendo un orden para no tener que volver atras a completar la siguiente misión.`;
+      }
+
       // Generar nuevos desafíos
-      const missionPrompt = `Genera ${missionCount} misiones en ${correctedCityName} que se puedan completar en ${duration} días. ${preferencesText}
+      const missionPrompt = `Genera ${missionCount} misiones en ${correctedCityName} que se puedan completar en ${duration} días. ${preferencesText} ${orderText}
       
 Devuelve un objeto JSON con la siguiente estructura exacta:
 {
@@ -335,13 +344,15 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
     }
 
     // Vincular los desafíos al journey
-    const journeyMissions = challenges.map((challenge: { id: string }) => ({
+    const journeyMissions = challenges.map((challenge: { id: string }, index: number) => ({
       journeyId: journey.id,
       challengeId: challenge.id,
       completed: false,
       created_at: new Date().toISOString(),
       start_date: startIsoString,
-      end_date: endIsoString
+      end_date: endIsoString,
+      route_id: useLogicalOrder ? null : null, // Se actualizará después de crear la ruta
+      order_index: useLogicalOrder ? index + 1 : null
     }));
 
     console.log('Vincular misiones al journey:', journeyMissions);
@@ -383,9 +394,43 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
 
     console.log('Misiones creadas verificadas:', createdMissions);
 
+    // Si se selecciona orden lógico, crear una ruta y actualizar las misiones
+    let routeId = null;
+    if (useLogicalOrder) {
+      const { data: route, error: routeError } = await supabase
+        .from('routes')
+        .insert([{
+          journey_id: journey.id,
+          name: `Ruta de ${correctedCityName}`,
+          description: `Ruta lógica de misiones en ${correctedCityName}`,
+          order_index: 1
+        }])
+        .select('id')
+        .single();
+
+      if (routeError) {
+        console.error('Error creando ruta:', routeError);
+        throw routeError;
+      }
+
+      routeId = route.id;
+
+      // Actualizar las misiones con el routeId
+      const { error: updateError } = await supabase
+        .from('journeys_missions')
+        .update({ route_id: routeId })
+        .eq('journeyId', journey.id);
+
+      if (updateError) {
+        console.error('Error actualizando misiones con routeId:', updateError);
+        throw updateError;
+      }
+    }
+
     return {
       journeyId: journey.id,
-      challenges: createdMissions
+      challenges: createdMissions,
+      routeId: routeId
     };
   } catch (error) {
     console.error('Error generando misiones:', error);

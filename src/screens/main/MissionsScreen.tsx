@@ -52,6 +52,8 @@ interface JourneyMission {
     difficulty: string;
     points: number;
   };
+  order_index?: number;
+  route_id?: string;
 }
 
 interface Friend {
@@ -392,6 +394,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const dispatch = useDispatch();
   const theme = useTheme();
   const [refreshing, setRefreshing] = useState(false);
+  const [showRoutesModal, setShowRoutesModal] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState<any>(null);
+  const [hasRouteForSelectedCity, setHasRouteForSelectedCity] = useState(false);
 
   // Cargar puntos del usuario al inicio
   useEffect(() => {
@@ -425,6 +430,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             completed,
             challengeId,
             end_date,
+            order_index,
+            route_id,
             challenges!inner (
               id,
               title,
@@ -495,7 +502,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             description: jm.challenges.description,
             difficulty: jm.challenges.difficulty,
             points: jm.challenges.points
-          }
+          },
+          order_index: jm.order_index,
+          route_id: jm.route_id
         }))
       );
 
@@ -528,6 +537,19 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   useEffect(() => {
     fetchMissions();
   }, [journeyId]);
+
+  // Efecto para verificar si la ciudad seleccionada tiene una ruta
+  useEffect(() => {
+    if (selectedCity && cityMissions[selectedCity]) {
+      const missions = cityMissions[selectedCity].pending
+        .concat(cityMissions[selectedCity].completed)
+        .concat(cityMissions[selectedCity].expired);
+      const hasRoute = missions.some(mission => mission.route_id !== null);
+      setHasRouteForSelectedCity(hasRoute);
+    } else {
+      setHasRouteForSelectedCity(false);
+    }
+  }, [selectedCity, cityMissions]);
 
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     console.log('🎯 Iniciando completeMission para misión:', missionId);
@@ -848,6 +870,68 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     setRefreshing(false);
   };
 
+  // Modificar la función que ordena las misiones
+  const sortMissions = (missions: JourneyMission[]) => {
+    return missions.sort((a, b) => {
+      // Si hay order_index, usar ese para ordenar
+      if (a.order_index !== null && b.order_index !== null) {
+        return a.order_index - b.order_index;
+      }
+      // Si no hay order_index, mantener el orden original
+      return 0;
+    });
+  };
+
+  const handleViewRoute = async (cityName: string) => {
+    try {
+      // Buscar una misión con route_id en la ciudad seleccionada
+      const missionsInCity = cityMissions[cityName]?.pending
+        .concat(cityMissions[cityName]?.completed)
+        .concat(cityMissions[cityName]?.expired) || [];
+
+      const missionWithRoute = missionsInCity.find(m => m.route_id !== null);
+
+      if (!missionWithRoute || !missionWithRoute.route_id) {
+        Alert.alert('Error', 'No se encontró información de ruta para esta ciudad.');
+        return;
+      }
+
+      const routeId = missionWithRoute.route_id;
+      console.log('ℹ️ Intentando obtener ruta con ID:', routeId);
+
+      // Consultar la tabla routes usando el routeId encontrado
+      const { data: route, error } = await supabase
+        .from('routes')
+        .select(`
+          id,
+          name,
+          description,
+          journeys_missions (
+            id,
+            order_index,
+            challenge:challenges (
+              title,
+              description,
+              difficulty,
+              points
+            )
+          )
+        `)
+        .eq('id', routeId) // Usar el ID de la ruta encontrado
+        .single();
+
+      if (error) throw error;
+
+      if (route) {
+        setCurrentRoute(route);
+        setShowRoutesModal(true);
+      }
+    } catch (error) {
+      console.error('Error al obtener la ruta:', error);
+      Alert.alert('Error', 'No se pudo cargar la ruta');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -925,10 +1009,18 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           onPress={() => setSelectedCity(null)}
           activeOpacity={0.7}
         >
-          {/* @ts-ignore */}
           <Ionicons name="arrow-back" size={20} color="#FFF" />
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
+        {selectedCity && hasRouteForSelectedCity && (
+          <TouchableOpacity 
+            style={styles.routeButton}
+            onPress={() => handleViewRoute(selectedCity)}
+          >
+            <Ionicons name="map" size={24} color="#005F9E" />
+            <Text style={styles.routeButtonText}>Ver Ruta</Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
             {refreshing ? (
@@ -952,7 +1044,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         {cityData.pending.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
-            {cityData.pending.map(mission => (
+            {sortMissions(cityData.pending).map(mission => (
               <MissionCard
                 key={mission.id}
                 mission={mission}
@@ -970,7 +1062,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
               <View style={styles.dividerLine} />
             </View>
-            {cityData.expired.map(mission => (
+            {sortMissions(cityData.expired).map(mission => (
               <MissionCard
                 key={mission.id}
                 mission={mission}
@@ -988,7 +1080,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               <Text style={styles.completedText}>Completadas</Text>
               <View style={styles.dividerLine} />
             </View>
-            {cityData.completed.map(mission => (
+            {sortMissions(cityData.completed).map(mission => (
               <MissionCard
                 key={mission.id}
                 mission={mission}
@@ -1022,6 +1114,55 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       />
 
       {renderGeneratingLoader()}
+
+      {/* Modal de Rutas */}
+      <Modal
+        visible={showRoutesModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRoutesModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ruta de Misiones</Text>
+              <TouchableOpacity onPress={() => setShowRoutesModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            {currentRoute && (
+              <ScrollView style={styles.routeList}>
+                {currentRoute.journeys_missions
+                  .sort((a: any, b: any) => a.order_index - b.order_index)
+                  .map((mission: any, index: number) => (
+                    <View key={mission.id} style={styles.routeItem}>
+                      <View style={styles.routeNumber}>
+                        <Text style={styles.routeNumberText}>{index + 1}</Text>
+                      </View>
+                      <View style={styles.routeMissionInfo}>
+                        <Text style={styles.routeMissionTitle}>
+                          {mission.challenge.title}
+                        </Text>
+                        <Text style={styles.routeMissionDescription}>
+                          {mission.challenge.description}
+                        </Text>
+                        <View style={styles.routeMissionMeta}>
+                          <Text style={styles.routeMissionDifficulty}>
+                            Dificultad: {mission.challenge.difficulty}
+                          </Text>
+                          <Text style={styles.routeMissionPoints}>
+                            {mission.challenge.points} puntos
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1387,6 +1528,75 @@ const styles = StyleSheet.create({
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  routeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E4EAFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  routeButtonText: {
+    color: '#005F9E',
+    marginLeft: 5,
+    fontWeight: '500',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  routeList: {
+    maxHeight: '80%',
+  },
+  routeItem: {
+    flexDirection: 'row',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  routeNumber: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  routeNumberText: {
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  routeMissionInfo: {
+    flex: 1,
+  },
+  routeMissionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 5,
+  },
+  routeMissionDescription: {
+    fontSize: 14,
+    color: colors.text.primary,
+    marginBottom: 8,
+  },
+  routeMissionMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  routeMissionDifficulty: {
+    fontSize: 12,
+    color: colors.text.secondary,
+  },
+  routeMissionPoints: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    fontWeight: 'bold',
   },
 });
 

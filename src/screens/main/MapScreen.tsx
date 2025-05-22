@@ -467,6 +467,7 @@ const MapScreen = () => {
   });
   // Estado para los tags
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [useLogicalOrder, setUseLogicalOrder] = useState(false);
 
   // Estado para indicar carga durante cambio de vista
   const [changingView, setChangingView] = useState(false);
@@ -769,12 +770,13 @@ const MapScreen = () => {
         // Llamar a la API para generar las misiones con el nombre real de la ciudad
         const result = await generateMission(
           cityName,
-          updatedDuration, // Usar la duración actualizada
+          updatedDuration,
           missionCountNum,
           user.id,
-          newStartDate, // Usar las fechas ajustadas
+          newStartDate,
           newEndDate,
-          selectedTags // Pasar los tags seleccionados
+          selectedTags,
+          useLogicalOrder
         );
 
         if (!result.journeyId) {
@@ -950,6 +952,29 @@ const MapScreen = () => {
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+
+          <View style={styles.logicalOrderContainer}>
+            <TouchableOpacity
+              style={[
+                styles.logicalOrderButton,
+                useLogicalOrder && styles.logicalOrderButtonActive
+              ]}
+              onPress={() => setUseLogicalOrder(!useLogicalOrder)}
+            >
+              <Ionicons 
+                name={useLogicalOrder ? "checkmark-circle" : "checkmark-circle-outline"} 
+                size={20} 
+                color={useLogicalOrder ? "#FFFFFF" : "#005F9E"} 
+                style={{ marginRight: 8 }} 
+              />
+              <Text style={[
+                styles.logicalOrderText,
+                useLogicalOrder && styles.logicalOrderTextActive
+              ]}>
+                Orden Lógico de Misiones
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -1859,6 +1884,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.primary,
+  },
+  logicalOrderContainer: {
+    marginVertical: 10,
+    paddingHorizontal: 10,
+  },
+  logicalOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E4EAFF',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#005F9E',
+  },
+  logicalOrderButtonActive: {
+    backgroundColor: '#005F9E',
+  },
+  logicalOrderText: {
+    color: '#005F9E',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  logicalOrderTextActive: {
+    color: '#FFFFFF',
   },
 });
 
