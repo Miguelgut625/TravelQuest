@@ -499,6 +499,16 @@ export const createJournalEntry = async (data: {
       }
     }
 
+    // Al crear la entrada de diario:
+    await supabase
+      .from('journal')
+      .insert({
+        userId: data.userId,
+        missionId: data.missionId,
+        content: '¡He completado una misión de evento!',
+        is_event: true
+      });
+
     return newEntry;
 
   } catch (error) {

@@ -8,6 +8,7 @@ interface CustomUser {
   username?: string;
   profilePicture?: string;
   custom_title?: string;
+  role: 'user' | 'admin';
 }
 
 interface AuthSliceState {

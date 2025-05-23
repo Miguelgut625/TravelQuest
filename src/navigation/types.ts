@@ -19,5 +19,6 @@ export type RootStackParamList = {
     Friends: undefined;
     Leaderboard: undefined;
     BadgesScreen: undefined;
+    CreateMission: undefined;
     // Añade aquí más pantallas según sea necesario
 }; 

@@ -323,4 +323,21 @@ export const getCityIdByName = async (cityName: string): Promise<string> => {
     console.error('Error en getCityIdByName:', error);
     throw error;
   }
+};
+
+export const updateUserRole = async (userId: string, role: 'user' | 'admin') => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ role })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    throw error;
+  }
 }; 

@@ -5,6 +5,7 @@ interface User {
   id: string;
   username?: string;
   profile_pic_url?: string;
+  role: 'user' | 'admin';
 }
 
 interface AuthState {

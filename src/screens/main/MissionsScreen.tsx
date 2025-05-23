@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, RefreshControl, Button } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -20,6 +20,7 @@ import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-cont
 import { RouteProp } from '@react-navigation/native';
 import { getOrCreateCity } from '../../services/missionGenerator';
 import MissionHintModal from '../../components/MissionHintModal';
+import CreateMissionForm from '../../components/CreateMissionForm';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -51,6 +52,9 @@ interface JourneyMission {
     description: string;
     difficulty: string;
     points: number;
+    is_event: boolean;
+    start_date?: string;
+    end_date?: string;
   };
   order_index?: number;
   route_id?: string;
@@ -125,11 +129,26 @@ const MissionCard = ({ mission, onComplete, onShare }: {
 }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showHintModal, setShowHintModal] = useState(false);
-  const timeRemaining = getTimeRemaining(mission.end_date);
-  const isExpired = timeRemaining.isExpired && !mission.completed;
+  let timeRemaining = getTimeRemaining(mission.end_date);
+  let isExpired = timeRemaining.isExpired && !mission.completed;
+  let isNotStarted = false;
+  if (mission.challenge.is_event) {
+    // Usar el end_date y start_date del challenge para el contador
+    timeRemaining = getTimeRemaining(mission.challenge.end_date);
+    isExpired = timeRemaining.isExpired && !mission.completed;
+    // Si la misión aún no ha comenzado
+    if (mission.challenge.start_date) {
+      const now = new Date();
+      const start = new Date(mission.challenge.start_date);
+      if (now < start) {
+        isNotStarted = true;
+        timeRemaining = { text: `Disponible desde ${start.toLocaleDateString()}` };
+      }
+    }
+  }
 
   const handleMissionPress = () => {
-    if (!mission.completed && !isExpired) {
+    if (!mission.completed && !isExpired && !isNotStarted) {
       setShowUploadModal(true);
     }
   };
@@ -153,7 +172,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
           isExpired && styles.expiredCard
         ]}
         onPress={handleMissionPress}
-        disabled={mission.completed || isExpired}
+        disabled={mission.completed || isExpired || isNotStarted}
       >
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
@@ -162,7 +181,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
               styles.badge,
               { backgroundColor: mission.completed ? colors.success : isExpired ? '#D32F2F' : '#FFB74D' }
             ]}>
-              {mission.completed ? 'Completada' : isExpired ? 'Expirada' : 'Pendiente'}
+              {mission.completed ? 'Completada' : isExpired ? 'Expirada' : isNotStarted ? 'Próximamente' : 'Pendiente'}
             </Text>
             <Text style={[
               styles.timeRemaining,
@@ -178,7 +197,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
           <Text style={styles.points}>{mission.challenge.points} puntos</Text>
           
           <View style={styles.actionsContainer}>
-            {(!mission.completed && !timeRemaining.isExpired) && (
+            {(!mission.completed && !isExpired && !isNotStarted) && (
               <>
                 <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
                   {/* @ts-ignore */}
@@ -397,6 +416,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const [showRoutesModal, setShowRoutesModal] = useState(false);
   const [currentRoute, setCurrentRoute] = useState<any>(null);
   const [hasRouteForSelectedCity, setHasRouteForSelectedCity] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const isAdmin = user?.role === 'admin';
+  const [citiesMap, setCitiesMap] = useState({});
 
   // Cargar puntos del usuario al inicio
   useEffect(() => {
@@ -406,6 +428,22 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       }).catch(console.error);
     }
   }, [user?.id]);
+
+  // Cargar el mapeo de cityId a nombre de ciudad
+  const fetchCitiesMap = async () => {
+    const { data, error } = await supabase
+      .from('cities')
+      .select('id, name');
+    if (!error && data) {
+      const map = {};
+      data.forEach(city => { map[city.id] = city.name; });
+      setCitiesMap(map);
+    }
+  };
+
+  useEffect(() => {
+    fetchCitiesMap();
+  }, []);
 
   const fetchMissions = async () => {
     if (!user?.id) {
@@ -495,13 +533,20 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         journey.journeys_missions.map((jm) => ({
           id: jm.id,
           completed: jm.completed,
-          cityName: journey.cities?.name || 'Ciudad Desconocida',
-          end_date: jm.end_date,
+          cityName: jm.challenges.cityId && citiesMap[jm.challenges.cityId]
+            ? citiesMap[jm.challenges.cityId]
+            : journey.cities?.name || 'Ciudad Desconocida',
+          end_date: jm.challenges.is_event && jm.challenges.end_date
+            ? jm.challenges.end_date
+            : jm.end_date,
           challenge: {
             title: jm.challenges.title,
             description: jm.challenges.description,
             difficulty: jm.challenges.difficulty,
-            points: jm.challenges.points
+            points: jm.challenges.points,
+            is_event: jm.challenges.is_event ?? false,
+            start_date: jm.challenges.start_date ?? null,
+            end_date: jm.challenges.end_date ?? null,
           },
           order_index: jm.order_index,
           route_id: jm.route_id
@@ -1012,15 +1057,6 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           <Ionicons name="arrow-back" size={20} color="#FFF" />
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
-        {selectedCity && hasRouteForSelectedCity && (
-          <TouchableOpacity 
-            style={styles.routeButton}
-            onPress={() => handleViewRoute(selectedCity)}
-          >
-            <Ionicons name="map" size={24} color="#005F9E" />
-            <Text style={styles.routeButtonText}>Ver Ruta</Text>
-          </TouchableOpacity>
-        )}
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
             {refreshing ? (
@@ -1033,87 +1069,121 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         </View>
       </View>
 
-      <Text style={styles.cityTitle}>{selectedCity}</Text>
+      {showCreateForm && isAdmin ? (
+        <View style={styles.createFormContainer}>
+          <CreateMissionForm onMissionCreated={() => {
+            setShowCreateForm(false);
+            fetchMissions();
+          }} />
+        </View>
+      ) : (
+        <>
+          <Text style={styles.cityTitle}>{selectedCity}</Text>
+          <ScrollView 
+            style={styles.missionsList}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+          >
+            {cityData.pending.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
+                {sortMissions(cityData.pending).map(mission =>
+                  mission.challenge && mission.challenge.is_event ? (
+                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
+                      <Text>{mission.challenge.description}</Text>
+                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                    </View>
+                  ) : (
+                    <MissionCard
+                      key={mission.id}
+                      mission={mission}
+                      onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
+                      onShare={() => setIsShareModalVisible(true)}
+                    />
+                  )
+                )}
+              </>
+            )}
 
-      <ScrollView 
-        style={styles.missionsList}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {cityData.pending.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
-            {sortMissions(cityData.pending).map(mission => (
-              <MissionCard
-                key={mission.id}
-                mission={mission}
-                onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
-                onShare={() => setIsShareModalVisible(true)}
-              />
-            ))}
-          </>
-        )}
+            {cityData.expired.length > 0 && (
+              <>
+                <View style={styles.completedDivider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                {sortMissions(cityData.expired).map(mission =>
+                  mission.challenge && mission.challenge.is_event ? (
+                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
+                      <Text>{mission.challenge.description}</Text>
+                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                    </View>
+                  ) : (
+                    <MissionCard
+                      key={mission.id}
+                      mission={mission}
+                      onComplete={() => { }}
+                      onShare={() => setIsShareModalVisible(true)}
+                    />
+                  )
+                )}
+              </>
+            )}
 
-        {cityData.expired.length > 0 && (
-          <>
-            <View style={styles.completedDivider}>
-              <View style={styles.dividerLine} />
-              <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
-              <View style={styles.dividerLine} />
-            </View>
-            {sortMissions(cityData.expired).map(mission => (
-              <MissionCard
-                key={mission.id}
-                mission={mission}
-                onComplete={() => { }}
-                onShare={() => setIsShareModalVisible(true)}
-              />
-            ))}
-          </>
-        )}
+            {cityData.completed.length > 0 && (
+              <>
+                <View style={styles.completedDivider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.completedText}>Completadas</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                {sortMissions(cityData.completed).map(mission =>
+                  mission.challenge && mission.challenge.is_event ? (
+                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
+                      <Text>{mission.challenge.description}</Text>
+                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                    </View>
+                  ) : (
+                    <MissionCard
+                      key={mission.id}
+                      mission={mission}
+                      onComplete={() => { }}
+                      onShare={() => setIsShareModalVisible(true)}
+                    />
+                  )
+                )}
+              </>
+            )}
+          </ScrollView>
 
-        {cityData.completed.length > 0 && (
-          <>
-            <View style={styles.completedDivider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.completedText}>Completadas</Text>
-              <View style={styles.dividerLine} />
-            </View>
-            {sortMissions(cityData.completed).map(mission => (
-              <MissionCard
-                key={mission.id}
-                mission={mission}
-                onComplete={() => { }}
-                onShare={() => setIsShareModalVisible(true)}
-              />
-            ))}
-          </>
-        )}
-      </ScrollView>
+          {/* Modal de misión completada */}
+          <MissionCompletedModal
+            visible={missionCompleted}
+            info={completedMissionInfo}
+            onFinished={() => {
+              setMissionCompleted(false);
+              navigation.navigate('Journal', { refresh: true });
+            }}
+          />
 
-      {/* Modal de misión completada */}
-      <MissionCompletedModal
-        visible={missionCompleted}
-        info={completedMissionInfo}
-        onFinished={() => {
-          setMissionCompleted(false);
-          navigation.navigate('Journal', { refresh: true });
-        }}
-      />
+          {/* Modal de carga durante el proceso */}
+          <CompletingMissionModal
+            visible={completingMission && !missionCompleted}
+          />
 
-      {/* Modal de carga durante el proceso */}
-      <CompletingMissionModal
-        visible={completingMission && !missionCompleted}
-      />
+          <FriendSelectionModal
+            visible={isShareModalVisible}
+            onClose={() => setIsShareModalVisible(false)}
+            onSelect={handleShareJourney}
+          />
 
-      <FriendSelectionModal
-        visible={isShareModalVisible}
-        onClose={() => setIsShareModalVisible(false)}
-        onSelect={handleShareJourney}
-      />
-
-      {renderGeneratingLoader()}
+          {renderGeneratingLoader()}
+        </>
+      )}
 
       {/* Modal de Rutas */}
       <Modal
@@ -1597,6 +1667,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.secondary,
     fontWeight: 'bold',
+  },
+  createFormContainer: {
+    padding: 16,
   },
 });
 

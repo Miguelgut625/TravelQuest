@@ -25,6 +25,8 @@ import { supabase } from '../../services/supabase';
 import * as Notifications from 'expo-notifications';
 import NotificationService from '../../services/NotificationService';
 import { getFriends } from '../../services/friendService';
+import { Button } from 'react-native-paper';
+import { createClient } from '@supabase/supabase-js';
 
 interface City {
   id: string;
@@ -852,6 +854,139 @@ const MapScreen = () => {
     setErrorLocationMsg(`Error al cargar el Globo Terráqueo: ${error}`);
   };
 
+  const [eventMissions, setEventMissions] = useState([]);
+  const [eventCities, setEventCities] = useState({});
+
+  // Función para cargar misiones de evento y ciudades
+  const fetchEventMissions = async () => {
+    const { data, error } = await supabase
+      .from('challenges')
+      .select('*');
+    if (!error) setEventMissions((data || []).filter(m => m.is_event));
+    // Obtener nombres de ciudades para las misiones de evento
+    const cityIds = [...new Set((data || []).filter(m => m.is_event && m.cityId).map(m => m.cityId))];
+    if (cityIds.length > 0) {
+      const { data: citiesData } = await supabase
+        .from('cities')
+        .select('id, name')
+        .in('id', cityIds);
+      const cityMap = {};
+      (citiesData || []).forEach(c => { cityMap[c.id] = c.name; });
+      setEventCities(cityMap);
+    }
+  };
+
+  useEffect(() => {
+    fetchEventMissions();
+    // Suscripción en tiempo real a la tabla challenges para is_event=true
+    const channel = supabase.channel('event-missions-realtime');
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, (payload) => {
+        // Solo recargar si la misión es de evento
+        if (payload.new?.is_event || payload.old?.is_event) {
+          fetchEventMissions();
+        }
+      })
+      .subscribe();
+    return () => {
+      channel.unsubscribe();
+    };
+  }, []);
+
+  const [userEventMissions, setUserEventMissions] = useState({});
+
+  // Cargar misiones de evento ya aceptadas por el usuario
+  const fetchUserEventMissions = async () => {
+    if (!user || !user.id) return;
+    const { data, error } = await supabase
+      .from('journeys')
+      .select('id, cityId, journeys_missions (challengeId)')
+      .eq('userId', user.id);
+    if (!error && data) {
+      // Mapear: { [challengeId]: journeyId }
+      const accepted = {};
+      data.forEach(journey => {
+        (journey.journeys_missions || []).forEach(jm => {
+          accepted[jm.challengeId] = journey.id;
+        });
+      });
+      setUserEventMissions(accepted);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserEventMissions();
+  }, [user, showEventsModal]);
+
+  const handleAcceptEventMission = async (mission) => {
+    try {
+      if (!user || !user.id) {
+        Alert.alert('Error', 'Debes iniciar sesión para aceptar una misión.');
+        return;
+      }
+      let cityId = mission.cityId;
+      if (!cityId) {
+        Alert.alert('Error', 'La misión de evento no tiene una ciudad asociada.');
+        return;
+      }
+      // Buscar journey existente para la ciudad
+      let journeyId = null;
+      const { data: journeys, error: journeyError } = await supabase
+        .from('journeys')
+        .select('id')
+        .eq('userId', user.id)
+        .eq('cityId', cityId);
+      if (journeyError) {
+        Alert.alert('Error', 'No se pudo comprobar tus viajes.');
+        return;
+      }
+      if (journeys && journeys.length > 0) {
+        journeyId = journeys[0].id;
+      } else {
+        // Crear un nuevo journey para la ciudad
+        const { data: newJourney, error: newJourneyError } = await supabase
+          .from('journeys')
+          .insert({
+            userId: user.id,
+            cityId: cityId,
+            description: `Viaje a evento`,
+            created_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+        if (newJourneyError || !newJourney) {
+          Alert.alert('Error', 'No se pudo crear un viaje para la misión de evento.');
+          return;
+        }
+        journeyId = newJourney.id;
+      }
+      // Insertar la misión de evento en journeys_missions (permitir duplicados para pruebas)
+      const { error: insertError } = await supabase
+        .from('journeys_missions')
+        .insert({
+          journeyId: journeyId,
+          challengeId: mission.id,
+          completed: false,
+          created_at: new Date().toISOString(),
+        });
+      if (insertError) {
+        Alert.alert('Error', 'No se pudo añadir la misión de evento a tu viaje.');
+        return;
+      }
+      Alert.alert('¡Listo!', 'La misión de evento ha sido añadida a tus misiones.');
+      setShowEventsModal(false);
+      navigation.navigate('Missions', {
+        journeyId: journeyId,
+        challenges: []
+      });
+    } catch (error) {
+      console.error('Error al aceptar misión de evento:', error);
+      Alert.alert('Error', 'No se pudo añadir la misión de evento.');
+    }
+  };
+
+  const [showEventsModal, setShowEventsModal] = useState(false);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Barra superior con botón para expandir/colapsar */}
@@ -1088,6 +1223,95 @@ const MapScreen = () => {
             {currentStep || "Cargando globo terrestre..."}
           </Text>
         </View>
+      )}
+
+      {/* Botón flotante para ver eventos */}
+      <TouchableOpacity
+        style={styles.eventButton}
+        onPress={() => setShowEventsModal(true)}
+      >
+        <Ionicons name="star" size={24} color="#FFF" />
+        <Text style={styles.eventButtonText}>Ver Eventos</Text>
+      </TouchableOpacity>
+
+      {/* Modal para mostrar las misiones de evento */}
+      {showEventsModal && (
+        <Modal animationType="slide" onRequestClose={() => setShowEventsModal(false)}>
+          <View style={styles.eventsModalContainer}>
+            <Text style={styles.sectionTitle}>Misiones de Evento</Text>
+            <ScrollView>
+              {eventMissions.map(mission => {
+                // Calcular días restantes usando start_date y end_date
+                let diasRestantes = null;
+                let rangoFechas = null;
+                let haComenzado = true;
+                if (mission.start_date && mission.end_date) {
+                  const fechaInicio = new Date(mission.start_date);
+                  const fechaFin = new Date(mission.end_date);
+                  const hoy = new Date();
+                  hoy.setHours(0,0,0,0);
+                  const diff = Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24));
+                  diasRestantes = diff >= 0 ? diff : 0;
+                  rangoFechas = `Del ${fechaInicio.toLocaleDateString()} al ${fechaFin.toLocaleDateString()}`;
+                  haComenzado = hoy >= fechaInicio;
+                }
+                const ciudad = mission.cityId && eventCities[mission.cityId] ? eventCities[mission.cityId] : 'Ciudad desconocida';
+                return (
+                  <View key={mission.id} style={styles.eventCard}>
+                    <Text style={styles.eventTitle}>{mission.title}</Text>
+                    <Text style={{ color: '#1D3557', fontWeight: 'bold', marginBottom: 4 }}>Ciudad: {ciudad}</Text>
+                    {rangoFechas && (
+                      <Text style={{ color: '#005F9E', fontWeight: 'bold', marginBottom: 4 }}>{rangoFechas}</Text>
+                    )}
+                    <Text>{mission.description}</Text>
+                    {mission.start_date && mission.end_date ? (
+                      <View style={{
+                        backgroundColor: diasRestantes <= 3 ? '#FF6B6B' : '#FFD700',
+                        borderRadius: 8,
+                        padding: 6,
+                        marginVertical: 6,
+                        alignSelf: 'flex-start'
+                      }}>
+                        <Text style={{
+                          color: '#1D3557',
+                          fontWeight: 'bold'
+                        }}>
+                          {diasRestantes > 0
+                            ? `¡Tiempo limitado! Quedan ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`
+                            : 'Expirada'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={{
+                        backgroundColor: '#70C1B3',
+                        borderRadius: 8,
+                        padding: 6,
+                        marginVertical: 6,
+                        alignSelf: 'flex-start'
+                      }}>
+                        <Text style={{ color: '#1D3557', fontWeight: 'bold' }}>Sin límite de tiempo</Text>
+                      </View>
+                    )}
+                    <Button
+                      mode="contained"
+                      onPress={() => handleAcceptEventMission(mission)}
+                      style={{ marginTop: 8 }}
+                      disabled={!haComenzado}
+                    >
+                      {haComenzado ? 'Quiero esta misión' : 'Disponible próximamente'}
+                    </Button>
+                    {!haComenzado && (
+                      <Text style={{ color: '#FF6B6B', marginTop: 4, fontWeight: 'bold' }}>
+                        Esta misión estará disponible a partir de la fecha de inicio
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <Button onPress={() => setShowEventsModal(false)} style={{ marginTop: 16 }}>Cerrar</Button>
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
   );
@@ -1908,6 +2132,46 @@ const styles = StyleSheet.create({
   },
   logicalOrderTextActive: {
     color: '#FFFFFF',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 12,
+  },
+  eventCard: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  eventTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  eventButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#FFD700',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 30,
+    elevation: 5,
+    zIndex: 100,
+  },
+  eventButtonText: {
+    color: '#26547C',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  eventsModalContainer: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    padding: 24,
+    paddingTop: 48,
   },
 });
 

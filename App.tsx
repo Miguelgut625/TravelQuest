@@ -71,10 +71,23 @@ const AppContent = () => {
 
         if (session?.user) {
           console.log('Usuario autenticado encontrado:', session.user.email);
+          
+          // Obtener datos adicionales del usuario
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('username, role')
+            .eq('id', session.user.id)
+            .single();
+
+          if (userError) {
+            console.error('Error obteniendo datos del usuario:', userError);
+          }
+
           store.dispatch(setUser({
             email: session.user.email || '',
             id: session.user.id,
-            username: session.user.user_metadata?.username
+            username: userData?.username || session.user.user_metadata?.username,
+            role: userData?.role || 'user'
           }));
           store.dispatch(setAuthState('authenticated'));
         } else {

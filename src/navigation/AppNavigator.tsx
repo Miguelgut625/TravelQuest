@@ -29,12 +29,17 @@ import { linking } from './linking';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import GroupChatScreen from '../screens/main/GroupChatScreen';
 import FriendProfileScreen from '../screens/main/FriendProfileScreen';
+import CreateMissionScreen from '../screens/admin/CreateMissionScreen';
 
 const Stack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const MainFlow = () => {
+  const { user } = useSelector((state: RootState) => state.auth);
+  const isAdmin = user?.role === 'admin';
+  console.log('Estado del usuario:', user);
+
   return (
     <Stack.Navigator>
       <Stack.Screen name="TabNavigator" component={TabNavigator} options={{ headerShown: false }} />
@@ -46,11 +51,25 @@ const MainFlow = () => {
       <Stack.Screen name="Groups" component={GroupsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="GroupChat" component={GroupChatScreen} options={{ headerShown: false }} />
       <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
+      {isAdmin && (
+        <Stack.Screen 
+          name="CreateMission" 
+          component={CreateMissionScreen} 
+          options={{ 
+            headerShown: false,
+            title: 'Crear Misión'
+          }} 
+        />
+      )}
     </Stack.Navigator>
   );
 };
 
 const TabNavigator = () => {
+  const { user } = useSelector((state: RootState) => state.auth);
+  const isAdmin = user?.role === 'admin';
+  console.log('Estado del usuario en TabNavigator:', user);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -89,6 +108,22 @@ const TabNavigator = () => {
       <Tab.Screen name="Missions" component={MissionsScreen} options={{ title: 'Misiones' }} />
       <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} options={{ title: 'Diario' }} />
       <Tab.Screen name="Conversations" component={ConversationsScreen} options={{ title: 'Mensajes' }} />
+      {isAdmin && (
+        <Tab.Screen 
+          name="CreateMission" 
+          component={CreateMissionScreen} 
+          options={{ 
+            title: 'Crear Misión',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Ionicons 
+                name={focused ? 'add-circle' : 'add-circle-outline'} 
+                size={26} 
+                color={color} 
+              />
+            ),
+          }} 
+        />
+      )}
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Perfil' }} />
     </Tab.Navigator>
   );

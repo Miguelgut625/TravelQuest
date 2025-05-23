@@ -66,7 +66,7 @@ const LoginScreen = () => {
 
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('username')
+        .select('username, role')
         .eq('id', data.user.id)
         .single();
 
@@ -76,12 +76,14 @@ const LoginScreen = () => {
 
       console.log('Datos del usuario obtenidos de la tabla users:', userData);
       console.log('Username específico:', userData?.username);
+      console.log('Rol del usuario:', userData?.role);
 
       // Actualizar el estado con los datos del usuario
       dispatch(setUser({
         email: data.user.email || '',
         id: data.user.id,
-        username: userData?.username || 'Usuario'
+        username: userData?.username || 'Usuario',
+        role: userData?.role || 'user'
       }));
       dispatch(setAuthState('authenticated'));
 
