@@ -1,4 +1,5 @@
 const { supabase } = require('../../services/supabase.server.js');
+const NotificationService = require('../services/NotificationService');
 
 // Obtener todos los amigos de un usuario
 const getFriends = async (req, res) => {
@@ -15,9 +16,10 @@ const getFriends = async (req, res) => {
     // Obtener detalles de cada amigo
     const friendsDetails = await Promise.all(
       friendData.map(async (friend) => {
+        // Obtener datos del usuario
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('username, points')
+          .select('username, points, profile_pic_url')
           .eq('id', friend.user2Id)
           .single();
 
@@ -26,6 +28,7 @@ const getFriends = async (req, res) => {
           return null;
         }
 
+        // Obtener el rango del usuario desde la tabla de leaderboard
         const { data: rankData, error: rankError } = await supabase
           .from('leaderboard')
           .select('rank')
@@ -36,6 +39,7 @@ const getFriends = async (req, res) => {
           user2Id: friend.user2Id,
           username: userData.username,
           points: userData.points,
+          avatarUrl: userData.profile_pic_url,
           rankIndex: rankError ? undefined : rankData.rank
         };
       })
@@ -160,7 +164,13 @@ const sendFriendRequest = async (req, res) => {
       .single();
 
     if (!senderError && senderData) {
-      // Aquí se podría implementar la lógica de notificación
+      // Enviar notificación al receptor
+      const notificationService = NotificationService.getInstance();
+      await notificationService.notifyFriendRequest(
+        receiverId,
+        senderId,
+        senderData.username
+      );
     }
 
     res.status(201).json({ success: true, data });
@@ -210,6 +220,23 @@ const acceptFriendRequest = async (req, res) => {
       });
 
     if (friendError2) throw friendError2;
+
+    // Obtener el nombre del usuario que aceptó la solicitud
+    const { data: receiverData, error: receiverError } = await supabase
+      .from('users')
+      .select('username')
+      .eq('id', receiverId)
+      .single();
+
+    if (!receiverError && receiverData) {
+      // Enviar notificación al remitente de la solicitud
+      const notificationService = NotificationService.getInstance();
+      await notificationService.notifyFriendRequestAccepted(
+        senderId,
+        receiverId,
+        receiverData.username
+      );
+    }
 
     res.status(200).json({ success: true });
   } catch (error) {
