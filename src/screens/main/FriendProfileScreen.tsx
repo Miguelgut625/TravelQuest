@@ -6,7 +6,7 @@ import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserJournalEntries, CityJournalEntry } from '../../services/journalService';
-import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends, getFriends } from '../../services/friendService';
+import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends, getFriends, checkFriendshipStatus, getUserRank, getSentPendingRequests, checkPendingRequests, getUserProfileData, getUserVisitedCities } from '../../services/friendService';
 import { getRankTitle, getRankTitleStyle } from '../../utils/rankUtils';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -168,7 +168,7 @@ const FriendProfileScreen = () => {
         console.log('Current user:', user?.id);
         console.log('Friend ID:', friendId);
         setFriendshipChecked(false);
-        checkFriendshipStatus();
+        checkFriendshipStatusLocal();
         checkPendingRequest();
         fetchMutualFriends();
         fetchFriendsList();
@@ -176,15 +176,9 @@ const FriendProfileScreen = () => {
         // Si no viene el rankIndex por navegación, lo calculamos consultando el leaderboard
         const fetchRankIndex = async () => {
             if (rankIndex === undefined && friendId) {
-                const { data, error } = await supabase
-                    .from('users')
-                    .select('id')
-                    .order('points', { ascending: false });
-                if (!error && data) {
-                    const index = data.findIndex((user: any) => user.id === friendId);
-                    if (index !== -1) {
-                        setLocalRankIndex(index);
-                    }
+                const rank = await getUserRank(friendId);
+                if (rank !== null) {
+                    setLocalRankIndex(rank);
                 }
             } else if (rankIndex !== undefined) {
                 setLocalRankIndex(rankIndex);
@@ -206,22 +200,12 @@ const FriendProfileScreen = () => {
             setLoading(true);
             setError(null);
 
-            // Obtener los puntos, nivel, XP y privacidad del amigo
-            const { data: friendData, error: friendError } = await supabase
-                .from('users')
-                .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title, friends_visibility, comments_visibility')
-                .eq('id', friendId)
-                .single();
+            // Obtener los datos del perfil del amigo
+            const friendData = await getUserProfileData(friendId, user.id);
+            if (!friendData) throw new Error('No se pudieron obtener los datos del perfil');
 
-            if (friendError) throw friendError;
-
-            // Comprobar privacidad del perfil
-            const canViewProfile =
-                friendData.profile_visibility === 'public' ||
-                (friendData.profile_visibility === 'friends' && isFriend) ||
-                (friendData.profile_visibility === 'private' && user?.id === friendId);
-
-            if (!canViewProfile) {
+            // Verificar permisos de acceso
+            if (!friendData.permissions.canViewProfile) {
                 setError('No tienes permiso para ver este perfil');
                 setLoading(false);
                 return;
@@ -237,13 +221,8 @@ const FriendProfileScreen = () => {
             setFriendsVisibility(friendData.friends_visibility || 'public');
             setCommentsVisibility(friendData.comments_visibility || 'public');
 
-            // Obtener las ciudades visitadas del amigo desde journeys
-            const { data: journeys, error: journeysError } = await supabase
-                .from('journeys')
-                .select('cityId')
-                .eq('userId', friendId);
-            if (journeysError) throw journeysError;
-            const uniqueCities = new Set((journeys || []).map((j: any) => j.cityId)).size;
+            // Obtener las ciudades visitadas del amigo
+            const visitedCities = await getUserVisitedCities(friendId);
 
             // Obtener las entradas del diario del amigo
             const entries = await getUserJournalEntries(friendId);
@@ -259,7 +238,7 @@ const FriendProfileScreen = () => {
             setStats({
                 totalPoints: friendData.points || 0,
                 completedMissions,
-                visitedCities: uniqueCities
+                visitedCities
             });
 
         } catch (error) {
@@ -270,7 +249,7 @@ const FriendProfileScreen = () => {
         }
     };
 
-    const checkFriendshipStatus = async () => {
+    const checkFriendshipStatusLocal = async () => {
         if (!user || !friendId) {
             console.log('checkFriendshipStatus - Missing user or friendId');
             setFriendshipChecked(true);
@@ -278,23 +257,9 @@ const FriendProfileScreen = () => {
         }
         try {
             console.log('Checking friendship between:', user.id, 'and', friendId);
-            // Verificar si existe una relación de amistad en cualquier dirección
-            const { data: friendshipData, error: friendshipError } = await supabase
-                .from('friends')
-                .select('created_at')
-                .or(`and(user1Id.eq.${user.id},user2Id.eq.${friendId}),and(user1Id.eq.${friendId},user2Id.eq.${user.id})`);
-
-            console.log('Friendship check result:', { friendshipData, friendshipError });
-
-            if (!friendshipError && friendshipData && friendshipData.length > 0) {
-                console.log('Setting isFriend to true');
-                setIsFriend(true);
-                setFriendshipDate(friendshipData[0].created_at);
-            } else {
-                console.log('Setting isFriend to false');
-                setIsFriend(false);
-                setFriendshipDate(null);
-            }
+            const result = await checkFriendshipStatus(user.id, friendId);
+            setIsFriend(result.isFriend);
+            setFriendshipDate(result.friendshipDate);
         } catch (e) {
             console.error('Error checking friendship status:', e);
             setIsFriend(false);
@@ -308,30 +273,8 @@ const FriendProfileScreen = () => {
         if (!user || !friendId) return;
         try {
             console.log('Checking pending requests for:', { userId: user.id, friendId });
-
-            // Verificar solicitudes enviadas
-            const { data: sentRequest, error: sentError } = await supabase
-                .from('friendship_invitations')
-                .select('id')
-                .eq('senderId', user.id)
-                .eq('receiverId', friendId)
-                .eq('status', 'Pending')
-                .maybeSingle();
-
-            // Verificar solicitudes recibidas
-            const { data: receivedRequest, error: receivedError } = await supabase
-                .from('friendship_invitations')
-                .select('id')
-                .eq('senderId', friendId)
-                .eq('receiverId', user.id)
-                .eq('status', 'Pending')
-                .maybeSingle();
-
-            console.log('Request check results:', { sentRequest, receivedRequest });
-
-            const hasPending = (!sentError && sentRequest) || (!receivedError && receivedRequest);
-            console.log('Setting hasPendingRequest to:', hasPending);
-            setHasPendingRequest(hasPending);
+            const { hasPendingRequest } = await checkPendingRequests(user.id, friendId);
+            setHasPendingRequest(hasPendingRequest);
         } catch (error) {
             console.error('Error checking pending request:', error);
             setHasPendingRequest(false);
@@ -462,17 +405,8 @@ const FriendProfileScreen = () => {
         try {
             const friends = await getFriends(user.id);
             setMyFriends(friends);
-            // Obtener solicitudes pendientes enviadas
-            const { data: sentRequests, error: sentError } = await supabase
-                .from('friendship_invitations')
-                .select('receiverId')
-                .eq('senderId', user.id)
-                .eq('status', 'Pending');
-            if (!sentError && sentRequests) {
-                setMyPendingRequests(sentRequests.map((req: any) => req.receiverId));
-            } else {
-                setMyPendingRequests([]);
-            }
+            const pendingRequests = await getSentPendingRequests(user.id);
+            setMyPendingRequests(pendingRequests);
         } catch (e) {
             setMyFriends([]);
             setMyPendingRequests([]);

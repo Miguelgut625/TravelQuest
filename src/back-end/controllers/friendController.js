@@ -381,6 +381,206 @@ const getMutualFriends = async (req, res) => {
   }
 };
 
+// Verificar estado de amistad entre dos usuarios
+const checkFriendshipStatus = async (req, res) => {
+  const { userId1, userId2 } = req.params;
+
+  try {
+    const { data: friendshipData, error: friendshipError } = await supabase
+      .from('friends')
+      .select('created_at')
+      .or(`and(user1Id.eq.${userId1},user2Id.eq.${userId2}),and(user1Id.eq.${userId2},user2Id.eq.${userId1})`);
+
+    if (friendshipError) throw friendshipError;
+
+    const isFriend = friendshipData && friendshipData.length > 0;
+    const friendshipDate = isFriend ? friendshipData[0].created_at : null;
+
+    res.status(200).json({ isFriend, friendshipDate });
+  } catch (error) {
+    console.error('Error al verificar estado de amistad:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Obtener el rango de un usuario
+const getUserRank = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .order('points', { ascending: false });
+
+    if (error) throw error;
+
+    const index = data.findIndex(user => user.id === userId);
+    res.status(200).json(index !== -1 ? index : null);
+  } catch (error) {
+    console.error('Error al obtener el rango del usuario:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Obtener solicitudes pendientes enviadas
+const getSentPendingRequests = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const { data: sentRequests, error: sentError } = await supabase
+      .from('friendship_invitations')
+      .select('receiverId')
+      .eq('senderId', userId)
+      .eq('status', 'Pending');
+
+    if (sentError) throw sentError;
+
+    res.status(200).json(sentRequests.map(req => req.receiverId));
+  } catch (error) {
+    console.error('Error al obtener solicitudes enviadas:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Verificar solicitudes pendientes entre dos usuarios
+const checkPendingRequests = async (req, res) => {
+  const { userId1, userId2 } = req.params;
+
+  try {
+    // Verificar solicitudes enviadas
+    const { data: sentRequest, error: sentError } = await supabase
+      .from('friendship_invitations')
+      .select('id')
+      .eq('senderId', userId1)
+      .eq('receiverId', userId2)
+      .eq('status', 'Pending')
+      .maybeSingle();
+
+    if (sentError) throw sentError;
+
+    // Verificar solicitudes recibidas
+    const { data: receivedRequest, error: receivedError } = await supabase
+      .from('friendship_invitations')
+      .select('id')
+      .eq('senderId', userId2)
+      .eq('receiverId', userId1)
+      .eq('status', 'Pending')
+      .maybeSingle();
+
+    if (receivedError) throw receivedError;
+
+    const hasPendingRequest = !!(sentRequest || receivedRequest);
+
+    res.status(200).json({ hasPendingRequest });
+  } catch (error) {
+    console.error('Error al verificar solicitudes pendientes:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Verificar permisos de acceso a un perfil
+const checkProfileAccess = async (viewerId, profileId) => {
+  try {
+    // Obtener configuración de privacidad del perfil
+    const { data: profileData, error: profileError } = await supabase
+      .from('users')
+      .select('profile_visibility, friends_visibility, comments_visibility')
+      .eq('id', profileId)
+      .single();
+
+    if (profileError) throw profileError;
+
+    // Si el usuario es el dueño del perfil, tiene acceso total
+    if (viewerId === profileId) {
+      return {
+        canViewProfile: true,
+        canViewFriends: true,
+        canComment: true
+      };
+    }
+
+    // Verificar si son amigos
+    const { data: friendshipData, error: friendshipError } = await supabase
+      .from('friends')
+      .select('id')
+      .or(`and(user1Id.eq.${viewerId},user2Id.eq.${profileId}),and(user1Id.eq.${profileId},user2Id.eq.${viewerId})`)
+      .maybeSingle();
+
+    const isFriend = !!friendshipData;
+
+    // Determinar permisos basados en la configuración de privacidad
+    return {
+      canViewProfile: 
+        profileData.profile_visibility === 'public' ||
+        (profileData.profile_visibility === 'friends' && isFriend),
+      canViewFriends:
+        profileData.friends_visibility === 'public' ||
+        (profileData.friends_visibility === 'friends' && isFriend),
+      canComment:
+        profileData.comments_visibility === 'public' ||
+        (profileData.comments_visibility === 'friends' && isFriend)
+    };
+  } catch (error) {
+    console.error('Error al verificar permisos de acceso:', error);
+    return {
+      canViewProfile: false,
+      canViewFriends: false,
+      canComment: false
+    };
+  }
+};
+
+// Obtener datos del perfil de un usuario
+const getUserProfileData = async (req, res) => {
+  const { userId } = req.params;
+  const viewerId = req.query.viewerId; // ID del usuario que está viendo el perfil
+
+  try {
+    // Verificar permisos de acceso
+    const access = await checkProfileAccess(viewerId, userId);
+    if (!access.canViewProfile) {
+      return res.status(403).json({ error: 'No tienes permiso para ver este perfil' });
+    }
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('points, level, xp, xp_next, username, profile_pic_url, profile_visibility, custom_title, friends_visibility, comments_visibility')
+      .eq('id', userId)
+      .single();
+
+    if (userError) throw userError;
+
+    res.status(200).json({
+      ...userData,
+      permissions: access
+    });
+  } catch (error) {
+    console.error('Error al obtener datos del perfil:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Obtener ciudades visitadas por un usuario
+const getUserVisitedCities = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const { data: journeys, error: journeysError } = await supabase
+      .from('journeys')
+      .select('cityId')
+      .eq('userId', userId);
+
+    if (journeysError) throw journeysError;
+
+    const uniqueCities = new Set(journeys.map(j => j.cityId)).size;
+    res.status(200).json({ visitedCities: uniqueCities });
+  } catch (error) {
+    console.error('Error al obtener ciudades visitadas:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getFriends,
   getFriendRequests,
@@ -389,5 +589,12 @@ module.exports = {
   rejectFriendRequest,
   deleteFriendship,
   cancelFriendRequest,
-  getMutualFriends
+  getMutualFriends,
+  checkFriendshipStatus,
+  getUserRank,
+  getSentPendingRequests,
+  checkPendingRequests,
+  getUserProfileData,
+  getUserVisitedCities,
+  checkProfileAccess
 }; 

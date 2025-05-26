@@ -136,4 +136,35 @@ export const getJournalEntryById = async (entryId: string, currentUserId?: strin
     console.error('Error al obtener entrada del diario:', error);
     throw error;
   }
+};
+
+/**
+ * Obtiene la configuración de visibilidad de comentarios de un usuario
+ * @param userId ID del usuario
+ * @returns La configuración de visibilidad de comentarios
+ */
+export const getUserCommentsVisibility = async (userId: string): Promise<'public' | 'friends' | 'private'> => {
+  try {
+    const response = await axios.get(`${API_URL}/journal/user/${userId}/comments-visibility`);
+    return response.data.comments_visibility;
+  } catch (error) {
+    console.error('Error al obtener privacidad de comentarios:', error);
+    return 'public';
+  }
+};
+
+/**
+ * Verifica si dos usuarios son amigos
+ * @param userId1 ID del primer usuario
+ * @param userId2 ID del segundo usuario
+ * @returns true si son amigos, false en caso contrario
+ */
+export const checkFriendship = async (userId1: string, userId2: string): Promise<boolean> => {
+  try {
+    const response = await axios.get(`${API_URL}/journal/friendship/${userId1}/${userId2}`);
+    return response.data.areFriends;
+  } catch (error) {
+    console.error('Error al verificar amistad:', error);
+    return false;
+  }
 }; 

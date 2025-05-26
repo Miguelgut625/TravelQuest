@@ -230,6 +230,65 @@ const updateJournalWithAIDescription = async (req, res) => {
   }
 };
 
+// Obtener la configuración de visibilidad de comentarios de un usuario
+const getUserCommentsVisibility = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('comments_visibility')
+      .eq('id', userId)
+      .single();
+
+    if (error) throw error;
+
+    res.json({ comments_visibility: data?.comments_visibility || 'public' });
+  } catch (error) {
+    console.error('Error al obtener privacidad de comentarios:', error);
+    res.status(500).json({ error: 'Error al obtener la configuración de privacidad' });
+  }
+};
+
+// Verificar si dos usuarios son amigos
+const checkFriendship = async (req, res) => {
+  try {
+    const { userId1, userId2 } = req.params;
+
+    // Verificar si userId1 es user1Id
+    const { data: user1Data, error: user1Error } = await supabase
+      .from('friends')
+      .select('id')
+      .eq('user1Id', userId1)
+      .eq('user2Id', userId2)
+      .single();
+
+    if (user1Error && user1Error.code !== 'PGRST116') {
+      throw user1Error;
+    }
+
+    // Verificar si userId1 es user2Id
+    const { data: user2Data, error: user2Error } = await supabase
+      .from('friends')
+      .select('id')
+      .eq('user1Id', userId2)
+      .eq('user2Id', userId1)
+      .single();
+
+    if (user2Error && user2Error.code !== 'PGRST116') {
+      throw user2Error;
+    }
+
+    // Si cualquiera de las dos consultas devuelve datos, son amigos
+    const areFriends = !!(user1Data || user2Data);
+
+    res.json({ areFriends });
+  } catch (error) {
+    console.error('Error al verificar amistad:', error);
+    res.status(500).json({ error: 'Error al verificar la amistad' });
+  }
+};
+
 // Funciones auxiliares
 const checkJournalTables = async () => {
   try {
@@ -318,5 +377,7 @@ module.exports = {
   createJournalEntry,
   getCommentsByEntryId,
   addCommentToEntry,
-  updateJournalWithAIDescription
+  updateJournalWithAIDescription,
+  getUserCommentsVisibility,
+  checkFriendship
 }; 

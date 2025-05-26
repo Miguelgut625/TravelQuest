@@ -9,7 +9,9 @@ import {
   addPhotoToEntry, 
   getJournalEntryById, 
   getCommentsByEntryId, 
-  addCommentToEntryTable 
+  addCommentToEntryTable,
+  getUserCommentsVisibility,
+  checkFriendship
 } from '../../services/journalService';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
@@ -47,16 +49,8 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   useEffect(() => {
     const fetchAuthorCommentsVisibility = async (authorId: string) => {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('comments_visibility')
-          .eq('id', authorId)
-          .single();
-        if (!error && data) {
-          setCommentsVisibility(data.comments_visibility || 'public');
-        } else {
-          setCommentsVisibility('public');
-        }
+        const visibility = await getUserCommentsVisibility(authorId);
+        setCommentsVisibility(visibility);
       } catch (error) {
         setCommentsVisibility('public');
         console.error('Error al obtener privacidad de comentarios:', error);
@@ -68,7 +62,7 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   }, [entry]);
 
   useEffect(() => {
-    const checkFriendship = async () => {
+    const checkFriendshipStatus = async () => {
       setCheckingFriendship(true);
       if (!user || !entry?.user_id || user.id === entry.user_id) {
         setIsFriend(false);
@@ -76,38 +70,8 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
         return;
       }
       try {
-        // Primero verificar si el usuario actual es user1Id
-        const { data: user1Data, error: user1Error } = await supabase
-          .from('friends')
-          .select('id')
-          .eq('user1Id', user.id)
-          .eq('user2Id', entry.user_id)
-          .single();
-
-        if (user1Error && user1Error.code !== 'PGRST116') {
-          console.error('Error al verificar amistad (user1):', user1Error);
-        }
-
-        // Luego verificar si el usuario actual es user2Id
-        const { data: user2Data, error: user2Error } = await supabase
-          .from('friends')
-          .select('id')
-          .eq('user1Id', entry.user_id)
-          .eq('user2Id', user.id)
-          .single();
-
-        if (user2Error && user2Error.code !== 'PGRST116') {
-          console.error('Error al verificar amistad (user2):', user2Error);
-        }
-
-        // Si cualquiera de las dos consultas devuelve datos, son amigos
-        setIsFriend(!!user1Data || !!user2Data);
-        
-        console.log('Estado de amistad:', {
-          user1Data,
-          user2Data,
-          isFriend: !!user1Data || !!user2Data
-        });
+        const areFriends = await checkFriendship(user.id, entry.user_id);
+        setIsFriend(areFriends);
       } catch (error) {
         console.error('Error al verificar amistad:', error);
         setIsFriend(false);
@@ -115,7 +79,7 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
         setCheckingFriendship(false);
       }
     };
-    checkFriendship();
+    checkFriendshipStatus();
   }, [user, entry]);
 
   useEffect(() => {

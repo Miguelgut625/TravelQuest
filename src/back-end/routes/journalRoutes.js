@@ -20,4 +20,10 @@ router.post('/entry/:entryId/comments', journalController.addCommentToEntry);
 // Actualizar una entrada con descripción de IA
 router.put('/entry/ai-description', journalController.updateJournalWithAIDescription);
 
+// Obtener la configuración de visibilidad de comentarios de un usuario
+router.get('/user/:userId/comments-visibility', journalController.getUserCommentsVisibility);
+
+// Verificar si dos usuarios son amigos
+router.get('/friendship/:userId1/:userId2', journalController.checkFriendship);
+
 module.exports = router; 
