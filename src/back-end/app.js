@@ -5,10 +5,11 @@ const challengeRoutes = require('./routes/challengesRoutes.js');
 const friendRoutes = require('./routes/friendRoutes.js');
 const badgeRoutes = require('./routes/badgeRoutes.js');
 const leaderboardRoutes = require('./routes/leaderboardRoutes.js');
+const journalRoutes = require('./routes/journalRoutes.js');
 const router = Router();
 
 // Rutas
-//router.use('/journal', journalRoutes);
+router.use('/journal', journalRoutes);
 router.use('/challenges', challengeRoutes);
 router.use('/cities', cityRoutes);
 router.use('/users', authRoutes);

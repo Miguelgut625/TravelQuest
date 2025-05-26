@@ -58,6 +58,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createJournalEntry = exports.getMissionJournalEntries = exports.getUserJournalEntries = exports.checkJournalTables = exports.addPhotoToEntry = exports.addCommentToEntry = exports.getJournalEntryById = exports.getCommentsByEntryId = exports.addCommentToEntryTable = void 0;
 var supabase_1 = require("./supabase");
+var API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 /**
  * Verifica si existe la tabla journal_entries o journey_diary en la base de datos
  * @returns objeto con la información de qué tablas existen
