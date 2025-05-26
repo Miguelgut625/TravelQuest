@@ -260,7 +260,7 @@ const DateRangePickerMobile: React.FC<{
 
               <View style={styles.durationContainer}>
                 <Text style={styles.durationText}>
-                  Duración: {calculateDuration(startDate, endDate)} días    
+                  Duración: {calculateDuration(startDate, endDate)} días
                 </Text>
                 <TouchableOpacity
                   style={styles.calendarCloseButton}
@@ -924,6 +924,11 @@ const MapScreen = () => {
         Alert.alert('Error', 'Debes iniciar sesión para aceptar una misión.');
         return;
       }
+      // Verificar si ya la aceptó
+      if (userEventMissions && userEventMissions[mission.id]) {
+        Alert.alert('Ya aceptada', 'Ya has aceptado esta misión de evento anteriormente.');
+        return;
+      }
       let cityId = mission.cityId;
       if (!cityId) {
         Alert.alert('Error', 'La misión de evento no tiene una ciudad asociada.');
@@ -968,6 +973,9 @@ const MapScreen = () => {
           challengeId: mission.id,
           completed: false,
           created_at: new Date().toISOString(),
+          // Añadimos las fechas del challenge para que la misión tenga el rango correcto
+          start_date: mission.start_date || null,
+          end_date: mission.end_date || null,
         });
       if (insertError) {
         Alert.alert('Error', 'No se pudo añadir la misión de evento a tu viaje.');
@@ -1020,7 +1028,7 @@ const MapScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="¿Qué ciudad quieres visitar?"
-            placeholderTextColor= '#26547C'
+            placeholderTextColor='#26547C'
             value={searchCity}
             onChangeText={handleCitySearch}
           />
@@ -1097,11 +1105,11 @@ const MapScreen = () => {
               ]}
               onPress={() => setUseLogicalOrder(!useLogicalOrder)}
             >
-              <Ionicons 
-                name={useLogicalOrder ? "checkmark-circle" : "checkmark-circle-outline"} 
-                size={20} 
-                color={useLogicalOrder ? "#FFFFFF" : "#005F9E"} 
-                style={{ marginRight: 8 }} 
+              <Ionicons
+                name={useLogicalOrder ? "checkmark-circle" : "checkmark-circle-outline"}
+                size={20}
+                color={useLogicalOrder ? "#FFFFFF" : "#005F9E"}
+                style={{ marginRight: 8 }}
               />
               <Text style={[
                 styles.logicalOrderText,
@@ -1240,74 +1248,90 @@ const MapScreen = () => {
           <View style={styles.eventsModalContainer}>
             <Text style={styles.sectionTitle}>Misiones de Evento</Text>
             <ScrollView>
-              {eventMissions.map(mission => {
-                // Calcular días restantes usando start_date y end_date
-                let diasRestantes = null;
-                let rangoFechas = null;
-                let haComenzado = true;
-                if (mission.start_date && mission.end_date) {
-                  const fechaInicio = new Date(mission.start_date);
-                  const fechaFin = new Date(mission.end_date);
-                  const hoy = new Date();
-                  hoy.setHours(0,0,0,0);
-                  const diff = Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24));
-                  diasRestantes = diff >= 0 ? diff : 0;
-                  rangoFechas = `Del ${fechaInicio.toLocaleDateString()} al ${fechaFin.toLocaleDateString()}`;
-                  haComenzado = hoy >= fechaInicio;
-                }
-                const ciudad = mission.cityId && eventCities[mission.cityId] ? eventCities[mission.cityId] : 'Ciudad desconocida';
-                return (
-                  <View key={mission.id} style={styles.eventCard}>
-                    <Text style={styles.eventTitle}>{mission.title}</Text>
-                    <Text style={{ color: '#1D3557', fontWeight: 'bold', marginBottom: 4 }}>Ciudad: {ciudad}</Text>
-                    {rangoFechas && (
-                      <Text style={{ color: '#005F9E', fontWeight: 'bold', marginBottom: 4 }}>{rangoFechas}</Text>
-                    )}
-                    <Text>{mission.description}</Text>
-                    {mission.start_date && mission.end_date ? (
-                      <View style={{
-                        backgroundColor: diasRestantes <= 3 ? '#FF6B6B' : '#FFD700',
-                        borderRadius: 8,
-                        padding: 6,
-                        marginVertical: 6,
-                        alignSelf: 'flex-start'
-                      }}>
-                        <Text style={{
-                          color: '#1D3557',
-                          fontWeight: 'bold'
+              {eventMissions
+                .filter(mission => {
+                  // Si tiene fecha de fin, solo mostrar si no ha expirado
+                  if (mission.start_date && mission.end_date) {
+                    const fechaFin = new Date(mission.end_date);
+                    const hoy = new Date();
+                    hoy.setHours(0, 0, 0, 0);
+                    return fechaFin >= hoy;
+                  }
+                  // Si no tiene fecha de fin, mostrar siempre
+                  return true;
+                })
+                .map(mission => {
+                  // Calcular días restantes usando start_date y end_date
+                  let diasRestantes = null;
+                  let rangoFechas = null;
+                  let haComenzado = true;
+                  if (mission.start_date && mission.end_date) {
+                    const fechaInicio = new Date(mission.start_date);
+                    const fechaFin = new Date(mission.end_date);
+                    const hoy = new Date();
+                    hoy.setHours(0, 0, 0, 0);
+                    const diff = Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24));
+                    diasRestantes = diff >= 0 ? diff : 0;
+                    rangoFechas = `Del ${fechaInicio.toLocaleDateString()} al ${fechaFin.toLocaleDateString()}`;
+                    haComenzado = hoy >= fechaInicio;
+                  }
+                  const ciudad = mission.cityId && eventCities[mission.cityId] ? eventCities[mission.cityId] : 'Ciudad desconocida';
+                  return (
+                    <View key={mission.id} style={styles.eventCard}>
+                      <Text style={styles.eventTitle}>{mission.title}</Text>
+                      <Text style={{ color: '#1D3557', fontWeight: 'bold', marginBottom: 4 }}>Ciudad: {ciudad}</Text>
+                      {rangoFechas && (
+                        <Text style={{ color: '#005F9E', fontWeight: 'bold', marginBottom: 4 }}>{rangoFechas}</Text>
+                      )}
+                      <Text>{mission.description}</Text>
+                      {mission.start_date && mission.end_date ? (
+                        <View style={{
+                          backgroundColor: diasRestantes <= 3 ? '#FF6B6B' : '#FFD700',
+                          borderRadius: 8,
+                          padding: 6,
+                          marginVertical: 6,
+                          alignSelf: 'flex-start'
                         }}>
-                          {diasRestantes > 0
-                            ? `¡Tiempo limitado! Quedan ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`
-                            : 'Expirada'}
+                          <Text style={{
+                            color: '#1D3557',
+                            fontWeight: 'bold'
+                          }}>
+                            {diasRestantes > 0
+                              ? `¡Tiempo limitado! Quedan ${diasRestantes} día${diasRestantes === 1 ? '' : 's'}`
+                              : 'Expirada'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{
+                          backgroundColor: '#70C1B3',
+                          borderRadius: 8,
+                          padding: 6,
+                          marginVertical: 6,
+                          alignSelf: 'flex-start'
+                        }}>
+                          <Text style={{ color: '#1D3557', fontWeight: 'bold' }}>Sin límite de tiempo</Text>
+                        </View>
+                      )}
+                      <Button
+                        mode="contained"
+                        onPress={() => handleAcceptEventMission(mission)}
+                        style={{ marginTop: 8 }}
+                        disabled={!haComenzado || (userEventMissions && userEventMissions[mission.id])}
+                      >
+                        {!haComenzado
+                          ? 'Disponible próximamente'
+                          : (userEventMissions && userEventMissions[mission.id])
+                            ? 'Ya aceptada'
+                            : 'Quiero esta misión'}
+                      </Button>
+                      {!haComenzado && (
+                        <Text style={{ color: '#FF6B6B', marginTop: 4, fontWeight: 'bold' }}>
+                          Esta misión estará disponible a partir de la fecha de inicio
                         </Text>
-                      </View>
-                    ) : (
-                      <View style={{
-                        backgroundColor: '#70C1B3',
-                        borderRadius: 8,
-                        padding: 6,
-                        marginVertical: 6,
-                        alignSelf: 'flex-start'
-                      }}>
-                        <Text style={{ color: '#1D3557', fontWeight: 'bold' }}>Sin límite de tiempo</Text>
-                      </View>
-                    )}
-                    <Button
-                      mode="contained"
-                      onPress={() => handleAcceptEventMission(mission)}
-                      style={{ marginTop: 8 }}
-                      disabled={!haComenzado}
-                    >
-                      {haComenzado ? 'Quiero esta misión' : 'Disponible próximamente'}
-                    </Button>
-                    {!haComenzado && (
-                      <Text style={{ color: '#FF6B6B', marginTop: 4, fontWeight: 'bold' }}>
-                        Esta misión estará disponible a partir de la fecha de inicio
-                      </Text>
-                    )}
-                  </View>
-                );
-              })}
+                      )}
+                    </View>
+                  );
+                })}
             </ScrollView>
             <Button onPress={() => setShowEventsModal(false)} style={{ marginTop: 16 }}>Cerrar</Button>
           </View>
@@ -1361,7 +1385,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
 
   const toggleFriendSelection = (friendId: string) => {
     if (isSharing) return; // No permitir cambios durante el proceso de compartir
-    
+
     setSelectedFriends(current => {
       if (current.includes(friendId)) {
         return current.filter(id => id !== friendId);
@@ -1373,7 +1397,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
 
   const selectAllFriends = () => {
     if (isSharing) return; // No permitir cambios durante el proceso de compartir
-    
+
     if (selectedFriends.length === friends.length) {
       // Si todos están seleccionados, deseleccionar todos
       setSelectedFriends([]);
@@ -1391,7 +1415,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
 
     // Prevenir múltiples envíos
     if (isSharing) return;
-    
+
     setIsSharing(true);
 
     const selectedFriendsObjects = friends.filter(friend =>
@@ -1462,7 +1486,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
               <Text style={styles.loadingText}>Cargando amigos...</Text>
             </View>
           ) : (
-            <ScrollView 
+            <ScrollView
               style={styles.friendsListContainer}
               contentContainerStyle={friends.length === 0 ? styles.emptyListContent : null}
             >
@@ -1508,11 +1532,11 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
             )}
 
             <View style={styles.buttonContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.cancelButton,
                   isSharing && styles.disabledButton
-                ]} 
+                ]}
                 onPress={onClose}
                 disabled={isSharing}
               >
@@ -1521,7 +1545,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
 
               <TouchableOpacity
                 style={[
-                  styles.shareButton, 
+                  styles.shareButton,
                   (selectedFriends.length === 0 || isSharing) && styles.disabledButton
                 ]}
                 onPress={handleShareWithSelected}
@@ -1530,7 +1554,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
                 {isSharing ? (
                   <View style={styles.sharingButtonContent}>
                     <ActivityIndicator size="small" color="#fff" />
-                    <Text style={[styles.shareButtonText, {marginLeft: 8}]}>Compartiendo...</Text>
+                    <Text style={[styles.shareButtonText, { marginLeft: 8 }]}>Compartiendo...</Text>
                   </View>
                 ) : (
                   <Text style={styles.shareButtonText}>
@@ -1852,7 +1876,7 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
     alignItems: 'center',
-  }, 
+  },
   calendarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1927,7 +1951,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 12,
-    width:300 
+    width: 300
   },
   durationText: {
     color: colors.primary,

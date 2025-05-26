@@ -73,8 +73,8 @@ const CreateMissionScreen = () => {
       } else {
         setEndDate(date);
       }
+      setShowCalendar(false);
     }
-    setShowCalendar(false);
   };
 
   const formatDate = (date: Date | null) => date ? format(date, 'dd/MM/yyyy') : 'No seleccionada';

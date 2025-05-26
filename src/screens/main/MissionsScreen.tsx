@@ -195,7 +195,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
         <View style={styles.cardFooter}>
           <Text style={styles.difficulty}>Dificultad: {mission.challenge.difficulty}</Text>
           <Text style={styles.points}>{mission.challenge.points} puntos</Text>
-          
+
           <View style={styles.actionsContainer}>
             {(!mission.completed && !isExpired && !isNotStarted) && (
               <>
@@ -220,7 +220,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
         onClose={() => setShowUploadModal(false)}
         onSuccess={handleUploadSuccess}
       />
-      
+
       <MissionHintModal
         visible={showHintModal}
         missionId={mission.id}
@@ -563,8 +563,24 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             expired: []
           };
         }
+        // Lógica de expiración unificada para normales y evento
+        let isExpired = false;
+        let endDate = mission.challenge.is_event && mission.challenge.end_date
+          ? mission.challenge.end_date
+          : mission.end_date;
+        if (!mission.completed && endDate) {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const end = new Date(endDate);
+          end.setHours(0, 0, 0, 0);
+          if (end < now) {
+            isExpired = true;
+          }
+        }
         if (mission.completed) {
           missionsByCity[mission.cityName].completed.push(mission);
+        } else if (isExpired) {
+          missionsByCity[mission.cityName].expired.push(mission);
         } else {
           missionsByCity[mission.cityName].pending.push(mission);
         }
@@ -728,13 +744,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                     user?.id || '',
                     aiDescription
                   );
-                  
+
                   if (updateResult.success) {
                     console.log('✅ Descripción actualizada exitosamente');
                     aiSuccess = true;
                   } else {
                     console.warn('⚠️ No se pudo actualizar la descripción:', updateResult.message);
-                    
+
                     // Intento de respaldo usando el método directo anterior
                     console.log('🔄 Intentando actualización directa como respaldo...');
                     const { error: updateError } = await supabase
@@ -742,7 +758,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       .update({ content: aiDescription })
                       .eq('missionid', missionId)
                       .eq('userid', user?.id || '');
-                    
+
                     if (updateError) {
                       console.error('❌ Error en actualización de respaldo:', updateError);
                     } else {
@@ -759,14 +775,14 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               } finally {
                 setGeneratingDescription(false);
                 dispatch(setRefreshJournal(true));
-                
+
                 // Actualizar el estado local de las misiones independientemente del éxito o fracaso de la IA
                 updateLocalMissionState(missionId, foundCityName, foundMissionIndex);
               }
             } catch (journalError) {
               console.error('❌ Error al crear entrada del diario:', journalError);
               // No lanzar error, continuar con el flujo
-              
+
               // Actualizar el estado local de las misiones incluso si hay error en el diario
               updateLocalMissionState(missionId, foundCityName, foundMissionIndex);
             }
@@ -782,10 +798,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             console.error('❌ Error al otorgar insignias:', badgeError);
             // No interrumpir el flujo por error en las insignias
           }
-          
+
           try {
             const expResult = await addExperienceToUser(user.id, foundMissionPoints);
-            
+
             // Actualizar información de misión completada con datos de experiencia
             setCompletedMissionInfo(prev => ({
               ...prev!,
@@ -828,30 +844,30 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   // Función para actualizar el estado local de las misiones
   const updateLocalMissionState = (missionId: string, cityName: string, missionIndex: number) => {
     if (missionIndex === -1 || !cityName) return;
-    
+
     setCityMissions(prevState => {
       // Crear copia profunda del estado anterior
       const newState = JSON.parse(JSON.stringify(prevState));
-      
-      if (newState[cityName] && 
-          newState[cityName].pending && 
-          missionIndex < newState[cityName].pending.length) {
-        
+
+      if (newState[cityName] &&
+        newState[cityName].pending &&
+        missionIndex < newState[cityName].pending.length) {
+
         // Obtener la misión de las pendientes
         const mission = newState[cityName].pending[missionIndex];
-        
+
         // Marcarla como completada
         mission.completed = true;
-        
+
         // Eliminar de pendientes
         newState[cityName].pending.splice(missionIndex, 1);
-        
+
         // Añadir a completadas
         newState[cityName].completed.push(mission);
-        
+
         console.log('🔄 Estado local de misión actualizado: Misión movida de pendiente a completada');
       }
-      
+
       return newState;
     });
   };
@@ -918,11 +934,18 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   // Modificar la función que ordena las misiones
   const sortMissions = (missions: JourneyMission[]) => {
     return missions.sort((a, b) => {
-      // Si hay order_index, usar ese para ordenar
-      if (a.order_index !== null && b.order_index !== null) {
+      // Si ambas tienen order_index, usar ese para ordenar
+      if (a.order_index !== null && b.order_index !== null && a.order_index !== undefined && b.order_index !== undefined) {
         return a.order_index - b.order_index;
       }
-      // Si no hay order_index, mantener el orden original
+      // Si ambas tienen end_date, ordenar por la más próxima a expirar
+      if (a.end_date && b.end_date) {
+        return new Date(a.end_date).getTime() - new Date(b.end_date).getTime();
+      }
+      // Si solo una tiene end_date, esa va antes
+      if (a.end_date && !b.end_date) return -1;
+      if (!a.end_date && b.end_date) return 1;
+      // Si ninguna tiene, mantener el orden original
       return 0;
     });
   };
@@ -1079,7 +1102,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       ) : (
         <>
           <Text style={styles.cityTitle}>{selectedCity}</Text>
-          <ScrollView 
+          <ScrollView
             style={styles.missionsList}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -1103,6 +1126,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       onShare={() => setIsShareModalVisible(true)}
                     />
                   )
+                )}
+                {cityData.expired.length > 0 && (
+                  <View style={{ height: 2, backgroundColor: '#E0E0E0', marginVertical: 16, borderRadius: 2 }} />
                 )}
               </>
             )}
@@ -1200,7 +1226,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
-            
+
             {currentRoute && (
               <ScrollView style={styles.routeList}>
                 {currentRoute.journeys_missions
@@ -1265,7 +1291,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    marginTop:10
+    marginTop: 10
   },
   backButton: {
     flexDirection: 'row',
@@ -1412,7 +1438,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     borderRadius: 10,
-    padding: 15, 
+    padding: 15,
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
