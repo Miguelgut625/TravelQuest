@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Aler
 import { Button } from 'react-native-paper';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { logout, setAuthState, setUser } from '../../features/authSlice';
+import { logout, setAuthState, setUser, setCustomTitle } from '../../features/auth/authSlice';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -550,30 +550,60 @@ const ProfileScreen = () => {
 
   const fetchCurrentTitle = async () => {
     if (!user?.id) return;
-    const { data, error } = await supabase
-      .from('users')
-      .select('custom_title')
-      .eq('id', user.id)
-      .single();
-    if (!error && data?.custom_title) {
-      setSelectedTitle(data.custom_title);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('custom_title')
+        .eq('id', user.id)
+        .single();
+      
+      if (!error && data?.custom_title) {
+        setSelectedTitle(data.custom_title);
+        // Actualizar el título en Redux usando setUser
+        dispatch(setUser({
+          ...user,
+          custom_title: data.custom_title
+        }));
+      }
+    } catch (error) {
+      console.error('Error al obtener el título:', error);
     }
   };
 
   const handleSaveTitle = async () => {
     if (!user?.id) return;
-    setSavingTitle(true);
-    const { error } = await supabase
-      .from('users')
-      .update({ custom_title: selectedTitle })
-      .eq('id', user.id);
-    setSavingTitle(false);
-    if (!error) {
-      Alert.alert('Éxito', 'Título actualizado');
-    } else {
+    try {
+      setSavingTitle(true);
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_title: selectedTitle })
+        .eq('id', user.id);
+
+      if (!error) {
+        // Actualizar el título en Redux usando setUser
+        const updatedUser = {
+          ...user,
+          custom_title: selectedTitle
+        };
+        dispatch(setUser(updatedUser));
+        Alert.alert('Éxito', 'Título actualizado');
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar el título');
+      }
+    } catch (error) {
+      console.error('Error al actualizar el título:', error);
       Alert.alert('Error', 'No se pudo actualizar el título');
+    } finally {
+      setSavingTitle(false);
     }
   };
+
+  // Añadir useEffect para actualizar el título cuando cambie en Redux
+  useEffect(() => {
+    if (user?.custom_title) {
+      setSelectedTitle(user.custom_title);
+    }
+  }, [user?.custom_title]);
 
   const fetchAdvancedStats = async () => {
     if (!user?.id) return;

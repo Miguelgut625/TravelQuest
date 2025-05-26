@@ -1,0 +1,67 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, StyleSheet } from 'react-native';
+import axios from 'axios';
+
+const UserScoreScreen = () => {
+  // Estado para almacenar la puntuación
+  const [score, setScore] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Obtener la puntuación del usuario
+  useEffect(() => {
+    const fetchUserScore = async () => {
+      try {
+        // Aquí deberías usar la URL de tu servidor para obtener la puntuación
+        const response = await axios.get('https://tuservidor.com/api/getUserScore');
+        setScore(response.data.score);  // Asumimos que la respuesta tiene un campo 'score'
+      } catch (err) {
+        setError('No se pudo obtener la puntuación');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserScore();
+  }, []); // El array vacío asegura que la llamada se haga solo una vez, al montar el componente
+
+  // Renderizar la UI
+  if (loading) {
+    return <Text>Cargando...</Text>;
+  }
+
+  if (error) {
+    return <Text>{error}</Text>;
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Puntuación del Usuario:</Text>
+      {score !== null ? (
+        <Text style={styles.score}>Puntuación: {score}</Text>
+      ) : (
+        <Text>No se pudo obtener la puntuación</Text>
+      )}
+      <Button title="Recargar puntuación" onPress={() => fetchUserScore()} />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    marginBottom: 20,
+  },
+  score: {
+    fontSize: 18,
+    marginBottom: 20,
+  },
+});
+
+export default UserScoreScreen;

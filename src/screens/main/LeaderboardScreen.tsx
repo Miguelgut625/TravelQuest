@@ -1,23 +1,38 @@
 // src/screens/main/LeaderboardScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { supabase } from '../../services/supabase';
-import { useNavigation } from '@react-navigation/native'; // Importa el hook de navegación
-import { Ionicons } from '@expo/vector-icons'; // Importa los íconos de Ionicons
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
+import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 interface LeaderboardItem {
-  id: string; // Asegúrate de que este campo exista en tu tabla
-  username: string; // Cambia 'username' si el campo tiene otro nombre
+  id: string;
+  username: string;
   points: number;
 }
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
+const colors = {
+  primary: '#005F9E',
+  secondary: '#7F5AF0',
+  background: '#F5F5F5',
+  white: '#FFFFFF',
+  text: {
+    primary: '#333333',
+    secondary: '#666666',
+    light: '#999999',
+  },
+  border: '#EEEEEE',
+  success: '#4CAF50',
+  error: '#D32F2F',
+};
 
 const LeaderboardScreen = () => {
-  const navigation = useNavigation(); // Obtén el objeto de navegación
+  const navigation = useNavigation();
   const { user } = useSelector((state: RootState) => state.auth);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,17 +41,16 @@ const LeaderboardScreen = () => {
   useEffect(() => {
     const fetchLeaderboardData = async () => {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('id, username, points') // Asegúrate de incluir el campo id
-          .order('points', { ascending: false });
-
-        if (error) throw error;
-
-        // Limitar a los 10 primeros usuarios
-        setLeaderboardData(data.slice(0, 10));
-      } catch (err: any) { // Especifica el tipo de 'err' como 'any'
-        setError(err.message);
+        const response = await axios.get(`${API_URL}/leaderboard`);
+        
+        if (response.data.success) {
+          setLeaderboardData(response.data.data);
+        } else {
+          throw new Error(response.data.error || 'Error al obtener el leaderboard');
+        }
+      } catch (err: any) {
+        console.error('Error al obtener el leaderboard:', err);
+        setError(err.response?.data?.error || err.message || 'Error al obtener el leaderboard');
       } finally {
         setLoading(false);
       }
@@ -73,7 +87,7 @@ const LeaderboardScreen = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size={50} color="#005F9E" />
+        <ActivityIndicator size={50} color={colors.primary} />
       </View>
     );
   }
@@ -89,7 +103,7 @@ const LeaderboardScreen = () => {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color={colors.secondary} />
+        <Ionicons name="arrow-back" size={24} color={colors.primary} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Tabla de clasificación</Text>
@@ -101,50 +115,41 @@ const LeaderboardScreen = () => {
     </View>
   );
 };
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     paddingHorizontal: width < 400 ? 6 : 16,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    marginTop: 40,
+    marginTop: 10,
     marginBottom: 10,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.white,
     borderRadius: 8,
     alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   backButtonText: {
     fontSize: 16,
     marginLeft: 5,
-    color: colors.secondary,
+    color: colors.primary,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   title: {
     fontSize: width < 400 ? 22 : 28,
     fontWeight: 'bold',
-    color: colors.secondary,
+    color: colors.primary,
     textAlign: 'center',
-    marginBottom: 8,
+    marginVertical: 16,
   },
   itemContainer: {
     backgroundColor: colors.white,
@@ -166,7 +171,7 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: width < 400 ? 18 : 24,
     fontWeight: 'bold',
-    color: colors.secondary,
+    color: colors.primary,
     marginRight: 8,
   },
   usernameContainer: {
@@ -200,7 +205,7 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: colors.primary,
   },
   errorText: {
     color: colors.error,

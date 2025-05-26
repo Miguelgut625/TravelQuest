@@ -1,4 +1,6 @@
 import { supabase } from './supabase';
+import axios from 'axios';
+import { API_URL } from '../config/api';
 
 // Tipos de datos para insignias
 export interface Badge {
@@ -24,13 +26,8 @@ export interface UserBadge {
 // Obtener todas las insignias disponibles
 export const getAllBadges = async (): Promise<Badge[]> => {
   try {
-    const { data, error } = await supabase
-      .from('badges')
-      .select('*')
-      .order('category', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
+    const { data } = await axios.get(`${API_URL}/badges`);
+    return data;
   } catch (error) {
     console.error('Error al obtener insignias:', error);
     return [];
@@ -40,17 +37,8 @@ export const getAllBadges = async (): Promise<Badge[]> => {
 // Obtener las insignias de un usuario
 export const getUserBadges = async (userId: string): Promise<UserBadge[]> => {
   try {
-    const { data, error } = await supabase
-      .from('user_badges')
-      .select(`
-        *,
-        badges (*)
-      `)
-      .eq('userId', userId)
-      .order('unlocked_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
+    const { data } = await axios.get(`${API_URL}/badges/user/${userId}`);
+    return data;
   } catch (error) {
     console.error('Error al obtener insignias del usuario:', error);
     return [];
@@ -60,77 +48,11 @@ export const getUserBadges = async (userId: string): Promise<UserBadge[]> => {
 // Desbloquear una insignia para un usuario
 export const unlockBadge = async (userId: string, badgeId: string): Promise<boolean> => {
   try {
-    console.log(`Iniciando desbloqueo de insignia: ID=${badgeId} para usuario: ID=${userId}`);
-    
-    if (!userId || !badgeId) {
-      console.error('Parámetros insuficientes para unlockBadge', { userId, badgeId });
-      return false;
-    }
-    
-    // Verificar si existe la insignia en la tabla badges
-    console.log(`Verificando si la insignia ${badgeId} existe...`);
-    const { data: badgeExists, error: badgeError } = await supabase
-      .from('badges')
-      .select('id, name')
-      .eq('id', badgeId)
-      .single();
-      
-    if (badgeError) {
-      console.error(`Error al verificar si la insignia ${badgeId} existe:`, badgeError);
-      return false;
-    }
-    
-    if (!badgeExists) {
-      console.error(`La insignia con ID ${badgeId} no existe en la tabla badges`);
-      return false;
-    }
-    
-    console.log(`Insignia encontrada: ${badgeExists.name} (${badgeId})`);
-    
-    // Verificar si el usuario ya tiene esta insignia
-    console.log(`Verificando si el usuario ${userId} ya tiene la insignia ${badgeId}...`);
-    const { data: existingBadge, error: checkError } = await supabase
-      .from('user_badges')
-      .select('id')
-      .eq('userId', userId)
-      .eq('badgeId', badgeId)
-      .single();
-
-    if (checkError) {
-      if (checkError.code === 'PGRST116') {
-        // PGRST116 es el código de "no se encontró registro", que es lo que esperamos
-        console.log(`Confirmado: El usuario ${userId} no tiene la insignia ${badgeId} todavía`);
-      } else {
-        console.error(`Error al verificar si el usuario ya tiene la insignia:`, checkError);
-        throw checkError;
-      }
-    } else {
-      // Si ya tiene la insignia, no hacer nada
-      console.log(`El usuario ${userId} ya tiene la insignia ${badgeId} - No se realizarán cambios`);
-      return true;
-    }
-
-    console.log(`Insertando nueva insignia para usuario ${userId}: ${badgeId}`);
-    
-    // Añadir la insignia al usuario
-    const { data: insertData, error: insertError } = await supabase
-      .from('user_badges')
-      .insert([
-        {
-          userId,
-          badgeId,
-          unlocked_at: new Date().toISOString()
-        }
-      ])
-      .select();
-
-    if (insertError) {
-      console.error(`Error al insertar insignia en user_badges:`, insertError);
-      throw insertError;
-    }
-    
-    console.log(`¡Insignia otorgada exitosamente! Datos insertados:`, insertData);
-    return true;
+    const { data } = await axios.post(`${API_URL}/badges/unlock`, {
+      userId,
+      badgeId
+    });
+    return data.success;
   } catch (error) {
     console.error('Error al desbloquear insignia:', error);
     return false;
@@ -308,24 +230,13 @@ export const checkSocialBadges = async (userId: string): Promise<string[]> => {
   }
 };
 
-// Verificar todas las posibles insignias para un usuario
+// Verificar y otorgar todas las posibles insignias para un usuario
 export const checkAllBadges = async (userId: string): Promise<string[]> => {
   try {
-    const missionBadges = await checkMissionBadges(userId);
-    const levelBadges = await checkLevelBadges(userId);
-    const cityBadges = await checkCityBadges(userId);
-    const socialBadges = await checkSocialBadges(userId);
-    const specialBadges = await checkSpecialBadges(userId);
-    
-    return [
-      ...missionBadges,
-      ...levelBadges,
-      ...cityBadges,
-      ...socialBadges,
-      ...specialBadges
-    ];
+    const { data } = await axios.get(`${API_URL}/badges/check/${userId}`);
+    return data.unlockedBadges || [];
   } catch (error) {
-    console.error('Error al verificar todas las insignias:', error);
+    console.error('Error al verificar insignias:', error);
     return [];
   }
 };
@@ -449,149 +360,21 @@ export const awardSpecificBadges = async (userId: string, eventType: string): Pr
   }
 };
 
-// Función para verificar si el usuario ya tiene la insignia de nueva ciudad
-// y otorgarle 500 puntos extra si es así
+// Verificar insignia de nueva ciudad y otorgar puntos extra
 export const checkNewCityBadgeAndAwardPoints = async (userId: string): Promise<{
   alreadyHasBadge: boolean;
   pointsAwarded: number;
   badgeName?: string;
 }> => {
   try {
-    if (!userId) {
-      console.log('checkNewCityBadgeAndAwardPoints: userId no proporcionado');
-      return { alreadyHasBadge: false, pointsAwarded: 0 };
-    }
-    
-    console.log(`checkNewCityBadgeAndAwardPoints: Verificando insignia para usuario ${userId}`);
-    
-    // ID de la insignia de nueva ciudad
-    const newCityBadgeId = 'e733a802-553b-4a69-ae09-9b772dd7f8f1';
-    console.log(`ID de insignia a verificar: ${newCityBadgeId}`);
-    
-    // Obtener el nombre de la insignia
-    const { data: badgeData, error: badgeError } = await supabase
-      .from('badges')
-      .select('name')
-      .eq('id', newCityBadgeId)
-      .single();
-      
-    if (badgeError) {
-      console.error('Error al obtener datos de la insignia:', badgeError);
-    }
-    
-    const badgeName = badgeData?.name || 'Explorador de Nuevas Ciudades';
-    console.log(`Nombre de la insignia: ${badgeName}`);
-    
-    // Verificar si el usuario ya tiene la insignia
-    console.log(`Verificando si el usuario ${userId} ya tiene la insignia ${newCityBadgeId}`);
-    const { data, error } = await supabase
-      .from('user_badges')
-      .select('id')
-      .eq('userId', userId)
-      .eq('badgeId', newCityBadgeId)
-      .single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        console.log('El usuario no tiene la insignia (error PGRST116)');
-      } else {
-        console.error('Error al verificar insignia:', error);
-        return { alreadyHasBadge: false, pointsAwarded: 0 };
-      }
-    }
-    
-    // Si el usuario ya tiene la insignia, otorgar puntos extra
-    if (data) {
-      console.log(`Usuario ${userId} ya tiene la insignia ${newCityBadgeId}`);
-      
-      // Actualizar los puntos del usuario
-      console.log('Obteniendo puntos actuales del usuario');
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('points')
-        .eq('id', userId)
-        .single();
-      
-      if (userError) {
-        console.error('Error al obtener puntos del usuario:', userError);
-        return { alreadyHasBadge: true, pointsAwarded: 0, badgeName };
-      }
-      
-      const currentPoints = userData?.points || 0;
-      const newPoints = currentPoints + 500;
-      console.log(`Puntos actuales: ${currentPoints}, Nuevos puntos: ${newPoints}`);
-      
-      console.log(`Actualizando puntos del usuario ${userId} a ${newPoints}`);
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ points: newPoints })
-        .eq('id', userId);
-      
-      if (updateError) {
-        console.error('Error al actualizar puntos:', updateError);
-        return { alreadyHasBadge: true, pointsAwarded: 0, badgeName };
-      }
-      
-      console.log(`Se otorgaron 500 puntos extra al usuario ${userId}`);
-      
-      // Crear notificación para los puntos extra
-      /* 
-      try {
-        await supabase
-          .from('notifications')
-          .insert([{
-            userId: userId,
-            title: '¡500 puntos extra!',
-            message: `Has recibido 500 puntos extra por descubrir una nueva ciudad teniendo ya el logro de "${badgeName}".`,
-            type: 'points',
-            read: false,
-            created_at: new Date().toISOString()
-          }]);
-      } catch (notifyError) {
-        console.error('Error al crear notificación de puntos:', notifyError);
-      }
-      */
-      
-      return { alreadyHasBadge: true, pointsAwarded: 500, badgeName };
-    }
-    
-    // Si el usuario no tiene la insignia, otorgarla directamente
-    try {
-      console.log(`Otorgando insignia de Descubridor (ID: ${newCityBadgeId}) al usuario ${userId}`);
-      const unlocked = await unlockBadge(userId, newCityBadgeId);
-      
-      if (unlocked) {
-        console.log(`Insignia otorgada correctamente: ${badgeName}`);
-        
-        // Crear notificación para el usuario
-        /*
-        try {
-          await supabase
-            .from('notifications')
-            .insert([{
-              userId: userId,
-              title: '¡Nuevo logro desbloqueado!',
-              message: `Has desbloqueado el logro "${badgeName}" por descubrir una nueva ciudad.`,
-              type: 'achievement',
-              read: false,
-              created_at: new Date().toISOString()
-            }]);
-        } catch (notifyError) {
-          console.error('Error al crear notificación:', notifyError);
-        }
-        */
-        
-        return { alreadyHasBadge: false, pointsAwarded: 0, badgeName };
-      } else {
-        console.error('Error al desbloquear insignia de nueva ciudad');
-        return { alreadyHasBadge: false, pointsAwarded: 0 };
-      }
-    } catch (unlockError) {
-      console.error('Error en proceso de desbloqueo de insignia:', unlockError);
-      return { alreadyHasBadge: false, pointsAwarded: 0 };
-    }
+    const { data } = await axios.get(`${API_URL}/badges/check-new-city/${userId}`);
+    return {
+      alreadyHasBadge: data.alreadyHasBadge,
+      pointsAwarded: data.pointsAwarded,
+      badgeName: data.badgeName
+    };
   } catch (error) {
-    console.error('Error en checkNewCityBadgeAndAwardPoints:', error);
+    console.error('Error al verificar insignia de nueva ciudad:', error);
     return { alreadyHasBadge: false, pointsAwarded: 0 };
   }
 };
@@ -715,5 +498,40 @@ export const checkSpecialBadges = async (userId: string): Promise<string[]> => {
   } catch (error) {
     console.error('Error al verificar insignias especiales:', error);
     return [];
+  }
+};
+
+// Actualizar título personalizado del usuario
+export const updateUserTitle = async (userId: string, title: string): Promise<{
+  success: boolean;
+  user?: any;
+  error?: string;
+}> => {
+  try {
+    const { data } = await axios.post(`${API_URL}/badges/update-title`, {
+      userId,
+      title
+    });
+    return {
+      success: true,
+      user: data.user
+    };
+  } catch (error: any) {
+    console.error('Error al actualizar título:', error);
+    return {
+      success: false,
+      error: error.response?.data?.error || 'Error al actualizar título'
+    };
+  }
+};
+
+// Obtener título personalizado del usuario
+export const getUserTitle = async (userId: string): Promise<string> => {
+  try {
+    const { data } = await axios.get(`${API_URL}/badges/user-title/${userId}`);
+    return data.custom_title || '';
+  } catch (error) {
+    console.error('Error al obtener título:', error);
+    return '';
   }
 }; 

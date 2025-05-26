@@ -1,12 +1,23 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator
+} from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { setUser, setAuthState, setError } from '../../features/authSlice';
-import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import axios from 'axios';
+import { API_URL } from '../../config/api';
+
+axios.defaults.timeout = 10000;
+axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -29,67 +40,33 @@ const LoginScreen = () => {
       dispatch(setAuthState('loading'));
       dispatch(setError(null));
 
-      console.log('Iniciando sesión para:', email);
-
-      // Intentar iniciar sesión directamente
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const response = await axios.post(`${API_URL}/users/login`, {
         email: email.trim(),
         password: password.trim()
       });
 
-      if (error) {
-        console.error('Error de autenticación:', error);
-        if (error.message.includes('Invalid login credentials')) {
+      dispatch(setUser({
+        email: response.data.user.email || '',
+        id: response.data.user.id,
+        username: response.data.user.username
+      }));
+
+      dispatch(setAuthState('authenticated'));
+    } catch (error) {
+      if (error.response) {
+        const { status, data } = error.response;
+        if (status === 401) {
           dispatch(setError('Email o contraseña incorrectos.'));
-        } else if (error.message.includes('User not allowed') || error.message.includes('Email not confirmed')) {
+        } else if (status === 403 && data.needsVerification) {
           dispatch(setError('Necesitas verificar tu correo electrónico antes de iniciar sesión'));
-          // Redirigir a la pantalla de verificación
           navigation.navigate('VerifyEmail', { email: email.trim() });
           return;
         } else {
-          dispatch(setError('Error al iniciar sesión: ' + error.message));
+          dispatch(setError('Error al iniciar sesión: ' + (data.error || 'Intente nuevamente')));
         }
-        dispatch(setAuthState('unauthenticated'));
-        return;
+      } else {
+        dispatch(setError('No se pudo conectar con el servidor. Verifica tu conexión a internet.'));
       }
-
-      if (!data.user) {
-        dispatch(setError('No se encontró el usuario'));
-        dispatch(setAuthState('unauthenticated'));
-        return;
-      }
-
-      console.log('Login exitoso:', data.user.email);
-
-      // Obtener datos adicionales del usuario
-      console.log('Obteniendo datos del usuario con ID:', data.user.id);
-
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('username, role')
-        .eq('id', data.user.id)
-        .single();
-
-      if (userError) {
-        console.error('Error obteniendo datos del usuario:', userError);
-      }
-
-      console.log('Datos del usuario obtenidos de la tabla users:', userData);
-      console.log('Username específico:', userData?.username);
-      console.log('Rol del usuario:', userData?.role);
-
-      // Actualizar el estado con los datos del usuario
-      dispatch(setUser({
-        email: data.user.email || '',
-        id: data.user.id,
-        username: userData?.username || 'Usuario',
-        role: userData?.role || 'user'
-      }));
-      dispatch(setAuthState('authenticated'));
-
-    } catch (error) {
-      console.error('Error inesperado durante el login:', error);
-      dispatch(setError('Ocurrió un error inesperado'));
       dispatch(setAuthState('unauthenticated'));
     } finally {
       setLoading(false);
@@ -124,9 +101,7 @@ const LoginScreen = () => {
           secureTextEntry
         />
 
-        {error && (
-          <Text style={styles.errorText}>{error}</Text>
-        )}
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
         <TouchableOpacity
           style={styles.button}
@@ -147,6 +122,15 @@ const LoginScreen = () => {
         >
           <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
+
+        {loading && (
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={() => setLoading(false)}
+          >
+            <Text style={styles.cancelText}>Cancelar</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')}>
           <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
@@ -219,6 +203,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
+  cancelButton: {
+    marginTop: 15,
+    padding: 8,
+  },
+  cancelText: {
+    color: '#ff6b6b',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
 });
 
-export default LoginScreen; 
+export default LoginScreen;
