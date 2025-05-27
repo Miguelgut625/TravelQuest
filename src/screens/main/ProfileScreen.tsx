@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Modal, Aler
 import { Button } from 'react-native-paper';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
-import { logout, setAuthState, setUser, setCustomTitle } from '../../features/auth/authSlice';
+import { logout, setAuthState, setUser } from '../../features/auth/authSlice';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { calculateNextLevelXP } from '../../services/experienceService';
 import * as ImagePicker from 'expo-image-picker';
 import { updateProfilePicture, getProfilePictureUrl } from '../../services/profileService';
+import profileService from '../../services/profileService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserBadges } from '../../services/badgeService';
 import { lightBlue100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
@@ -120,66 +121,18 @@ const ProfileScreen = () => {
       setLoadingStats(true);
       console.log('Obteniendo estadísticas...');
 
-      // Obtener los puntos, nivel y XP del usuario
-      const { data: userPointsData, error: userPointsError } = await supabase
-        .from('users')
-        .select('points, level, xp, xp_next')
-        .eq('id', user.id)
-        .single();
-
-      if (userPointsError) throw userPointsError;
-
-      // Obtener los journeys del usuario con sus misiones completadas
-      const { data: journeys, error: journeysError } = await supabase
-        .from('journeys')
-        .select(`
-          id,
-          cityId,
-          journeys_missions!inner (
-            completed,
-            challenges!inner (
-              points
-            )
-          )
-        `)
-        .eq('userId', user.id);
-
-      if (journeysError) throw journeysError;
-
-      // Calcular estadísticas
-      const stats = {
-        totalPoints: 0,
-        completedMissions: 0,
-        visitedCities: new Set<string>()
-      };
-
-      (journeys as Journey[])?.forEach((journey: Journey) => {
-        // Añadir la ciudad a las visitadas (usando Set para evitar duplicados)
-        if (journey.cityId) {
-          stats.visitedCities.add(journey.cityId);
-        }
-
-        // Contar misiones completadas y puntos
-        journey.journeys_missions.forEach((mission: JourneyMission) => {
-          if (mission.completed) {
-            stats.completedMissions++;
-            stats.totalPoints += mission.challenges.points;
-          }
-        });
-      });
-
-      setRealPoints(userPointsData?.points || 0);
-
+      const stats = await profileService.getUserStats(user.id);
+      
+      setRealPoints(stats.points);
       setStats({
-        totalPoints: userPointsData?.points || 0,
+        totalPoints: stats.points,
         completedMissions: stats.completedMissions,
-        visitedCities: stats.visitedCities.size
+        visitedCities: stats.visitedCities
       });
 
-      // Actualizar nivel y XP
-      setLevel(userPointsData?.level || 1);
-      setXp(userPointsData?.xp || 0);
-      setXpNext(userPointsData?.xp_next || 50);
+      setLevel(stats.level);
+      setXp(stats.xp);
+      setXpNext(stats.xpNext);
 
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
@@ -203,16 +156,10 @@ const ProfileScreen = () => {
   const fetchProfileVisibility = async () => {
     if (!user?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('profile_visibility, friends_visibility, comments_visibility')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-      setProfileVisibility(data?.profile_visibility || 'public');
-      setFriendsVisibility(data?.friends_visibility || 'public');
-      setCommentsVisibility(data?.comments_visibility || 'public');
+      const privacySettings = await profileService.getPrivacySettings(user.id);
+      setProfileVisibility(privacySettings.profileVisibility);
+      setFriendsVisibility(privacySettings.friendsVisibility);
+      setCommentsVisibility(privacySettings.commentsVisibility);
     } catch (error) {
       console.error('Error al obtener configuración de privacidad:', error);
     }
@@ -221,11 +168,7 @@ const ProfileScreen = () => {
   const updateProfileVisibility = async (visibility: 'public' | 'friends' | 'private') => {
     if (!user?.id) return;
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ profile_visibility: visibility })
-        .eq('id', user.id);
-      if (error) throw error;
+      await profileService.updatePrivacySettings(user.id, 'profile', visibility);
       setProfileVisibility(visibility);
       Alert.alert('Éxito', 'Configuración de privacidad actualizada');
     } catch (error) {
@@ -237,11 +180,7 @@ const ProfileScreen = () => {
   const updateFriendsVisibility = async (visibility: 'public' | 'friends' | 'private') => {
     if (!user?.id) return;
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ friends_visibility: visibility })
-        .eq('id', user.id);
-      if (error) throw error;
+      await profileService.updatePrivacySettings(user.id, 'friends', visibility);
       setFriendsVisibility(visibility);
       Alert.alert('Éxito', 'Configuración de privacidad de amigos actualizada');
     } catch (error) {
@@ -253,11 +192,7 @@ const ProfileScreen = () => {
   const updateCommentsVisibility = async (visibility: 'public' | 'friends' | 'private') => {
     if (!user?.id) return;
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ comments_visibility: visibility })
-        .eq('id', user.id);
-      if (error) throw error;
+      await profileService.updatePrivacySettings(user.id, 'comments', visibility);
       setCommentsVisibility(visibility);
       Alert.alert('Éxito', 'Configuración de privacidad de comentarios actualizada');
     } catch (error) {
@@ -336,23 +271,18 @@ const ProfileScreen = () => {
       setProfilePicUrl(cloudinaryUrl);
 
       // Actualizar el estado de Redux si es necesario
-      // Asegurarse de que user y sus propiedades existan antes de actualizar
       if (user) {
         try {
-          // Usar setUser en lugar de updateUser para actualizar el perfil
           dispatch(setUser({
             ...user,
-            profile_pic_url: cloudinaryUrl
+            profilePicture: cloudinaryUrl
           }));
         } catch (reduxError) {
           console.error('Error al actualizar el estado Redux:', reduxError);
-          // Continuar con el flujo aunque falle la actualización de Redux
         }
       }
 
-      // Mostrar un mensaje de éxito más discreto
       console.log('Foto de perfil actualizada correctamente');
-      // Mostrar un Alert sólo si todo funciona correctamente
       Alert.alert('Éxito', 'Foto de perfil actualizada correctamente');
     } catch (error: any) {
       console.error('Error al subir la imagen:', error);
@@ -551,20 +481,12 @@ const ProfileScreen = () => {
   const fetchCurrentTitle = async () => {
     if (!user?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('custom_title')
-        .eq('id', user.id)
-        .single();
-      
-      if (!error && data?.custom_title) {
-        setSelectedTitle(data.custom_title);
-        // Actualizar el título en Redux usando setUser
-        dispatch(setUser({
-          ...user,
-          custom_title: data.custom_title
-        }));
-      }
+      const { customTitle } = await profileService.getCustomTitle(user.id);
+      setSelectedTitle(customTitle);
+      dispatch(setUser({
+        ...user,
+        custom_title: customTitle
+      }));
     } catch (error) {
       console.error('Error al obtener el título:', error);
     }
@@ -574,22 +496,14 @@ const ProfileScreen = () => {
     if (!user?.id) return;
     try {
       setSavingTitle(true);
-      const { error } = await supabase
-        .from('users')
-        .update({ custom_title: selectedTitle })
-        .eq('id', user.id);
-
-      if (!error) {
-        // Actualizar el título en Redux usando setUser
-        const updatedUser = {
-          ...user,
-          custom_title: selectedTitle
-        };
-        dispatch(setUser(updatedUser));
-        Alert.alert('Éxito', 'Título actualizado');
-      } else {
-        Alert.alert('Error', 'No se pudo actualizar el título');
-      }
+      await profileService.updateCustomTitle(user.id, selectedTitle);
+      
+      const updatedUser = {
+        ...user,
+        custom_title: selectedTitle
+      };
+      dispatch(setUser(updatedUser));
+      Alert.alert('Éxito', 'Título actualizado');
     } catch (error) {
       console.error('Error al actualizar el título:', error);
       Alert.alert('Error', 'No se pudo actualizar el título');
@@ -610,11 +524,10 @@ const ProfileScreen = () => {
     
     try {
       setLoadingAdvancedStats(true);
-      const stats = await getAdvancedMissionStats(user.id);
+      const stats = await profileService.getAdvancedStats(user.id);
       setAdvancedStats(stats);
     } catch (error) {
       console.error('Error al obtener estadísticas avanzadas:', error);
-      // No mostrar alerta para evitar interrumpir la experiencia del usuario
     } finally {
       setLoadingAdvancedStats(false);
     }
