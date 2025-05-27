@@ -115,6 +115,20 @@ const LeaderboardScreen = () => {
     </View>
   );
 };
+const colors = {
+  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
+  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
+  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
+  white: '#FFFFFF',        // Blanco neutro
+  text: {
+    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
+    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
+    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+  },
+  border: '#89C2D9',       // Azul claro (suave y limpio)
+  success: '#06D6A0',      // Verde menta (positivo y moderno)
+  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+};
 
 const styles = StyleSheet.create({
   container: {

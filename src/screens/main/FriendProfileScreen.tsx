@@ -487,7 +487,7 @@ const FriendProfileScreen = () => {
                         </Text>
                     )}
                     {/* Estadística de amigos */}
-                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, alignSelf: 'flex-start' }} onPress={() => setShowFriendsModal(true)}>
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, justifyContent:'center' }} onPress={() => setShowFriendsModal(true)}>
                         <Ionicons name="people" size={20} color="#005F9E" style={{ marginRight: 6 }} />
                         <Text style={{ fontSize: 16, color: '#005F9E', fontWeight: 'bold' }}>{friendsCount} Amigos</Text>
                     </TouchableOpacity>
@@ -644,10 +644,25 @@ const FriendProfileScreen = () => {
     );
 };
 
+const colors = {
+    primary: '#003580',      // Azul oscuro (corporativo)
+    secondary: '#0071c2',    // Azul brillante (para botones y acentos)
+    background: '#ffffff',   // Blanco como fondo principal
+    white: '#FFFFFF',        // Blanco neutro reutilizable
+    text: {
+      primary: '#00264d',    // Azul muy oscuro (para alta legibilidad)
+      secondary: '#005b99',  // Azul medio (texto secundario)
+      light: '#66a3ff',      // Azul claro (detalles decorativos o descripciones)
+    },
+    border: '#66b3ff',       // Azul claro (para bordes y separadores)
+    success: '#38b000',      // Verde vibrante (indicadores positivos)
+    error: '#e63946',        // Rojo vivo (errores y alertas)
+  };
+  
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: colors.primary,
     },
     loadingContainer: {
         flex: 1,
@@ -655,7 +670,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerBackground: {
-        backgroundColor: '#005F9E',
+        backgroundColor: colors.primary,
         padding: 20,
     },
     header: {
@@ -668,14 +683,15 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: 'white',
+        color: colors.white,
         marginRight: 6,
     },
     profileSection: {
         alignItems: 'center',
         padding: 20,
-        backgroundColor: 'white',
+        backgroundColor: colors.text.light,
         marginBottom: 10,
+        borderRadius: 20,
         position: 'relative',
     },
     actionIconProfile: {
@@ -745,7 +761,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         padding: 20,
+        marginHorizontal: 20,
         backgroundColor: 'white',
+        borderRadius:20
     },
     statItem: {
         alignItems: 'center',
