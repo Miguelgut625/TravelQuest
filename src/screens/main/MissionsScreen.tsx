@@ -463,14 +463,14 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           cities (
             name
           ),
-          journeys_missions!inner (
+          journeys_missions (
             id,
             completed,
             challengeId,
             end_date,
             order_index,
             route_id,
-            challenges!inner (
+            challenges (
               id,
               title,
               description,
@@ -482,6 +482,14 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         .eq('userId', user.id)
         .order('created_at', { ascending: false });
 
+      console.log('🔍 Consulta de viajes propios:', {
+        userId: user.id,
+        error: ownJourneysError,
+        resultados: ownJourneys?.length || 0,
+        datos: ownJourneys,
+        query: 'SELECT * FROM journeys WHERE userId = ' + user.id
+      });
+
       if (ownJourneysError) throw ownJourneysError;
 
       // Obtener viajes compartidos
@@ -489,19 +497,19 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         .from('journeys_shared')
         .select(`
           journeyId,
-          journeys!inner (
+          journeys (
             id,
             description,
             created_at,
             cities (
               name
             ),
-            journeys_missions!inner (
+            journeys_missions (
               id,
               completed,
               challengeId,
               end_date,
-              challenges!inner (
+              challenges (
                 id,
                 title,
                 description,
@@ -515,6 +523,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         .eq('status', 'accepted')
         .order('shared_at', { ascending: false });
 
+      console.log('🔍 Consulta de viajes compartidos:', {
+        userId: user.id,
+        error: sharedJourneysError,
+        resultados: sharedJourneys?.length || 0,
+        query: 'SELECT * FROM journeys_shared WHERE sharedWithUserId = ' + user.id
+      });
+
       if (sharedJourneysError) throw sharedJourneysError;
 
       // Combinar viajes propios y compartidos
@@ -523,35 +538,72 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         ...(sharedJourneys?.map(shared => shared.journeys) || [])
       ];
 
+      console.log('📊 Viajes disponibles:', {
+        total: allJourneys.length,
+        propios: ownJourneys?.length || 0,
+        compartidos: sharedJourneys?.length || 0,
+        primerViaje: allJourneys[0] ? {
+          id: allJourneys[0].id,
+          misiones: allJourneys[0].journeys_missions?.length
+        } : null
+      });
+
       if (allJourneys.length === 0) {
         setError('No hay viajes disponibles');
         setLoading(false);
         return;
       }
 
+      // Procesar los datos obtenidos
       const allMissions = allJourneys.flatMap((journey: Journey) =>
-        journey.journeys_missions.map((jm) => ({
-          id: jm.id,
-          completed: jm.completed,
-          cityName: jm.challenges.cityId && citiesMap[jm.challenges.cityId]
-            ? citiesMap[jm.challenges.cityId]
-            : journey.cities?.name || 'Ciudad Desconocida',
-          end_date: jm.challenges.is_event && jm.challenges.end_date
-            ? jm.challenges.end_date
-            : jm.end_date,
-          challenge: {
-            title: jm.challenges.title,
-            description: jm.challenges.description,
-            difficulty: jm.challenges.difficulty,
-            points: jm.challenges.points,
-            is_event: jm.challenges.is_event ?? false,
-            start_date: jm.challenges.start_date ?? null,
-            end_date: jm.challenges.end_date ?? null,
-          },
-          order_index: jm.order_index,
-          route_id: jm.route_id
-        }))
+        journey.journeys_missions.map((jm) => {
+          // Ya no filtramos misiones mal formadas aquí, se asume que la BDD está consistente tras ajustar RLS
+          // El log de misiones potencialmente mal formadas ya no es necesario si los datos son consistentes
+
+          // Simplificar la determinación del nombre de la ciudad
+          const cityName = journey.cities?.name || 'Ciudad Desconocida';
+
+          return {
+            id: jm.id,
+            completed: jm.completed,
+            cityName: cityName,
+            // Usar encadenamiento opcional en caso de que challenge o sus propiedades sean inesperadamente null/undefined
+            end_date: jm.challenges?.is_event && jm.challenges?.end_date
+              ? jm.challenges?.end_date
+              : jm.end_date,
+            challenge: {
+              // Usar encadenamiento opcional y valores por defecto al acceder a propiedades de challenge
+              id: jm.challenges?.id || 'unknown', // Añadir valor por defecto seguro
+              title: jm.challenges?.title || 'Sin título',
+              description: jm.challenges?.description || 'Sin descripción',
+              difficulty: jm.challenges?.difficulty || 'Normal',
+              points: jm.challenges?.points || 0,
+              is_event: jm.challenges?.is_event ?? false,
+              start_date: jm.challenges?.start_date ?? null,
+              end_date: jm.challenges?.end_date ?? null,
+            },
+            order_index: jm.order_index,
+            route_id: jm.route_id,
+            // Mantener referencia al journey si es necesario
+            journey: { id: jm.journeys?.id, created_at: jm.journeys?.created_at }
+          };
+        })
       );
+
+      console.log('📝 Misiones procesadas (después de consulta directa):', {
+        totalMisiones: allMissions.length,
+        primerMision: allMissions[0] ? {
+          id: allMissions[0].id,
+          titulo: allMissions[0].challenge.title,
+          ciudad: allMissions[0].cityName
+        } : null
+      });
+
+      if (allMissions.length === 0) {
+        setError('No hay misiones disponibles');
+        setLoading(false);
+        return;
+      }
 
       // Organizar misiones por ciudad
       const missionsByCity: CityMissions = {};
@@ -565,8 +617,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         }
         // Lógica de expiración unificada para normales y evento
         let isExpired = false;
-        let endDate = mission.challenge.is_event && mission.challenge.end_date
-          ? mission.challenge.end_date
+        // Usar encadenamiento opcional al acceder a propiedades de challenge
+        let endDate = mission.challenge?.is_event && mission.challenge?.end_date
+          ? mission.challenge?.end_date
           : mission.end_date;
         if (!mission.completed && endDate) {
           const now = new Date();
@@ -1049,7 +1102,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               cityName={cityName}
               totalMissions={
                 // @ts-ignore - TypeScript no puede inferir la estructura
-                missions.completed.length + missions.pending.length
+                missions.completed.length + missions.pending.length + missions.expired.length
               }
               completedMissions={
                 // @ts-ignore - TypeScript no puede inferir la estructura
