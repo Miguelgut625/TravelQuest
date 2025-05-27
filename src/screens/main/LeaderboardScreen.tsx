@@ -16,20 +16,6 @@ interface LeaderboardItem {
 
 const { width } = Dimensions.get('window');
 
-const colors = {
-  primary: '#005F9E',
-  secondary: '#7F5AF0',
-  background: '#F5F5F5',
-  white: '#FFFFFF',
-  text: {
-    primary: '#333333',
-    secondary: '#666666',
-    light: '#999999',
-  },
-  border: '#EEEEEE',
-  success: '#4CAF50',
-  error: '#D32F2F',
-};
 
 const LeaderboardScreen = () => {
   const navigation = useNavigation();
@@ -114,6 +100,21 @@ const LeaderboardScreen = () => {
       />
     </View>
   );
+};
+
+const colors = {
+  primary: '#003580',      // Azul oscuro (corporativo)
+  secondary: '#0071c2',    // Azul brillante (para botones y acentos)
+  background: '#ffffff',   // Blanco como fondo principal
+  white: '#FFFFFF',        // Blanco neutro reutilizable
+  text: {
+    primary: '#00264d',    // Azul muy oscuro (para alta legibilidad)
+    secondary: '#005b99',  // Azul medio (texto secundario)
+    light: '#66a3ff',      // Azul claro (detalles decorativos o descripciones)
+  },
+  border: '#66b3ff',       // Azul claro (para bordes y separadores)
+  success: '#38b000',      // Verde vibrante (indicadores positivos)
+  error: '#e63946',        // Rojo vivo (errores y alertas)
 };
 
 const styles = StyleSheet.create({

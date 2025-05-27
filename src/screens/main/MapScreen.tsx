@@ -1581,19 +1581,20 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
 };
 
 const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
+  primary: '#003580',      // Azul oscuro (corporativo)
+  secondary: '#0071c2',    // Azul brillante (para botones y acentos)
+  background: '#ffffff',   // Blanco como fondo principal
+  white: '#FFFFFF',        // Blanco neutro reutilizable
   text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
+    primary: '#00264d',    // Azul muy oscuro (para alta legibilidad)
+    secondary: '#005b99',  // Azul medio (texto secundario)
+    light: '#66a3ff',      // Azul claro (detalles decorativos o descripciones)
   },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
+  border: '#66b3ff',       // Azul claro (para bordes y separadores)
+  success: '#38b000',      // Verde vibrante (indicadores positivos)
+  error: '#e63946',        // Rojo vivo (errores y alertas)
 };
+
 
 
 const styles = StyleSheet.create({
@@ -2177,7 +2178,8 @@ const styles = StyleSheet.create({
   eventButton: {
     position: 'absolute',
     bottom: 30,
-    right: 20,
+    right: 130,
+    left: 130,
     backgroundColor: '#FFD700',
     flexDirection: 'row',
     alignItems: 'center',
@@ -2187,7 +2189,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   eventButtonText: {
-    color: '#26547C',
+    color: colors.primary,
     fontWeight: 'bold',
     marginLeft: 8,
   },

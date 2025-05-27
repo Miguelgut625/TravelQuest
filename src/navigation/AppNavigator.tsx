@@ -21,8 +21,7 @@ import BadgesScreen from '../screens/main/BadgesScreen';
 import GroupsScreen from '../screens/main/GroupsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from 'react-native-paper';
-import { View, ActivityIndicator, Text, Platform, StatusBar } from 'react-native';
+import { View, ActivityIndicator, Platform, StatusBar } from 'react-native';
 import ChatScreen from '../screens/main/ChatScreen';
 import ConversationsScreen from '../screens/main/ConversationsScreen';
 import { linking } from './linking';
@@ -30,6 +29,21 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import GroupChatScreen from '../screens/main/GroupChatScreen';
 import FriendProfileScreen from '../screens/main/FriendProfileScreen';
 import CreateMissionScreen from '../screens/admin/CreateMissionScreen';
+
+const colors = {
+  primary: '#003580',
+  secondary: '#0071c2',
+  background: '#ffffff',
+  white: '#FFFFFF',
+  text: {
+    primary: '#00264d',
+    secondary: '#005b99',
+    light: '#66a3ff',
+  },
+  border: '#66b3ff',
+  success: '#38b000',
+  error: '#e63946',
+};
 
 const Stack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
@@ -82,14 +96,14 @@ const TabNavigator = () => {
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={26} color={color} />;
         },
-        tabBarActiveTintColor: '#A8DADC',         // Azul oscuro
-        tabBarInactiveTintColor: '#A8DADC',       // Azul claro pastel
+        tabBarActiveTintColor: colors.white,
+        tabBarInactiveTintColor: colors.text.light,
         headerShown: false,
         tabBarStyle: {
           height: Platform.OS === 'ios' ? 90 : 70,
           paddingBottom: Platform.OS === 'ios' ? 30 : 12,
           paddingTop: 12,
-          backgroundColor: '#26547C',
+          backgroundColor: colors.primary,
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -103,7 +117,6 @@ const TabNavigator = () => {
         },
       })}
     >
-
       <Tab.Screen name="Map" component={MapScreen} options={{ title: 'Mapa' }} />
       <Tab.Screen name="Missions" component={MissionsScreen} options={{ title: 'Misiones' }} />
       <Tab.Screen name="Journal" component={JournalScreen} initialParams={{ refresh: false }} options={{ title: 'Diario' }} />
@@ -135,8 +148,8 @@ const AppNavigator = () => {
   if (authState === 'loading') {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
-          <ActivityIndicator size={24} color="#005F9E" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+          <ActivityIndicator size={24} color={colors.secondary} />
         </View>
       </SafeAreaProvider>
     );
@@ -144,16 +157,16 @@ const AppNavigator = () => {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={true} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={true} />
       <NavigationContainer linking={linking} theme={{
         dark: false,
         colors: {
-          background: '#FFFFFF',
-          border: '#e5e5e5',
-          card: '#FFFFFF',
-          text: '#222222',
-          notification: '#005F9E',
-          primary: '#005F9E',
+          background: colors.background,
+          border: colors.border,
+          card: colors.white,
+          text: colors.text.primary,
+          notification: colors.secondary,
+          primary: colors.primary,
         },
       }}>
         {authState === 'authenticated' ? (
