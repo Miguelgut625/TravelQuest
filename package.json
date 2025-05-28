@@ -6,7 +6,12 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "dev": "node ./src/back-end/server.js & expo start --clear",
+    "dev:api": "node ./src/back-end/server.js",
+    "dev:app": "expo start --clear",
+    "build:android": "eas build -p android --profile preview",
+    "build:android-prod": "eas build -p android --profile production"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
@@ -77,6 +82,7 @@
     "@babel/plugin-transform-optional-catch-binding": "^7.24.0",
     "@babel/plugin-transform-optional-chaining": "^7.24.0",
     "@types/react": "~18.3.12",
+    "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^13.0.0",
     "expo-module-scripts": "^4.0.5",
     "metro-react-native-babel-transformer": "^0.77.0",

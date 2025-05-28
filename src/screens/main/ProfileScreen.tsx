@@ -330,16 +330,10 @@ const ProfileScreen = () => {
         return;
       }
 
-      // Verificar que la sesión se haya cerrado correctamente
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log('Sesión aún activa, intentando cerrar nuevamente');
-        await supabase.auth.signOut();
-      }
-
-      // Una vez que la sesión está cerrada, limpiamos el estado de Redux
+      // Limpiamos el estado de Redux
       console.log('Limpiando estado de Redux');
-      dispatch(logout());
+      dispatch(setUser(null));
+      dispatch(setAuthState('unauthenticated'));
 
       // Forzar la actualización del estado de autenticación
       dispatch(setAuthState('unauthenticated'));
