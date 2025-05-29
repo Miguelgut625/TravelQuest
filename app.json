@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -17,6 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.travelquest.app",
+      "jsEngine": "jsc",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
         "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
@@ -33,14 +35,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "jsEngine": "jsc",
       "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
@@ -88,19 +84,18 @@
           "icon": "./assets/notification-icon.png",
           "color": "#005F9E",
           "sounds": [
-            "./assets/notification-sound.wav"
+            "./assets/notification_sound.wav"
           ]
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "23531f81-440f-4633-a2f0-bbfd404b8c60"
+        "projectId": "f4f1efd8-e4f3-4a4d-bf22-ef7da8e63b99"
       }
     },
-    "newArchEnabled": false,
     "updates": {
-      "url": "https://u.expo.dev/23531f81-440f-4633-a2f0-bbfd404b8c60"
+      "url": "https://u.expo.dev/f4f1efd8-e4f3-4a4d-bf22-ef7da8e63b99"
     }
   }
 }
