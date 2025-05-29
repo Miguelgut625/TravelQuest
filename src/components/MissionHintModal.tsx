@@ -38,10 +38,23 @@ const MissionHintModal: React.FC<MissionHintModalProps> = ({ visible, onClose, m
               setError(null);
               
               const hintData = await getMissionHint(user.id, missionId);
+              if (!hintData || !hintData.hint) {
+                throw new Error('No se pudo obtener una pista válida');
+              }
               setHint(hintData.hint);
             } catch (error: any) {
               console.error('Error al obtener pista:', error);
-              setError(error.message || 'No se pudo obtener la pista. Verifica que tengas suficientes puntos.');
+              let errorMessage = 'No se pudo obtener la pista. ';
+              
+              if (error.response?.status === 400) {
+                errorMessage += 'Verifica que tengas suficientes puntos.';
+              } else if (error.response?.status === 404) {
+                errorMessage += 'La misión no fue encontrada.';
+              } else {
+                errorMessage += 'Inténtalo de nuevo más tarde.';
+              }
+              
+              setError(errorMessage);
             } finally {
               setLoading(false);
             }
@@ -78,7 +91,11 @@ const MissionHintModal: React.FC<MissionHintModalProps> = ({ visible, onClose, m
               <Text style={styles.costInfo}>
                 Costo: {HINT_COST} puntos
               </Text>
-              <TouchableOpacity style={styles.button} onPress={handleGetHint}>
+              <TouchableOpacity 
+                style={styles.button} 
+                onPress={handleGetHint}
+                disabled={loading}
+              >
                 <Text style={styles.buttonText}>Obtener Pista</Text>
               </TouchableOpacity>
             </View>
@@ -107,7 +124,13 @@ const MissionHintModal: React.FC<MissionHintModalProps> = ({ visible, onClose, m
               <Ionicons name="warning" size={30} color="#D32F2F" style={styles.warningIcon} />
               <Text style={styles.errorTitle}>No se pudo obtener la pista</Text>
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={[styles.button, styles.tryAgainButton]} onPress={() => setError(null)}>
+              <TouchableOpacity 
+                style={[styles.button, styles.tryAgainButton]} 
+                onPress={() => {
+                  setError(null);
+                  handleGetHint();
+                }}
+              >
                 <Text style={styles.buttonText}>Volver a intentar</Text>
               </TouchableOpacity>
             </View>
@@ -200,44 +223,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center'
+    marginTop: 10,
+    color: '#005F9E',
+    fontSize: 16
   },
   hintResultContainer: {
-    padding: 15,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 10,
-    alignItems: 'center'
+    padding: 20
   },
   infoIcon: {
-    marginBottom: 10
+    marginBottom: 15,
+    alignSelf: 'center'
   },
   hintTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 10
+    marginBottom: 10,
+    textAlign: 'center'
   },
   hintText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
+    color: '#555',
     lineHeight: 24,
-    marginBottom: 20
+    marginBottom: 20,
+    textAlign: 'center'
   },
   closeHintButton: {
     backgroundColor: '#4CAF50'
   },
   errorContainer: {
-    padding: 15,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 10,
+    padding: 20,
     alignItems: 'center'
   },
   warningIcon: {
-    marginBottom: 10
+    marginBottom: 15
   },
   errorTitle: {
     fontSize: 18,
@@ -247,12 +266,12 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#333',
+    color: '#666',
     textAlign: 'center',
     marginBottom: 20
   },
   tryAgainButton: {
-    backgroundColor: '#FF5722'
+    backgroundColor: '#D32F2F'
   }
 });
 

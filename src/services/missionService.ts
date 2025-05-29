@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import axios from 'axios';
+import { API_URL } from '../config/api';
 import { addPointsToUser, deductPointsFromUser } from './pointsService';
 import { generateMissionHint } from './aiService';
 
@@ -8,7 +9,7 @@ export const HINT_COST = 15;
 // Interfaz para la pista
 export interface MissionHint {
   hint: string;
-  missionId: string;
+  missionId?: string;
 }
 
 /**
@@ -19,80 +20,40 @@ export interface MissionHint {
  */
 export const getMissionHint = async (userId: string, missionId: string): Promise<MissionHint> => {
   try {
-    // Verificar si hay puntos suficientes
-    await deductPointsFromUser(userId, HINT_COST);
-
-    // Obtener información de la misión para generar una pista contextualizada
-    const { data: missionData, error: missionError } = await supabase
-      .from('journeys_missions')
-      .select(`
-        id,
-        journeyId,
-        challengeId,
-        journeys (
-          id, 
-          cities (
-            name
-          )
-        ),
-        challenges (
-          id,
-          title,
-          description,
-          difficulty
-        )
-      `)
-      .eq('id', missionId)
-      .single();
-
-    if (missionError || !missionData) {
-      throw missionError || new Error('No se encontró la misión');
+    console.log('Solicitando pista con:', { userId, missionId, url: `${API_URL}/missions/hint/${userId}/${missionId}` });
+    
+    const response = await axios.get(`${API_URL}/missions/hint/${userId}/${missionId}`);
+    console.log('Respuesta del servidor:', response.data);
+    
+    const data = response.data as { hint: string; missionId?: string };
+    
+    // Validar que la respuesta tenga la estructura correcta
+    if (!data || typeof data.hint !== 'string') {
+      console.error('Respuesta inválida:', data);
+      throw new Error('Respuesta inválida del servidor');
     }
 
-    const missionTitle = missionData.challenges.title;
-    const missionDescription = missionData.challenges.description;
-    // Obtener el nombre de la ciudad a través de la relación con journeys
-    const cityName = missionData.journeys?.cities?.name || 'Ciudad desconocida';
-    
-    // Generar pista utilizando AI
-    const hint = await generateMissionHint(
-      missionDescription,
-      missionTitle,
-      cityName
-    );
-
-    // Registrar el uso de la pista
-    await supabase
-      .from('mission_hints')
-      .insert([
-        {
-          userId,
-          missionId,
-          hint,
-          created_at: new Date().toISOString()
-        }
-      ]);
-
     return {
-      hint,
-      missionId
+      hint: data.hint,
+      missionId: data.missionId || missionId
     };
-  } catch (error) {
-    console.error('Error al obtener pista para la misión:', error);
+  } catch (error: any) {
+    console.error('Error detallado al obtener pista:', {
+      error: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: `${API_URL}/missions/hint/${userId}/${missionId}`
+    });
     throw error;
   }
 };
 
 export const getMissionsByCityAndDuration = async (city: string, duration: number) => {
   try {
-    const { data, error } = await supabase
-      .from('missions')
-      .select('*')
-      .eq('city', city)
-      .lte('duration', duration);
-
-    if (error) throw error;
-    return data;
+    const response = await axios.get(`${API_URL}/missions/city`, {
+      params: { city, duration }
+    });
+    return response.data;
   } catch (error) {
     console.error('Error fetching missions:', error);
     throw error;

@@ -1,13 +1,22 @@
-const { Router } = require('express');
-const { getCities, getCityById, createCity, updateCity, deleteCity } = require('../controllers/cityController.js');
-
-const router = Router();
+const express = require('express');
+const router = express.Router();
+const {
+  getCities,
+  getCityById,
+  getCitiesByCountry,
+  searchCities,
+  createCity,
+  updateCity,
+  deleteCity
+} = require('../controllers/cityController');
 
 // Rutas para ciudades
-router.get('/', getCities); // Obtener todas las ciudades ✓ 
-router.get('/:id', getCityById); // Obtener una ciudad por ID ✓
-router.post('/', createCity); // Crear una nueva ciudad ✘
-router.put('/:id', updateCity); // Actualizar una ciudad ✘
-router.delete('/:id', deleteCity); // Eliminar una ciudad ✘
+router.get('/', getCities);
+router.get('/:id', getCityById);
+router.get('/country/:countryId', getCitiesByCountry);
+router.get('/search', searchCities);
+router.post('/', createCity);
+router.put('/:id', updateCity);
+router.delete('/:id', deleteCity);
 
 module.exports = router;

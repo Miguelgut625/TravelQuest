@@ -1,14 +1,20 @@
-const { Router } = require('express');
-const { getJourneys, getJourneyById, createJourney, updateJourney, deleteJourney, getJourneysByUserId } = require('../controllers/journeysController.js');
-
-const router = Router();
+const express = require('express');
+const router = express.Router();
+const {
+  getJourneyById,
+  getJourneysByUser,
+  createJourney,
+  updateJourney,
+  deleteJourney,
+  shareJourney
+} = require('../controllers/journeyController');
 
 // Rutas para viajes
-router.get('/', getJourneys); // Obtener todos los viajes ✓
-router.get('/:id', getJourneyById); // Obtener un viaje por ID ✓
-router.post('/', createJourney); // Crear un nuevo viaje ✘
-router.put('/:id', updateJourney); // Actualizar un viaje ✘
-router.delete('/:id', deleteJourney); // Eliminar un viaje ✘
-router.get('/user/:id', getJourneysByUserId); // Obtener viajes por userId ✓
+router.get('/:id', getJourneyById);
+router.get('/user/:userId', getJourneysByUser);
+router.post('/', createJourney);
+router.put('/:id', updateJourney);
+router.delete('/:id', deleteJourney);
+router.post('/:id/share', shareJourney);
 
-module.exports = router
+module.exports = router;

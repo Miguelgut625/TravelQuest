@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import axios from 'axios';
+import { API_URL } from '../config/api';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Accede a tu clave de API como una variable de entorno
@@ -189,30 +190,11 @@ export const generateMission = async (
   useLogicalOrder: boolean = false
 ) => {
   try {
-    console.log('generateMission recibió fechas:', {
-      startDate,
-      endDate,
-      duration
-    });
+    // Limpiar el nombre de la ciudad
+    const cleanCityName = cityName.trim();
 
-    console.log('Tags seleccionados:', tags);
-    console.log('Orden lógico:', useLogicalOrder);
-
-    // Crear fechas por defecto si no se proporcionan
-    const validStartDate = startDate instanceof Date ? startDate : new Date();
-    const validEndDate = endDate instanceof Date ? endDate : new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
-
-    // Convertir a ISO string para la base de datos
-    const startIsoString = validStartDate.toISOString();
-    const endIsoString = validEndDate.toISOString();
-
-    console.log('Fechas validadas para misiones:', {
-      startIsoString,
-      endIsoString
-    });
-
-    console.log('Iniciando generación de misión:', {
-      cityName,
+    console.log('generateMission recibió parámetros:', {
+      cityName: cleanCityName,
       duration,
       missionCount,
       userId,
@@ -222,218 +204,48 @@ export const generateMission = async (
       useLogicalOrder
     });
 
-    // Verificar y crear usuario si no existe
-    await getOrCreateUser(userId);
-
-    // Primero, usar Gemini para corregir el nombre de la ciudad
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const cityCorrectionPrompt = `Corrige el nombre de la ciudad "${cityName}" al nombre oficial y correcto. 
-    Devuelve SOLO el nombre corregido, sin explicaciones ni formato adicional. 
-    Por ejemplo, si el usuario escribe "akilante", debes devolver "Alicante".`;
-
-    console.log('Prompt de corrección de ciudad:', cityCorrectionPrompt);
-    const cityCorrectionResult = await model.generateContent(cityCorrectionPrompt);
-    const cityCorrectionResponse = await cityCorrectionResult.response;
-    const correctedCityName = cityCorrectionResponse.text().trim();
-
-    console.log('Nombre de ciudad corregido:', correctedCityName);
-
-    // Obtener o crear la ciudad con el nombre corregido
-    const cityId = await getOrCreateCity(correctedCityName, userId);
-    console.log('CityId obtenido/creado:', cityId);
-
-    // Crear un nuevo journey
-    const { data: journey, error: journeyError } = await supabase
-      .from('journeys')
-      .insert([{
-        userId,
-        cityId,
-        description: `Viaje a ${correctedCityName} por ${duration} días`,
-        created_at: new Date().toISOString(),
-        start_date: startIsoString,
-        end_date: endIsoString
-      }])
-      .select('id')
-      .single();
-
-    if (journeyError) {
-      console.error('Error creando journey:', journeyError);
-      throw journeyError;
+    // Validar parámetros requeridos
+    if (!cleanCityName || !duration || !userId) {
+      throw new Error('Faltan parámetros requeridos: cityName, duration, userId');
     }
 
-    console.log('Journey creado:', journey);
+    // Convertir las fechas a formato ISO
+    const formattedStartDate = startDate ? startDate.toISOString() : null;
+    const formattedEndDate = endDate ? endDate.toISOString() : null;
 
-    // Verificar si hay suficientes desafíos existentes que el usuario no haya solicitado
-    const existingChallenges = await getExistingChallenges(cityId, missionCount, userId);
-    console.log('Desafíos existentes encontrados:', existingChallenges);
+    console.log('Enviando request a la API con datos:', {
+      cityName: cleanCityName,
+      duration,
+      missionCount,
+      userId,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+      tags,
+      useLogicalOrder
+    });
 
-    let challenges;
-    if (existingChallenges && existingChallenges.length > 0) {
-      // Usar desafíos existentes
-      console.log('Usando desafíos existentes');
-      challenges = existingChallenges;
-    } else {
-      // Solo generar nuevos desafíos si no hay suficientes existentes
-      console.log('Generando nuevos desafíos');
+    const response = await axios.post(`${API_URL}/missions/generate`, {
+      cityName: cleanCityName,
+      duration,
+      missionCount,
+      userId,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+      tags,
+      useLogicalOrder
+    });
 
-      // Preparar la parte de preferencias para el prompt
-      let preferencesText = '';
-      if (tags && tags.length > 0) {
-        preferencesText = `Las misiones deben basarse en las siguientes preferencias del usuario: ${tags.join(', ')}.`;
-      }
-
-      // Añadir instrucción de orden lógico si está activado
-      let orderText = '';
-      if (useLogicalOrder) {
-        orderText = `Las misiones deben seguir un orden lógico de visita, considerando la ubicación y el tiempo de visita de cada lugar. Por ejemplo, en la ciudad de Alicante, puede ser primero el teatro, el ayuntamiento y el castillo luego la explanada y por último el puerto, siguiendo un orden para no tener que volver atras a completar la siguiente misión.`;
-      }
-
-      // Generar nuevos desafíos
-      const missionPrompt = `Genera ${missionCount} misiones en ${correctedCityName} que se puedan completar en ${duration} días. ${preferencesText} ${orderText}
-      
-Devuelve un objeto JSON con la siguiente estructura exacta:
-{
-  "misiones": [
-    {
-      "Título": "Título de la misión",
-      "Descripción": "Descripción muy detallada y muy descriptiva de la misión incluyendo qué foto tomar y recomendaciones de que hacer por la zona, pide solo una foto y que sea relativamente facil de conseguir es decir no pidas una fota en una hora del dia o no pidas una foto de un sitio que es iliegal la entrada, intenta no repetir las mismas misiones",
-      "Dificultad": "Fácil|Media|Difícil",
-      "Puntos": 25|50|100
-    }
-  ]
-}
-Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No incluyas explicaciones adicionales, solo el JSON.`;
-
-      console.log('Prompt de misiones:', missionPrompt);
-      const result = await model.generateContent(missionPrompt);
-      const response = await result.response;
-      const missionsData = response.text();
-
-      console.log('Respuesta de la API:', missionsData);
-
-      const jsonMatch = missionsData.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No se encontró un objeto JSON válido en la respuesta');
-      }
-
-      const missions = JSON.parse(jsonMatch[0]);
-
-      if (!missions.misiones || !Array.isArray(missions.misiones)) {
-        throw new Error('La respuesta no contiene un array de misiones válido');
-      }
-
-      // Crear los desafíos
-      const formattedChallenges = missions.misiones.map((mission: any) => ({
-        title: mission.Título,
-        description: mission.Descripción,
-        cityId,
-        duration,
-        difficulty: mission.Dificultad,
-        points: mission.Puntos
-      }));
-
-      const { data: newChallenges, error: challengesError } = await supabase
-        .from('challenges')
-        .insert(formattedChallenges)
-        .select('id');
-
-      if (challengesError) throw challengesError;
-
-      challenges = newChallenges;
-    }
-
-    // Vincular los desafíos al journey
-    const journeyMissions = challenges.map((challenge: { id: string }, index: number) => ({
-      journeyId: journey.id,
-      challengeId: challenge.id,
-      completed: false,
-      created_at: new Date().toISOString(),
-      start_date: startIsoString,
-      end_date: endIsoString,
-      route_id: useLogicalOrder ? null : null, // Se actualizará después de crear la ruta
-      order_index: useLogicalOrder ? index + 1 : null
-    }));
-
-    console.log('Vincular misiones al journey:', journeyMissions);
-
-    const { error: linkError } = await supabase
-      .from('journeys_missions')
-      .insert(journeyMissions);
-
-    if (linkError) {
-      console.error('Error vinculando misiones:', linkError);
-      throw linkError;
-    }
-
-    // Verificar que las misiones se hayan creado correctamente
-    const { data: createdMissions, error: verifyError } = await supabase
-      .from('journeys_missions')
-      .select(`
-        id,
-        challengeId,
-        completed,
-        challenge:challenges (
-        title,
-        description,
-        difficulty,
-          points
-        )
-      `)
-      .eq('journeyId', journey.id)
-      .order('created_at', { ascending: true });
-
-    if (verifyError) {
-      console.error('Error verificando misiones creadas:', verifyError);
-      throw verifyError;
-    }
-
-    if (!createdMissions || createdMissions.length === 0) {
-      throw new Error('No se pudieron crear las misiones');
-    }
-
-    console.log('Misiones creadas verificadas:', createdMissions);
-
-    // Si se selecciona orden lógico, crear una ruta y actualizar las misiones
-    let routeId = null;
-    if (useLogicalOrder) {
-      const { data: route, error: routeError } = await supabase
-        .from('routes')
-        .insert([{
-          journey_id: journey.id,
-          name: `Ruta de ${correctedCityName}`,
-          description: `Ruta lógica de misiones en ${correctedCityName}`,
-          order_index: 1
-        }])
-        .select('id')
-        .single();
-
-      if (routeError) {
-        console.error('Error creando ruta:', routeError);
-        throw routeError;
-      }
-
-      routeId = route.id;
-
-      // Actualizar las misiones con el routeId
-      const { error: updateError } = await supabase
-        .from('journeys_missions')
-        .update({ route_id: routeId })
-        .eq('journeyId', journey.id);
-
-      if (updateError) {
-        console.error('Error actualizando misiones con routeId:', updateError);
-        throw updateError;
-      }
-    }
-
-    return {
-      journeyId: journey.id,
-      challenges: createdMissions,
-      routeId: routeId
-    };
-  } catch (error) {
+    console.log('Respuesta de la API:', response.data);
+    return response.data;
+  } catch (error: any) {
     console.error('Error generando misiones:', error);
+    if (error.response) {
+      console.error('Detalles del error:', {
+        status: error.response.status,
+        data: error.response.data
+      });
+      throw new Error(error.response.data.error || 'Error al generar misiones');
+    }
     throw error;
   }
 };

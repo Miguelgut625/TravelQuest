@@ -8,6 +8,9 @@ const badgeRoutes = require('./routes/badgeRoutes.js');
 const leaderboardRoutes = require('./routes/leaderboardRoutes.js');
 const journalRoutes = require('./routes/journalRoutes.js');
 const profileRoutes = require('./routes/profileRoutes');
+const missionRoutes = require('./routes/missionRoutes.js');
+const routeRoutes = require('./routes/routeRoutes.js');
+const journeyRoutes = require('./routes/journeyRoutes.js');
 
 const app = express();
 
@@ -24,6 +27,9 @@ app.use('/friends', friendRoutes);
 app.use('/badges', badgeRoutes);
 app.use('/leaderboard', leaderboardRoutes);
 app.use('/profile', profileRoutes);
+app.use('/missions', missionRoutes);
+app.use('/routes', routeRoutes);
+app.use('/journeys', journeyRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {

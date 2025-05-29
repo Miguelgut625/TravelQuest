@@ -21,6 +21,7 @@ import { RouteProp } from '@react-navigation/native';
 import { getOrCreateCity } from '../../services/missionGenerator';
 import MissionHintModal from '../../components/MissionHintModal';
 import CreateMissionForm from '../../components/CreateMissionForm';
+import { shareJourney } from '../../services/shareService';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -129,6 +130,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
 }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showHintModal, setShowHintModal] = useState(false);
+  const user = useSelector((state: RootState) => state.auth.user);
   let timeRemaining = getTimeRemaining(mission.end_date);
   let isExpired = timeRemaining.isExpired && !mission.completed;
   let isNotStarted = false;
@@ -160,6 +162,10 @@ const MissionCard = ({ mission, onComplete, onShare }: {
 
   const handleShowHint = (e: any) => {
     e.stopPropagation();
+    if (!user?.id) {
+      Alert.alert('Error', 'Debes iniciar sesión para obtener pistas');
+      return;
+    }
     setShowHintModal(true);
   };
 
@@ -938,21 +944,16 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   }, [missionCompleted, navigation]);
 
   const handleShareJourney = async (friend: Friend) => {
-    if (!journeyId) {
-      Alert.alert('Error', 'No se pudo compartir el journey porque no se encontró el ID del viaje.');
+    if (!journeyId || !user?.id) {
+      Alert.alert('Error', 'No se pudo compartir el journey porque no se encontró el ID del viaje o no estás autenticado.');
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('journeys_shared')
-        .insert({
-          journeyId: journeyId,
-          ownerId: user?.id || '',
-          sharedWithUserId: friend.user2Id
-        });
-      if (error) throw error;
-      Alert.alert('Éxito', `Journey compartido con ${friend.username}`);
+      const success = await shareJourney(journeyId, user.id, friend);
+      if (success) {
+        Alert.alert('Éxito', `Journey compartido con ${friend.username}`);
+      }
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'No se pudo compartir el journey');
