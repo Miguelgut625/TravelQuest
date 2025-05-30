@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
 
 interface CloudinaryConfigGuideProps {
   onClose: () => void;
@@ -9,7 +8,7 @@ interface CloudinaryConfigGuideProps {
 
 const CloudinaryConfigGuide: React.FC<CloudinaryConfigGuideProps> = ({ onClose }) => {
   const openCloudinaryWebsite = () => {
-    WebBrowser.openBrowserAsync('https://cloudinary.com/');
+    Linking.openURL('https://cloudinary.com/');
   };
 
   return (
@@ -91,7 +90,7 @@ const CloudinaryConfigGuide: React.FC<CloudinaryConfigGuideProps> = ({ onClose }
 
           <Text style={styles.sectionTitle}>¿Necesitas ayuda?</Text>
           <Text style={styles.paragraph}>
-            Si encuentras problemas, consulta la <Text style={styles.link} onPress={() => WebBrowser.openBrowserAsync('https://cloudinary.com/documentation')}>documentación oficial de Cloudinary</Text> o
+            Si encuentras problemas, consulta la <Text style={styles.link} onPress={() => Linking.openURL('https://cloudinary.com/documentation')}>documentación oficial de Cloudinary</Text> o
             ponte en contacto con el soporte de tu aplicación.
           </Text>
         </ScrollView>
