@@ -1000,9 +1000,15 @@ const MapScreen = () => {
       {/* Barra superior con botón para expandir/colapsar */}
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>TravelQuest</Text>
-        <TouchableOpacity onPress={toggleFormCollapse} style={styles.collapseButton}>
-          <Ionicons name={isFormCollapsed ? "chevron-down-outline" : "close"} size={24} color="white" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => setShowEventsModal(true)} style={styles.eventsHeaderButton}>
+            <Ionicons name="calendar" size={20} color="#FFD700" style={{ marginRight: 4 }} />
+            <Text style={styles.eventsHeaderButtonText}>Ver Eventos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={toggleFormCollapse} style={styles.collapseButton}>
+            <Ionicons name={isFormCollapsed ? "chevron-down-outline" : "close"} size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Formulario de búsqueda */}
@@ -1233,15 +1239,6 @@ const MapScreen = () => {
         </View>
       )}
 
-      {/* Botón flotante para ver eventos */}
-      <TouchableOpacity
-        style={styles.eventButton}
-        onPress={() => setShowEventsModal(true)}
-      >
-        <Ionicons name="star" size={24} color="#FFF" />
-        <Text style={styles.eventButtonText}>Ver Eventos</Text>
-      </TouchableOpacity>
-
       {/* Modal para mostrar las misiones de evento */}
       {showEventsModal && (
         <Modal animationType="slide" onRequestClose={() => setShowEventsModal(false)}>
@@ -1316,7 +1313,7 @@ const MapScreen = () => {
                         mode="contained"
                         onPress={() => handleAcceptEventMission(mission)}
                         style={{ marginTop: 8 }}
-                        disabled={!haComenzado || (userEventMissions && userEventMissions[mission.id])}
+                        disabled={Boolean(!haComenzado || (userEventMissions && userEventMissions[mission.id]))}
                       >
                         {!haComenzado
                           ? 'Disponible próximamente'
@@ -2196,6 +2193,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     padding: 24,
     paddingTop: 48,
+  },
+  eventsHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  eventsHeaderButtonText: {
+    color: '#FFD700',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
