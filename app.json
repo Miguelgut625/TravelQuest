@@ -23,6 +23,9 @@
         "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para tomar fotos de tus misiones.",
         "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a tu biblioteca de fotos para seleccionar imágenes de tus misiones.",
         "NSUserNotificationUsageDescription": "Necesitamos permisos para enviarte notificaciones sobre nuevos mensajes y actividades."
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -36,7 +39,15 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.travelquest.app",
       "googleServicesFile": "./google-services.json",
@@ -44,7 +55,8 @@
         "googleMaps": {
           "apiKey": "MAPS_API_KEY"
         }
-      }
+      },
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -75,15 +87,20 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#005F9E",
-          "sounds": ["./assets/notification-sound.wav"]
+          "sounds": [
+            "./assets/notification-sound.wav"
+          ]
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "3bcb2257-c4b1-4975-9dd4-d7d6c6b3b8a1"
       }
     },
-    "newArchEnabled": false
+    "newArchEnabled": false,
+    "updates": {
+      "url": "https://u.expo.dev/3bcb2257-c4b1-4975-9dd4-d7d6c6b3b8a1"
+    }
   }
 }
