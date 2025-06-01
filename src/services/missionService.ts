@@ -59,3 +59,70 @@ export const getMissionsByCityAndDuration = async (city: string, duration: numbe
     throw error;
   }
 };
+
+export const getMissionById = async (missionId: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/missions/${missionId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching mission:', error);
+    throw error;
+  }
+};
+
+export const getMissionsByUser = async (userId: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/missions/user/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user missions:', error);
+    throw error;
+  }
+};
+
+export const updateMissionProgress = async (userId: string, missionId: string, progress: number) => {
+  try {
+    const response = await axios.put(`${API_URL}/missions/${missionId}/progress`, {
+      userId,
+      progress
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating mission progress:', error);
+    throw error;
+  }
+};
+
+export const getEventMissions = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/missions/events`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching event missions:', error);
+    throw error;
+  }
+};
+
+export const getUserEventMissions = async (userId: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/missions/events/user/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user event missions:', error);
+    throw error;
+  }
+};
+
+export const acceptEventMission = async (userId: string, missionId: string, cityId: string, startDate?: string, endDate?: string) => {
+  try {
+    const response = await axios.post(`${API_URL}/missions/events/${userId}/${missionId}/accept`, {
+      cityId,
+      start_date: startDate,
+      end_date: endDate
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error accepting event mission:', error);
+    throw error;
+  }
+};

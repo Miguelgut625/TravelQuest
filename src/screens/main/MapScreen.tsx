@@ -27,6 +27,7 @@ import NotificationService from '../../services/NotificationService';
 import { getFriends } from '../../services/friendService';
 import { Button } from 'react-native-paper';
 import { createClient } from '@supabase/supabase-js';
+import { getEventMissions, getUserEventMissions, acceptEventMission } from '../../services/missionService';
 
 interface City {
   id: string;
@@ -859,20 +860,12 @@ const MapScreen = () => {
 
   // Función para cargar misiones de evento y ciudades
   const fetchEventMissions = async () => {
-    const { data, error } = await supabase
-      .from('challenges')
-      .select('*');
-    if (!error) setEventMissions((data || []).filter(m => m.is_event));
-    // Obtener nombres de ciudades para las misiones de evento
-    const cityIds = [...new Set((data || []).filter(m => m.is_event && m.cityId).map(m => m.cityId))];
-    if (cityIds.length > 0) {
-      const { data: citiesData } = await supabase
-        .from('cities')
-        .select('id, name')
-        .in('id', cityIds);
-      const cityMap = {};
-      (citiesData || []).forEach(c => { cityMap[c.id] = c.name; });
-      setEventCities(cityMap);
+    try {
+      const { missions, cities } = await getEventMissions();
+      setEventMissions(missions.filter(m => m.is_event));
+      setEventCities(cities);
+    } catch (error) {
+      console.error('Error fetching event missions:', error);
     }
   };
 
@@ -898,19 +891,11 @@ const MapScreen = () => {
   // Cargar misiones de evento ya aceptadas por el usuario
   const fetchUserEventMissions = async () => {
     if (!user || !user.id) return;
-    const { data, error } = await supabase
-      .from('journeys')
-      .select('id, cityId, journeys_missions (challengeId)')
-      .eq('userId', user.id);
-    if (!error && data) {
-      // Mapear: { [challengeId]: journeyId }
-      const accepted = {};
-      data.forEach(journey => {
-        (journey.journeys_missions || []).forEach(jm => {
-          accepted[jm.challengeId] = journey.id;
-        });
-      });
+    try {
+      const accepted = await getUserEventMissions(user.id);
       setUserEventMissions(accepted);
+    } catch (error) {
+      console.error('Error fetching user event missions:', error);
     }
   };
 
@@ -934,53 +919,15 @@ const MapScreen = () => {
         Alert.alert('Error', 'La misión de evento no tiene una ciudad asociada.');
         return;
       }
-      // Buscar journey existente para la ciudad
-      let journeyId = null;
-      const { data: journeys, error: journeyError } = await supabase
-        .from('journeys')
-        .select('id')
-        .eq('userId', user.id)
-        .eq('cityId', cityId);
-      if (journeyError) {
-        Alert.alert('Error', 'No se pudo comprobar tus viajes.');
-        return;
-      }
-      if (journeys && journeys.length > 0) {
-        journeyId = journeys[0].id;
-      } else {
-        // Crear un nuevo journey para la ciudad
-        const { data: newJourney, error: newJourneyError } = await supabase
-          .from('journeys')
-          .insert({
-            userId: user.id,
-            cityId: cityId,
-            description: `Viaje a evento`,
-            created_at: new Date().toISOString(),
-          })
-          .select('id')
-          .single();
-        if (newJourneyError || !newJourney) {
-          Alert.alert('Error', 'No se pudo crear un viaje para la misión de evento.');
-          return;
-        }
-        journeyId = newJourney.id;
-      }
-      // Insertar la misión de evento en journeys_missions (permitir duplicados para pruebas)
-      const { error: insertError } = await supabase
-        .from('journeys_missions')
-        .insert({
-          journeyId: journeyId,
-          challengeId: mission.id,
-          completed: false,
-          created_at: new Date().toISOString(),
-          // Añadimos las fechas del challenge para que la misión tenga el rango correcto
-          start_date: mission.start_date || null,
-          end_date: mission.end_date || null,
-        });
-      if (insertError) {
-        Alert.alert('Error', 'No se pudo añadir la misión de evento a tu viaje.');
-        return;
-      }
+
+      const { journeyId } = await acceptEventMission(
+        user.id,
+        mission.id,
+        cityId,
+        mission.start_date,
+        mission.end_date
+      );
+
       Alert.alert('¡Listo!', 'La misión de evento ha sido añadida a tus misiones.');
       setShowEventsModal(false);
       navigation.navigate('Missions', {

@@ -377,8 +377,139 @@ Los puntos deben ser: 25 para Fácil, 50 para Media, 100 para Difícil. No inclu
   }
 };
 
+// Obtener misiones de evento
+const getEventMissions = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('challenges')
+      .select('*')
+      .eq('is_event', true);
+
+    if (error) throw error;
+
+    // Obtener nombres de ciudades para las misiones de evento
+    const cityIds = [...new Set((data || []).filter(m => m.cityId).map(m => m.cityId))];
+    let cityMap = {};
+    
+    if (cityIds.length > 0) {
+      const { data: citiesData, error: citiesError } = await supabase
+        .from('cities')
+        .select('id, name')
+        .in('id', cityIds);
+
+      if (citiesError) throw citiesError;
+
+      cityMap = (citiesData || []).reduce((acc, city) => {
+        acc[city.id] = city.name;
+        return acc;
+      }, {});
+    }
+
+    res.status(200).json({
+      missions: data,
+      cities: cityMap
+    });
+  } catch (error) {
+    console.error('Error al obtener misiones de evento:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Obtener misiones de evento de un usuario
+const getUserEventMissions = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from('journeys')
+      .select('id, cityId, journeys_missions (challengeId)')
+      .eq('userId', userId);
+
+    if (error) throw error;
+
+    // Mapear: { [challengeId]: journeyId }
+    const accepted = {};
+    data.forEach(journey => {
+      (journey.journeys_missions || []).forEach(jm => {
+        accepted[jm.challengeId] = journey.id;
+      });
+    });
+
+    res.status(200).json(accepted);
+  } catch (error) {
+    console.error('Error al obtener misiones de evento del usuario:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// Aceptar misión de evento
+const acceptEventMission = async (req, res) => {
+  const { userId, missionId } = req.params;
+  const { cityId } = req.body;
+
+  try {
+    if (!cityId) {
+      return res.status(400).json({ error: 'La misión de evento no tiene una ciudad asociada' });
+    }
+
+    // Buscar journey existente para la ciudad
+    let journeyId = null;
+    const { data: journeys, error: journeyError } = await supabase
+      .from('journeys')
+      .select('id')
+      .eq('userId', userId)
+      .eq('cityId', cityId);
+
+    if (journeyError) throw journeyError;
+
+    if (journeys && journeys.length > 0) {
+      journeyId = journeys[0].id;
+    } else {
+      // Crear un nuevo journey para la ciudad
+      const { data: newJourney, error: newJourneyError } = await supabase
+        .from('journeys')
+        .insert({
+          userId: userId,
+          cityId: cityId,
+          description: `Viaje a evento`,
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (newJourneyError) throw newJourneyError;
+      journeyId = newJourney.id;
+    }
+
+    // Insertar la misión de evento en journeys_missions
+    const { error: insertError } = await supabase
+      .from('journeys_missions')
+      .insert({
+        journeyId: journeyId,
+        challengeId: missionId,
+        completed: false,
+        created_at: new Date().toISOString(),
+        start_date: req.body.start_date || null,
+        end_date: req.body.end_date || null,
+      });
+
+    if (insertError) throw insertError;
+
+    res.status(200).json({ 
+      message: 'Misión de evento aceptada exitosamente',
+      journeyId 
+    });
+  } catch (error) {
+    console.error('Error al aceptar misión de evento:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getMissionsByCityAndDuration,
   getMissionHint,
-  generateMission
+  generateMission,
+  getEventMissions,
+  getUserEventMissions,
+  acceptEventMission
 }; 
