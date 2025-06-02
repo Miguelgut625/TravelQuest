@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import { getForecastByCity, getForecastByCoordinates } from '../services/weatherService';
+import { colors, commonStyles, typography, spacing, shadows, borderRadius } from '../styles/theme';
 
 // API key de OpenWeatherMap
 const OPENWEATHERMAP_API_KEY = Constants.expoConfig?.extra?.openWeatherMapApiKey || '7b4032296ff42f3251c5b97a5eff8ef7';
@@ -237,95 +238,65 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 15,
+    ...commonStyles.modalOverlay,
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    width: '100%',
-    maxWidth: 500,
-    maxHeight: '85%',
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    ...commonStyles.modalContent,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    ...commonStyles.modalHeader,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    ...typography.h3,
+    color: colors.text.primary,
   },
   modalBody: {
-    padding: 16,
+    ...commonStyles.modalBody,
   },
   loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...commonStyles.loadingContainer,
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
+    ...typography.body,
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
   },
   errorContainer: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...commonStyles.errorContainer,
   },
   errorText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#D32F2F',
+    ...typography.body,
+    color: colors.error,
     textAlign: 'center',
+    marginTop: spacing.sm,
   },
   retryButton: {
-    marginTop: 15,
-    backgroundColor: '#005F9E',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+    ...commonStyles.button,
+    marginTop: spacing.md,
   },
   retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    ...commonStyles.buttonText,
   },
   forecastContainer: {
-    padding: 8,
+    padding: spacing.sm,
   },
   forecastCard: {
-    marginBottom: 10,
-    elevation: 2,
+    ...commonStyles.card,
+    marginBottom: spacing.sm,
   },
   forecastDayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   forecastDay: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    ...typography.h3,
+    color: colors.text.primary,
   },
   forecastDate: {
-    fontSize: 14,
-    color: '#666',
+    ...typography.small,
+    color: colors.text.secondary,
   },
   forecastRow: {
     flexDirection: 'row',

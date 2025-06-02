@@ -10,6 +10,7 @@ import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, commonStyles, carouselStyles, typography, spacing, shadows, borderRadius } from '../../styles/theme';
 
 interface JournalScreenProps {
   route: RouteProp<TabParamList, 'Journal'>;
@@ -485,22 +486,6 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   );
 };
 
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
-
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -514,16 +499,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 15,
-    marginTop: 20
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    marginTop: spacing.xl,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    ...typography.h2,
     color: colors.text.light,
     letterSpacing: 1,
-    marginTop: 30,
+    marginTop: spacing.xl,
   },
   backButton: {
     backgroundColor: '#EDF6F9',
@@ -622,9 +606,9 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   contentContainer: {
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   cityCardContainer: {
     flex: 1,
@@ -655,99 +639,91 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.text.light,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    borderRadius: borderRadius.medium,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.medium,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: spacing.xs,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...typography.h3,
     flex: 1,
-    color: '#005F9E',
+    color: colors.primary,
     letterSpacing: 1,
   },
   detailButton: {
-    padding: 5,
+    padding: spacing.xs,
   },
   cardDate: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 10,
+    color: colors.text.secondary,
+    ...typography.small,
+    marginBottom: spacing.sm,
   },
   cardAuthor: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 10,
+    color: colors.text.secondary,
+    ...typography.small,
+    marginBottom: spacing.sm,
     fontStyle: 'italic',
   },
   cardContent: {
-    color: '#333',
-    marginBottom: 10,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
     lineHeight: 20,
   },
   expandText: {
-    color: '#005F9E',
+    color: colors.primary,
     fontStyle: 'italic',
-    marginBottom: 10,
-    fontSize: 12,
+    marginBottom: spacing.sm,
+    ...typography.small,
   },
   collapseText: {
-    color: '#005F9E',
+    color: colors.primary,
     fontStyle: 'italic',
-    fontSize: 12,
+    ...typography.small,
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   viewDetailButton: {
-    backgroundColor: '#005F9E',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.small,
   },
   viewDetailText: {
-    color: 'white',
-    fontSize: 12,
+    color: colors.white,
+    ...typography.small,
     fontWeight: 'bold',
   },
   photoGrid: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   thumbnail: {
     width: 80,
     height: 80,
-    borderRadius: 5,
-    marginRight: 5,
+    borderRadius: borderRadius.small,
+    marginRight: spacing.xs,
   },
   morePhotos: {
     width: 80,
     height: 80,
-    backgroundColor: '#005F9E',
-    borderRadius: 5,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.small,
     justifyContent: 'center',
     alignItems: 'center',
   },
   morePhotosText: {
-    color: 'white',
-    fontSize: 16,
+    color: colors.white,
+    ...typography.body,
     fontWeight: 'bold',
   },
   tags: {
@@ -755,9 +731,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tag: {
-    color: '#005F9E',
-    marginRight: 10,
-    fontSize: 12,
+    color: colors.primary,
+    marginRight: spacing.sm,
+    ...typography.small,
   },
   loadingContainer: {
     flex: 1,
@@ -845,24 +821,24 @@ const styles = StyleSheet.create({
   },
   aiGeneratedContent: {
     fontStyle: 'normal',
-    color: '#333',
+    color: colors.text.primary,
     lineHeight: 22,
   },
   aiGeneratedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#7F5AF0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.medium,
     alignSelf: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   aiGeneratedText: {
-    color: '#FFF',
-    fontSize: 12,
+    color: colors.white,
+    ...typography.small,
     fontWeight: 'bold',
-    marginLeft: 4,
+    marginLeft: spacing.xs,
   },
 });
 

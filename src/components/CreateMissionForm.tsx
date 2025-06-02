@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
 import { supabase } from '../services/supabase';
 import { useTheme } from 'react-native-paper';
+import { colors, commonStyles, typography, spacing, borderRadius } from '../styles/theme';
 
 interface CreateMissionFormProps {
   onMissionCreated: () => void;
@@ -126,24 +127,23 @@ const CreateMissionForm: React.FC<CreateMissionFormProps> = ({ onMissionCreated 
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 16,
+    ...commonStyles.container,
+    padding: spacing.md,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    ...typography.h2,
+    marginBottom: spacing.lg,
     textAlign: 'center',
   },
   input: {
-    marginBottom: 16,
+    ...commonStyles.input,
   },
   difficultyContainer: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 8,
+    ...typography.body,
+    marginBottom: spacing.sm,
   },
   difficultyButtons: {
     flexDirection: 'row',
@@ -151,10 +151,10 @@ const styles = StyleSheet.create({
   },
   difficultyButton: {
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: spacing.xs,
   },
   submitButton: {
-    marginTop: 16,
+    marginTop: spacing.md,
   },
 });
 

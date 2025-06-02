@@ -16,7 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserBadges } from '../../services/badgeService';
 import { lightBlue100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 import { getAdvancedMissionStats, AdvancedMissionStats } from '../../services/statisticsService';
-import { useThemeContext } from '../../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemeSelector } from '../../components/ThemeSelector';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -57,7 +58,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { theme, isDarkMode, toggleTheme } = useThemeContext();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');

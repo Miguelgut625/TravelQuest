@@ -1,11 +1,9 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { Badge, UserBadge } from '../services/badgeService';
 import { Ionicons } from '@expo/vector-icons';
 import { Surface } from 'react-native-paper';
-import { colors, sharedStyles } from '../styles/sharedStyles';
-
-// Importar la imagen local
+import { colors, commonStyles, typography, spacing, shadows, borderRadius } from '../styles/theme';
 
 interface BadgesListProps {
   userBadges: UserBadge[];
@@ -160,59 +158,58 @@ const BadgesList = ({ userBadges, loading, onBadgePress, onSetTitle, currentTitl
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: spacing.md,
     backgroundColor: colors.primary,
   },
   loadingContainer: {
-    ...sharedStyles.loadingContainer,
+    ...commonStyles.loadingContainer,
     backgroundColor: colors.background,
   },
   loadingText: {
     color: colors.text.light,
-    fontSize: 18,
+    ...typography.body,
     fontWeight: '600',
   },
   emptyContainer: {
-    ...sharedStyles.emptyContainer,
+    ...commonStyles.emptyContainer,
     backgroundColor: colors.background,
-    padding: 40,
+    padding: spacing.xl,
   },
   emptyText: {
-    ...sharedStyles.emptyText,
-    fontSize: 18,
+    ...commonStyles.emptyText,
+    ...typography.body,
     color: colors.text.light,
-    marginTop: 12,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   tipText: {
-    fontSize: 15,
+    ...typography.caption,
     color: colors.text.light,
-    marginTop: 8,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
   categoryContainer: {
-    marginBottom: 28,
+    marginBottom: spacing.xl,
   },
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
-    paddingHorizontal: 5,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   categoryTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    ...typography.h2,
     color: colors.text.light,
-    marginLeft: 10,
+    marginLeft: spacing.sm,
     letterSpacing: 0.5,
   },
   badgeContainer: {
-    marginBottom: 14,
+    marginBottom: spacing.sm,
   },
   badgeSurface: {
-    ...sharedStyles.card,
-    padding: 18,
-    borderRadius: 16,
+    ...commonStyles.card,
+    padding: spacing.lg,
+    borderRadius: borderRadius.large,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.border,
@@ -228,15 +225,13 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 18,
+    marginRight: spacing.lg,
     borderRadius: 32,
     backgroundColor: colors.background,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: colors.text.light,
-    shadowColor: colors.secondary,
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
+    ...shadows.small,
   },
   badgeIcon: {
     width: 60,

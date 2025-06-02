@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator 
 import { useDispatch } from 'react-redux';
 import { setUser, setToken } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
+import { colors, commonStyles, typography, spacing, borderRadius } from '../../styles/theme';
 
 const RegisterScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -105,50 +106,34 @@ const RegisterScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    ...commonStyles.container,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+    padding: spacing.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 40,
-    color: '#333',
+    ...typography.h1,
+    marginBottom: spacing.xl,
+    color: colors.text.primary,
   },
   input: {
-    width: '100%',
-    height: 50,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    ...commonStyles.input,
   },
   button: {
-    width: '100%',
-    height: 50,
-    backgroundColor: '#005F9E',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
+    ...commonStyles.button,
+    marginTop: spacing.sm,
   },
   buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...commonStyles.buttonText,
   },
   link: {
-    marginTop: 20,
-    color: '#005F9E',
+    marginTop: spacing.lg,
+    color: colors.primary,
     textDecorationLine: 'underline',
   },
   errorText: {
-    color: 'red',
-    marginTop: 10,
+    color: colors.error,
+    marginTop: spacing.sm,
   },
 });
 

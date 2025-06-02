@@ -22,7 +22,7 @@ import GroupsScreen from '../screens/main/GroupsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
-import { View, ActivityIndicator, Text, Platform, StatusBar } from 'react-native';
+import { View, ActivityIndicator, Text, Platform, StatusBar, Dimensions } from 'react-native';
 import ChatScreen from '../screens/main/ChatScreen';
 import ConversationsScreen from '../screens/main/ConversationsScreen';
 import { linking } from './linking';
@@ -30,6 +30,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import GroupChatScreen from '../screens/main/GroupChatScreen';
 import FriendProfileScreen from '../screens/main/FriendProfileScreen';
 import CreateMissionScreen from '../screens/admin/CreateMissionScreen';
+import { useTheme as useAppTheme } from '../context/ThemeContext';
 
 const Stack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
@@ -68,6 +69,12 @@ const MainFlow = () => {
 const TabNavigator = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const isAdmin = user?.role === 'admin';
+  const { isDarkMode, colors } = useAppTheme();
+  const { width } = Dimensions.get('window');
+  // Tamaño de iconos y padding responsive
+  const iconSize = width < 400 ? 32 : width < 600 ? 36 : 38;
+  const tabPadding = width < 400 ? 10 : width < 600 ? 16 : 20;
+
   console.log('Estado del usuario en TabNavigator:', user);
 
   return (
@@ -76,20 +83,22 @@ const TabNavigator = () => {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === 'Map') iconName = focused ? 'compass' : 'compass-outline';
-          else if (route.name === 'Missions') iconName = focused ? 'flag' : 'flag-outline';
+          else if (route.name === 'Missions') iconName = focused ? 'trophy' : 'trophy-outline';
           else if (route.name === 'Journal') iconName = focused ? 'reader' : 'reader-outline';
           else if (route.name === 'Conversations') iconName = focused ? 'chatbox' : 'chatbox-outline';
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
-          return <Ionicons name={iconName} size={26} color={color} />;
+          return <Ionicons name={iconName} size={iconSize} color={color} />;
         },
-        tabBarActiveTintColor: '#A8DADC',         // Azul oscuro
-        tabBarInactiveTintColor: '#A8DADC',       // Azul claro pastel
+        tabBarActiveTintColor: isDarkMode ? colors.accent : colors.primary,
+        tabBarInactiveTintColor: isDarkMode ? colors.text.secondary : colors.text.secondary,
         headerShown: false,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 90 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 12,
-          paddingTop: 12,
-          backgroundColor: '#26547C',
+          height: width < 400 ? 80 : width < 600 ? 88 : 96,
+          paddingBottom: tabPadding,
+          paddingTop: tabPadding,
+          backgroundColor: isDarkMode ? colors.background : colors.background,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -97,9 +106,9 @@ const TabNavigator = () => {
           shadowRadius: 3,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: width < 400 ? 10 : 12,
           fontWeight: '500',
-          marginTop: 4,
+          marginTop: 2,
         },
       })}
     >
@@ -145,30 +154,18 @@ const AppNavigator = () => {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={true} />
-      <NavigationContainer linking={linking} theme={{
-        dark: false,
-        colors: {
-          background: '#FFFFFF',
-          border: '#e5e5e5',
-          card: '#FFFFFF',
-          text: '#222222',
-          notification: '#005F9E',
-          primary: '#005F9E',
-        },
-      }}>
-        {authState === 'authenticated' ? (
-          <MainFlow />
-        ) : (
-          <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-            <AuthStack.Screen name="Login" component={LoginScreen} />
-            <AuthStack.Screen name="Register" component={RegisterScreen} />
-            <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <AuthStack.Screen name="VerifyCode" component={VerifyCodeScreen} />
-            <AuthStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-            <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-          </AuthStack.Navigator>
-        )}
-      </NavigationContainer>
+      {authState === 'authenticated' ? (
+        <MainFlow />
+      ) : (
+        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+          <AuthStack.Screen name="Login" component={LoginScreen} />
+          <AuthStack.Screen name="Register" component={RegisterScreen} />
+          <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <AuthStack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+          <AuthStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+          <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </AuthStack.Navigator>
+      )}
     </SafeAreaProvider>
   );
 };

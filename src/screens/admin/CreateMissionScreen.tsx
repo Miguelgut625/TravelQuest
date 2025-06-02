@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { format } from 'date-fns';
+import { colors, commonStyles, typography, spacing, shadows, borderRadius } from '../../styles/theme';
 
 interface City {
   id: string;
@@ -137,7 +138,7 @@ const CreateMissionScreen = () => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Crear Nueva Misión</Text>
@@ -167,7 +168,7 @@ const CreateMissionScreen = () => {
               onChangeText={handleCitySearch}
               style={styles.input}
               mode="outlined"
-              left={<TextInput.Icon icon="map-marker" color="#005F9E" />}
+              left={<TextInput.Icon icon="map-marker" color={colors.primary} />}
               autoCorrect={false}
               autoCapitalize="words"
               onFocus={() => city.length > 2 && filteredCities.length > 0 && setShowSuggestions(true)}
@@ -182,7 +183,7 @@ const CreateMissionScreen = () => {
                       style={styles.suggestionItem}
                       onPress={() => handleCitySelect(item)}
                     >
-                      <Ionicons name="location" size={18} color="#005F9E" style={styles.locationIcon} />
+                      <Ionicons name="location" size={18} color={colors.primary} style={styles.locationIcon} />
                       <Text style={styles.suggestionText}>{item.name}</Text>
                     </TouchableOpacity>
                   )}
@@ -216,19 +217,19 @@ const CreateMissionScreen = () => {
           <View style={{ marginBottom: 16 }}>
             <TouchableOpacity
               style={{
-                backgroundColor: '#FFF',
-                borderRadius: 8,
+                backgroundColor: colors.white,
+                borderRadius: borderRadius.medium,
                 borderWidth: 1,
-                borderColor: '#89C2D9',
-                padding: 12,
-                marginBottom: 8,
+                borderColor: colors.border,
+                padding: spacing.md,
+                marginBottom: spacing.sm,
               }}
               onPress={() => setShowCalendar(true)}
             >
-              <Text style={{ color: '#1D3557', fontWeight: 'bold' }}>
+              <Text style={{ color: colors.text.primary, fontWeight: 'bold' }}>
                 Seleccionar rango de fechas para la misión
               </Text>
-              <Text style={{ color: '#1D3557', marginTop: 4 }}>
+              <Text style={{ color: colors.text.primary, marginTop: spacing.sm }}>
                 {startDate && endDate
                   ? `Del ${formatDate(startDate)} al ${formatDate(endDate)}`
                   : 'No seleccionado'}
@@ -242,18 +243,18 @@ const CreateMissionScreen = () => {
                     if (!startDate) return {};
                     const marked: any = {};
                     const startStr = startDate.toISOString().split('T')[0];
-                    marked[startStr] = { startingDay: true, color: '#005F9E', textColor: 'white' };
+                    marked[startStr] = { startingDay: true, color: colors.primary, textColor: 'white' };
                     if (endDate) {
                       let current = new Date(startDate);
                       while (current < endDate) {
                         current.setDate(current.getDate() + 1);
                         const dStr = current.toISOString().split('T')[0];
                         if (dStr !== endDate.toISOString().split('T')[0]) {
-                          marked[dStr] = { color: '#e6f2ff', textColor: '#005F9E' };
+                          marked[dStr] = { color: '#e6f2ff', textColor: colors.primary };
                         }
                       }
                       const endStr = endDate.toISOString().split('T')[0];
-                      marked[endStr] = { endingDay: true, color: '#005F9E', textColor: 'white' };
+                      marked[endStr] = { endingDay: true, color: colors.primary, textColor: 'white' };
                     }
                     return marked;
                   })()}
@@ -262,7 +263,7 @@ const CreateMissionScreen = () => {
                 />
                 <Button
                   mode="outlined"
-                  style={{ marginTop: 12, alignSelf: 'center' }}
+                  style={{ marginTop: spacing.md, alignSelf: 'center' }}
                   onPress={() => {
                     setStartDate(null);
                     setEndDate(null);
@@ -291,78 +292,69 @@ const CreateMissionScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#26547C',
+    ...commonStyles.container,
+    backgroundColor: colors.primary,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#26547C',
+    ...commonStyles.header,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: spacing.md,
   },
   backButtonText: {
-    color: '#FFF',
-    marginLeft: 8,
-    fontSize: 16,
+    color: colors.white,
+    ...typography.body,
+    marginLeft: spacing.sm,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
+    ...typography.h3,
+    color: colors.white,
   },
   formContainer: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#F1FAEE',
+    padding: spacing.md,
+    backgroundColor: colors.background,
   },
   input: {
-    marginBottom: 16,
-    backgroundColor: '#FFF',
+    ...commonStyles.input,
   },
   suggestionsDropdown: {
     position: 'absolute',
     top: 60,
     left: 0,
     right: 0,
-    backgroundColor: '#FFF',
-    borderRadius: 8,
-    elevation: 5,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.medium,
+    ...shadows.medium,
     zIndex: 10,
     borderWidth: 1,
-    borderColor: '#89C2D9',
+    borderColor: colors.border,
     maxHeight: 180,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
   },
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E4EAFF',
+    borderBottomColor: colors.border,
   },
   suggestionText: {
-    fontSize: 16,
-    color: '#1D3557',
-    marginLeft: 8,
+    ...typography.body,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
   },
   locationIcon: {
-    color: '#005F9E',
+    color: colors.primary,
   },
   difficultyContainer: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#1D3557',
+    ...typography.body,
+    marginBottom: spacing.sm,
+    color: colors.text.primary,
   },
   difficultyButtons: {
     flexDirection: 'row',
@@ -370,11 +362,11 @@ const styles = StyleSheet.create({
   },
   difficultyButton: {
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: spacing.xs,
   },
   submitButton: {
-    marginTop: 16,
-    backgroundColor: '#06D6A0',
+    marginTop: spacing.md,
+    backgroundColor: colors.success,
   },
 });
 

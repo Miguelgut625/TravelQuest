@@ -5,6 +5,7 @@ import { useAppSelector } from '../features/hooks';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Notification } from '../types/notifications';
+import { colors, commonStyles, typography, spacing, shadows, borderRadius } from '../styles/theme';
 
 export const NotificationsList = () => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -80,44 +81,30 @@ ListEmptyComponent = {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        padding: 16,
+        ...commonStyles.container,
+        padding: spacing.md,
     },
     notificationItem: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 8,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
+        ...commonStyles.card,
     },
     notificationContent: {
         flex: 1,
     },
     notificationTitle: {
-        fontSize: 16,
+        ...typography.body,
         fontWeight: 'bold',
-        marginBottom: 4,
+        marginBottom: spacing.xs,
     },
     notificationMessage: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 8,
+        ...typography.small,
+        color: colors.text.secondary,
+        marginBottom: spacing.sm,
     },
     notificationDate: {
-        fontSize: 12,
-        color: '#999',
+        ...typography.caption,
+        color: colors.text.secondary,
     },
     emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
+        ...commonStyles.emptyContainer,
     },
 }); 

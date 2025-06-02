@@ -1,7 +1,8 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import * as React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { colors, commonStyles, typography } from '../styles/theme';
 
 interface SimpleWebViewProps {
   style?: any;
@@ -120,26 +121,21 @@ export const SimpleWebView = (props: SimpleWebViewProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
+    ...commonStyles.container,
+    backgroundColor: colors.background,
   },
   webview: {
     flex: 1,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...commonStyles.loadingContainer,
   },
   errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    ...commonStyles.errorContainer,
   },
   errorText: {
-    fontSize: 16,
-    color: 'red',
+    ...typography.body,
+    color: colors.error,
     textAlign: 'center',
-  }
+  },
 }); 

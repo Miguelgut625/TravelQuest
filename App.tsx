@@ -9,7 +9,9 @@ import { setAuthState, setUser } from './src/features/auth/authSlice';
 import { Provider as PaperProvider, DefaultTheme, MD3DarkTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
-import { ThemeProvider, useThemeContext } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { NavigationContainer } from '@react-navigation/native';
+import { linking } from './src/navigation/linking';
 
 const lightTheme = {
   ...DefaultTheme,
@@ -39,8 +41,8 @@ const darkTheme = {
   },
 };
 
-const AppContent = () => {
-  const { isDarkMode } = useThemeContext();
+const App = () => {
+  const { isDarkMode } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,12 +51,10 @@ const AppContent = () => {
       try {
         console.log(`Iniciando la aplicación en plataforma: ${Platform.OS}`);
 
-        // Comprobar si hay alguna incompatibilidad específica de la plataforma
         if (Platform.OS === 'web') {
           console.log('Ejecutando en modo web');
         }
 
-        // Verificar sesión actual
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
@@ -62,7 +62,6 @@ const AppContent = () => {
           throw sessionError;
         }
 
-        // Verificar configuración de Cloudinary
         const cloudinaryConfig = getCloudinaryConfigInfo();
         console.log('Estado configuración Cloudinary:',
           cloudinaryConfig.isConfigured ? 'OK' : 'No configurado',
@@ -72,7 +71,6 @@ const AppContent = () => {
         if (session?.user) {
           console.log('Usuario autenticado encontrado:', session.user.email);
           
-          // Obtener datos adicionales del usuario
           const { data: userData, error: userError } = await supabase
             .from('users')
             .select('username, role')
@@ -108,13 +106,11 @@ const AppContent = () => {
 
     initializeApp();
 
-    // Manejador global de errores no capturados
-    const handleError = (error: Error) => {
-      console.error('Error no capturado:', error);
-    };
-
-    // Configurar listeners globales de error
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const handleError = (error: Error) => {
+        console.error('Error no capturado:', error);
+      };
+
       window.addEventListener('error', (event) => {
         handleError(event.error);
       });
@@ -157,20 +153,26 @@ const AppContent = () => {
   }
 
   return (
-    <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
-      <SafeAreaProvider>
-        <AppNavigator />
-      </SafeAreaProvider>
-    </PaperProvider>
-  );
-};
-
-const App = () => {
-  return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <ThemeProvider>
-          <AppContent />
+          <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
+            <SafeAreaProvider>
+              <NavigationContainer theme={{
+                dark: isDarkMode,
+                colors: {
+                  background: isDarkMode ? '#1B263B' : '#FFFFFF',
+                  border: isDarkMode ? '#274472' : '#e5e5e5',
+                  card: isDarkMode ? '#274472' : '#FFFFFF',
+                  text: isDarkMode ? '#EDF6F9' : '#222222',
+                  notification: isDarkMode ? '#41729F' : '#005F9E',
+                  primary: isDarkMode ? '#41729F' : '#005F9E',
+                },
+              }}>
+                <AppNavigator />
+              </NavigationContainer>
+            </SafeAreaProvider>
+          </PaperProvider>
         </ThemeProvider>
       </PersistGate>
     </Provider>

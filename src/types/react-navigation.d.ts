@@ -6,6 +6,14 @@ declare module '@react-navigation/native' {
   export type RouteProp<T, K extends keyof T = keyof T> = any;
   export function useIsFocused(): boolean;
   export function useFocusEffect(effect: React.EffectCallback): void;
+  export type LinkingOptions<T> = {
+    prefixes: string[];
+    config?: {
+      screens: Record<string, any>;
+    };
+    getInitialURL?: () => Promise<string | null>;
+    subscribe?: (listener: (url: string) => void) => (() => void) | undefined;
+  };
 }
 
 declare module '@react-navigation/native-stack' {
