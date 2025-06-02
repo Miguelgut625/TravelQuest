@@ -1,5 +1,6 @@
 const { supabase } = require('../../services/supabase.server.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { generateMissionHint } = require('../../services/aiService.js');
 
 // Inicializar el modelo de IA con la clave de API desde las variables de entorno
 console.log('Inicializando Google AI con API key:', process.env.GOOGLE_API_KEY ? 'API key presente' : 'API key no encontrada');
@@ -76,7 +77,8 @@ const getMissionHint = async (req, res) => {
         challenge:challenges (
           id,
           title,
-          description
+          description,
+          cityId
         )
       `)
       .eq('id', missionId)
@@ -97,13 +99,13 @@ const getMissionHint = async (req, res) => {
       titulo: journeyMission.challenge.title 
     });
 
-    // Generar pista usando IA
+    // Generar pista usando el servicio de IA
     console.log('🤖 Generando pista con IA...');
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `Genera una pista sutil para la siguiente misión: ${journeyMission.challenge.description}. La pista debe ser vaga pero útil.`;
-    
-    const result = await model.generateContent(prompt);
-    const hint = result.response.text();
+    const hint = await generateMissionHint(
+      journeyMission.challenge.description,
+      journeyMission.challenge.title,
+      journeyMission.challenge.cityId // o null si no está disponible
+    );
     console.log('✅ Pista generada:', hint.substring(0, 50) + '...');
 
     // Actualizar puntos del usuario
@@ -118,24 +120,7 @@ const getMissionHint = async (req, res) => {
       throw updateError;
     }
 
-    // Registrar uso de pista
-    console.log('📝 Registrando uso de pista...');
-    const { error: hintError } = await supabase
-      .from('mission_hints')
-      .insert([{
-        user_id: userId,
-        mission_id: missionId,
-        challenge_id: journeyMission.challenge.id,
-        hint,
-        used_at: new Date().toISOString()
-      }]);
-
-    if (hintError) {
-      console.error('❌ Error al registrar pista:', hintError);
-      throw hintError;
-    }
-
-    console.log('✅ Pista registrada exitosamente');
+    console.log('✅ Puntos actualizados exitosamente');
     res.status(200).json({ 
       hint,
       missionId: missionId
