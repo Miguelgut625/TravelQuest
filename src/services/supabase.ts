@@ -14,7 +14,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
     flowType: 'implicit',
     debug: LOGGING_CONFIG.CATEGORIES.AUTH
-  }
+  },
+  // Configuración específica para React Native
+  global: {
+    headers: {
+      'x-client-info': 'travelquest-reactnative',
+    },
+  },
 });
 
 // Agregar un listener para errores de autenticación

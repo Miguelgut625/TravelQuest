@@ -5,7 +5,8 @@ import missionReducer from './missionSlice';
 import journalReducer from '../features/journalSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import journeyReducer from './journey/journeySlice';
-import cityReducer from '../../app/redux/slices/citySlice';
+// Comentado temporalmente para depuración
+// import cityReducer from '../../app/redux/slices/citySlice';
 
 const persistConfig = {
   key: 'root',
@@ -26,7 +27,8 @@ const rootReducer = {
   missions: missionReducer,
   journal: journalReducer,
   journey: journeyReducer,
-  cities: cityReducer,
+  // Comentado temporalmente para depuración
+  // cities: cityReducer,
 };
 
 export const store = configureStore({
@@ -41,7 +43,8 @@ export const store = configureStore({
 
 export const persistor = persistStore(store);
 
-// Agregar listener para depuración
+// Agregar listener para depuración - comentado temporalmente
+/*
 store.subscribe(() => {
   const state = store.getState();
   console.log('Estado actual:', {
@@ -49,9 +52,11 @@ store.subscribe(() => {
     missions: state.missions,
     journal: state.journal,
     journey: state.journey,
-    cities: state.cities
+    // Comentado temporalmente para depuración
+    // cities: state.cities
   });
 });
+*/
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch; 
