@@ -6,11 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-<<<<<<< HEAD
     "newArchEnabled": false,
-=======
-    "newArchEnabled": true,
->>>>>>> 13e49f71 (sdk 53)
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",

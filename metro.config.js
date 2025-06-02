@@ -11,7 +11,6 @@ module.exports = {
         unstable_enablePackageExports: false,
         alias: {
             // Solo los aliases más esenciales
-            'ws': false,
             'stream': false,
             'crypto': false,
             'fs': false,

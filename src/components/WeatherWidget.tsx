@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
 import { Card } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,57 +48,124 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForecast, setShowForecast] = useState(false);
+  
+  // Ref para cancelar requests en cleanup
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
 
-  // Función para cargar los datos del clima
+  // Función para cargar los datos del clima con timeout
   const loadWeatherData = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
+      // Cancelar request anterior si existe
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Crear nuevo abort controller
+      abortControllerRef.current = new AbortController();
+      
       // Verificar la API key
       if (!OPENWEATHERMAP_API_KEY || OPENWEATHERMAP_API_KEY === 'TU_API_KEY_AQUI') {
-        setError('API Key de OpenWeatherMap no configurada');
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setError('API Key de OpenWeatherMap no configurada');
+          setIsLoading(false);
+        }
         return;
       }
       
       let weatherResponse;
       
-      // Obtener clima por nombre de ciudad o coordenadas
-      if (cityName) {
-        weatherResponse = await getWeatherByCity(cityName, OPENWEATHERMAP_API_KEY);
-      } else if (latitude !== undefined && longitude !== undefined) {
-        weatherResponse = await getWeatherByCoordinates(latitude, longitude, OPENWEATHERMAP_API_KEY);
-      } else {
-        // Intentar usar la ubicación actual
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Permiso para acceder a la ubicación denegado');
-          setIsLoading(false);
-          return;
+      // Promise race para timeout
+      const weatherPromise = (async () => {
+        // Obtener clima por nombre de ciudad o coordenadas
+        if (cityName) {
+          return await getWeatherByCity(cityName, OPENWEATHERMAP_API_KEY);
+        } else if (latitude !== undefined && longitude !== undefined) {
+          return await getWeatherByCoordinates(latitude, longitude, OPENWEATHERMAP_API_KEY);
+        } else {
+          // Intentar usar la ubicación actual con timeout
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            throw new Error('Permiso para acceder a la ubicación denegado');
+          }
+          
+          // Timeout para getCurrentPositionAsync en iOS
+          const locationPromise = Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 10000,
+            distanceInterval: 1000
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout obteniendo ubicación')), 10000)
+          );
+          
+          const location = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
+          return await getWeatherByCoordinates(
+            location.coords.latitude,
+            location.coords.longitude,
+            OPENWEATHERMAP_API_KEY
+          );
         }
-        
-        const location = await Location.getCurrentPositionAsync({});
-        weatherResponse = await getWeatherByCoordinates(
-          location.coords.latitude,
-          location.coords.longitude,
-          OPENWEATHERMAP_API_KEY
-        );
-      }
+      })();
       
-      setWeatherData(weatherResponse);
-    } catch (error) {
+      // Timeout para weather request
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout obteniendo datos del clima')), 15000)
+      );
+      
+      weatherResponse = await Promise.race([weatherPromise, timeoutPromise]);
+      
+      if (isMountedRef.current) {
+        setWeatherData(weatherResponse as WeatherData);
+      }
+    } catch (error: any) {
       console.error('Error cargando datos del clima:', error);
-      setError(`Error: ${error.message}`);
+      if (isMountedRef.current && !abortControllerRef.current?.signal.aborted) {
+        // Mostrar error más amigable para usuarios
+        let errorMessage = 'Error cargando el clima';
+        if (error.message?.includes('Timeout')) {
+          errorMessage = 'Timeout - Verifica tu conexión';
+        } else if (error.message?.includes('ubicación')) {
+          errorMessage = 'No se pudo obtener la ubicación';
+        } else if (error.message?.includes('API')) {
+          errorMessage = 'Servicio temporalmente no disponible';
+        }
+        setError(errorMessage);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
   // Cargar datos al montar el componente o cuando cambien las props
   useEffect(() => {
+    isMountedRef.current = true;
     loadWeatherData();
-  }, [cityName, latitude, longitude]);
+    
+    return () => {
+      // Cleanup: cancelar requests y marcar como unmounted
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [cityName, latitude, longitude]); // Dependencias específicas
+
+  // Cleanup cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Vista compacta
   if (compact) {
@@ -203,20 +270,20 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
 
               <View style={styles.weatherDetails}>
                 <View style={styles.detailItem}>
-                  <Ionicons name="water-outline" size={22} color="#005F9E" />
+                  <Ionicons name="water" size={20} color="#005F9E" />
                   <Text style={styles.detailValue}>{weatherData.main.humidity}%</Text>
                   <Text style={styles.detailLabel}>Humedad</Text>
                 </View>
                 
                 <View style={styles.detailItem}>
-                  <Ionicons name="speedometer-outline" size={22} color="#005F9E" />
-                  <Text style={styles.detailValue}>{weatherData.main.pressure} hPa</Text>
+                  <Ionicons name="speedometer" size={20} color="#005F9E" />
+                  <Text style={styles.detailValue}>{weatherData.main.pressure}</Text>
                   <Text style={styles.detailLabel}>Presión</Text>
                 </View>
                 
                 <View style={styles.detailItem}>
-                  <Ionicons name="compass-outline" size={22} color="#005F9E" />
-                  <Text style={styles.detailValue}>{Math.round(weatherData.wind.speed * 3.6)} km/h</Text>
+                  <Ionicons name="flag" size={20} color="#005F9E" />
+                  <Text style={styles.detailValue}>{weatherData.wind.speed}</Text>
                   <Text style={styles.detailLabel}>Viento</Text>
                 </View>
               </View>

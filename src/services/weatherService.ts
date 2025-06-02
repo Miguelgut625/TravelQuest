@@ -45,10 +45,24 @@ export const getUserJourneyCities = async (userId: string) => {
 export const getWeatherByCity = async (cityName: string, apiKey: string) => {
     try {
         console.log(`Obteniendo clima para ciudad: ${cityName}`);
+        
+        // Crear AbortController para timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+        
         // Hacemos la petición a OpenWeatherMap API usando el nombre de la ciudad
         const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&units=metric&lang=es&appid=${apiKey}`
+            `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&units=metric&lang=es&appid=${apiKey}`,
+            { 
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                }
+            }
         );
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`Error al obtener datos del clima: ${response.status} ${response.statusText}`);
@@ -62,8 +76,11 @@ export const getWeatherByCity = async (cityName: string, apiKey: string) => {
         }
 
         return data;
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error obteniendo datos del clima por ciudad:', error);
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout: La solicitud tardó demasiado');
+        }
         throw error;
     }
 };
@@ -72,10 +89,24 @@ export const getWeatherByCity = async (cityName: string, apiKey: string) => {
 export const getWeatherByCoordinates = async (latitude: number, longitude: number, apiKey: string) => {
     try {
         console.log(`Obteniendo clima para coordenadas: ${latitude}, ${longitude}`);
+        
+        // Crear AbortController para timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+        
         // Hacemos la petición a OpenWeatherMap API con coordenadas
         const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=es&appid=${apiKey}`
+            `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=es&appid=${apiKey}`,
+            { 
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                }
+            }
         );
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`Error al obtener datos del clima: ${response.status} ${response.statusText}`);
@@ -89,8 +120,11 @@ export const getWeatherByCoordinates = async (latitude: number, longitude: numbe
         }
 
         return data;
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error obteniendo datos del clima por coordenadas:', error);
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout: La solicitud tardó demasiado');
+        }
         throw error;
     }
 };
@@ -100,10 +134,23 @@ export const getForecastByCity = async (cityName: string, apiKey: string) => {
     try {
         console.log(`Obteniendo pronóstico para ciudad: ${cityName}`);
 
+        // Crear AbortController para timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
         // Usar la API de pronóstico estándar de OpenWeatherMap (5 días con intervalos de 3 horas)
         const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(cityName)}&units=metric&lang=es&appid=${apiKey}`
+            `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(cityName)}&units=metric&lang=es&appid=${apiKey}`,
+            { 
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                }
+            }
         );
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`Error al obtener pronóstico: ${response.status} ${response.statusText}`);
@@ -118,8 +165,11 @@ export const getForecastByCity = async (cityName: string, apiKey: string) => {
 
         // Procesar los datos para agruparlos por día
         return processForecastData(data);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error obteniendo pronóstico por ciudad:', error);
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout: La solicitud tardó demasiado');
+        }
         throw error;
     }
 };
@@ -129,10 +179,23 @@ export const getForecastByCoordinates = async (latitude: number, longitude: numb
     try {
         console.log(`Obteniendo pronóstico para coordenadas: ${latitude}, ${longitude}`);
 
+        // Crear AbortController para timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
         // Usar la API de pronóstico estándar de OpenWeatherMap (5 días con intervalos de 3 horas)
         const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&units=metric&lang=es&appid=${apiKey}`
+            `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&units=metric&lang=es&appid=${apiKey}`,
+            { 
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                }
+            }
         );
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`Error al obtener pronóstico: ${response.status} ${response.statusText}`);
@@ -147,8 +210,11 @@ export const getForecastByCoordinates = async (latitude: number, longitude: numb
 
         // Procesar los datos para agruparlos por día
         return processForecastData(data);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error obteniendo pronóstico por coordenadas:', error);
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout: La solicitud tardó demasiado');
+        }
         throw error;
     }
 };

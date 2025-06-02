@@ -137,9 +137,15 @@ const prepareImageForAPI = async (imageUrl: string): Promise<{
   try {
     // Si es una URL de Cloudinary, intentar usarla directamente
     if (isCloudinaryUrl(imageUrl)) {
-      // Verificar que la URL es accesible
+      // Verificar que la URL es accesible con timeout
       try {
-        const response = await axios.head(imageUrl, { timeout: 5000 });
+        const response = await axios.head(imageUrl, { 
+          timeout: 8000,  // 8 segundos timeout
+          headers: {
+            'Accept': 'image/*',
+            'User-Agent': 'TravelQuest/1.0'
+          }
+        });
         if (response.status === 200) {
           console.log('✅ URL de Cloudinary verificada, usando directamente');
           return {
@@ -147,8 +153,8 @@ const prepareImageForAPI = async (imageUrl: string): Promise<{
             data: { uri: imageUrl }
           };
         }
-      } catch (headError) {
-        console.warn('⚠️ Error verificando URL de Cloudinary:', headError);
+      } catch (headError: any) {
+        console.warn('⚠️ Error verificando URL de Cloudinary:', headError.message || headError);
         // Continuar con el método de base64 como fallback
       }
     }
@@ -167,7 +173,7 @@ const prepareImageForAPI = async (imageUrl: string): Promise<{
     if (parts.length !== 2) {
       return {
         success: false,
-        error: 'Formato de datos base64 inválido'
+        error: 'Formato de datos base64 inválidos'
       };
     }
 
@@ -188,7 +194,7 @@ const prepareImageForAPI = async (imageUrl: string): Promise<{
         data: base64Data
       }
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: `Error preparando imagen: ${error.message || error}`
@@ -268,11 +274,15 @@ const getImageBase64 = async (imageUrl: string): Promise<string | null> => {
 
     // Obtener la imagen como blob con timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
     
     try {
       const response = await fetch(sanitizedUrl, { 
-        signal: controller.signal 
+        signal: controller.signal,
+        headers: {
+          'Accept': 'image/*',
+          'User-Agent': 'TravelQuest/1.0'
+        }
       });
       clearTimeout(timeoutId);
       
@@ -280,18 +290,18 @@ const getImageBase64 = async (imageUrl: string): Promise<string | null> => {
         throw new Error(`Error obteniendo imagen: ${response.status} ${response.statusText}`);
       }
       
-    const blob = await response.blob();
+      const blob = await response.blob();
       
       if (blob.size === 0) {
         throw new Error('Blob de imagen vacío');
       }
     
-    // Convertir blob a base64
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      // Convertir blob a base64 con timeout adicional
+      const readPromise = new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
           try {
-        const base64 = reader.result as string;
+            const base64 = reader.result as string;
             
             // Verificar que el resultado sea válido
             if (!base64 || typeof base64 !== 'string' || base64.length < 100) {
@@ -305,21 +315,32 @@ const getImageBase64 = async (imageUrl: string): Promise<string | null> => {
               return;
             }
             
-        resolve(base64);
+            resolve(base64);
           } catch (e) {
             reject(e);
           }
-      };
+        };
         reader.onerror = (e) => {
           reject(new Error(`Error leyendo blob: ${e}`));
         };
-      reader.readAsDataURL(blob);
-    });
-    } catch (fetchError) {
+        reader.readAsDataURL(blob);
+      });
+      
+      // Timeout para la conversión a base64
+      const readerTimeoutPromise = new Promise<string>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout convirtiendo a base64')), 10000)
+      );
+      
+      return await Promise.race([readPromise, readerTimeoutPromise]);
+      
+    } catch (fetchError: any) {
       if (timeoutId) clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Timeout obteniendo imagen');
+      }
       throw fetchError;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error convirtiendo imagen a base64:', error);
     return null;
   }
@@ -688,16 +709,28 @@ export const generateMissionHint = async (
     Recuerda: tu pista debe garantizar que el usuario pueda completar la misión correctamente, siendo específica y directa.
     `;
 
-    // Generar la respuesta
-    const result = await model.generateContent(prompt);
+    // Implementar timeout para evitar cuelgues
+    const hintPromise = model.generateContent(prompt);
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout generando pista con IA')), 20000)
+    );
+    
+    // Generar la respuesta con timeout
+    const result = await Promise.race([hintPromise, timeoutPromise]);
     const response = result.response;
     const responseText = response.text();
     
     console.log('Pista generada con éxito');
     
     return responseText.trim();
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al generar pista con IA:', error);
+    
+    // Si es timeout, mostrar mensaje específico
+    if (error.message?.includes('Timeout')) {
+      console.warn('Timeout generando pista, usando fallback');
+    }
+    
     return generateFallbackHint(missionDescription, cityName);
   }
 };

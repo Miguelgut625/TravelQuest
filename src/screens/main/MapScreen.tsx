@@ -395,7 +395,7 @@ const MapScreen = () => {
 
       console.log('Permisos concedidos, obteniendo ubicación actual...');
 
-      // Configurar opciones para obtener la ubicación
+      // Configurar opciones para obtener la ubicación con timeout
       const options = Platform.OS === 'android' ? {
         accuracy: Location.Accuracy.Balanced,
         timeInterval: 10000,
@@ -409,7 +409,14 @@ const MapScreen = () => {
 
       try {
         console.log('Intentando obtener ubicación...');
-        let location = await Location.getCurrentPositionAsync(options);
+        
+        // Agregar timeout específico para iOS
+        const locationPromise = Location.getCurrentPositionAsync(options);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout obteniendo ubicación')), 15000)
+        );
+        
+        let location = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
         console.log('Ubicación obtenida:', JSON.stringify(location.coords));
 
         // Actualizar estado con la ubicación obtenida
@@ -431,7 +438,12 @@ const MapScreen = () => {
         // Intentar con el método getLastKnownPositionAsync como fallback
         console.log('Intentando obtener última ubicación conocida...');
         try {
-          const lastLocation = await Location.getLastKnownPositionAsync();
+          const lastLocationPromise = Location.getLastKnownPositionAsync();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout obteniendo última ubicación')), 10000)
+          );
+          
+          const lastLocation = await Promise.race([lastLocationPromise, timeoutPromise]) as Location.LocationObject;
           if (lastLocation) {
             console.log('Última ubicación conocida:', JSON.stringify(lastLocation.coords));
             setUserLocation({
@@ -451,12 +463,20 @@ const MapScreen = () => {
           console.error('Error al obtener última ubicación conocida:', lastLocError);
         }
 
-        // No lanzamos error, simplemente dejamos la ubicación por defecto
-        setErrorLocationMsg(`No se pudo obtener tu ubicación. Usando ubicación por defecto.`);
+        // Mensaje de error más amigable
+        let errorMessage = 'No se pudo obtener tu ubicación. Usando ubicación por defecto.';
+        if (locationError.message?.includes('Timeout')) {
+          errorMessage = 'Timeout obteniendo ubicación. Verifica tu conexión GPS.';
+        }
+        setErrorLocationMsg(errorMessage);
       }
     } catch (error: any) {
-      console.error('Error al obtener la ubicación:', error);
-      setErrorLocationMsg(`Error al obtener la ubicación: ${error.message}. Usando ubicación por defecto.`);
+      console.error('Error general al obtener ubicación:', error);
+      let errorMessage = 'No se pudo obtener tu ubicación. Usando ubicación por defecto.';
+      if (error.message?.includes('Timeout')) {
+        errorMessage = 'Timeout obteniendo ubicación. Verifica tu conexión GPS.';
+      }
+      setErrorLocationMsg(errorMessage);
     }
   };
 

@@ -57,7 +57,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { theme, isDarkMode, toggleTheme } = useThemeContext();
+  const { isDarkMode, toggleTheme } = useThemeContext();
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -1226,12 +1226,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    Color: colors.text.primary,
+    color: colors.text.primary,
     letterSpacing: 1,
   },
   privacyContainer: {
     borderRadius: 10,
     padding: 15,
+    justifyContent: 'center',
   },
   privacyButton: {
     backgroundColor: colors.success,
@@ -1351,50 +1352,64 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 1,
   },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  privacyLabel: {
+    fontSize: 16,
+    color: colors.text.primary,
+    marginBottom: 8,
+    fontWeight: '600',
+    width: '100%',
+  },
+  titleInput: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: colors.text.primary,
+    marginBottom: 15,
+  },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: '#1B263B',
-    padding: 25,
+    backgroundColor: colors.text.light,
     borderRadius: 20,
+    padding: 24,
     width: '90%',
     maxWidth: 400,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 10,
+    elevation: 15,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 25,
-    textAlign: 'center',
-    color: '#EDF6F9',
-    letterSpacing: 1,
-  },
-  input: {
-    borderWidth: 2,
-    borderColor: '#41729F',
-    borderRadius: 12,
-    padding: 15,
+    color: colors.text.primary,
     marginBottom: 20,
-    backgroundColor: '#274472',
-    color: '#EDF6F9',
-    fontSize: 16,
+    letterSpacing: 1,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    width: '100%',
     marginTop: 20,
   },
   modalButton: {
     flex: 1,
-    padding: 18,
+    padding: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginHorizontal: 8,

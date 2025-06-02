@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Modal, TouchableOpacity, Image } from 'react-native';
 import { Card } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,59 +63,125 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
   const [forecastData, setForecastData] = useState<ForecastData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Refs para cleanup
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
 
-  // Función para obtener los datos del pronóstico
+  // Función para obtener los datos del pronóstico con timeout
   const loadForecastData = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
+      // Cancelar request anterior si existe
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Crear nuevo abort controller
+      abortControllerRef.current = new AbortController();
+      
       // Verificar la API key
       if (!OPENWEATHERMAP_API_KEY || OPENWEATHERMAP_API_KEY === 'TU_API_KEY_AQUI') {
-        setError('API Key de OpenWeatherMap no configurada');
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setError('API Key de OpenWeatherMap no configurada');
+          setIsLoading(false);
+        }
         return;
       }
       
       let forecastResponse;
       
-      // Obtener pronóstico por nombre de ciudad o coordenadas
-      if (cityName) {
-        forecastResponse = await getForecastByCity(cityName, OPENWEATHERMAP_API_KEY);
-      } else if (latitude !== undefined && longitude !== undefined) {
-        forecastResponse = await getForecastByCoordinates(latitude, longitude, OPENWEATHERMAP_API_KEY);
-      } else {
-        // Intentar usar la ubicación actual
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Permiso para acceder a la ubicación denegado');
-          setIsLoading(false);
-          return;
+      // Promise con timeout
+      const forecastPromise = (async () => {
+        // Obtener pronóstico por nombre de ciudad o coordenadas
+        if (cityName) {
+          return await getForecastByCity(cityName, OPENWEATHERMAP_API_KEY);
+        } else if (latitude !== undefined && longitude !== undefined) {
+          return await getForecastByCoordinates(latitude, longitude, OPENWEATHERMAP_API_KEY);
+        } else {
+          // Intentar usar la ubicación actual con timeout
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            throw new Error('Permiso para acceder a la ubicación denegado');
+          }
+          
+          // Timeout para getCurrentPositionAsync en iOS
+          const locationPromise = Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 10000,
+            distanceInterval: 1000
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout obteniendo ubicación')), 10000)
+          );
+          
+          const location = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
+          return await getForecastByCoordinates(
+            location.coords.latitude,
+            location.coords.longitude,
+            OPENWEATHERMAP_API_KEY
+          );
         }
-        
-        const location = await Location.getCurrentPositionAsync({});
-        forecastResponse = await getForecastByCoordinates(
-          location.coords.latitude,
-          location.coords.longitude,
-          OPENWEATHERMAP_API_KEY
-        );
-      }
+      })();
       
-      setForecastData(forecastResponse);
-    } catch (error) {
+      // Timeout para forecast request
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout obteniendo pronóstico')), 15000)
+      );
+      
+      forecastResponse = await Promise.race([forecastPromise, timeoutPromise]);
+      
+      if (isMountedRef.current) {
+        setForecastData(forecastResponse as ForecastData);
+      }
+    } catch (error: any) {
       console.error('Error cargando pronóstico:', error);
-      setError(`Error: ${error.message}`);
+      if (isMountedRef.current && !abortControllerRef.current?.signal.aborted) {
+        // Mostrar error más amigable para usuarios
+        let errorMessage = 'Error cargando el pronóstico';
+        if (error.message?.includes('Timeout')) {
+          errorMessage = 'Timeout - Verifica tu conexión';
+        } else if (error.message?.includes('ubicación')) {
+          errorMessage = 'No se pudo obtener la ubicación';
+        } else if (error.message?.includes('API')) {
+          errorMessage = 'Servicio temporalmente no disponible';
+        }
+        setError(errorMessage);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
   // Cargar datos al mostrar el modal
   useEffect(() => {
     if (visible) {
+      isMountedRef.current = true;
       loadForecastData();
     }
+    
+    return () => {
+      // Cleanup cuando se cierra el modal
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [visible, cityName, latitude, longitude]);
+
+  // Cleanup cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Función para convertir timestamp a día de la semana
   const getDayOfWeek = (date: Date) => {
