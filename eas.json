@@ -1,0 +1,61 @@
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "channel": "development"
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview2": {
+      "android": {
+        "gradleCommand": ":app:assembleRelease"
+      }
+    },
+    "preview3": {
+      "developmentClient": true
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production"
+    },
+    "apk": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_USE_HERMES": "1"
+      },
+      "distribution": "internal"
+    },
+    "simple-apk": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_USE_HERMES": "1"
+      },
+      "distribution": "internal"
+    },
+    "local": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal",
+      "developmentClient": false
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "expo": {
+    "name": "TravelQuest",
+    "slug": "TravelQuest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.travelquest.app",
+      "jsEngine": "jsc",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
+        "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceso a la ubicación para mostrar tu posición en el mapa y generar misiones cercanas.",
+        "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para tomar fotos de tus misiones.",
+        "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a tu biblioteca de fotos para seleccionar imágenes de tus misiones.",
+        "NSUserNotificationUsageDescription": "Necesitamos permisos para enviarte notificaciones sobre nuevos mensajes y actividades."
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "jsEngine": "jsc",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.travelquest.app",
+      "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "MAPS_API_KEY"
+        }
+      },
+      "runtimeVersion": "1.0.0"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "locales": {
+      "en": "./assets/locales/en.json",
+      "es": "./assets/locales/es.json",
+      "fr": "./assets/locales/fr.json",
+      "de": "./assets/locales/de.json"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow TravelQuest to use your location."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TravelQuest to access your photos.",
+          "cameraPermission": "Allow TravelQuest to access your camera."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#005F9E",
+          "sounds": [
+            "./assets/notification_sound.wav"
+          ]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f4f1efd8-e4f3-4a4d-bf22-ef7da8e63b99"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f4f1efd8-e4f3-4a4d-bf22-ef7da8e63b99"
+    }
+  }
+}

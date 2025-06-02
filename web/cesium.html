@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cesium Globo 3D</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .toolbar-instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      max-width: 400px;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <div class="toolbar-instructions">
+    • Desliza para rotar manualmente<br>
+    • Pellizca para hacer zoom<br>
+    • Toca para detener la rotación
+  </div>
+
+  <script>
+    // Token de Cesium
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiNGNjYzBhOS0wYzA1LTRiNTQtYWJhYi01YjEwNTZiZmJhNDQiLCJpZCI6MjkwMjQyLCJpYXQiOjE3NDM1ODE4NTB9.M05o3luP4BS1qlxa46iP5PWBPIos1RpFjsXhqj8Xl0Q';
+    
+    // Crear el visor
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      animation: false,
+      baseLayerPicker: false,
+      fullscreenButton: false,
+      geocoder: false,
+      homeButton: false,
+      infoBox: false,
+      sceneModePicker: false,
+      selectionIndicator: false,
+      timeline: false,
+      navigationHelpButton: false,
+      navigationInstructionsInitiallyVisible: false,
+      contextOptions: {
+        webgl: {
+          alpha: true,
+          preserveDrawingBuffer: true
+        }
+      }
+    });
+    
+    // Eliminar la atribución por defecto para tener una interfaz más limpia
+    viewer.cesiumWidget.creditContainer.style.display = "none";
+    
+    // Configurar el terreno
+    Cesium.createWorldTerrainAsync()
+      .then(terrainProvider => {
+        viewer.terrainProvider = terrainProvider;
+      })
+      .catch(error => {
+        console.warn('Error al cargar el terreno avanzado:', error);
+      });
+    
+    // Agregar capas de imágenes
+    try {
+      const worldImagery = Cesium.ImageryLayer.fromWorldImagery();
+      viewer.imageryLayers.add(worldImagery);
+      
+      // Añadir capa de referencia
+      Cesium.TileMapServiceImageryProvider.fromUrl(
+        Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
+      ).then(provider => {
+        const referenceLayer = new Cesium.ImageryLayer(provider);
+        viewer.imageryLayers.add(referenceLayer);
+      }).catch(error => {
+        console.warn('Error al cargar la capa de referencia:', error);
+      });
+    } catch (e) {
+      console.warn('Error al configurar las capas de imágenes:', e);
+    }
+    
+    // Configurar la cámara
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(0, 0, 20000000),
+      orientation: {
+        heading: 0.0,
+        pitch: -1.3,
+        roll: 0.0
+      },
+      duration: 1
+    });
+    
+    // Activar efectos visuales
+    if (viewer.scene && viewer.scene.globe) {
+      viewer.scene.globe.depthTestAgainstTerrain = false;
+      viewer.scene.globe.enableLighting = true;
+    }
+    
+    // Configurar rotación automática
+    let autoRotate = true;
+    let lastTime = Date.now();
+    
+    function startAutoRotation() {
+      function tick() {
+        if (!autoRotate) return;
+        
+        const currentTime = Date.now();
+        const delta = currentTime - lastTime;
+        lastTime = currentTime;
+        
+        viewer.scene.camera.rotate(Cesium.Cartesian3.UNIT_Z, -delta / 30000);
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    
+    // Iniciar la rotación automática
+    startAutoRotation();
+    
+    // Manejar interacción del usuario
+    let touchStarted = false;
+    
+    viewer.screenSpaceEventHandler.setInputAction(function() {
+      autoRotate = false;
+      touchStarted = true;
+    }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+    
+    viewer.screenSpaceEventHandler.setInputAction(function() {
+      touchStarted = false;
+      // Reactivar la rotación después de 3 segundos
+      setTimeout(function() {
+        if (!touchStarted) {
+          autoRotate = true;
+          lastTime = Date.now();
+          startAutoRotation();
+        }
+      }, 3000);
+    }, Cesium.ScreenSpaceEventType.LEFT_UP);
+  </script>
+</body>
+</html> 

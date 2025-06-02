@@ -1,0 +1,13 @@
+{
+  "welcome": "Bienvenido a TravelQuest",
+  "start": "Comienza tu aventura",
+  "destination": "¿A dónde te gustaría ir?",
+  "duration": "¿Cuánto tiempo te quedarás?",
+  "missions": "Tus Misiones",
+  "settings": "Configuración",
+  "profile": "Perfil",
+  "language": "Idioma",
+  "notifications": "Notificaciones",
+  "help": "Ayuda y Soporte",
+  "about": "Acerca de TravelQuest"
+} 

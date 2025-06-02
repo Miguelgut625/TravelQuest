@@ -1,0 +1,13 @@
+{
+  "welcome": "Welcome to TravelQuest",
+  "start": "Start your adventure",
+  "destination": "Where would you like to go?",
+  "duration": "How long will you stay?",
+  "missions": "Your Missions",
+  "settings": "Settings",
+  "profile": "Profile",
+  "language": "Language",
+  "notifications": "Notifications",
+  "help": "Help & Support",
+  "about": "About TravelQuest"
+} 
