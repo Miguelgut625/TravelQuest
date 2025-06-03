@@ -1291,7 +1291,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     marginTop:40,
-    borderBottomWidth: 1,
     borderBottomRadius: 10,
   },
   backButton: {

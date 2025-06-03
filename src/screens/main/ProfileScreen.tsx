@@ -1105,7 +1105,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, 
   },
   headerBackground: {
-    backgroundColor: colors.text.secondary,
+    backgroundColor: colors.secondary,
     paddingTop: 20,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
@@ -1177,12 +1177,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.border,
+    color: colors.white,
     marginBottom: 5,
   },
   email: {
     fontSize: 16,
-    color: colors.text.light,
+    color: colors.text.primary,
     marginBottom: 10,
   },
   stats: {

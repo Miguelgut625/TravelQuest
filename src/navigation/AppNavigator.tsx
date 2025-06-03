@@ -111,7 +111,6 @@ const TabNavigator = () => {
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,
           shadowRadius: 3,
-          borderTopColor: colors.border,
         },
         tabBarLabelStyle: {
           fontSize: 12,
