@@ -126,7 +126,7 @@ const getTimeRemaining = (endDate: string) => {
 const MissionCard = ({ mission, onComplete, onShare }: {
   mission: JourneyMission;
   onComplete: (imageUrl?: string) => void;
-  onShare: () => void;
+  onShare: (mission: JourneyMission) => void;
 }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showHintModal, setShowHintModal] = useState(false);
@@ -169,6 +169,15 @@ const MissionCard = ({ mission, onComplete, onShare }: {
     setShowHintModal(true);
   };
 
+  const handleShare = (e: any) => {
+    e.stopPropagation();
+    console.log('🔍 Preparando para compartir misión:', {
+      id: mission.id,
+      title: mission.challenge.title
+    });
+    onShare(mission);
+  };
+
   return (
     <>
       <TouchableOpacity
@@ -205,7 +214,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
           <View style={styles.actionsContainer}>
             {(!mission.completed && !isExpired && !isNotStarted) && (
               <>
-                <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
+                <TouchableOpacity onPress={handleShare} style={styles.shareIcon}>
                   {/* @ts-ignore */}
                   <Ionicons name="share-social" size={20} color="#005F9E" />
                 </TouchableOpacity>
@@ -266,10 +275,11 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   </TouchableOpacity>
 );
 
-const FriendSelectionModal = ({ visible, onClose, onSelect }: {
+const FriendSelectionModal = ({ visible, onClose, onSelect, isSharing }: {
   visible: boolean;
   onClose: () => void;
   onSelect: (friend: Friend) => void;
+  isSharing: boolean;
 }) => {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
@@ -322,20 +332,21 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
       <View style={modalStyles.modalOverlay}>
         <View style={modalStyles.modalContent}>
           <Text style={modalStyles.modalTitle}>Selecciona un amigo</Text>
-          {loading ? (
-            <ActivityIndicator size={40} color="#4CAF50" />
-          ) : (
-            <FlatList
-              data={friends}
-              keyExtractor={(item) => item.user2Id}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={modalStyles.friendItem} onPress={() => onSelect(item)}>
-                  <Text style={modalStyles.friendName}>{item.username}</Text>
-                  <Text style={modalStyles.friendPoints}>Puntos: {item.points}</Text>
-                </TouchableOpacity>
-              )}
-            />
+          {isSharing && (
+            <View style={modalStyles.sharingContainer}>
+              <Text style={modalStyles.sharingText}>Compartiendo viaje...</Text>
+            </View>
           )}
+          <FlatList
+            data={friends}
+            keyExtractor={(item) => item.user2Id}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={modalStyles.friendItem} onPress={() => onSelect(item)}>
+                <Text style={modalStyles.friendName}>{item.username}</Text>
+                <Text style={modalStyles.friendPoints}>Puntos: {item.points}</Text>
+              </TouchableOpacity>
+            )}
+          />
           <TouchableOpacity style={modalStyles.cancelButton} onPress={onClose}>
             <Text style={modalStyles.cancelButtonText}>Cancelar</Text>
           </TouchableOpacity>
@@ -363,6 +374,19 @@ const modalStyles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10
+  },
+  sharingContainer: {
+    backgroundColor: '#E3F2FD',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#2196F3'
+  },
+  sharingText: {
+    color: '#2196F3',
+    textAlign: 'center',
+    fontWeight: 'bold'
   },
   friendItem: {
     padding: 10,
@@ -425,6 +449,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const isAdmin = user?.role === 'admin';
   const [citiesMap, setCitiesMap] = useState({});
+  const [isSharing, setIsSharing] = useState(false);
 
   // Cargar puntos del usuario al inicio
   useEffect(() => {
@@ -943,22 +968,71 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     }
   }, [missionCompleted, navigation]);
 
+  const handleShareMission = (mission: JourneyMission) => {
+    console.log('🔍 Configurando misión para compartir:', {
+      id: mission.id,
+      title: mission.challenge.title
+    });
+    setMissionToShare(mission);
+    setIsShareModalVisible(true);
+  };
+
   const handleShareJourney = async (friend: Friend) => {
-    if (!journeyId || !user?.id) {
-      Alert.alert('Error', 'No se pudo compartir el journey porque no se encontró el ID del viaje o no estás autenticado.');
-      return;
+    setIsSharing(true);
+    console.log('🔍 Iniciando proceso de compartir misión:', {
+        userId: user?.id,
+        friend: friend.username,
+        missionToShare: missionToShare?.id
+    });
+
+    // Obtener el journeyId de la misión seleccionada
+    if (!missionToShare) {
+        console.error('❌ No hay misión seleccionada para compartir');
+        Alert.alert('Error', 'No se pudo compartir la misión porque no hay ninguna seleccionada.');
+        setIsSharing(false);
+        return;
     }
 
+    // Buscar el journeyId asociado a la misión
     try {
-      const success = await shareJourney(journeyId, user.id, friend);
-      if (success) {
-        Alert.alert('Éxito', `Journey compartido con ${friend.username}`);
-      }
+        console.log('🔍 Buscando journeyId para la misión:', missionToShare.id);
+        const { data: journeyMission, error } = await supabase
+            .from('journeys_missions')
+            .select('journeyId')
+            .eq('id', missionToShare.id)
+            .single();
+
+        if (error) {
+            console.error('❌ Error al buscar journeyId:', error);
+            throw error;
+        }
+
+        if (!journeyMission?.journeyId) {
+            console.error('❌ No se encontró journeyId para la misión');
+            Alert.alert('Error', 'No se pudo encontrar el viaje asociado a esta misión.');
+            return;
+        }
+
+        console.log('✅ JourneyId encontrado:', journeyMission.journeyId);
+
+        if (!user?.id) {
+            console.error('❌ Usuario no autenticado');
+            Alert.alert('Error', 'Debes iniciar sesión para compartir misiones.');
+            return;
+        }
+
+        const success = await shareJourney(journeyMission.journeyId, user.id, friend);
+        if (success) {
+            console.log('✅ Misión compartida exitosamente con:', friend.username);
+            Alert.alert('Éxito', `Misión compartida con ${friend.username}`);
+        }
     } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'No se pudo compartir el journey');
+        console.error('❌ Error al compartir misión:', err);
+        Alert.alert('Error', 'No se pudo compartir la misión');
     } finally {
-      setIsShareModalVisible(false);
+        setIsSharing(false);
+        setIsShareModalVisible(false);
+        setMissionToShare(null);
     }
   };
 
@@ -1177,7 +1251,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       key={mission.id}
                       mission={mission}
                       onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
-                      onShare={() => setIsShareModalVisible(true)}
+                      onShare={handleShareMission}
                     />
                   )
                 )}
@@ -1206,7 +1280,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       key={mission.id}
                       mission={mission}
                       onComplete={() => { }}
-                      onShare={() => setIsShareModalVisible(true)}
+                      onShare={() => handleShareMission(mission)}
                     />
                   )
                 )}
@@ -1232,7 +1306,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       key={mission.id}
                       mission={mission}
                       onComplete={() => { }}
-                      onShare={() => setIsShareModalVisible(true)}
+                      onShare={() => handleShareMission(mission)}
                     />
                   )
                 )}
@@ -1257,8 +1331,14 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
           <FriendSelectionModal
             visible={isShareModalVisible}
-            onClose={() => setIsShareModalVisible(false)}
+            onClose={() => {
+              if (!isSharing) {
+                setIsShareModalVisible(false);
+                setMissionToShare(null);
+              }
+            }}
             onSelect={handleShareJourney}
+            isSharing={isSharing}
           />
 
           {renderGeneratingLoader()}
@@ -1751,6 +1831,17 @@ const styles = StyleSheet.create({
   },
   createFormContainer: {
     padding: 16,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
 });
 
