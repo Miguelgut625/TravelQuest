@@ -1714,7 +1714,7 @@ const styles = StyleSheet.create({
   loadingTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: colors.text.light,
     marginTop: 16,
   },
   loadingStep: {
