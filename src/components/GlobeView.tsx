@@ -1266,17 +1266,17 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
                           <View style={styles.forecastDetails}>
                             <View style={styles.forecastDetailItem}>
-                              <Ionicons name="water-outline" size={18} color="#003366" />
+                              <Ionicons name="water-outline" size={18} color="#0071c2" />
                               <Text style={styles.forecastDetailText}>{day.humidity}%</Text>
                             </View>
 
                             <View style={styles.forecastDetailItem}>
-                              <Ionicons name="umbrella-outline" size={18} color="#003366" />
+                              <Ionicons name="umbrella-outline" size={18} color="#0071c2" />
                               <Text style={styles.forecastDetailText}>{Math.round(day.pop * 100)}%</Text>
                             </View>
 
                             <View style={styles.forecastDetailItem}>
-                              <Ionicons name="compass-outline" size={18} color="#003366" />
+                              <Ionicons name="compass-outline" size={18} color="#0071c2" />
                               <Text style={styles.forecastDetailText}>{Math.round(day.speed * 3.6)} km/h</Text>
                             </View>
                           </View>
@@ -1302,7 +1302,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                           {weatherData?.name || 'Ubicación desconocida'}
                           {weatherData?.sys?.country ? `, ${weatherData.sys.country}` : ''}
                         </Text>
-                        <Ionicons name={cityDropdownVisible ? "chevron-up" : "chevron-down"} size={18} color="#003366" />
+                        <Ionicons name={cityDropdownVisible ? "chevron-up" : "chevron-down"} size={18} color="#0071c2" />
                       </TouchableOpacity>
 
                       {cityDropdownVisible && (
@@ -1320,7 +1320,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                             <Ionicons 
                               name={!selectedCity ? "locate" : "locate-outline"} 
                               size={16} 
-                              color={!selectedCity ? "#FF5722" : "#003366"} 
+                              color={!selectedCity ? "#FF5722" : "#0071c2"} 
                             />
                             <Text 
                               style={[
@@ -1334,7 +1334,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
                           {isLoadingCities ? (
                             <View style={styles.loadingCitiesContainer}>
-                              <ActivityIndicator size="small" color="#003366" />
+                              <ActivityIndicator size="small" color="#0071c2" />
                               <Text style={styles.loadingCitiesText}>Cargando ciudades...</Text>
                             </View>
                           ) : userCities.length > 0 ? (
@@ -1353,7 +1353,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                                 <Ionicons 
                                   name={selectedCity === city.name ? "location" : "location-outline"} 
                                   size={16} 
-                                  color={selectedCity === city.name ? "#FF5722" : "#003366"} 
+                                  color={selectedCity === city.name ? "#FF5722" : "#0071c2"} 
                                 />
                                 <Text 
                                   style={[
@@ -1373,7 +1373,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                             style={styles.refreshCitiesButton}
                             onPress={loadUserCities}
                           >
-                            <Ionicons name="refresh" size={16} color="#003366" />
+                            <Ionicons name="refresh" size={16} color="#0071c2" />
                             <Text style={styles.refreshCitiesText}>Actualizar ciudades</Text>
                           </TouchableOpacity>
                         </View>
@@ -1398,12 +1398,12 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                     <View style={styles.weatherDetails}>
                       <View style={styles.weatherDetailRow}>
                         <View style={styles.weatherDetailItem}>
-                          <Ionicons name="thermometer-outline" size={24} color="#003366" />
+                          <Ionicons name="thermometer-outline" size={24} color="#0071c2" />
                           <Text style={styles.weatherDetailLabel}>Sensación</Text>
                           <Text style={styles.weatherDetailValue}>{Math.round(weatherData?.main?.feels_like || 0)}°C</Text>
                         </View>
                         <View style={styles.weatherDetailItem}>
-                          <Ionicons name="water-outline" size={24} color="#003366" />
+                          <Ionicons name="water-outline" size={24} color="#0071c2" />
                           <Text style={styles.weatherDetailLabel}>Humedad</Text>
                           <Text style={styles.weatherDetailValue}>{weatherData?.main?.humidity || 0}%</Text>
                         </View>
@@ -1411,12 +1411,12 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
                       <View style={styles.weatherDetailRow}>
                         <View style={styles.weatherDetailItem}>
-                          <Ionicons name="speedometer-outline" size={24} color="#003366" />
+                          <Ionicons name="speedometer-outline" size={24} color="#0071c2" />
                           <Text style={styles.weatherDetailLabel}>Presión</Text>
                           <Text style={styles.weatherDetailValue}>{weatherData?.main?.pressure || 0} hPa</Text>
                         </View>
                         <View style={styles.weatherDetailItem}>
-                          <Ionicons name="compass-outline" size={24} color="#003366" />
+                          <Ionicons name="compass-outline" size={24} color="#0071c2" />
                           <Text style={styles.weatherDetailLabel}>Viento</Text>
                           <Text style={styles.weatherDetailValue}>{Math.round((weatherData?.wind?.speed || 0) * 3.6)} km/h</Text>
                         </View>
@@ -1639,7 +1639,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryButton: {
-    backgroundColor: '#003366', // Azul profundo
+    backgroundColor: '#0071c2', // Azul profundo
     marginHorizontal: 5,
     marginTop: 10,
   },
@@ -1649,7 +1649,7 @@ const styles = StyleSheet.create({
     bottom: 16,
   },
   fab: {
-    backgroundColor: '#003366', // Azul profundo
+    backgroundColor: '#0071c2', // Azul profundo
     marginBottom: 8,
   },
   weatherModalOverlay: {
@@ -1809,7 +1809,7 @@ const styles = StyleSheet.create({
   },
   weatherTabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: '#003366', // Azul profundo
+    borderBottomColor: '#0071c2', // Azul profundo
   },
   weatherTabText: {
     fontSize: 16,
@@ -1818,7 +1818,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   weatherTabTextActive: {
-    color: '#003366', // Azul profundo
+    color: '#0071c2', // Azul profundo
   },
   forecastContainer: {
     padding: 10,
@@ -1925,7 +1925,7 @@ const styles = StyleSheet.create({
   refreshCitiesText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#003366', // Azul profundo
+    color: '#0071c2', // Azul profundo
   },
   loadingIndicatorText: {
     fontSize: 14,

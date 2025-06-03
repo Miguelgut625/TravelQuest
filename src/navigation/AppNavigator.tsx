@@ -35,6 +35,22 @@ const Stack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Paleta de colores corporativa
+const colors = {
+  primary: '#003580',      // Azul oscuro (corporativo)
+  secondary: '#0071c2',    // Azul brillante (para botones y acentos)
+  background: '#ffffff',   // Blanco como fondo principal
+  white: '#FFFFFF',        // Blanco neutro reutilizable
+  text: {
+    primary: '#00264d',    // Azul muy oscuro (para alta legibilidad)
+    secondary: '#005b99',  // Azul medio (texto secundario)
+    light: '#66a3ff',      // Azul claro (detalles decorativos o descripciones)
+  },
+  border: '#66b3ff',       // Azul claro (para bordes y separadores)
+  success: '#38b000',      // Verde vibrante (indicadores positivos)
+  error: '#e63946',        // Rojo vivo (errores y alertas)
+};
+
 const MainFlow = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const isAdmin = user?.role === 'admin';
@@ -82,24 +98,26 @@ const TabNavigator = () => {
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={26} color={color} />;
         },
-        tabBarActiveTintColor: '#A8DADC',         // Azul oscuro
-        tabBarInactiveTintColor: '#A8DADC',       // Azul claro pastel
+        tabBarActiveTintColor: colors.text.light,         
+        tabBarInactiveTintColor: colors.white,      
         headerShown: false,
         tabBarStyle: {
           height: Platform.OS === 'ios' ? 90 : 70,
           paddingBottom: Platform.OS === 'ios' ? 30 : 12,
           paddingTop: 12,
-          backgroundColor: '#26547C',
+          backgroundColor: colors.primary, 
           elevation: 8,
-          shadowColor: '#000',
+          shadowColor: colors.text.primary,
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,
           shadowRadius: 3,
+          borderTopColor: colors.border,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '500',
           marginTop: 4,
+          color: colors.white,
         },
       })}
     >
@@ -135,8 +153,8 @@ const AppNavigator = () => {
   if (authState === 'loading') {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
-          <ActivityIndicator size={24} color="#005F9E" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+          <ActivityIndicator size={24} color={colors.primary} />
         </View>
       </SafeAreaProvider>
     );
@@ -144,16 +162,16 @@ const AppNavigator = () => {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={true} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} translucent={true} />
       <NavigationContainer linking={linking} theme={{
         dark: false,
         colors: {
-          background: '#FFFFFF',
-          border: '#e5e5e5',
-          card: '#FFFFFF',
-          text: '#222222',
-          notification: '#005F9E',
-          primary: '#005F9E',
+          background: colors.background,
+          border: colors.border,
+          card: colors.white,
+          text: colors.text.primary,
+          notification: colors.primary,
+          primary: colors.primary,
         },
       }}>
         {authState === 'authenticated' ? (
