@@ -70,7 +70,7 @@ const App = () => {
 
         if (session?.user) {
           console.log('Usuario autenticado encontrado:', session.user.email);
-          
+
           const { data: userData, error: userError } = await supabase
             .from('users')
             .select('username, role')
@@ -158,19 +158,21 @@ const App = () => {
         <ThemeProvider>
           <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
             <SafeAreaProvider>
-              <NavigationContainer theme={{
-                dark: isDarkMode,
-                colors: {
-                  background: isDarkMode ? '#1B263B' : '#FFFFFF',
-                  border: isDarkMode ? '#274472' : '#e5e5e5',
-                  card: isDarkMode ? '#274472' : '#FFFFFF',
-                  text: isDarkMode ? '#EDF6F9' : '#222222',
-                  notification: isDarkMode ? '#41729F' : '#005F9E',
-                  primary: isDarkMode ? '#41729F' : '#005F9E',
-                },
-              }}>
-                <AppNavigator />
-              </NavigationContainer>
+              <View style={{ flex: 1, backgroundColor: isDarkMode ? '#1B263B' : '#FFFFFF' }}>
+                <NavigationContainer theme={{
+                  dark: isDarkMode,
+                  colors: {
+                    background: isDarkMode ? '#1B263B' : '#FFFFFF',
+                    border: isDarkMode ? '#274472' : '#e5e5e5',
+                    card: isDarkMode ? '#274472' : '#FFFFFF',
+                    text: isDarkMode ? '#EDF6F9' : '#222222',
+                    notification: isDarkMode ? '#41729F' : '#005F9E',
+                    primary: isDarkMode ? '#41729F' : '#005F9E',
+                  },
+                }}>
+                  <AppNavigator />
+                </NavigationContainer>
+              </View>
             </SafeAreaProvider>
           </PaperProvider>
         </ThemeProvider>

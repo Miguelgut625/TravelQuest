@@ -5,15 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinary } from '../../services/cloudinaryService';
-import { 
-  addPhotoToEntry, 
-  getJournalEntryById, 
-  getCommentsByEntryId, 
-  addCommentToEntryTable 
+import {
+  addPhotoToEntry,
+  getJournalEntryById,
+  getCommentsByEntryId,
+  addCommentToEntryTable
 } from '../../services/journalService';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
+import { useTheme } from '../../context/ThemeContext';
+import { typography, shadows } from '../../styles/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface JournalEntryDetailScreenProps {
   route: RouteProp<{ JournalEntryDetail: { entry: any } }, 'JournalEntryDetail'>;
@@ -28,6 +31,15 @@ interface Comment {
   profile_pic_url?: string;
 }
 
+const EntryHeader = ({ title, onBack, styles, titleColor, isDarkMode, colors }) => (
+  <View style={styles.header}>
+    <TouchableOpacity onPress={onBack} style={styles.backButton}>
+      <Ionicons name="arrow-back" size={24} color={isDarkMode ? '#fff' : '#fff'} />
+    </TouchableOpacity>
+    <Text style={[styles.headerTitle, { color: titleColor, flex: 1 }]} numberOfLines={1}>{title}</Text>
+  </View>
+);
+
 const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   const { entry } = route.params;
   const navigation = useNavigation();
@@ -41,6 +53,9 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   const [commentsVisibility, setCommentsVisibility] = useState<'public' | 'friends' | 'private'>('public');
   const [isFriend, setIsFriend] = useState(false);
   const [checkingFriendship, setCheckingFriendship] = useState(true);
+  const { colors, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = getStyles(colors, isDarkMode, insets);
 
   const isOwner = user && entry && user.id === entry.user_id;
 
@@ -102,7 +117,7 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
 
         // Si cualquiera de las dos consultas devuelve datos, son amigos
         setIsFriend(!!user1Data || !!user2Data);
-        
+
         console.log('Estado de amistad:', {
           user1Data,
           user2Data,
@@ -127,7 +142,7 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
   const canComment = () => {
     if (!user) return false;
     if (isOwner) return true;
-    
+
     switch (commentsVisibility) {
       case 'public':
         return true;
@@ -263,17 +278,17 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
 
         // Subir imagen a Cloudinary
         const cloudinaryUrl = await uploadImageToCloudinary(imageUri, `journal_${entry.id}`);
-        
+
         // Añadir URL a la entrada
         const success = await addPhotoToEntry(entry.id, cloudinaryUrl);
-        
+
         if (success) {
           // Actualizar la entrada local
           entry.photos = [...(entry.photos || []), cloudinaryUrl];
-          
+
           // Navegar a la última foto añadida
           setCurrentPhotoIndex(entry.photos.length - 1);
-          
+
           Alert.alert('Éxito', 'Imagen añadida correctamente');
         } else {
           Alert.alert('Error', 'No se pudo añadir la imagen');
@@ -339,57 +354,35 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
 
   if (!entry) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#A8DADC" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Entrada no encontrada</Text>
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No se pudo cargar la entrada del diario</Text>
-        </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'red', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: 'white', fontSize: 32 }}>PRUEBA DE RENDER DIRECTO</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
-    >
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        
-        {/* Header con botón de regreso */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#A8DADC" />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.headerSafeArea}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.accent }]} onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color="#222" />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>{entry.title}</Text>
-          <TouchableOpacity onPress={refreshEntry} style={styles.refreshButton} disabled={refreshing}>
-            {refreshing ? (
-              <ActivityIndicator size="small" color="#A8DADC" />
-            ) : (
-              <Ionicons name="refresh" size={24} color="#A8DADC" />
-            )}
-          </TouchableOpacity>
+          <View style={{ width: 36 }} />
         </View>
-        
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Fecha */}
-          <Text style={styles.dateText}>{formatDate(entry.created_at)}</Text>
-          
-          {/* Imágenes */}
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 0 }}>
+        <Text style={styles.dateText}>{formatDate(entry.created_at)}</Text>
+        {/* Imagen principal */}
+        <View style={styles.photoContainer}>
           {entry.photos && entry.photos.length > 0 ? (
-            <View style={styles.photoContainer}>
+            <>
               <Image
                 source={{ uri: entry.photos[currentPhotoIndex] }}
                 style={[styles.mainPhoto, { width: Dimensions.get('window').width - 32 }]}
                 resizeMode="cover"
               />
-              
+
               {/* Indicadores de foto (dots) */}
               {entry.photos.length > 1 && (
                 <View style={styles.photoDots}>
@@ -404,7 +397,7 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
                   ))}
                 </View>
               )}
-              
+
               {/* Botones para navegar entre fotos */}
               {entry.photos.length > 1 && (
                 <View style={styles.photoNavButtons}>
@@ -434,215 +427,210 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
                   </TouchableOpacity>
                 </View>
               )}
-            </View>
+            </>
           ) : (
             <View style={styles.noPhotoContainer}>
               <Ionicons name="image-outline" size={64} color="#ccc" />
               <Text style={styles.noPhotoText}>Sin imágenes</Text>
             </View>
           )}
-          
-          {/* Botón para añadir imágenes - solo se muestra si es mi entrada */}
-          {isMyEntry && (
-            <TouchableOpacity 
-              style={styles.addPhotoButton} 
-              onPress={handleAddPhoto}
-              disabled={isAddingPhoto}
-            >
-              {isAddingPhoto ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="add" size={24} color="#fff" />
-                  <Text style={styles.addPhotoText}>Añadir imagen</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-          
-          {/* Contenido principal */}
-          <View style={styles.contentContainer}>
-            <Text style={styles.content}>
-              {entry.content.split('\n').map((paragraph, index) => (
-                <React.Fragment key={index}>
-                  {paragraph.trim() !== '' && (
-                    <Text>
-                      {paragraph}
-                      {index < entry.content.split('\n').length - 1 && '\n\n'}
-                    </Text>
-                  )}
-                </React.Fragment>
-              ))}
-            </Text>
+        </View>
+        {/* Botón añadir imagen */}
+        {isMyEntry && (
+          <TouchableOpacity style={styles.addPhotoButton} onPress={handleAddPhoto} disabled={isAddingPhoto}>
+            {isAddingPhoto ? (
+              <ActivityIndicator size="small" color={isDarkMode ? colors.background : colors.surface} />
+            ) : (
+              <>
+                <Ionicons name="add" size={24} color={isDarkMode ? colors.background : colors.surface} />
+                <Text style={styles.addPhotoText}>Añadir imagen</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+        {/* Card de contenido */}
+        <View style={styles.contentCard}>
+          <Text style={styles.content}>
+            {entry.content.split('\n').map((paragraph, index) => (
+              <React.Fragment key={index}>
+                {paragraph.trim() !== '' && (
+                  <Text>
+                    {paragraph}
+                    {index < entry.content.split('\n').length - 1 && '\n\n'}
+                  </Text>
+                )}
+              </React.Fragment>
+            ))}
+          </Text>
+        </View>
+        {/* Etiquetas */}
+        {entry.tags && entry.tags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {entry.tags.map((tag, index) => (
+              <Text key={index} style={styles.tag}>#{tag}</Text>
+            ))}
           </View>
-          
-          {/* Etiquetas */}
-          {entry.tags && entry.tags.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {entry.tags.map((tag, index) => (
-                <Text key={index} style={styles.tag}>
-                  #{tag}
-                </Text>
-              ))}
-            </View>
-          )}
-          
-          {/* Sección de comentarios */}
-          <View style={styles.commentsSection}>
-            <View style={styles.commentsHeader}>
-              <Text style={styles.commentsSectionTitle}>Comentarios</Text>
-            </View>
-            {checkingFriendship ? (
-              <ActivityIndicator size="small" color="#005F9E" style={{ marginVertical: 10 }} />
-            ) : !canComment() ? (
-              <Text style={styles.noCommentsText}>
-                {commentsVisibility === 'private'
-                  ? 'El autor ha configurado esta entrada para que nadie pueda comentar.'
-                  : commentsVisibility === 'friends'
+        )}
+        {/* Comentarios */}
+        <View style={styles.commentsSection}>
+          <Text style={styles.commentsSectionTitle}>Comentarios</Text>
+          {checkingFriendship ? (
+            <ActivityIndicator size="small" color="#005F9E" style={{ marginVertical: 10 }} />
+          ) : !canComment() ? (
+            <Text style={styles.noCommentsText}>
+              {commentsVisibility === 'private'
+                ? 'El autor ha configurado esta entrada para que nadie pueda comentar.'
+                : commentsVisibility === 'friends'
                   ? 'Solo los amigos pueden comentar en esta entrada.'
                   : 'No tienes permiso para comentar en esta entrada.'}
-              </Text>
-            ) : null}
-            {comments.length > 0 ? (
-              <View style={styles.commentsList}>
-                {comments.map((comment, index) => (
-                  <View key={comment.id || index} style={styles.commentItem}>
-                    <View style={styles.commentHeader}>
-                      <TouchableOpacity 
-                        onPress={() => {
-                          if (comment.user_id === user?.id) {
-                            navigation.navigate('Profile');
-                          } else {
-                            navigation.navigate('FriendProfile', {
-                              friendId: comment.user_id,
-                              friendName: comment.username || 'Usuario'
-                            });
-                          }
-                        }}
-                        style={styles.commentAuthorContainer}
-                      >
-                        {comment.profile_pic_url ? (
-                          <Image 
-                            source={{ uri: comment.profile_pic_url }} 
-                            style={styles.commentUserAvatar}
-                          />
-                        ) : (
-                          <View style={styles.commentUserAvatarPlaceholder}>
-                            <Text style={styles.commentUserAvatarText}>
-                              {(comment.username || 'U')[0].toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                        <View style={styles.commentAuthorInfo}>
-                          <Text style={styles.commentAuthor}>{comment.username || 'Usuario'}</Text>
-                          {comment.user_id === user?.id && (
-                            <Text style={styles.youBadge}>Tú</Text>
-                          )}
+            </Text>
+          ) : null}
+          {comments.length > 0 ? (
+            <View style={styles.commentsList}>
+              {comments.map((comment, index) => (
+                <View key={comment.id || index} style={styles.commentItem}>
+                  <View style={styles.commentHeader}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (comment.user_id === user?.id) {
+                          navigation.navigate('Profile');
+                        } else {
+                          navigation.navigate('FriendProfile', {
+                            friendId: comment.user_id,
+                            friendName: comment.username || 'Usuario'
+                          });
+                        }
+                      }}
+                      style={styles.commentAuthorContainer}
+                    >
+                      {comment.profile_pic_url ? (
+                        <Image
+                          source={{ uri: comment.profile_pic_url }}
+                          style={styles.commentUserAvatar}
+                        />
+                      ) : (
+                        <View style={styles.commentUserAvatarPlaceholder}>
+                          <Text style={styles.commentUserAvatarText}>
+                            {(comment.username || 'U')[0].toUpperCase()}
+                          </Text>
                         </View>
-                      </TouchableOpacity>
-                      <Text style={styles.commentDate}>{formatCommentDate(comment.created_at)}</Text>
-                    </View>
-                    <Text style={styles.commentText}>{comment.comment}</Text>
+                      )}
+                      <View style={styles.commentAuthorInfo}>
+                        <Text style={styles.commentAuthor}>{comment.username || 'Usuario'}</Text>
+                        {comment.user_id === user?.id && (
+                          <Text style={styles.youBadge}>Tú</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                    <Text style={styles.commentDate}>{formatCommentDate(comment.created_at)}</Text>
                   </View>
-                ))}
-              </View>
-            ) : canComment() ? (
-              <Text style={styles.noCommentsText}>
-                No hay comentarios aún. ¡Sé el primero en comentar!
-              </Text>
-            ) : null}
-            
-            {/* Añadir comentario */}
-            {canComment() && (
-              <View style={styles.addCommentContainer}>
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder="Escribe un comentario..."
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  multiline
-                />
-                <TouchableOpacity 
-                  style={[
-                    styles.sendCommentButton,
-                    (!newComment.trim() || isAddingComment) && styles.disabledButton
-                  ]}
-                  onPress={handleAddComment}
-                  disabled={!newComment.trim() || isAddingComment}
-                >
-                  {isAddingComment ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="send" size={20} color="#fff" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+                  <Text style={styles.commentText}>{comment.comment}</Text>
+                </View>
+              ))}
+            </View>
+          ) : canComment() ? (
+            <Text style={styles.noCommentsText}>
+              No hay comentarios aún. ¡Sé el primero en comentar!
+            </Text>
+          ) : null}
+
+          {/* Añadir comentario */}
+          {canComment() && (
+            <View style={styles.addCommentContainer}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Escribe un comentario..."
+                value={newComment}
+                onChangeText={setNewComment}
+                multiline
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendCommentButton,
+                  { backgroundColor: colors.accent },
+                  (!newComment.trim() || isAddingComment) && styles.disabledButton
+                ]}
+                onPress={handleAddComment}
+                disabled={!newComment.trim() || isAddingComment}
+              >
+                {isAddingComment ? (
+                  <ActivityIndicator size="small" color="#222" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#222" />
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
-
-const styles = StyleSheet.create({
+const getStyles = (colors, isDarkMode, insets) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
   },
-  header: {
+  headerSafeArea: {
+    backgroundColor: isDarkMode ? colors.background : colors.primary,
+    zIndex: 10,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    backgroundColor: colors.primary,
-    marginBottom: 15,
-    marginTop: 30,
-  },
-  backButton: {
-    padding: 5,
-    color: colors.text.light,
+    marginBottom: 16,
+    marginTop: (insets?.top || 0) + 24,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
-    color: colors.text.light,
+    ...typography.h2,
+    color: isDarkMode ? colors.accent : colors.surface,
+    letterSpacing: 1,
     flex: 1,
+    textAlign: 'center',
+  },
+  backButton: {
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
   scrollContent: {
-    padding: 16,
+    padding: 0,
   },
   dateText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.text.secondary,
-    marginBottom: 16,
+    color: isDarkMode ? colors.accent : colors.primary,
+    ...typography.small,
+    marginBottom: 8,
+    marginLeft: 24,
+    marginTop: 8,
   },
   photoContainer: {
-    position: 'relative',
+    width: '92%',
+    alignSelf: 'center',
+    marginTop: 8,
     marginBottom: 16,
-    borderRadius: 10,
+    borderRadius: 20,
     overflow: 'hidden',
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 4,
+    elevation: 3,
   },
   mainPhoto: {
-    height: 250,
-    borderRadius: 10,
+    width: '100%',
+    height: 200,
+    borderRadius: 20,
   },
   photoDots: {
     flexDirection: 'row',
@@ -656,11 +644,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.15)',
     marginHorizontal: 4,
   },
   activeDot: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     width: 10,
     height: 10,
     borderRadius: 5,
@@ -693,49 +681,67 @@ const styles = StyleSheet.create({
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     marginBottom: 16,
   },
   noPhotoText: {
-    color: '#999',
+    color: colors.text.secondary,
     marginTop: 10,
   },
   addPhotoButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: isDarkMode ? colors.accent : colors.secondary,
     flexDirection: 'row',
-    padding: 12,
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginVertical: 12,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addPhotoText: {
-    color: colors.white,
+    color: isDarkMode ? colors.background : colors.surface,
     marginLeft: 8,
     fontWeight: 'bold',
+    fontSize: 16,
   },
-  contentContainer: {
-    marginBottom: 20,
-    padding: 12,
-    backgroundColor: colors.primary,
+  contentCard: {
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.accent : colors.primary,
+    ...shadows.medium,
   },
   content: {
+    color: colors.text.primary,
     fontSize: 16,
     lineHeight: 24,
-    color: colors.text.light,
     textAlign: 'justify',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 4,
   },
   tag: {
-    color: colors.secondary,
-    marginRight: 10,
-    marginBottom: 5,
-    fontSize: 14,
+    color: isDarkMode ? colors.accent : colors.primary,
+    backgroundColor: isDarkMode ? 'rgba(246,173,85,0.10)' : 'rgba(43,108,176,0.10)',
+    marginRight: 8,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 13,
   },
   errorContainer: {
     flex: 1,
@@ -745,38 +751,41 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.error,
     textAlign: 'center',
   },
   commentsSection: {
-    paddingTop: 16,
-    backgroundColor: colors.background,
-    borderRadius: 8,
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.accent : colors.primary,
+    ...shadows.medium,
   },
   commentsSectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    paddingLeft: 12,
-    color: colors.text.secondary,
+    ...typography.h3,
+    color: isDarkMode ? colors.accent : colors.primary,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   commentsList: {
     marginBottom: 6,
     padding: 6,
   },
   commentItem: {
-    padding: 12,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    marginBottom: 12,
+    backgroundColor: isDarkMode ? colors.surface : colors.background,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: colors.background,
+    borderColor: isDarkMode ? colors.accent : colors.primary,
   },
   commentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 4,
   },
   commentAuthorContainer: {
     flexDirection: 'row',
@@ -793,7 +802,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#E3F2FD',
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -801,7 +810,7 @@ const styles = StyleSheet.create({
   commentUserAvatarText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: colors.primary,
   },
   commentAuthorInfo: {
     flexDirection: 'row',
@@ -810,13 +819,14 @@ const styles = StyleSheet.create({
   },
   commentAuthor: {
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: isDarkMode ? colors.accent : colors.primary,
     fontSize: 14,
+    marginRight: 8,
   },
   youBadge: {
     fontSize: 12,
-    color: '#4CAF50',
-    backgroundColor: '#E8F5E9',
+    color: colors.success,
+    backgroundColor: colors.surface,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -824,17 +834,16 @@ const styles = StyleSheet.create({
   },
   commentDate: {
     fontSize: 12,
-    color: '#999',
-    marginLeft: 8,
+    color: colors.text.secondary,
   },
   commentText: {
-    color: '#333',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: 15,
     lineHeight: 20,
-    marginLeft: 44, // 36px avatar + 8px margin
+    marginTop: 2,
   },
   noCommentsText: {
-    color: '#999',
+    color: colors.text.secondary,
     textAlign: 'center',
     marginVertical: 16,
     fontStyle: 'italic',
@@ -842,7 +851,7 @@ const styles = StyleSheet.create({
   addCommentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 8,
+    marginTop: 8,
   },
   commentInput: {
     flex: 1,
@@ -853,12 +862,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     maxHeight: 100,
     marginRight: 8,
+    color: colors.text.primary,
+    backgroundColor: colors.surface,
   },
   sendCommentButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 8,

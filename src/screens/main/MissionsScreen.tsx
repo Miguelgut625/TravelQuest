@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, RefreshControl, Button } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, RefreshControl, Button, Animated, Easing } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -236,7 +236,7 @@ const MissionCard = ({ mission, onComplete, onShare, styles, colors }: {
   );
 };
 
-const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress, styles, colors }: {
+const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress, styles, colors, isDarkMode }: {
   cityName: string;
   totalMissions: number;
   completedMissions: number;
@@ -244,28 +244,36 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   onPress: () => void;
   styles: any;
   colors: any;
-}) => (
-  <TouchableOpacity style={styles.cityCard} onPress={onPress}>
-    <View style={styles.cityCardContent}>
-      <View style={styles.cityInfo}>
-        <Text style={styles.cityName}>{cityName}</Text>
-        <Text style={styles.missionCount}>
-          {completedMissions}/{totalMissions} misiones completadas
-        </Text>
+  isDarkMode: boolean;
+}) => {
+  // Calcular porcentaje de progreso
+  const progress = totalMissions > 0 ? completedMissions / totalMissions : 0;
+  // Colores de fondo según modo
+  const cardBg = isDarkMode ? colors.surface : colors.background;
+  const overlayColor = isDarkMode ? 'rgba(26,32,44,0.65)' : 'rgba(43,108,176,0.12)';
+  const progressColor = isDarkMode ? colors.accent : colors.secondary;
+  return (
+    <TouchableOpacity style={[styles.cityCardRedesigned, { backgroundColor: cardBg }]} onPress={onPress} activeOpacity={0.92}>
+      {/* Overlay para mejorar contraste */}
+      <View style={[styles.cityCardOverlayRedesigned, { backgroundColor: overlayColor }]} />
+      <View style={styles.cityCardContentRedesigned}>
+        <View style={styles.cityCardHeaderRow}>
+          <Ionicons name="location" size={28} color={isDarkMode ? colors.accent : colors.primary} style={{ marginRight: 10 }} />
+          <Text style={styles.cityCardTitle}>{cityName}</Text>
+        </View>
+        <Text style={styles.cityCardSubtitle}>{completedMissions}/{totalMissions} misiones completadas</Text>
+        {/* Barra de progreso */}
+        <View style={styles.cityCardProgressBarBg}>
+          <View style={[styles.cityCardProgressBarFill, { width: `${progress * 100}%`, backgroundColor: progressColor }]} />
+        </View>
+        {expiredMissions > 0 && (
+          <Text style={styles.cityCardExpiredText}>{expiredMissions} expiradas</Text>
+        )}
       </View>
-      {/* @ts-ignore */}
-      <Ionicons name="chevron-forward" size={24} color={colors.text.secondary} />
-    </View>
-    <View style={styles.progressBar}>
-      <View
-        style={[
-          styles.progressFill,
-          { width: `${(completedMissions / totalMissions) * 100}%` }
-        ]}
-      />
-    </View>
-  </TouchableOpacity>
-);
+      <Ionicons name="chevron-forward" size={26} color={isDarkMode ? colors.accent : colors.primary} style={styles.cityCardChevron} />
+    </TouchableOpacity>
+  );
+};
 
 const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   visible: boolean;
@@ -427,6 +435,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const isAdmin = user?.role === 'admin';
   const [citiesMap, setCitiesMap] = useState({});
   const styles = getStyles(colors, isDarkMode);
+  // Estado para animar el giro del botón de refrescar
+  const [refreshAnim] = useState(new Animated.Value(0));
 
   // Cargar puntos del usuario al inicio
   useEffect(() => {
@@ -1008,6 +1018,23 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
     }
   };
 
+  const handleRefreshAnimated = () => {
+    Animated.sequence([
+      Animated.timing(refreshAnim, {
+        toValue: 1,
+        duration: 700,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+      Animated.timing(refreshAnim, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true,
+      })
+    ]).start();
+    handleRefresh();
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -1031,18 +1058,21 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   if (!selectedCity) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-              {refreshing ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <Ionicons name="refresh" style={styles.refreshIcon} />
-              )}
-            </TouchableOpacity>
-            <Text style={styles.title}>Tus Ciudades</Text>
+        <View style={styles.headerRedesigned}>
+          <TouchableOpacity onPress={handleRefreshAnimated} style={styles.refreshFab} activeOpacity={0.8}>
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="refresh" style={styles.refreshFabIcon} />
+            )}
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.titleRedesigned}>Tus Ciudades</Text>
           </View>
-          <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
+          <View style={styles.pointsBubble}>
+            <Ionicons name="trophy" size={18} color={colors.accent} style={{ marginRight: 6 }} />
+            <Text style={styles.pointsBubbleText}>Puntos: {userPoints}</Text>
+          </View>
         </View>
         <View style={styles.container}>
           <ScrollView
@@ -1056,21 +1086,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               <CityCard
                 key={cityName}
                 cityName={cityName}
-                totalMissions={
-                  // @ts-ignore - TypeScript no puede inferir la estructura
-                  missions.completed.length + missions.pending.length
-                }
-                completedMissions={
-                  // @ts-ignore - TypeScript no puede inferir la estructura
-                  missions.completed.length
-                }
-                expiredMissions={
-                  // @ts-ignore - TypeScript no puede inferir la estructura
-                  missions.expired.length
-                }
+                totalMissions={missions.completed.length + missions.pending.length}
+                completedMissions={missions.completed.length}
+                expiredMissions={missions.expired.length}
                 onPress={() => setSelectedCity(cityName)}
                 styles={styles}
                 colors={colors}
+                isDarkMode={isDarkMode}
               />
             ))}
           </ScrollView>
@@ -1083,200 +1105,96 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setSelectedCity(null)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.surface} />
-          <Text style={styles.backButtonText}>Volver</Text>
-        </TouchableOpacity>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-            {refreshing ? (
-              <ActivityIndicator size="small" color={colors.shareIcon} />
-            ) : (
-              <Ionicons name="refresh" size={24} color={colors.shareIcon} />
-            )}
+      <View style={styles.cityHeaderContainer}>
+        <View style={styles.cityHeaderRowFinal}>
+          <TouchableOpacity style={styles.cityBackButton} onPress={() => setSelectedCity(null)}>
+            <Ionicons name="arrow-back" size={26} color={isDarkMode ? colors.background : colors.surface} />
           </TouchableOpacity>
-          <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
+          <View style={styles.cityTitleHeaderWrapper}>
+            <Text style={styles.cityTitleHeaderFinal} numberOfLines={1} ellipsizeMode="tail">{selectedCity}</Text>
+          </View>
+          <View style={styles.pointsBubbleRowCityFinal}>
+            <View style={styles.pointsBubble}>
+              <Ionicons name="trophy" size={18} color={colors.accent} style={{ marginRight: 6 }} />
+              <Text style={styles.pointsBubbleText}>Puntos: {userPoints}</Text>
+            </View>
+          </View>
         </View>
       </View>
       <View style={styles.container}>
-        {showCreateForm && isAdmin ? (
-          <View style={styles.createFormContainer}>
-            <CreateMissionForm onMissionCreated={() => {
-              setShowCreateForm(false);
-              fetchMissions();
-            }} />
-          </View>
-        ) : (
-          <>
-            <Text style={styles.cityTitle}>{selectedCity}</Text>
-            <ScrollView
-              style={styles.missionsList}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-            >
-              {cityData.pending.length > 0 && (
-                <>
-                  <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
-                  {sortMissions(cityData.pending).map(mission =>
-                    mission.challenge && mission.challenge.is_event ? (
-                      <View key={mission.id} style={{ backgroundColor: colors.eventBackground, borderColor: colors.eventBorder, borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                        <Text style={{ fontWeight: 'bold', color: colors.eventText, fontSize: 18 }}>{mission.challenge.title}</Text>
-                        <Text>{mission.challenge.description}</Text>
-                        <Text style={{ color: colors.eventText, marginTop: 8 }}>Misión de Evento</Text>
-                      </View>
-                    ) : (
-                      <MissionCard
-                        key={mission.id}
-                        mission={mission}
-                        onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
-                        onShare={() => setIsShareModalVisible(true)}
-                        styles={styles}
-                        colors={colors}
-                      />
-                    )
-                  )}
-                  {cityData.expired.length > 0 && (
-                    <View style={{ height: 2, backgroundColor: colors.dividerAlt, marginVertical: 16, borderRadius: 2 }} />
-                  )}
-                </>
-              )}
-
-              {cityData.expired.length > 0 && (
-                <>
-                  <View style={styles.completedDivider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={[styles.completedText, { color: colors.error }]}>Expiradas</Text>
-                    <View style={styles.dividerLine} />
+        <ScrollView style={styles.missionsList}>
+          {/* Misiones pendientes */}
+          {cityData.pending.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
+              {sortMissions(cityData.pending).map(mission => (
+                <View key={mission.id} style={styles.missionCardRedesigned}>
+                  <View style={styles.missionCardHeaderRow}>
+                    <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
+                    {mission.completed && (
+                      <Text style={styles.missionBadgeCompleted}>Completada</Text>
+                    )}
+                    {!mission.completed && getTimeRemaining(mission.end_date).isExpired && (
+                      <Text style={styles.missionBadgeExpired}>Expirada</Text>
+                    )}
                   </View>
-                  {sortMissions(cityData.expired).map(mission =>
-                    mission.challenge && mission.challenge.is_event ? (
-                      <View key={mission.id} style={{ backgroundColor: colors.eventBackground, borderColor: colors.eventBorder, borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                        <Text style={{ fontWeight: 'bold', color: colors.eventText, fontSize: 18 }}>{mission.challenge.title}</Text>
-                        <Text>{mission.challenge.description}</Text>
-                        <Text style={{ color: colors.eventText, marginTop: 8 }}>Misión de Evento</Text>
-                      </View>
-                    ) : (
-                      <MissionCard
-                        key={mission.id}
-                        mission={mission}
-                        onComplete={() => { }}
-                        onShare={() => setIsShareModalVisible(true)}
-                        styles={styles}
-                        colors={colors}
-                      />
-                    )
+                  {!mission.completed && getTimeRemaining(mission.end_date).isExpired && (
+                    <Text style={styles.missionExpiredText}>Tiempo expirado</Text>
                   )}
-                </>
-              )}
-
-              {cityData.completed.length > 0 && (
-                <>
-                  <View style={styles.completedDivider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.completedText}>Completadas</Text>
-                    <View style={styles.dividerLine} />
+                  <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
+                  <View style={styles.missionCardFooterRow}>
+                    <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
                   </View>
-                  {sortMissions(cityData.completed).map(mission =>
-                    mission.challenge && mission.challenge.is_event ? (
-                      <View key={mission.id} style={{ backgroundColor: colors.eventBackground, borderColor: colors.eventBorder, borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                        <Text style={{ fontWeight: 'bold', color: colors.eventText, fontSize: 18 }}>{mission.challenge.title}</Text>
-                        <Text>{mission.challenge.description}</Text>
-                        <Text style={{ color: colors.eventText, marginTop: 8 }}>Misión de Evento</Text>
-                      </View>
-                    ) : (
-                      <MissionCard
-                        key={mission.id}
-                        mission={mission}
-                        onComplete={() => { }}
-                        onShare={() => setIsShareModalVisible(true)}
-                        styles={styles}
-                        colors={colors}
-                      />
-                    )
-                  )}
-                </>
-              )}
-            </ScrollView>
-
-            {/* Modal de misión completada */}
-            <MissionCompletedModal
-              visible={missionCompleted}
-              info={completedMissionInfo}
-              onFinished={() => {
-                setMissionCompleted(false);
-                navigation.navigate('Journal', { refresh: true });
-              }}
-            />
-
-            {/* Modal de carga durante el proceso */}
-            <CompletingMissionModal
-              visible={completingMission && !missionCompleted}
-            />
-
-            <FriendSelectionModal
-              visible={isShareModalVisible}
-              onClose={() => setIsShareModalVisible(false)}
-              onSelect={handleShareJourney}
-            />
-
-            {renderGeneratingLoader()}
-          </>
-        )}
-
-        {/* Modal de Rutas */}
-        <Modal
-          visible={showRoutesModal}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setShowRoutesModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Ruta de Misiones</Text>
-                <TouchableOpacity onPress={() => setShowRoutesModal(false)}>
-                  <Ionicons name="close" size={24} color="#666" />
-                </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+          {/* Misiones expiradas */}
+          {cityData.expired.length > 0 && (
+            <>
+              <View style={styles.completedDivider}>
+                <View style={styles.dividerLine} />
+                <Text style={[styles.completedText, { color: colors.error }]}>Expiradas</Text>
+                <View style={styles.dividerLine} />
               </View>
-
-              {currentRoute && (
-                <ScrollView style={styles.routeList}>
-                  {currentRoute.journeys_missions
-                    .sort((a: any, b: any) => a.order_index - b.order_index)
-                    .map((mission: any, index: number) => (
-                      <View key={mission.id} style={styles.routeItem}>
-                        <View style={styles.routeNumber}>
-                          <Text style={styles.routeNumberText}>{index + 1}</Text>
-                        </View>
-                        <View style={styles.routeMissionInfo}>
-                          <Text style={styles.routeMissionTitle}>
-                            {mission.challenge.title}
-                          </Text>
-                          <Text style={styles.routeMissionDescription}>
-                            {mission.challenge.description}
-                          </Text>
-                          <View style={styles.routeMissionMeta}>
-                            <Text style={styles.routeMissionDifficulty}>
-                              Dificultad: {mission.challenge.difficulty}
-                            </Text>
-                            <Text style={styles.routeMissionPoints}>
-                              {mission.challenge.points} puntos
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                </ScrollView>
-              )}
-            </View>
-          </View>
-        </Modal>
+              {sortMissions(cityData.expired).map(mission => (
+                <View key={mission.id} style={styles.missionCardRedesigned}>
+                  <View style={styles.missionCardHeaderRow}>
+                    <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
+                    <Text style={styles.missionBadgeExpired}>Expirada</Text>
+                  </View>
+                  <Text style={styles.missionExpiredText}>Tiempo expirado</Text>
+                  <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
+                  <View style={styles.missionCardFooterRow}>
+                    <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+          {/* Misiones completadas */}
+          {cityData.completed.length > 0 && (
+            <>
+              <View style={styles.completedDivider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.completedText}>Completadas</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              {sortMissions(cityData.completed).map(mission => (
+                <View key={mission.id} style={styles.missionCardRedesigned}>
+                  <View style={styles.missionCardHeaderRow}>
+                    <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
+                    <Text style={styles.missionBadgeCompleted}>Completada</Text>
+                  </View>
+                  <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
+                  <View style={styles.missionCardFooterRow}>
+                    <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -1382,55 +1300,77 @@ const getStyles = (colors, isDarkMode) => ({
   citiesList: {
     flex: 1,
   },
-  cityCard: {
-    backgroundColor: isDarkMode ? colors.surface : colors.primary,
-    borderRadius: 24,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+  cityCardRedesigned: {
+    width: '100%',
+    minHeight: 110,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginBottom: spacing.xxl,
+    marginTop: 2,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.13,
+    shadowRadius: 8,
+    elevation: 5,
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.large,
-    borderLeftWidth: isDarkMode ? 6 : 0,
-    borderLeftColor: isDarkMode ? colors.accent : 'transparent',
+    backgroundColor: colors.surface,
   },
-  cityCardContent: {
+  cityCardOverlayRedesigned: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  cityCardContentRedesigned: {
     flex: 1,
-    flexDirection: 'column',
+    zIndex: 2,
+    paddingVertical: spacing.lg,
+    paddingLeft: spacing.xl,
+    paddingRight: spacing.md,
     justifyContent: 'center',
-    marginLeft: spacing.md,
   },
-  cityInfo: {
-    flex: 1,
+  cityCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
   },
-  cityName: {
+  cityCardTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: isDarkMode ? colors.text.primary : colors.surface,
-    marginBottom: 2,
+    color: isDarkMode ? colors.accent : colors.text.primary,
     letterSpacing: 0.5,
+    flexShrink: 1,
   },
-  missionCount: {
+  cityCardSubtitle: {
     fontSize: 15,
-    color: isDarkMode ? colors.primary : colors.surface,
-    marginBottom: spacing.sm,
+    color: isDarkMode ? colors.accent : colors.text.secondary,
+    marginBottom: 8,
+    marginTop: 2,
   },
-  progressBar: {
-    height: isDarkMode ? 12 : 18,
-    backgroundColor: isDarkMode ? '#222F43' : '#E3EAFE',
-    borderRadius: 10,
+  cityCardProgressBarBg: {
+    height: 10,
+    backgroundColor: isDarkMode ? '#222' : '#E3EAFE',
+    borderRadius: 8,
     overflow: 'hidden',
-    marginTop: spacing.md,
-    marginBottom: 0,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 3,
-    elevation: 1,
+    marginTop: 2,
+    marginBottom: 2,
   },
-  progressFill: {
+  cityCardProgressBarFill: {
     height: '100%',
+    borderRadius: 8,
     backgroundColor: isDarkMode ? colors.accent : colors.secondary,
-    borderRadius: 10,
+  },
+  cityCardExpiredText: {
+    color: colors.error,
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginTop: 6,
+  },
+  cityCardChevron: {
+    zIndex: 2,
+    marginRight: spacing.xl,
+    color: isDarkMode ? colors.accent : colors.primary,
   },
   missionsList: {
     flex: 1,
@@ -1460,7 +1400,7 @@ const getStyles = (colors, isDarkMode) => ({
     letterSpacing: 1,
   },
   card: {
-    backgroundColor: isDarkMode ? colors.surface : colors.primary,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     paddingVertical: isDarkMode ? spacing.md : spacing.lg,
     paddingHorizontal: isDarkMode ? spacing.md : spacing.lg,
@@ -1739,12 +1679,220 @@ const getStyles = (colors, isDarkMode) => ({
     color: isDarkMode ? colors.text.secondary : colors.surface,
     opacity: 0.8,
   },
+  headerRedesigned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: isDarkMode ? colors.background : colors.primary,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 12,
+    minHeight: 110,
+    marginBottom: spacing.xxl,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleRedesigned: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: isDarkMode ? colors.accent : colors.surface,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  pointsBubbleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 0,
+    width: '100%',
+  },
+  pointsBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.13,
+    shadowRadius: 4,
+    elevation: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: isDarkMode ? 1 : 0,
+    borderColor: isDarkMode ? colors.accent : 'transparent',
+  },
+  pointsBubbleText: {
+    color: isDarkMode ? colors.accent : colors.primary,
+    fontWeight: 'bold',
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  refreshFabContainer: {
+    position: 'absolute',
+    top: 18,
+    left: 24,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  refreshFab: {
+    backgroundColor: colors.surface,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.13,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  refreshFabIcon: {
+    color: isDarkMode ? colors.accent : colors.primary,
+    fontSize: 26,
+  },
+  cityHeaderContainer: {
+    backgroundColor: isDarkMode ? colors.background : colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 12,
+    minHeight: 110,
+    paddingTop: 30,
+    paddingBottom: 24,
+    paddingHorizontal: 18,
+    justifyContent: 'flex-end',
+    marginBottom: 28,
+  },
+  cityHeaderRowFinal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  cityBackButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: isDarkMode ? colors.accent : colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  cityTitleHeaderWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  cityTitleHeaderFinal: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: isDarkMode ? colors.accent : colors.surface,
+    letterSpacing: 1,
+    textAlign: 'center',
+    maxWidth: '100%',
+  },
+  pointsBubbleRowCityFinal: {
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  missionCardRedesigned: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? colors.accent : colors.primary,
+  },
+  missionCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  missionCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: isDarkMode ? colors.accent : colors.primary,
+    flex: 1,
+  },
+  missionBadgeCompleted: {
+    backgroundColor: isDarkMode ? colors.accent : colors.success,
+    color: isDarkMode ? colors.background : colors.surface,
+    fontWeight: 'bold',
+    fontSize: 13,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    marginLeft: 8,
+    overflow: 'hidden',
+  },
+  missionBadgeExpired: {
+    backgroundColor: colors.error,
+    color: colors.surface,
+    fontWeight: 'bold',
+    fontSize: 13,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    marginLeft: 8,
+    overflow: 'hidden',
+  },
+  missionExpiredText: {
+    color: colors.error,
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  missionCardDescription: {
+    color: isDarkMode ? colors.text.primary : colors.text.primary,
+    fontSize: 15,
+    marginBottom: 10,
+  },
+  missionCardFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  missionPoints: {
+    color: isDarkMode ? colors.accent : colors.secondary,
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
 });
 
 const MissionsScreen = (props: any) => {
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors, isDarkMode);
-  
+
   return (
     <SafeAreaViewContext style={styles.container}>
       <MissionsScreenComponent {...props} />
