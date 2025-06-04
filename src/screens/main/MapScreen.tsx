@@ -965,41 +965,43 @@ const MapScreen = () => {
                 outputRange: [-50, 0]
               })
             }],
-            display: isFormCollapsed ? 'none' : 'flex'
+            display: isFormCollapsed ? 'none' : 'flex',
+            maxHeight: height * 0.7 // Limitar altura máxima al 70% de la pantalla
           }
         ]}
       >
-        {/* Campo de búsqueda de ciudad - puesto primero para que sea lo más visible */}
-        <View style={styles.cityInputContainer}>
-          <Ionicons name="search" size={24} style={styles.searchIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="¿Qué ciudad quieres visitar?"
-            placeholderTextColor='#26547C'
-            value={searchCity}
-            onChangeText={handleCitySearch}
-          />
-        </View>
-
-        {/* Sugerencias de ciudades */}
-        {showSuggestions && filteredCities.length > 0 && (
-          <View style={styles.suggestionsList}>
-            {filteredCities.map((city) => (
-              <TouchableOpacity
-                key={city.id}
-                style={styles.suggestionItem}
-                onPress={() => handleCitySelect(city)}
-              >
-                <Ionicons name="location" size={18} color="#005F9E" style={styles.locationIcon} />
-                <Text style={styles.suggestionText}>{city.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
         <ScrollView
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
+          contentContainerStyle={styles.scrollContent}
         >
+          {/* Campo de búsqueda de ciudad - puesto primero para que sea lo más visible */}
+          <View style={styles.cityInputContainer}>
+            <Ionicons name="search" size={24} style={styles.searchIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="¿Qué ciudad quieres visitar?"
+              placeholderTextColor='#26547C'
+              value={searchCity}
+              onChangeText={handleCitySearch}
+            />
+          </View>
+
+          {/* Sugerencias de ciudades */}
+          {showSuggestions && filteredCities.length > 0 && (
+            <View style={styles.suggestionsList}>
+              {filteredCities.map((city) => (
+                <TouchableOpacity
+                  key={city.id}
+                  style={styles.suggestionItem}
+                  onPress={() => handleCitySelect(city)}
+                >
+                  <Ionicons name="location" size={18} color="#005F9E" style={styles.locationIcon} />
+                  <Text style={styles.suggestionText}>{city.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           <View style={styles.formRow}>
             <View style={styles.missionInputContainer}>
               <Ionicons name="list" size={20} color="#666" style={styles.missionIcon} />
@@ -1541,8 +1543,6 @@ const colors = {
   success: '#38b000',      // Verde vibrante (indicadores positivos)
   error: '#e63946',        // Rojo vivo (errores y alertas)
 };
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -2145,6 +2145,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     padding: 24,
     paddingTop: 48,
+  },
+  scrollContent: {
+    paddingBottom: 20, // Añadir padding al final para mejor scroll
   },
 });
 

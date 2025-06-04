@@ -79,14 +79,26 @@ interface Journey {
     completed: boolean;
     challengeId: string;
     end_date: string;
+    order_index?: number;
+    route_id?: string;
     challenges: {
       id: string;
       title: string;
       description: string;
       difficulty: string;
       points: number;
+      is_event?: boolean;
+      start_date?: string;
+      end_date?: string;
     };
   }[];
+}
+
+interface RouteDetailData {
+  id: string;
+  name: string;
+  description: string;
+  journeys_missions: JourneyMission[];
 }
 
 const getTimeRemaining = (endDate: string) => {
@@ -190,7 +202,14 @@ const MissionCard = ({ mission, onComplete, onShare }: {
         disabled={mission.completed || isExpired || isNotStarted}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
+          {mission.route_id && mission.order_index !== undefined && (
+            <View style={styles.missionOrderContainer}>
+              <Text style={styles.missionOrderText}>{mission.order_index}</Text>
+            </View>
+          )}
+          <View style={styles.missionTitleContainer}>
+            <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
+          </View>
           <View style={styles.badgeContainer}>
             <Text style={[
               styles.badge,
@@ -444,12 +463,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const theme = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [showRoutesModal, setShowRoutesModal] = useState(false);
-  const [currentRoute, setCurrentRoute] = useState<any>(null);
+  const [currentRoute, setCurrentRoute] = useState<RouteDetailData | null>(null);
   const [hasRouteForSelectedCity, setHasRouteForSelectedCity] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const isAdmin = user?.role === 'admin';
   const [citiesMap, setCitiesMap] = useState({});
   const [isSharing, setIsSharing] = useState(false);
+  const [showingRouteMissions, setShowingRouteMissions] = useState(false);
 
   // Cargar puntos del usuario al inicio
   useEffect(() => {
@@ -681,20 +701,96 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   useEffect(() => {
     fetchMissions();
-  }, [journeyId]);
+  }, [user, journeyId]);
 
-  // Efecto para verificar si la ciudad seleccionada tiene una ruta
+  // Efecto para verificar si la ciudad seleccionada tiene una ruta y cargarla
   useEffect(() => {
     if (selectedCity && cityMissions[selectedCity]) {
-      const missions = cityMissions[selectedCity].pending
+      const missionsInCity = cityMissions[selectedCity].pending
         .concat(cityMissions[selectedCity].completed)
         .concat(cityMissions[selectedCity].expired);
-      const hasRoute = missions.some(mission => mission.route_id !== null);
-      setHasRouteForSelectedCity(hasRoute);
-    } else {
-      setHasRouteForSelectedCity(false);
+      
+      // Buscar la primera misión en la ciudad seleccionada que tenga route_id
+      const missionWithRoute = missionsInCity.find(mission => mission.route_id !== null && mission.route_id !== undefined);
+
+      if (missionWithRoute && missionWithRoute.route_id) {
+        setHasRouteForSelectedCity(true);
+        // Cargar los datos completos de la ruta cuando se selecciona la ciudad
+        fetchRouteDetails(missionWithRoute.route_id);
+      } else {
+        setHasRouteForSelectedCity(false);
+        setCurrentRoute(null); // Limpiar la ruta si la ciudad seleccionada no tiene
+      }
     }
   }, [selectedCity, cityMissions]);
+
+  // Función para obtener los detalles completos de la ruta
+  const fetchRouteDetails = async (routeId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('routes')
+        .select(`
+          id,
+          name,
+          description,
+          journeys_missions (
+            id,
+            completed,
+            route_id,
+            order_index,
+            end_date,
+            start_date,
+            challenges (
+              id,
+              title,
+              description,
+              difficulty,
+              points,
+              is_event,
+              start_date,
+              end_date
+            )
+          )
+        `)
+        .eq('id', routeId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        // Transformar los datos de la ruta para que coincidan con RouteDetailData
+        const transformedRoute: RouteDetailData = {
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          journeys_missions: data.journeys_missions.map((jm: any) => ({
+            id: jm.id,
+            completed: jm.completed,
+            cityName: selectedCity || 'Ciudad Desconocida',
+            end_date: jm.end_date || (jm.challenges?.is_event ? jm.challenges?.end_date : null),
+            start_date: jm.start_date || (jm.challenges?.is_event ? jm.challenges?.start_date : null),
+            challenge: {
+              id: jm.challenges?.id || 'unknown',
+              title: jm.challenges?.title || 'Sin título',
+              description: jm.challenges?.description || 'Sin descripción',
+              difficulty: jm.challenges?.difficulty || 'Normal',
+              points: jm.challenges?.points || 0,
+              is_event: jm.challenges?.is_event ?? false,
+              start_date: jm.challenges?.start_date ?? null,
+              end_date: jm.challenges?.end_date ?? null,
+            },
+            order_index: jm.order_index,
+            route_id: jm.route_id,
+          })),
+        };
+        setCurrentRoute(transformedRoute);
+      }
+
+    } catch (error) {
+      console.error('Error fetching route details:', error);
+      setCurrentRoute(null);
+    }
+  };
 
   const handleCompleteMission = async (missionId: string, imageUrl?: string) => {
     console.log('🎯 Iniciando completeMission para misión:', missionId);
@@ -922,6 +1018,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       console.error('Error al completar misión:', error);
       Alert.alert('Error', 'No se pudo completar la misión. Inténtalo de nuevo.');
       setCompletingMission(false);
+      // En caso de error, es posible que necesitemos recargar las misiones para reflejar el estado correcto
+      // fetchMissions(); // Considerar recargar si el error es crítico y el estado local quedó inconsistente
     }
   };
 
@@ -1056,6 +1154,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchMissions();
+    // Si hay una ciudad seleccionada y tiene ruta, recargar también los detalles de la ruta
+    if (selectedCity && hasRouteForSelectedCity && currentRoute) {
+       fetchRouteDetails(currentRoute.id);
+    }
     setRefreshing(false);
   };
 
@@ -1076,56 +1178,6 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       // Si ninguna tiene, mantener el orden original
       return 0;
     });
-  };
-
-  const handleViewRoute = async (cityName: string) => {
-    try {
-      // Buscar una misión con route_id en la ciudad seleccionada
-      const missionsInCity = cityMissions[cityName]?.pending
-        .concat(cityMissions[cityName]?.completed)
-        .concat(cityMissions[cityName]?.expired) || [];
-
-      const missionWithRoute = missionsInCity.find(m => m.route_id !== null);
-
-      if (!missionWithRoute || !missionWithRoute.route_id) {
-        Alert.alert('Error', 'No se encontró información de ruta para esta ciudad.');
-        return;
-      }
-
-      const routeId = missionWithRoute.route_id;
-      console.log('ℹ️ Intentando obtener ruta con ID:', routeId);
-
-      // Consultar la tabla routes usando el routeId encontrado
-      const { data: route, error } = await supabase
-        .from('routes')
-        .select(`
-          id,
-          name,
-          description,
-          journeys_missions (
-            id,
-            order_index,
-            challenge:challenges (
-              title,
-              description,
-              difficulty,
-              points
-            )
-          )
-        `)
-        .eq('id', routeId) // Usar el ID de la ruta encontrado
-        .single();
-
-      if (error) throw error;
-
-      if (route) {
-        setCurrentRoute(route);
-        setShowRoutesModal(true);
-      }
-    } catch (error) {
-      console.error('Error al obtener la ruta:', error);
-      Alert.alert('Error', 'No se pudo cargar la ruta');
-    }
   };
 
   if (loading) {
@@ -1197,6 +1249,16 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   const cityData = cityMissions[selectedCity];
 
+  // Filtrar misiones que NO tienen route_id para la vista principal de la ciudad
+  const missionsWithoutRoute = {
+    pending: cityData.pending.filter(m => m.route_id === null || m.route_id === undefined),
+    completed: cityData.completed.filter(m => m.route_id === null || m.route_id === undefined),
+    expired: cityData.expired.filter(m => m.route_id === null || m.route_id === undefined),
+  };
+
+  // Misiones que SÍ tienen route_id (para el modal de ruta)
+  // No necesitamos filtrarlas aquí, las obtendremos directamente de currentRoute
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -1229,22 +1291,151 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         </View>
       ) : (
         <>
-          <Text style={styles.cityTitle}>{selectedCity}</Text>
+          <View style={styles.cityHeader}>
+            <Text style={styles.cityTitle}>{selectedCity}</Text>
+            {hasRouteForSelectedCity && currentRoute && (
+              <TouchableOpacity 
+                style={[styles.routeButton, showingRouteMissions && styles.routeButtonActive]} 
+                onPress={() => setShowingRouteMissions(!showingRouteMissions)}
+              >
+                <Ionicons 
+                  name={showingRouteMissions ? "list-circle-outline" : "map-outline"} 
+                  size={20} 
+                  color={showingRouteMissions ? "#FFFFFF" : "#005F9E"} 
+                />
+                <Text style={[styles.routeButtonText, showingRouteMissions && styles.routeButtonTextActive]}>
+                  {showingRouteMissions ? 'Ver misiones sin ruta' : 'Ver misiones de ruta'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <ScrollView
             style={styles.missionsList}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
             }
           >
-            {cityData.pending.length > 0 && (
+            {showingRouteMissions && currentRoute ? (
               <>
-                <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
-                {sortMissions(cityData.pending).map(mission =>
-                  mission.challenge && mission.challenge.is_event ? (
+                <View style={styles.routeInfoContainer}>
+                  <Text style={styles.routeName}>{currentRoute.name}</Text>
+                  <Text style={styles.routeDescription}>{currentRoute.description}</Text>
+                </View>
+                <Text style={styles.sectionTitle}>Misiones de la Ruta</Text>
+                {sortMissions(currentRoute.journeys_missions).map(mission => {
+                  const now = new Date();
+                  let timeRemaining = { isExpired: false, text: 'Sin fecha límite' };
+                  let isExpired = false;
+                  let isNotStarted = false;
+                  let dateStatusText = 'Sin fecha límite';
+
+                  console.log('🔍 Depurando fechas de misión:', {
+                    id: mission.id,
+                    title: mission.challenge.title,
+                    end_date: mission.end_date,
+                    start_date: mission.start_date,
+                    challenge_end_date: mission.challenge.end_date,
+                    challenge_start_date: mission.challenge.start_date,
+                    is_event: mission.challenge.is_event,
+                    completed: mission.completed
+                  });
+
+                  const endDateToUse = mission.challenge.is_event && mission.challenge.end_date
+                    ? mission.challenge.end_date
+                    : mission.end_date;
+
+                  const startDateToUse = mission.challenge.is_event && mission.challenge.start_date
+                    ? mission.challenge.start_date
+                    : mission.start_date;
+
+                  console.log('📅 Fechas procesadas:', {
+                    endDateToUse,
+                    startDateToUse,
+                    now: now.toISOString()
+                  });
+
+                  if (!mission.completed && startDateToUse) {
+                    const start = new Date(startDateToUse);
+                    if (now < start) {
+                      isNotStarted = true;
+                      const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+                      dateStatusText = `Disponible desde ${start.toLocaleDateString(undefined, options)}`;
+                      console.log('⏳ Misión no iniciada:', {
+                        start: start.toISOString(),
+                        now: now.toISOString(),
+                        dateStatusText
+                      });
+                    }
+                  }
+
+                  if (!mission.completed && !isNotStarted && endDateToUse) {
+                    const end = new Date(endDateToUse);
+                    if (now > end) {
+                      isExpired = true;
+                      dateStatusText = 'Tiempo expirado';
+                      console.log('❌ Misión expirada:', {
+                        end: end.toISOString(),
+                        now: now.toISOString(),
+                        dateStatusText
+                      });
+                    } else {
+                      timeRemaining = getTimeRemaining(endDateToUse);
+                      dateStatusText = timeRemaining.text;
+                      console.log('⏱️ Tiempo restante:', {
+                        end: end.toISOString(),
+                        now: now.toISOString(),
+                        timeRemaining: timeRemaining.text
+                      });
+                    }
+                  } else if (!mission.completed && !isNotStarted && !endDateToUse) {
+                    dateStatusText = 'Sin fecha límite';
+                    console.log('ℹ️ Sin fecha límite');
+                  }
+
+                  let cardStyles: any[] = [styles.card];
+                  let badgeText = 'Pendiente';
+                  let badgeColor = '#FFB74D';
+
+                  if (mission.completed) {
+                    badgeText = 'Completada';
+                    badgeColor = '#38b000';
+                    cardStyles.push(styles.completedCard);
+                    dateStatusText = 'Misión completada';
+                    console.log('✅ Misión completada');
+                  } else if (isNotStarted) {
+                    badgeText = 'Próximamente';
+                    badgeColor = '#0071c2';
+                    console.log('🆕 Misión próximamente');
+                  } else if (isExpired) {
+                    badgeText = 'Expirada';
+                    badgeColor = '#D32F2F';
+                    cardStyles.push(styles.expiredCard);
+                    console.log('⛔ Misión expirada');
+                  }
+
+                  console.log('🏷️ Estado final de la misión:', {
+                    badgeText,
+                    dateStatusText,
+                    isExpired,
+                    isNotStarted,
+                    completed: mission.completed
+                  });
+
+                  return mission.challenge && mission.challenge.is_event ? (
                     <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
                       <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
                       <Text>{mission.challenge.description}</Text>
                       <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                      <View style={styles.badgeContainer}>
+                        <Text style={[styles.badge, { backgroundColor: badgeColor }]}>
+                          {badgeText}
+                        </Text>
+                        {dateStatusText !== '' && (
+                          <Text style={[styles.timeRemaining, isExpired && styles.expiredTime]}>
+                            {dateStatusText}
+                          </Text>
+                        )}
+                      </View>
                     </View>
                   ) : (
                     <MissionCard
@@ -1253,63 +1444,93 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
                       onShare={handleShareMission}
                     />
-                  )
-                )}
-                {cityData.expired.length > 0 && (
-                  <View style={{ height: 2, backgroundColor: '#E0E0E0', marginVertical: 16, borderRadius: 2 }} />
-                )}
+                  );
+                })}
               </>
-            )}
-
-            {cityData.expired.length > 0 && (
+            ) : (
               <>
-                <View style={styles.completedDivider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-                {sortMissions(cityData.expired).map(mission =>
-                  mission.challenge && mission.challenge.is_event ? (
-                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
-                      <Text>{mission.challenge.description}</Text>
-                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
-                    </View>
-                  ) : (
-                    <MissionCard
-                      key={mission.id}
-                      mission={mission}
-                      onComplete={() => { }}
-                      onShare={() => handleShareMission(mission)}
-                    />
-                  )
+                {missionsWithoutRoute.pending.length > 0 && (
+                  <>
+                    <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
+                    {sortMissions(missionsWithoutRoute.pending).map(mission =>
+                      mission.challenge && mission.challenge.is_event ? (
+                        <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                          <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
+                          <Text>{mission.challenge.description}</Text>
+                          <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                        </View>
+                      ) : (
+                        <MissionCard
+                          key={mission.id}
+                          mission={mission}
+                          onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
+                          onShare={handleShareMission}
+                        />
+                      )
+                    )}
+                    {missionsWithoutRoute.expired.length > 0 && (
+                      <View style={{ height: 2, backgroundColor: '#E0E0E0', marginVertical: 16, borderRadius: 2 }} />
+                    )}
+                  </>
                 )}
-              </>
-            )}
 
-            {cityData.completed.length > 0 && (
-              <>
-                <View style={styles.completedDivider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.completedText}>Completadas</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-                {sortMissions(cityData.completed).map(mission =>
-                  mission.challenge && mission.challenge.is_event ? (
-                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
-                      <Text>{mission.challenge.description}</Text>
-                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                {missionsWithoutRoute.expired.length > 0 && (
+                  <>
+                    <View style={styles.completedDivider}>
+                      <View style={styles.dividerLine} />
+                      <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
+                      <View style={styles.dividerLine} />
                     </View>
-                  ) : (
-                    <MissionCard
-                      key={mission.id}
-                      mission={mission}
-                      onComplete={() => { }}
-                      onShare={() => handleShareMission(mission)}
-                    />
-                  )
+                    {sortMissions(missionsWithoutRoute.expired).map(mission =>
+                      mission.challenge && mission.challenge.is_event ? (
+                        <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                          <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
+                          <Text>{mission.challenge.description}</Text>
+                          <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                        </View>
+                      ) : (
+                        <MissionCard
+                          key={mission.id}
+                          mission={mission}
+                          onComplete={() => { }}
+                          onShare={() => handleShareMission(mission)}
+                        />
+                      )
+                    )}
+                  </>
                 )}
+
+                {missionsWithoutRoute.completed.length > 0 && (
+                  <>
+                    <View style={styles.completedDivider}>
+                      <View style={styles.dividerLine} />
+                      <Text style={styles.completedText}>Completadas</Text>
+                      <View style={styles.dividerLine} />
+                    </View>
+                    {sortMissions(missionsWithoutRoute.completed).map(mission =>
+                      mission.challenge && mission.challenge.is_event ? (
+                        <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                          <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
+                          <Text>{mission.challenge.description}</Text>
+                          <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                        </View>
+                      ) : (
+                        <MissionCard
+                          key={mission.id}
+                          mission={mission}
+                          onComplete={() => { }}
+                          onShare={() => handleShareMission(mission)}
+                        />
+                      )
+                    )}
+                  </>
+                )}
+                 {(missionsWithoutRoute.pending.length + missionsWithoutRoute.completed.length + missionsWithoutRoute.expired.length === 0) && (
+                   <View style={styles.emptyCityContainer}>
+                     <Ionicons name="moon-outline" size={64} color="#CCC" />
+                     <Text style={styles.emptyCityText}>No hay misiones disponibles en esta ciudad (aún){hasRouteForSelectedCity ? ". Revisa la ruta asociada a esta ciudad." : "."}</Text>
+                   </View>
+                 )}
               </>
             )}
           </ScrollView>
@@ -1344,55 +1565,6 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           {renderGeneratingLoader()}
         </>
       )}
-
-      {/* Modal de Rutas */}
-      <Modal
-        visible={showRoutesModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowRoutesModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Ruta de Misiones</Text>
-              <TouchableOpacity onPress={() => setShowRoutesModal(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            {currentRoute && (
-              <ScrollView style={styles.routeList}>
-                {currentRoute.journeys_missions
-                  .sort((a: any, b: any) => a.order_index - b.order_index)
-                  .map((mission: any, index: number) => (
-                    <View key={mission.id} style={styles.routeItem}>
-                      <View style={styles.routeNumber}>
-                        <Text style={styles.routeNumberText}>{index + 1}</Text>
-                      </View>
-                      <View style={styles.routeMissionInfo}>
-                        <Text style={styles.routeMissionTitle}>
-                          {mission.challenge.title}
-                        </Text>
-                        <Text style={styles.routeMissionDescription}>
-                          {mission.challenge.description}
-                        </Text>
-                        <View style={styles.routeMissionMeta}>
-                          <Text style={styles.routeMissionDifficulty}>
-                            Dificultad: {mission.challenge.difficulty}
-                          </Text>
-                          <Text style={styles.routeMissionPoints}>
-                            {mission.challenge.points} puntos
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -1412,8 +1584,6 @@ const colors = {
   success: '#38b000',      // Verde vibrante (indicadores positivos)
   error: '#e63946',        // Rojo vivo (errores y alertas)
 };
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -1767,12 +1937,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    marginRight: 10,
   },
   routeButtonText: {
     color: '#005F9E',
     marginLeft: 5,
     fontWeight: '500',
+  },
+  routeButtonActive: {
+    backgroundColor: '#005F9E',
+  },
+  routeButtonTextActive: {
+    color: '#FFFFFF',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1781,7 +1956,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   routeList: {
-    maxHeight: '80%',
+    flex: 1,
+    paddingVertical: 10,
   },
   routeItem: {
     flexDirection: 'row',
@@ -1842,6 +2018,79 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
+  },
+  routeModalContent: {
+    width: '95%',
+    maxWidth: 700,
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    padding: 20,
+    maxHeight: '95%',
+    alignItems: 'stretch',
+  },
+  routeModalDescription: {
+    fontSize: 14,
+    color: colors.text.primary,
+    marginBottom: 15,
+  },
+  noMissionsText: {
+    fontSize: 16,
+    color: '#CCC',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  emptyCityContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 50,
+  },
+  emptyCityText: {
+    fontSize: 18,
+    color: '#CCC',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  cityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  routeInfoContainer: {
+    backgroundColor: '#E4EAFF',
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  routeName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#005F9E',
+    marginBottom: 8,
+  },
+  routeDescription: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  missionOrderContainer: {
+    backgroundColor: '#005F9E',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  missionOrderText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  missionTitleContainer: {
+    flex: 1,
+    marginRight: 10,
   },
 });
 
