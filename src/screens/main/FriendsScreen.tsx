@@ -23,6 +23,8 @@ import { countUnreadMessages } from '../../services/messageService';
 import { getFriends, sendFriendRequest, getFriendRequests, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '../../services/friendService';
 import { searchUsersByUsername } from '../../services/userService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
+import { getFriendsScreenStyles } from '../../styles/theme';
 
 interface Friend {
   user2Id: string;
@@ -41,12 +43,12 @@ interface FriendRequest {
   receiverId: string;
 }
 
-const { width, height } = Dimensions.get('window');
-
-
 const FriendsScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { colors, isDarkMode } = useTheme();
+  const { width } = Dimensions.get('window');
+  const styles = getFriendsScreenStyles(colors, isDarkMode, width);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,7 +244,7 @@ const FriendsScreen = () => {
                     <Ionicons
                       name={hasPendingRequest ? "time-outline" : "person-add-outline"}
                       size={24}
-                      color={hasPendingRequest ? "#FFA000" : "#005F9E"}
+                      color={hasPendingRequest ? (isDarkMode ? colors.accent : "#FFA000") : (isDarkMode ? colors.accent : "#005F9E")}
                     />
                   </TouchableOpacity>
                 )}
@@ -279,7 +281,7 @@ const FriendsScreen = () => {
               <Text style={styles.badgeText}>{item.unreadMessages}</Text>
             </View>
           )}
-          <Ionicons name="chatbubble-outline" size={24} color="#005F9E" />
+          <Ionicons name="chatbubble-outline" size={24} color={isDarkMode ? colors.accent : '#005F9E'} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -394,11 +396,13 @@ const FriendsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.headerBar, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={28} color="#fff" />
+        <TouchableOpacity style={[styles.backButton, isDarkMode && { backgroundColor: colors.accent }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={28} color={isDarkMode ? '#181C22' : '#fff'} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.title}>Amigos</Text>
+          <Text style={[styles.title, isDarkMode && { color: colors.accent }]}>
+            Amigos
+          </Text>
         </View>
         <View style={styles.rightSpace} />
       </View>
@@ -490,352 +494,5 @@ const FriendsScreen = () => {
     </SafeAreaView>
   );
 };
-
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    paddingHorizontal: width < 400 ? 6 : 16,
-  },
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.primary,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingHorizontal: width < 400 ? 8 : 16,
-    marginTop:10,
-  },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: width < 400 ? 20 : 24,
-    fontWeight: 'bold',
-    color: colors.white,
-    textAlign: 'center',
-  },
-  backButton: {
-    padding: 8,
-  },
-  rightSpace: {
-    width: 32,
-  },
-  searchInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent:'center',
-    marginTop: 12,
-    marginBottom: 4,
-    marginHorizontal: width < 400 ? 8 : 16,
-  },
-  searchInfoText: {
-    color: colors.text.light,
-    fontSize: width < 400 ? 12 : 14,
-  },
-  searchContainer: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: width < 400 ? 10 : 16,
-    margin: width < 400 ? 8 : 16,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-  },
-  searchIcon: {
-    marginRight: 8,
-    color: colors.text.secondary,
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    fontSize: 16,
-    color: colors.text.primary,
-    paddingVertical: 10,
-  },
-  clearButton: {
-    marginLeft: 8,
-  },
-  searchResultsContainer: {
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    marginTop: 8,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    padding: 8,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  searchResultContent: {
-    flex: 1,
-  },
-  searchResultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  searchResultUsername: {
-    fontSize: 16,
-    color: colors.text.primary,
-    fontWeight: 'bold',
-  },
-  friendBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  friendBadgeText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  searchResultPoints: {
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  addFriendButton: {
-    marginLeft: 8,
-  },
-  noResultsText: {
-    color: colors.text.secondary,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: width < 400 ? 10 : 16,
-    marginHorizontal: width < 400 ? 8 : 16,
-    marginVertical: 8,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: width < 400 ? 18 : 24,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  statLabel: {
-    fontSize: width < 400 ? 12 : 14,
-    color: colors.text.secondary,
-    marginTop: 4,
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    padding: 4,
-    marginHorizontal: width < 400 ? 8 : 16,
-    marginBottom: 16,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTab: {
-    backgroundColor: colors.primary,
-  },
-  tabText: {
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  activeTabText: {
-    color: colors.white,
-  },
-  friendItem: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: width < 400 ? 10 : 16,
-    marginHorizontal: width < 400 ? 4 : 16,
-    marginVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  friendInfo: {
-    flex: 1,
-  },
-  friendName: {
-    fontSize: width < 400 ? 14 : 16,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  friendPoints: {
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    padding: 8,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  acceptButton: {
-    backgroundColor: colors.success,
-  },
-  rejectButton: {
-    backgroundColor: colors.error,
-  },
-  actionButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#FF5252',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  requestItem: {
-    padding: width < 400 ? 10 : 15,
-    marginVertical: 8,
-    borderRadius: 8,
-    backgroundColor: colors.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  requestInfo: {
-    flex: 1,
-  },
-  requestUsername: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  requestDate: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  requestActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  requestButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#FFA000',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 30,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  requestsContainer: {
-    flex: 1,
-  },
-  requestTabsContainer: {
-    flexDirection: 'row',
-    marginBottom: 15,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  requestTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeRequestTab: {
-    backgroundColor: '#005F9E',
-  },
-  requestTabText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  activeRequestTabText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  requestsList: {
-    flex: 1,
-  },
-});
 
 export default FriendsScreen;

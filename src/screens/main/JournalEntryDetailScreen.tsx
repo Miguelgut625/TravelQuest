@@ -364,15 +364,25 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.headerSafeArea}>
         <View style={styles.headerContent}>
-          <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.accent }]} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#222" />
+          <TouchableOpacity
+            style={[
+              styles.backButton,
+              { backgroundColor: isDarkMode ? colors.accent : colors.primary, borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }
+            ]}
+            onPress={handleBack}
+          >
+            <Ionicons name="arrow-back" size={24} color={isDarkMode ? '#181C22' : '#fff'} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>{entry.title}</Text>
+          <Text style={[styles.headerTitle, { color: isDarkMode ? colors.accent : colors.surface, textAlign: 'center', marginLeft: 12 }]}
+            numberOfLines={1}
+          >
+            {entry.title}
+          </Text>
           <View style={{ width: 36 }} />
         </View>
       </View>
       <ScrollView contentContainerStyle={{ padding: 0 }}>
-        <Text style={styles.dateText}>{formatDate(entry.created_at)}</Text>
+        <Text style={[styles.dateText, { color: isDarkMode ? colors.accent : colors.primary }]}>{formatDate(entry.created_at)}</Text>
         {/* Imagen principal */}
         <View style={styles.photoContainer}>
           {entry.photos && entry.photos.length > 0 ? (
@@ -450,7 +460,7 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
         )}
         {/* Card de contenido */}
         <View style={styles.contentCard}>
-          <Text style={styles.content}>
+          <Text style={[styles.content, { color: colors.text.primary }]}>
             {entry.content.split('\n').map((paragraph, index) => (
               <React.Fragment key={index}>
                 {paragraph.trim() !== '' && (
@@ -486,78 +496,61 @@ const JournalEntryDetailScreen = ({ route }: JournalEntryDetailScreenProps) => {
             </Text>
           ) : null}
           {comments.length > 0 ? (
-            <View style={styles.commentsList}>
-              {comments.map((comment, index) => (
-                <View key={comment.id || index} style={styles.commentItem}>
+            <ScrollView style={styles.commentsList}>
+              {comments.map((comment) => (
+                <View key={comment.id} style={styles.commentItem}>
                   <View style={styles.commentHeader}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (comment.user_id === user?.id) {
-                          navigation.navigate('Profile');
-                        } else {
-                          navigation.navigate('FriendProfile', {
-                            friendId: comment.user_id,
-                            friendName: comment.username || 'Usuario'
-                          });
-                        }
-                      }}
-                      style={styles.commentAuthorContainer}
-                    >
-                      {comment.profile_pic_url ? (
-                        <Image
-                          source={{ uri: comment.profile_pic_url }}
-                          style={styles.commentUserAvatar}
-                        />
-                      ) : (
-                        <View style={styles.commentUserAvatarPlaceholder}>
-                          <Text style={styles.commentUserAvatarText}>
-                            {(comment.username || 'U')[0].toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      <View style={styles.commentAuthorInfo}>
-                        <Text style={styles.commentAuthor}>{comment.username || 'Usuario'}</Text>
-                        {comment.user_id === user?.id && (
-                          <Text style={styles.youBadge}>Tú</Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                    <Text style={styles.commentDate}>{formatCommentDate(comment.created_at)}</Text>
+                    <View style={styles.commentAuthorContainer}>
+                      {/* Avatar y nombre */}
+                      <Text style={{ color: colors.text.primary, fontWeight: 'bold' }}>{comment.username || 'Usuario'}</Text>
+                    </View>
+                    <Text style={{ color: colors.text.secondary, fontSize: 12, marginLeft: 8 }}>{formatCommentDate(comment.created_at)}</Text>
                   </View>
-                  <Text style={styles.commentText}>{comment.comment}</Text>
+                  <Text style={{ color: colors.text.primary }}>{comment.comment}</Text>
                 </View>
               ))}
-            </View>
+            </ScrollView>
           ) : canComment() ? (
             <Text style={styles.noCommentsText}>
               No hay comentarios aún. ¡Sé el primero en comentar!
             </Text>
           ) : null}
 
-          {/* Añadir comentario */}
+          {/* Input de comentario */}
           {canComment() && (
-            <View style={styles.addCommentContainer}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
               <TextInput
-                style={styles.commentInput}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.surface,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  color: colors.text.primary,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  fontSize: 16,
+                  marginRight: 8,
+                }}
                 placeholder="Escribe un comentario..."
+                placeholderTextColor={isDarkMode ? colors.text.secondary : '#888'}
                 value={newComment}
                 onChangeText={setNewComment}
-                multiline
+                editable={!isAddingComment}
               />
               <TouchableOpacity
-                style={[
-                  styles.sendCommentButton,
-                  { backgroundColor: colors.accent },
-                  (!newComment.trim() || isAddingComment) && styles.disabledButton
-                ]}
+                style={{
+                  backgroundColor: isDarkMode ? colors.accent : colors.primary,
+                  borderRadius: 20,
+                  width: 40,
+                  height: 40,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
                 onPress={handleAddComment}
-                disabled={!newComment.trim() || isAddingComment}
+                disabled={isAddingComment || !newComment.trim()}
               >
-                {isAddingComment ? (
-                  <ActivityIndicator size="small" color="#222" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#222" />
-                )}
+                <Ionicons name="arrow-forward" size={24} color={isDarkMode ? '#181C22' : '#fff'} />
               </TouchableOpacity>
             </View>
           )}
