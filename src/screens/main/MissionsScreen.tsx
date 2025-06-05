@@ -1,6 +1,6 @@
 // @ts-nocheck - Ignorar todos los errores de TypeScript en este archivo
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, RefreshControl, Button, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, FlatList, SafeAreaView, RefreshControl, Button, Animated, Easing, StatusBar } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../features/store';
 import { supabase } from '../../services/supabase';
@@ -250,7 +250,7 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   const progress = totalMissions > 0 ? completedMissions / totalMissions : 0;
   // Colores de fondo según modo
   const cardBg = isDarkMode ? colors.surface : colors.background;
-  const overlayColor = isDarkMode ? 'rgba(26,32,44,0.65)' : 'rgba(43,108,176,0.12)';
+  const overlayColor = isDarkMode ? 'rgba(26,32,44,0.65)' : 'transparent';
   const progressColor = isDarkMode ? colors.accent : colors.secondary;
   return (
     <TouchableOpacity style={[styles.cityCardRedesigned, { backgroundColor: cardBg }]} onPress={onPress} activeOpacity={0.92}>
@@ -259,7 +259,7 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
       <View style={styles.cityCardContentRedesigned}>
         <View style={styles.cityCardHeaderRow}>
           <Ionicons name="location" size={28} color={isDarkMode ? colors.accent : colors.primary} style={{ marginRight: 10 }} />
-          <Text style={styles.cityCardTitle}>{cityName}</Text>
+          <Text style={[styles.cityCardTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>{cityName}</Text>
         </View>
         <Text style={styles.cityCardSubtitle}>{completedMissions}/{totalMissions} misiones completadas</Text>
         {/* Barra de progreso */}
@@ -1057,146 +1057,168 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   if (!selectedCity) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={styles.headerRedesigned}>
-          <TouchableOpacity onPress={handleRefreshAnimated} style={styles.refreshFab} activeOpacity={0.8}>
-            {refreshing ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Ionicons name="refresh" style={styles.refreshFabIcon} />
-            )}
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.titleRedesigned}>Tus Ciudades</Text>
+      <>
+        <SafeAreaView style={{ backgroundColor: isDarkMode ? colors.background : colors.primary }} edges={['top']}>
+          <StatusBar
+            barStyle={isDarkMode ? 'light-content' : 'light-content'}
+            backgroundColor={isDarkMode ? colors.background : colors.primary}
+            translucent={false}
+          />
+          <View style={styles.headerRedesigned}>
+            <TouchableOpacity onPress={handleRefreshAnimated} style={styles.refreshFab} activeOpacity={0.8}>
+              {refreshing ? (
+                <ActivityIndicator size="small" color={isDarkMode ? '#181C22' : colors.primary} />
+              ) : (
+                <Ionicons name="refresh" style={styles.refreshFabIcon} />
+              )}
+            </TouchableOpacity>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.titleRedesigned}>Tus Ciudades</Text>
+            </View>
+            <View style={{ width: 44, height: 44, marginRight: spacing.lg }} />
           </View>
-          <View style={styles.pointsBubble}>
-            <Ionicons name="trophy" size={18} color={colors.accent} style={{ marginRight: 6 }} />
-            <Text style={styles.pointsBubbleText}>Puntos: {userPoints}</Text>
+        </SafeAreaView>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['left', 'right', 'bottom']}>
+          <View style={{ width: '100%', alignItems: 'flex-start', marginTop: 24, marginBottom: 32, paddingLeft: spacing.lg }}>
+            <View style={styles.pointsBubble}>
+              <Ionicons name="trophy" size={28} color={isDarkMode ? colors.accent : colors.primary} style={{ marginRight: 12 }} />
+              <Text style={styles.pointsBubbleText}>Puntos: {userPoints}</Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.container}>
-          <ScrollView
-            style={styles.citiesList}
-            contentContainerStyle={{ flexGrow: 1 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-            }
-          >
-            {Object.entries(cityMissions).map(([cityName, missions]) => (
-              <CityCard
-                key={cityName}
-                cityName={cityName}
-                totalMissions={missions.completed.length + missions.pending.length}
-                completedMissions={missions.completed.length}
-                expiredMissions={missions.expired.length}
-                onPress={() => setSelectedCity(cityName)}
-                styles={styles}
-                colors={colors}
-                isDarkMode={isDarkMode}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      </SafeAreaView>
+          <View style={styles.container}>
+            <ScrollView
+              style={styles.citiesList}
+              contentContainerStyle={{ flexGrow: 1 }}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+              }
+            >
+              {Object.entries(cityMissions).map(([cityName, missions]) => (
+                <CityCard
+                  key={cityName}
+                  cityName={cityName}
+                  totalMissions={missions.completed.length + missions.pending.length}
+                  completedMissions={missions.completed.length}
+                  expiredMissions={missions.expired.length}
+                  onPress={() => setSelectedCity(cityName)}
+                  styles={styles}
+                  colors={colors}
+                  isDarkMode={isDarkMode}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
   const cityData = cityMissions[selectedCity];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={styles.cityHeaderContainer}>
-        <View style={styles.cityHeaderRowFinal}>
-          <TouchableOpacity style={styles.cityBackButton} onPress={() => setSelectedCity(null)}>
-            <Ionicons name="arrow-back" size={26} color={isDarkMode ? colors.background : colors.surface} />
-          </TouchableOpacity>
-          <View style={styles.cityTitleHeaderWrapper}>
-            <Text style={styles.cityTitleHeaderFinal} numberOfLines={1} ellipsizeMode="tail">{selectedCity}</Text>
-          </View>
-          <View style={styles.pointsBubbleRowCityFinal}>
-            <View style={styles.pointsBubble}>
-              <Ionicons name="trophy" size={18} color={colors.accent} style={{ marginRight: 6 }} />
-              <Text style={styles.pointsBubbleText}>Puntos: {userPoints}</Text>
+    <>
+      <SafeAreaView style={{ backgroundColor: isDarkMode ? colors.background : colors.primary }} edges={['top']}>
+        <StatusBar
+          barStyle={isDarkMode ? 'light-content' : 'light-content'}
+          backgroundColor={isDarkMode ? colors.background : colors.primary}
+          translucent={false}
+        />
+        <View style={styles.cityHeaderContainer}>
+          <View style={styles.cityHeaderRowFinal}>
+            <TouchableOpacity style={styles.cityBackButton} onPress={() => setSelectedCity(null)}>
+              <Ionicons name="arrow-back" size={26} color={isDarkMode ? '#181C22' : colors.primary} />
+            </TouchableOpacity>
+            <View style={styles.cityTitleHeaderWrapper}>
+              <Text style={styles.cityTitleHeaderFinal} numberOfLines={1} ellipsizeMode="tail">{selectedCity}</Text>
             </View>
+            <View style={{ width: 44, height: 44, marginRight: spacing.lg }} />
           </View>
         </View>
-      </View>
-      <View style={styles.container}>
-        <ScrollView style={styles.missionsList}>
-          {/* Misiones pendientes */}
-          {cityData.pending.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
-              {sortMissions(cityData.pending).map(mission => (
-                <View key={mission.id} style={styles.missionCardRedesigned}>
-                  <View style={styles.missionCardHeaderRow}>
-                    <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
-                    {mission.completed && (
-                      <Text style={styles.missionBadgeCompleted}>Completada</Text>
-                    )}
+      </SafeAreaView>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['left', 'right', 'bottom']}>
+        <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: spacing.xxl, paddingLeft: spacing.lg }}>
+          <View style={styles.pointsBubble}>
+            <Ionicons name="trophy" size={28} color={isDarkMode ? colors.accent : colors.primary} style={{ marginRight: 12 }} />
+            <Text style={styles.pointsBubbleText}>Puntos: {userPoints}</Text>
+          </View>
+        </View>
+        <View style={styles.container}>
+          <ScrollView style={styles.missionsList}>
+            {/* Misiones pendientes */}
+            {cityData.pending.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
+                {sortMissions(cityData.pending).map(mission => (
+                  <View key={mission.id} style={styles.missionCardRedesigned}>
+                    <View style={styles.missionCardHeaderRow}>
+                      <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
+                      {mission.completed && (
+                        <Text style={styles.missionBadgeCompleted}>Completada</Text>
+                      )}
+                      {!mission.completed && getTimeRemaining(mission.end_date).isExpired && (
+                        <Text style={styles.missionBadgeExpired}>Expirada</Text>
+                      )}
+                    </View>
                     {!mission.completed && getTimeRemaining(mission.end_date).isExpired && (
-                      <Text style={styles.missionBadgeExpired}>Expirada</Text>
+                      <Text style={styles.missionExpiredText}>Tiempo expirado</Text>
                     )}
+                    <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
+                    <View style={styles.missionCardFooterRow}>
+                      <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
+                    </View>
                   </View>
-                  {!mission.completed && getTimeRemaining(mission.end_date).isExpired && (
+                ))}
+              </>
+            )}
+            {/* Misiones expiradas */}
+            {cityData.expired.length > 0 && (
+              <>
+                <View style={styles.completedDivider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={[styles.completedText, { color: colors.error }]}>Expiradas</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                {sortMissions(cityData.expired).map(mission => (
+                  <View key={mission.id} style={styles.missionCardRedesigned}>
+                    <View style={styles.missionCardHeaderRow}>
+                      <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
+                      <Text style={styles.missionBadgeExpired}>Expirada</Text>
+                    </View>
                     <Text style={styles.missionExpiredText}>Tiempo expirado</Text>
-                  )}
-                  <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
-                  <View style={styles.missionCardFooterRow}>
-                    <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
+                    <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
+                    <View style={styles.missionCardFooterRow}>
+                      <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
+                    </View>
                   </View>
+                ))}
+              </>
+            )}
+            {/* Misiones completadas */}
+            {cityData.completed.length > 0 && (
+              <>
+                <View style={styles.completedDivider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.completedText}>Completadas</Text>
+                  <View style={styles.dividerLine} />
                 </View>
-              ))}
-            </>
-          )}
-          {/* Misiones expiradas */}
-          {cityData.expired.length > 0 && (
-            <>
-              <View style={styles.completedDivider}>
-                <View style={styles.dividerLine} />
-                <Text style={[styles.completedText, { color: colors.error }]}>Expiradas</Text>
-                <View style={styles.dividerLine} />
-              </View>
-              {sortMissions(cityData.expired).map(mission => (
-                <View key={mission.id} style={styles.missionCardRedesigned}>
-                  <View style={styles.missionCardHeaderRow}>
-                    <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
-                    <Text style={styles.missionBadgeExpired}>Expirada</Text>
+                {sortMissions(cityData.completed).map(mission => (
+                  <View key={mission.id} style={styles.missionCardRedesigned}>
+                    <View style={styles.missionCardHeaderRow}>
+                      <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
+                      <Text style={styles.missionBadgeCompleted}>Completada</Text>
+                    </View>
+                    <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
+                    <View style={styles.missionCardFooterRow}>
+                      <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
+                    </View>
                   </View>
-                  <Text style={styles.missionExpiredText}>Tiempo expirado</Text>
-                  <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
-                  <View style={styles.missionCardFooterRow}>
-                    <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
-                  </View>
-                </View>
-              ))}
-            </>
-          )}
-          {/* Misiones completadas */}
-          {cityData.completed.length > 0 && (
-            <>
-              <View style={styles.completedDivider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.completedText}>Completadas</Text>
-                <View style={styles.dividerLine} />
-              </View>
-              {sortMissions(cityData.completed).map(mission => (
-                <View key={mission.id} style={styles.missionCardRedesigned}>
-                  <View style={styles.missionCardHeaderRow}>
-                    <Text style={styles.missionCardTitle}>{mission.challenge.title}</Text>
-                    <Text style={styles.missionBadgeCompleted}>Completada</Text>
-                  </View>
-                  <Text style={styles.missionCardDescription}>{mission.challenge.description}</Text>
-                  <View style={styles.missionCardFooterRow}>
-                    <Text style={styles.missionPoints}>{mission.challenge.points} puntos</Text>
-                  </View>
-                </View>
-              ))}
-            </>
-          )}
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+                ))}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </SafeAreaView>
+    </>
   );
 };
 
@@ -1204,7 +1226,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 const getStyles = (colors, isDarkMode) => ({
   container: {
     flex: 1,
-    backgroundColor: isDarkMode ? colors.background : colors.surface,
+    backgroundColor: colors.background,
     paddingHorizontal: spacing.sm,
   },
   header: {
@@ -1308,19 +1330,22 @@ const getStyles = (colors, isDarkMode) => ({
     marginBottom: spacing.xxl,
     marginTop: 2,
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: isDarkMode ? 'transparent' : '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.13,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: isDarkMode ? 0 : 0.10,
+    shadowRadius: isDarkMode ? 0 : 8,
+    elevation: isDarkMode ? 0 : 4,
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? colors.accent : colors.primary,
   },
   cityCardOverlayRedesigned: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
+    backgroundColor: 'transparent',
   },
   cityCardContentRedesigned: {
     flex: 1,
@@ -1338,19 +1363,19 @@ const getStyles = (colors, isDarkMode) => ({
   cityCardTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: isDarkMode ? colors.accent : colors.text.primary,
+    color: isDarkMode ? colors.accent : colors.primary,
     letterSpacing: 0.5,
     flexShrink: 1,
   },
   cityCardSubtitle: {
     fontSize: 15,
-    color: isDarkMode ? colors.accent : colors.text.secondary,
+    color: colors.text.secondary,
     marginBottom: 8,
     marginTop: 2,
   },
   cityCardProgressBarBg: {
     height: 10,
-    backgroundColor: isDarkMode ? '#222' : '#E3EAFE',
+    backgroundColor: isDarkMode ? '#232B3A' : colors.divider,
     borderRadius: 8,
     overflow: 'hidden',
     marginTop: 2,
@@ -1359,7 +1384,7 @@ const getStyles = (colors, isDarkMode) => ({
   cityCardProgressBarFill: {
     height: '100%',
     borderRadius: 8,
-    backgroundColor: isDarkMode ? colors.accent : colors.secondary,
+    backgroundColor: isDarkMode ? colors.accent : colors.primary,
   },
   cityCardExpiredText: {
     color: colors.error,
@@ -1684,16 +1709,19 @@ const getStyles = (colors, isDarkMode) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: isDarkMode ? colors.background : colors.primary,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 12,
-    minHeight: 110,
-    marginBottom: spacing.xxl,
+    paddingTop: 8,
+    paddingBottom: 4,
+    paddingHorizontal: 0,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    minWidth: '100%',
+    width: '100%',
+    minHeight: 44,
+    marginBottom: 12,
+    borderBottomWidth: 0,
   },
   headerTitleContainer: {
     flex: 1,
@@ -1717,24 +1745,22 @@ const getStyles = (colors, isDarkMode) => ({
   pointsBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.13,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: isDarkMode ? colors.surface : colors.white,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: isDarkMode ? colors.accent : colors.primary,
+    shadowColor: 'transparent',
+    elevation: 0,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: isDarkMode ? 1 : 0,
-    borderColor: isDarkMode ? colors.accent : 'transparent',
+    justifyContent: 'flex-start',
+    minWidth: 200,
   },
   pointsBubbleText: {
     color: isDarkMode ? colors.accent : colors.primary,
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 22,
     letterSpacing: 0.5,
   },
   refreshFabContainer: {
@@ -1749,35 +1775,39 @@ const getStyles = (colors, isDarkMode) => ({
     elevation: 8,
   },
   refreshFab: {
-    backgroundColor: colors.surface,
+    backgroundColor: isDarkMode ? colors.accent : colors.surface,
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.13,
-    shadowRadius: 4,
-    elevation: 4,
+    borderWidth: 0,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    marginLeft: spacing.lg,
   },
   refreshFabIcon: {
-    color: isDarkMode ? colors.accent : colors.primary,
+    color: isDarkMode ? '#181C22' : colors.primary,
     fontSize: 26,
   },
   cityHeaderContainer: {
     backgroundColor: isDarkMode ? colors.background : colors.primary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 12,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     minHeight: 110,
     paddingTop: 30,
     paddingBottom: 24,
-    paddingHorizontal: 18,
+    paddingHorizontal: 0,
     justifyContent: 'flex-end',
     marginBottom: 28,
+    width: '100%',
+    borderBottomWidth: 0,
   },
   cityHeaderRowFinal: {
     flexDirection: 'row',
@@ -1791,12 +1821,13 @@ const getStyles = (colors, isDarkMode) => ({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: isDarkMode ? colors.accent : colors.primary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 6,
+    backgroundColor: isDarkMode ? colors.accent : colors.surface,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    marginLeft: spacing.lg,
   },
   cityTitleHeaderWrapper: {
     flex: 1,
@@ -1824,11 +1855,11 @@ const getStyles = (colors, isDarkMode) => ({
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.xl,
-    shadowColor: '#000',
+    shadowColor: isDarkMode ? 'transparent' : '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: isDarkMode ? 0 : 0.10,
+    shadowRadius: isDarkMode ? 0 : 8,
+    elevation: isDarkMode ? 0 : 4,
     borderWidth: 1.5,
     borderColor: isDarkMode ? colors.accent : colors.primary,
   },
@@ -1873,7 +1904,7 @@ const getStyles = (colors, isDarkMode) => ({
     marginBottom: 4,
   },
   missionCardDescription: {
-    color: isDarkMode ? colors.text.primary : colors.text.primary,
+    color: colors.text.primary,
     fontSize: 15,
     marginBottom: 10,
   },
@@ -1883,7 +1914,7 @@ const getStyles = (colors, isDarkMode) => ({
     justifyContent: 'flex-end',
   },
   missionPoints: {
-    color: isDarkMode ? colors.accent : colors.secondary,
+    color: colors.secondary,
     fontWeight: 'bold',
     fontSize: 15,
   },
@@ -1894,9 +1925,7 @@ const MissionsScreen = (props: any) => {
   const styles = getStyles(colors, isDarkMode);
 
   return (
-    <SafeAreaViewContext style={styles.container}>
-      <MissionsScreenComponent {...props} />
-    </SafeAreaViewContext>
+    <MissionsScreenComponent {...props} />
   );
 };
 

@@ -42,7 +42,7 @@ const darkTheme = {
 };
 
 const App = () => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, colors } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,20 +132,20 @@ const App = () => {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1B263B' : '#F5F7FA' }}>
-        <ActivityIndicator size={24} color={isDarkMode ? '#41729F' : '#005F9E'} />
-        <Text style={{ marginTop: 10, color: isDarkMode ? '#EDF6F9' : '#333333' }}>Cargando TravelQuest...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size={24} color={colors.primary} />
+        <Text style={{ marginTop: 10, color: colors.text.primary }}>Cargando TravelQuest...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: isDarkMode ? '#1B263B' : '#F5F7FA' }}>
-        <Text style={{ color: 'red', textAlign: 'center', marginBottom: 10 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: colors.background }}>
+        <Text style={{ color: colors.error, textAlign: 'center', marginBottom: 10 }}>
           {error}
         </Text>
-        <Text style={{ textAlign: 'center', color: isDarkMode ? '#EDF6F9' : '#333333' }}>
+        <Text style={{ textAlign: 'center', color: colors.text.primary }}>
           Por favor, intenta recargar la aplicación o contacta con soporte.
         </Text>
       </View>
@@ -158,16 +158,16 @@ const App = () => {
         <ThemeProvider>
           <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
             <SafeAreaProvider>
-              <View style={{ flex: 1, backgroundColor: isDarkMode ? '#1B263B' : '#FFFFFF' }}>
+              <View style={{ flex: 1, backgroundColor: colors.background }}>
                 <NavigationContainer theme={{
                   dark: isDarkMode,
                   colors: {
-                    background: isDarkMode ? '#1B263B' : '#FFFFFF',
-                    border: isDarkMode ? '#274472' : '#e5e5e5',
-                    card: isDarkMode ? '#274472' : '#FFFFFF',
-                    text: isDarkMode ? '#EDF6F9' : '#222222',
-                    notification: isDarkMode ? '#41729F' : '#005F9E',
-                    primary: isDarkMode ? '#41729F' : '#005F9E',
+                    background: colors.background,
+                    border: colors.border,
+                    card: colors.surface,
+                    text: colors.text.primary,
+                    notification: colors.primary,
+                    primary: colors.primary,
                   },
                 }}>
                   <AppNavigator />

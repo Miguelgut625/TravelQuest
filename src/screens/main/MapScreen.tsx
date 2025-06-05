@@ -205,7 +205,10 @@ const DateRangePickerMobile: React.FC<{
       <TouchableOpacity
         style={[
           styles.datePickerButton,
-          isDarkMode && { borderColor: colors.accent },
+          isDarkMode && {
+            backgroundColor: colors.surface,
+            borderColor: colors.accent
+          },
           customButtonStyle
         ]}
         onPress={onToggleCalendar}
@@ -229,9 +232,12 @@ const DateRangePickerMobile: React.FC<{
           onRequestClose={() => setShowCalendar(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, isDarkMode ? { backgroundColor: '#222F43', borderColor: colors.accent, borderWidth: 1 } : { backgroundColor: '#fff', borderColor: colors.primary, borderWidth: 1 }]}> 
-              <View style={[styles.calendarHeader, { backgroundColor: isDarkMode ? '#101828' : '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12 }]}> 
-                <Text style={[styles.calendarTitle, isDarkMode ? { color: '#EDF6F9' } : { color: '#1A202C' }]}>Selecciona fechas</Text>
+            <View style={[styles.modalContent, isDarkMode ? { backgroundColor: '#222F43', borderColor: colors.accent, borderWidth: 1 } : { backgroundColor: '#fff', borderColor: colors.primary, borderWidth: 1 }]}>
+              <View style={[styles.calendarHeader, { backgroundColor: isDarkMode ? 'transparent' : '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12 }]}>
+                <Text style={[
+                  styles.calendarTitle,
+                  isDarkMode ? { color: '#EDF6F9', textShadowColor: 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 0 } : { color: '#1A202C' }
+                ]}>Selecciona fechas</Text>
                 <TouchableOpacity onPress={() => setShowCalendar(false)}>
                   <Ionicons name="close" size={24} color={isDarkMode ? '#EDF6F9' : '#1A202C'} />
                 </TouchableOpacity>
@@ -290,7 +296,7 @@ const MapScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, colors } = useTheme();
   // Referencia al WebView para poder enviar mensajes al globo
   const webViewRef = useRef<WebView>(null);
   // Añadir la referencia a GlobeView
@@ -852,20 +858,42 @@ const MapScreen = () => {
   const [showEventsModal, setShowEventsModal] = useState(false);
 
   return (
-    <SafeAreaView style={[commonStyles.container, { backgroundColor: isDarkMode ? '#101828' : '#F5F7FA' }]} edges={['top']}>
+    <SafeAreaView style={[commonStyles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={[commonStyles.header, {
         justifyContent: 'space-between',
-        backgroundColor: isDarkMode ? '#101828' : colors.primary,
-      }]}> 
+        backgroundColor: isDarkMode ? colors.background : colors.primary,
+      }]}>
         <Text style={[commonStyles.title, { color: isDarkMode ? colors.accent : '#fff' }]}>TravelQuest</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => setShowEventsModal(true)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: spacing.sm }}>
-            <Ionicons name="calendar" size={20} color={isDarkMode ? colors.accent : colors.accent} style={{ marginRight: 4 }} />
-            <Text style={{ color: isDarkMode ? colors.accent : colors.accent, fontWeight: 'bold', fontSize: 16 }}>Ver Eventos</Text>
+          <TouchableOpacity
+            onPress={() => setShowEventsModal(true)}
+            style={[
+              { flexDirection: 'row', alignItems: 'center', marginRight: spacing.sm },
+              !isDarkMode && {
+                backgroundColor: '#fff',
+                borderColor: '#005F9E',
+                borderWidth: 1.5,
+                paddingVertical: 6,
+                paddingHorizontal: 14,
+                borderRadius: 22,
+                shadowColor: '#005F9E22',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.10,
+                shadowRadius: 4,
+                elevation: 2,
+              }
+            ]}>
+            <Ionicons name="calendar" size={20} color={isDarkMode ? colors.accent : '#005F9E'} style={{ marginRight: 6 }} />
+            <Text style={{
+              color: isDarkMode ? colors.accent : '#005F9E',
+              fontWeight: 'bold',
+              fontSize: 17,
+              letterSpacing: 0.2
+            }}>Ver Eventos</Text>
           </TouchableOpacity>
           {showForm && (
-            <TouchableOpacity onPress={() => setShowForm(false)} style={[commonStyles.button, { backgroundColor: colors.error, padding: 8, borderRadius: borderRadius.round, marginLeft: 8 }]}> 
+            <TouchableOpacity onPress={() => setShowForm(false)} style={[commonStyles.button, { backgroundColor: colors.error, padding: 8, borderRadius: borderRadius.round, marginLeft: 8 }]}>
               <Ionicons name="close" size={24} color={colors.surface} />
             </TouchableOpacity>
           )}
@@ -937,11 +965,11 @@ const MapScreen = () => {
             <View style={{
               width: '95%',
               maxWidth: 400,
-              backgroundColor: isDarkMode ? '#101828' : '#F5F7FA',
+              backgroundColor: isDarkMode ? colors.surface : '#F5F7FA',
               borderRadius: borderRadius.xl,
               padding: spacing.lg,
               borderWidth: 1,
-              borderColor: isDarkMode ? '#222F43' : '#E2E8F0',
+              borderColor: isDarkMode ? colors.border : '#E2E8F0',
               ...shadows.large,
             }}>
               <ScrollView
@@ -970,7 +998,7 @@ const MapScreen = () => {
                       paddingVertical: spacing.sm,
                     }}
                     placeholder="¿Qué ciudad quieres visitar?"
-                    placeholderTextColor={isDarkMode ? '#A9D6E5' : colors.text.secondary}
+                    placeholderTextColor={isDarkMode ? '#FFF' : colors.text.secondary}
                     value={searchCity}
                     onChangeText={handleCitySearch}
                     numberOfLines={1}
@@ -1004,12 +1032,12 @@ const MapScreen = () => {
                     borderColor: isDarkMode ? '#334366' : colors.primary,
                     marginRight: spacing.sm,
                     ...shadows.small,
-                  }}> 
+                  }}>
                     <Ionicons name="list" size={20} color={isDarkMode ? colors.accent : colors.primary} style={{ marginLeft: spacing.sm, marginRight: spacing.xs }} />
                     <TextInput
                       style={{ flex: 1, backgroundColor: 'transparent', color: isDarkMode ? '#EDF6F9' : colors.text.primary, fontSize: 16, paddingVertical: spacing.sm }}
                       placeholder="Nº misiones"
-                      placeholderTextColor={isDarkMode ? '#A9D6E5' : colors.text.secondary}
+                      placeholderTextColor={isDarkMode ? '#FFF' : colors.text.secondary}
                       value={missionCount}
                       onChangeText={setMissionCount}
                       keyboardType="numeric"
@@ -1171,9 +1199,21 @@ const MapScreen = () => {
 
       {/* Modal para mostrar las misiones de evento */}
       {showEventsModal && (
-        <Modal animationType="slide" onRequestClose={() => setShowEventsModal(false)}>
-          <View style={eventsModalContainer}>
-            <Text style={sectionTitle}>Misiones de Evento</Text>
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setShowEventsModal(false)}
+          transparent={false}
+        >
+          <SafeAreaView style={[
+            styles.eventsModalContainer,
+            { flex: 1 },
+            !isDarkMode && { backgroundColor: '#F5F7FA' },
+            isDarkMode && { backgroundColor: colors.background || '#101828' }
+          ]}>
+            <Text style={[
+              styles.sectionTitle,
+              { color: isDarkMode ? colors.accent : '#005F9E' }
+            ]}>Misiones de Evento</Text>
             <ScrollView>
               {eventMissions
                 .filter(mission => {
@@ -1204,23 +1244,35 @@ const MapScreen = () => {
                   }
                   const ciudad = mission.cityId && eventCities[mission.cityId] ? eventCities[mission.cityId] : 'Ciudad desconocida';
                   return (
-                    <View key={mission.id} style={styles.eventCard}>
-                      <Text style={styles.eventTitle}>{mission.title}</Text>
-                      <Text style={{ color: '#1D3557', fontWeight: 'bold', marginBottom: 4 }}>Ciudad: {ciudad}</Text>
-                      {rangoFechas && (
-                        <Text style={{ color: '#005F9E', fontWeight: 'bold', marginBottom: 4 }}>{rangoFechas}</Text>
-                      )}
-                      <Text>{mission.description}</Text>
+                    <View key={mission.id} style={[
+                      styles.eventCard,
+                      {
+                        borderWidth: 2,
+                        borderColor: isDarkMode ? colors.accent : '#005F9E',
+                        borderRadius: 16,
+                        marginBottom: 18,
+                        backgroundColor: 'transparent',
+                      }
+                    ]}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 28, marginBottom: 2 }}>
+                        <Text style={{ color: isDarkMode ? colors.accent : '#005F9E' }}>Ciudad:</Text>
+                        <Text style={{ color: isDarkMode ? '#FFF' : '#005F9E' }}> {ciudad}</Text>
+                      </Text>
+                      <Text style={{ color: isDarkMode ? '#FFF' : '#005F9E', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>{mission.title}</Text>
+                      <Text style={{ color: isDarkMode ? '#E0E0E0' : '#1D3557', fontWeight: 'bold', marginBottom: 4 }}>
+                        {rangoFechas}
+                      </Text>
+                      <Text style={{ color: isDarkMode ? '#CCCCCC' : '#222' }}>{mission.description}</Text>
                       {mission.start_date && mission.end_date ? (
                         <View style={{
-                          backgroundColor: diasRestantes <= 3 ? '#FF6B6B' : colors.accent,
+                          backgroundColor: isDarkMode ? colors.accent : '#005F9E',
                           borderRadius: 8,
                           padding: 6,
                           marginVertical: 6,
                           alignSelf: 'flex-start'
                         }}>
                           <Text style={{
-                            color: '#1D3557',
+                            color: isDarkMode ? '#222' : '#fff',
                             fontWeight: 'bold'
                           }}>
                             {diasRestantes > 0
@@ -1230,19 +1282,20 @@ const MapScreen = () => {
                         </View>
                       ) : (
                         <View style={{
-                          backgroundColor: '#70C1B3',
+                          backgroundColor: isDarkMode ? '#232A36' : '#B3D8F8',
                           borderRadius: 8,
                           padding: 6,
                           marginVertical: 6,
                           alignSelf: 'flex-start'
                         }}>
-                          <Text style={{ color: '#1D3557', fontWeight: 'bold' }}>Sin límite de tiempo</Text>
+                          <Text style={{ color: isDarkMode ? '#FFF' : '#005F9E', fontWeight: 'bold' }}>Sin límite de tiempo</Text>
                         </View>
                       )}
                       <Button
                         mode="contained"
                         onPress={() => handleAcceptEventMission(mission)}
-                        style={{ marginTop: 8 }}
+                        style={{ marginTop: 8, borderRadius: 22, backgroundColor: isDarkMode ? colors.accent : '#005F9E' }}
+                        labelStyle={{ color: isDarkMode ? '#222' : '#fff', fontWeight: 'bold' }}
                         disabled={Boolean(!haComenzado || (userEventMissions && userEventMissions[mission.id]))}
                       >
                         {!haComenzado
@@ -1260,8 +1313,14 @@ const MapScreen = () => {
                   );
                 })}
             </ScrollView>
-            <Button onPress={() => setShowEventsModal(false)} style={{ marginTop: 16 }}>Cerrar</Button>
-          </View>
+            <Button
+              onPress={() => setShowEventsModal(false)}
+              style={{ marginTop: 16, alignSelf: 'center', backgroundColor: isDarkMode ? colors.accent : '#005F9E', borderRadius: 18, paddingHorizontal: 24 }}
+              labelStyle={{ color: isDarkMode ? '#222' : '#fff', fontWeight: 'bold', fontSize: 15 }}
+            >
+              Cerrar
+            </Button>
+          </SafeAreaView>
         </Modal>
       )}
     </SafeAreaView>

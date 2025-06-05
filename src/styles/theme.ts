@@ -6,7 +6,7 @@ export const lightColors = {
   secondary: '#38A169',    // Verde naturaleza
   accent: '#D69E2E',       // Dorado cálido
   background: '#F7FAFC',   // Fondo claro suave
-  surface: '#FFFFFF',      // Superficie blanca
+  surface: '#F7FAFC',      // Superficie gris muy claro
   text: {
     primary: '#1A202C',    // Texto principal oscuro
     secondary: '#4A5568',  // Texto secundario
@@ -149,7 +149,6 @@ export const commonStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.primary,
     ...shadows.medium,
   },
   title: {
@@ -524,9 +523,9 @@ export function getCreateMissionStyles(colors, isDarkMode) {
       justifyContent: 'center',
       paddingTop: spacing.lg,
       paddingBottom: spacing.md,
-      backgroundColor: isDarkMode ? '#101828' : colors.primary,
+      backgroundColor: isDarkMode ? colors.background : colors.primary,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#101828' : colors.primary,
+      borderBottomColor: isDarkMode ? colors.background : colors.primary,
       ...shadows.small,
     },
     backButton: {
@@ -566,7 +565,7 @@ export function getCreateMissionStyles(colors, isDarkMode) {
       padding: spacing.xl,
       borderWidth: 1,
       borderColor: isDarkMode ? colors.border : '#E2E8F0',
-      ...shadows.large,
+      ...(isDarkMode ? {} : shadows.large),
     },
     fieldGroup: {
       marginBottom: spacing.xl,
@@ -1534,13 +1533,14 @@ export function getBadgesScreenStyles(colors, isDarkMode, width) {
       paddingHorizontal: 20,
       marginHorizontal: 12,
       marginBottom: 16,
+      marginTop: 18,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
       shadowRadius: 6,
       elevation: 2,
       borderWidth: 1,
-      borderColor: '#E2E8F0',
+      borderColor: isDarkMode ? colors.accent : colors.primary,
       gap: 0,
     },
     summaryItem: {
@@ -1558,7 +1558,7 @@ export function getBadgesScreenStyles(colors, isDarkMode, width) {
     },
     summaryLabel: {
       fontSize: width < 350 ? 13 : 15,
-      color: '#1A202C',
+      color: isDarkMode ? colors.text.secondary : '#1A202C',
       marginTop: 0,
       textAlign: 'left',
       width: '100%',

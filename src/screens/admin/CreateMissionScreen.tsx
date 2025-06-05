@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, ScrollView } from 'react-native';
-import { TextInput, Button, Switch } from 'react-native-paper';
+import { TextInput as RNTextInput } from 'react-native';
+import { Button, Switch } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
@@ -138,12 +139,6 @@ const CreateMissionScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={isDarkMode ? colors.accent : colors.surface} />
-          </TouchableOpacity>
           <Text style={styles.title}>Crear Nueva Misión</Text>
           <View style={{ width: 40, height: 40, marginLeft: 8 }} />
         </View>
@@ -152,37 +147,44 @@ const CreateMissionScreen = () => {
         <View style={styles.formCard}>
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Título de la misión</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              style={[styles.input, { paddingVertical: spacing.sm, fontSize: 15 }]}
-              mode="flat"
-              placeholder="Escribe el título"
-              placeholderTextColor={colors.text.secondary}
-            />
+            <View style={[
+              styles.input,
+              { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, borderRadius: borderRadius.medium }
+            ]}>
+              <RNTextInput
+                value={title}
+                onChangeText={setTitle}
+                style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0, borderWidth: 0 }}
+                placeholder="Escribe el título"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
           </View>
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Descripción</Text>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              style={[styles.input, { paddingVertical: spacing.sm, fontSize: 15 }]}
-              mode="flat"
-              multiline
-              numberOfLines={4}
-              placeholder="Describe la misión"
-              placeholderTextColor={colors.text.secondary}
-            />
+            <View style={[
+              styles.input,
+              { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, borderRadius: borderRadius.medium }
+            ]}>
+              <RNTextInput
+                value={description}
+                onChangeText={setDescription}
+                style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0, borderWidth: 0 }}
+                multiline
+                numberOfLines={4}
+                placeholder="Describe la misión"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
           </View>
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Ciudad</Text>
             <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm }]}>
               <Ionicons name="location-outline" size={20} color={isDarkMode ? colors.accent : colors.primary} style={{ marginRight: spacing.sm }} />
-              <TextInput
+              <RNTextInput
                 value={city}
                 onChangeText={handleCitySearch}
                 style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0 }}
-                mode="flat"
                 autoCorrect={false}
                 autoCapitalize="words"
                 placeholder="¿En qué ciudad?"
@@ -230,15 +232,19 @@ const CreateMissionScreen = () => {
           </View>
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Puntos</Text>
-            <TextInput
-              value={points}
-              onChangeText={setPoints}
-              style={[styles.input, { paddingVertical: spacing.sm, fontSize: 15 }]}
-              mode="flat"
-              keyboardType="numeric"
-              placeholder="¿Cuántos puntos?"
-              placeholderTextColor={colors.text.secondary}
-            />
+            <View style={[
+              styles.input,
+              { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, borderRadius: borderRadius.medium }
+            ]}>
+              <RNTextInput
+                value={points}
+                onChangeText={setPoints}
+                style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0, borderWidth: 0 }}
+                keyboardType="numeric"
+                placeholder="¿Cuántos puntos?"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
           </View>
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Rango de fechas</Text>

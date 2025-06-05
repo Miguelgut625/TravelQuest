@@ -17,7 +17,7 @@ import { getUserBadges } from '../../services/badgeService';
 import { lightBlue100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 import { getAdvancedMissionStats, AdvancedMissionStats } from '../../services/statisticsService';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeSelector } from '../../components/ThemeSelector';
+
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -58,7 +58,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode, colors, toggleTheme } = useTheme();
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -578,7 +578,7 @@ const ProfileScreen = () => {
 
   const fetchAdvancedStats = async () => {
     if (!user?.id) return;
-    
+
     try {
       setLoadingAdvancedStats(true);
       const stats = await getAdvancedMissionStats(user.id);
@@ -591,216 +591,343 @@ const ProfileScreen = () => {
     }
   };
 
+  // Funciones de estilos para el modal de cambio de contraseña
+  const getModalContentStyle = () => ({
+    backgroundColor: colors.surface,
+    padding: 25,
+    borderRadius: 20,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  });
+  const getModalTitleStyle = () => ({
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 25,
+    textAlign: 'center',
+    color: colors.text.primary,
+    letterSpacing: 1,
+  });
+  const getInputStyle = () => ({
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 20,
+    backgroundColor: colors.surface,
+    color: colors.text.primary,
+    fontSize: 16,
+  });
+  const getCancelButtonStyle = () => ({
+    backgroundColor: colors.error,
+    flex: 1,
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  });
+  const getSaveButtonStyle = () => ({
+    backgroundColor: colors.primary,
+    flex: 1,
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  });
+  const getModalButtonTextStyle = () => ({
+    color: colors.surface,
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  });
+
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView>
         {/* Header con foto de perfil y nivel */}
-        <View style={styles.headerBackground}>
+        <View style={[styles.headerBackground, { backgroundColor: isDarkMode ? colors.surface : colors.primary }]}>
           <View style={styles.header}>
-            <TouchableOpacity style={styles.avatarContainer} onPress={showImageOptions}>
+            <TouchableOpacity style={[
+              styles.avatarContainer,
+              isDarkMode
+                ? { backgroundColor: colors.surface, borderColor: colors.accent, shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 }
+                : { backgroundColor: colors.surface, borderColor: colors.primary }
+            ]} onPress={showImageOptions}>
               {uploadingImage ? (
                 <View style={styles.avatar}>
-                  <ActivityIndicator size="large" color="white" />
+                  <ActivityIndicator size="large" color={colors.primary} />
                 </View>
               ) : profilePicUrl ? (
                 <Image source={{ uri: profilePicUrl }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
+                  <Text style={[styles.avatarText, { color: isDarkMode ? colors.accent : colors.primary }]}>{user?.username?.charAt(0) || user?.email?.charAt(0) || 'U'}</Text>
                 </View>
               )}
-              <View style={styles.cameraIconContainer}>
-                <Ionicons name="camera" size={20} color="white" />
+              <View style={[styles.cameraIconContainer, { backgroundColor: isDarkMode ? colors.accent : colors.primary, borderColor: isDarkMode ? colors.surface : colors.surface }]}>
+                <Ionicons name="camera" size={20} color={isDarkMode ? colors.surface : colors.surface} />
               </View>
             </TouchableOpacity>
             <View style={styles.userInfo}>
               {selectedTitle ? (
-                <Text style={styles.customTitle}>{selectedTitle}</Text>
+                <Text style={{ color: colors.accent, fontWeight: 'bold', fontSize: 18, textAlign: 'center', letterSpacing: 1, textShadowColor: 'rgba(0,0,0,0.18)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }}>{selectedTitle}</Text>
               ) : null}
-              <Text style={styles.name}>{user?.username || 'Usuario'}</Text>
-              <Text style={styles.email}>{user?.email}</Text>
-              <View style={styles.levelContainer}>
-                <Text style={styles.levelText}>Nivel {level}</Text>
-                <View style={styles.progressBar}>
-                  <View style={[styles.progress, { width: `${(xp / xpNext) * 100}%` }]} />
+              <Text style={[styles.name, { color: isDarkMode ? colors.accent : '#FFF' }]}>{user?.username || 'Usuario'}</Text>
+              <Text style={{ color: isDarkMode ? colors.accent : '#FFF', fontSize: 15, marginBottom: 6 }}>{user?.email}</Text>
+              <View style={[styles.levelContainer,
+              isDarkMode
+                ? { backgroundColor: colors.surface, borderColor: colors.accent }
+                : { backgroundColor: colors.surface, borderColor: colors.primary }
+              ]}>
+                <Text style={{ color: isDarkMode ? colors.accent : colors.primary, fontWeight: 'bold', fontSize: 15 }}>Nivel {level}</Text>
+                <View style={{ height: 8, backgroundColor: colors.border, borderRadius: 4, marginVertical: 5, width: '100%', overflow: 'hidden' }}>
+                  <View style={{
+                    height: 8,
+                    backgroundColor: isDarkMode ? colors.accent : '#4CB6F7',
+                    borderRadius: 4,
+                    width: `${(xp / xpNext) * 100}%`
+                  }} />
                 </View>
-                <Text style={styles.xpText}>{xp}/{xpNext} XP</Text>
+                <Text style={{ color: colors.text.secondary, fontSize: 12, textAlign: 'right' }}>{xp}/{xpNext} XP</Text>
               </View>
             </View>
           </View>
         </View>
 
         {/* Estadísticas principales */}
-        <View style={styles.stats}>
-          {loadingStats ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size={40} color="#005F9E" />
-            </View>
-          ) : (
-            <>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{realPoints}</Text>
-                <Text style={styles.statLabel}>Puntos</Text>
+        <View style={[
+          styles.statsSummaryCard,
+          { backgroundColor: isDarkMode ? colors.surface : '#EDF6F9', borderRadius: 18, padding: 18, marginHorizontal: 10, marginTop: 18 }
+        ]}>
+          <View style={{ backgroundColor: isDarkMode ? colors.surface : '#FFF', borderRadius: 18, padding: 18, marginVertical: 18, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
+            {loadingStats ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size={40} color={colors.primary} />
               </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.completedMissions}</Text>
-                <Text style={styles.statLabel}>Misiones</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.visitedCities}</Text>
-                <Text style={styles.statLabel}>Ciudades</Text>
-              </View>
-            </>
-          )}
+            ) : (
+              <>
+                <View style={styles.statItem}>
+                  <Text style={{ fontSize: 28, fontWeight: 'bold', color: isDarkMode ? '#FFF' : colors.primary, textShadowColor: isDarkMode ? 'rgba(0,0,0,0.18)' : 'transparent', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: isDarkMode ? 2 : 0 }}>{realPoints}</Text>
+                  <Text style={{ fontSize: 13, color: isDarkMode ? 'rgba(255,255,255,0.85)' : colors.text.primary, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold', marginTop: 2 }}>PUNTOS</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={{ fontSize: 28, fontWeight: 'bold', color: isDarkMode ? '#FFF' : colors.primary, textShadowColor: isDarkMode ? 'rgba(0,0,0,0.18)' : 'transparent', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: isDarkMode ? 2 : 0 }}>{stats.completedMissions}</Text>
+                  <Text style={{ fontSize: 13, color: isDarkMode ? 'rgba(255,255,255,0.85)' : colors.text.primary, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold', marginTop: 2 }}>MISIONES</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={{ fontSize: 28, fontWeight: 'bold', color: isDarkMode ? '#FFF' : colors.primary, textShadowColor: isDarkMode ? 'rgba(0,0,0,0.18)' : 'transparent', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: isDarkMode ? 2 : 0 }}>{stats.visitedCities}</Text>
+                  <Text style={{ fontSize: 13, color: isDarkMode ? 'rgba(255,255,255,0.85)' : colors.text.primary, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold', marginTop: 2 }}>CIUDADES</Text>
+                </View>
+              </>
+            )}
+          </View>
         </View>
 
-        {/* Sección Social */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Social</Text>
+        {/* Social */}
+        <View style={[styles.section, { backgroundColor: isDarkMode ? colors.surface : '#EDF6F9' }]}>
+          <Text style={[styles.sectionTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Social</Text>
+          <Text style={[styles.sectionDescription, { color: colors.text.secondary }]}>Gestiona tus amigos y compite en el ranking.</Text>
           <View style={styles.privacyContainer}>
             <TouchableOpacity
-              style={styles.socialButton}
+              style={[styles.socialButton, isDarkMode
+                ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.accent, shadowColor: 'transparent' }
+                : { backgroundColor: colors.primary, borderWidth: 0, shadowColor: 'transparent' }
+              ]}
               onPress={() => navigation.navigate('Friends')}
             >
               <View style={styles.socialButtonContent}>
-                <Ionicons name="people" size={24} color="white" />
-                <Text style={styles.socialButtonText}>Amigos</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
+                <Ionicons name="people" size={24} color={isDarkMode ? colors.accent : colors.surface} />
+                <Text style={[styles.socialButtonText, { color: isDarkMode ? colors.accent : colors.surface }]}>Amigos</Text>
+                <Ionicons name="chevron-forward" size={20} color={isDarkMode ? colors.accent : colors.surface} />
               </View>
             </TouchableOpacity>
-            <Text style={styles.socialDescription}>
-              Conéctate con tus amigos
-            </Text>
-
             <TouchableOpacity
-              style={styles.socialButton}
+              style={[styles.socialButton, isDarkMode
+                ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.accent, shadowColor: 'transparent' }
+                : { backgroundColor: colors.primary, borderWidth: 0, shadowColor: 'transparent' }
+              ]}
               onPress={() => navigation.navigate('Leaderboard')}
             >
               <View style={styles.socialButtonContent}>
-                <Ionicons name="trophy" size={24} color="white" />
-                <Text style={styles.socialButtonText}>Leaderboard</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
+                <Ionicons name="trophy" size={24} color={isDarkMode ? colors.accent : colors.surface} />
+                <Text style={[styles.socialButtonText, { color: isDarkMode ? colors.accent : colors.surface }]}>Leaderboard</Text>
+                <Ionicons name="chevron-forward" size={20} color={isDarkMode ? colors.accent : colors.surface} />
               </View>
             </TouchableOpacity>
-            <Text style={styles.socialDescription}>
-              Mira el ranking de puntos
-            </Text>
           </View>
         </View>
 
-        {/* Sección Logros */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Logros</Text>
+        {/* Logros */}
+        <View style={[styles.section, { backgroundColor: isDarkMode ? colors.surface : '#EDF6F9' }]}>
+          <Text style={[styles.sectionTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Logros</Text>
+          <Text style={[styles.sectionDescription, { color: colors.text.secondary }]}>Revisa tus insignias obtenidas.</Text>
           <View style={styles.privacyContainer}>
             <TouchableOpacity
-              style={styles.badgesButton}
+              style={[styles.badgesButton, { backgroundColor: isDarkMode ? colors.surface : colors.primary, borderWidth: isDarkMode ? 1 : 0, borderColor: isDarkMode ? colors.accent : 'transparent', shadowColor: 'transparent' }]}
               onPress={() => navigation.navigate('BadgesScreen')}
             >
               <View style={styles.badgesButtonContent}>
-                <Ionicons name="medal" size={24} color="white" />
-                <Text style={styles.badgesButtonText}>Ver Mis Insignias</Text>
-                <Ionicons name="chevron-forward" size={20} color="white" />
+                <Ionicons name="medal" size={24} color={isDarkMode ? colors.accent : colors.surface} />
+                <Text style={[styles.badgesButtonText, { color: isDarkMode ? colors.accent : colors.surface }]}>Ver Mis Insignias</Text>
+                <Ionicons name="chevron-forward" size={20} color={isDarkMode ? colors.accent : colors.surface} />
               </View>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Sección Privacidad */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
+        {/* Privacidad */}
+        <View style={[styles.section, { backgroundColor: isDarkMode ? colors.surface : '#EDF6F9' }]}>
+          <TouchableOpacity
+            style={styles.sectionHeader}
             onPress={() => setShowPrivacySettings(!showPrivacySettings)}
           >
-            <Text style={styles.sectionTitle}>Privacidad</Text>
-            <Ionicons 
-              name={showPrivacySettings ? "chevron-up" : "chevron-down"} 
-              size={24} 
-              color="#EDF6F9" 
+            <Text style={[styles.sectionTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Privacidad</Text>
+            <Ionicons
+              name={showPrivacySettings ? "chevron-up" : "chevron-down"}
+              size={24}
+              color={isDarkMode ? colors.accent : colors.primary}
             />
           </TouchableOpacity>
-          
+          <Text style={[styles.sectionDescription, { color: colors.text.secondary }]}>Controla la visibilidad de tu perfil.</Text>
           {showPrivacySettings && (
             <View style={styles.privacyContainer}>
               {/* Visibilidad del perfil */}
-              <View style={styles.privacySection}>
-                <Text style={styles.privacyDescription}>Quién puede ver tu perfil</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <View style={[styles.privacySection, { backgroundColor: colors.surface, padding: 12 }]}>
+                <Text style={[styles.privacyDescription, { color: colors.text.primary }]}>Quién puede ver tu perfil</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 8 }}>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, profileVisibility === 'public' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (profileVisibility === 'public' ? colors.accent : 'transparent')
+                        : (profileVisibility === 'public' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateProfileVisibility('public')}
                   >
-                    <Ionicons name="globe-outline" size={20} color={profileVisibility === 'public' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, profileVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+                    <Ionicons name="globe-outline" size={20} color={isDarkMode ? (profileVisibility === 'public' ? '#181C22' : colors.accent) : (profileVisibility === 'public' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (profileVisibility === 'public' ? '#181C22' : colors.accent) : (profileVisibility === 'public' ? colors.white : colors.primary) }]}>Público</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, profileVisibility === 'friends' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (profileVisibility === 'friends' ? colors.accent : 'transparent')
+                        : (profileVisibility === 'friends' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateProfileVisibility('friends')}
                   >
-                    <Ionicons name="people-outline" size={20} color={profileVisibility === 'friends' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, profileVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+                    <Ionicons name="people-outline" size={20} color={isDarkMode ? (profileVisibility === 'friends' ? '#181C22' : colors.accent) : (profileVisibility === 'friends' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (profileVisibility === 'friends' ? '#181C22' : colors.accent) : (profileVisibility === 'friends' ? colors.white : colors.primary) }]}>Solo amigos</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, profileVisibility === 'private' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (profileVisibility === 'private' ? colors.accent : 'transparent')
+                        : (profileVisibility === 'private' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateProfileVisibility('private')}
                   >
-                    <Ionicons name="lock-closed-outline" size={20} color={profileVisibility === 'private' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, profileVisibility === 'private' && styles.privacyRadioTextSelected]}>Privado</Text>
+                    <Ionicons name="lock-closed-outline" size={20} color={isDarkMode ? (profileVisibility === 'private' ? '#181C22' : colors.accent) : (profileVisibility === 'private' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (profileVisibility === 'private' ? '#181C22' : colors.accent) : (profileVisibility === 'private' ? colors.white : colors.primary) }]}>Privado</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
               {/* Visibilidad de amigos */}
-              <View style={[styles.privacySection, { marginTop: 20 }]}>
-                <Text style={styles.privacyDescription}>Quién puede ver tu lista de amigos</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <View style={[styles.privacySection, { backgroundColor: colors.surface, padding: 12, marginTop: 12 }]}>
+                <Text style={[styles.privacyDescription, { color: colors.text.primary }]}>Quién puede ver tu lista de amigos</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 8 }}>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, friendsVisibility === 'public' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (friendsVisibility === 'public' ? colors.accent : 'transparent')
+                        : (friendsVisibility === 'public' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateFriendsVisibility('public')}
                   >
-                    <Ionicons name="globe-outline" size={20} color={friendsVisibility === 'public' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, friendsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+                    <Ionicons name="globe-outline" size={20} color={isDarkMode ? (friendsVisibility === 'public' ? '#181C22' : colors.accent) : (friendsVisibility === 'public' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (friendsVisibility === 'public' ? '#181C22' : colors.accent) : (friendsVisibility === 'public' ? colors.white : colors.primary) }]}>Público</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, friendsVisibility === 'friends' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (friendsVisibility === 'friends' ? colors.accent : 'transparent')
+                        : (friendsVisibility === 'friends' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateFriendsVisibility('friends')}
                   >
-                    <Ionicons name="people-outline" size={20} color={friendsVisibility === 'friends' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, friendsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+                    <Ionicons name="people-outline" size={20} color={isDarkMode ? (friendsVisibility === 'friends' ? '#181C22' : colors.accent) : (friendsVisibility === 'friends' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (friendsVisibility === 'friends' ? '#181C22' : colors.accent) : (friendsVisibility === 'friends' ? colors.white : colors.primary) }]}>Solo amigos</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, friendsVisibility === 'private' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (friendsVisibility === 'private' ? colors.accent : 'transparent')
+                        : (friendsVisibility === 'private' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateFriendsVisibility('private')}
                   >
-                    <Ionicons name="lock-closed-outline" size={20} color={friendsVisibility === 'private' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, friendsVisibility === 'private' && styles.privacyRadioTextSelected]}>Solo tú</Text>
+                    <Ionicons name="lock-closed-outline" size={20} color={isDarkMode ? (friendsVisibility === 'private' ? '#181C22' : colors.accent) : (friendsVisibility === 'private' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (friendsVisibility === 'private' ? '#181C22' : colors.accent) : (friendsVisibility === 'private' ? colors.white : colors.primary) }]}>Solo tú</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
               {/* Visibilidad de comentarios */}
-              <View style={[styles.privacySection, { marginTop: 20 }]}>
-                <Text style={styles.privacyDescription}>Quién puede comentar en tus entradas</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <View style={[styles.privacySection, { backgroundColor: colors.surface, padding: 12, marginTop: 12 }]}>
+                <Text style={[styles.privacyDescription, { color: colors.text.primary }]}>Quién puede comentar en tus entradas</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 8 }}>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, commentsVisibility === 'public' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (commentsVisibility === 'public' ? colors.accent : 'transparent')
+                        : (commentsVisibility === 'public' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateCommentsVisibility('public')}
                   >
-                    <Ionicons name="globe-outline" size={20} color={commentsVisibility === 'public' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, commentsVisibility === 'public' && styles.privacyRadioTextSelected]}>Público</Text>
+                    <Ionicons name="globe-outline" size={20} color={isDarkMode ? (commentsVisibility === 'public' ? '#181C22' : colors.accent) : (commentsVisibility === 'public' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (commentsVisibility === 'public' ? '#181C22' : colors.accent) : (commentsVisibility === 'public' ? colors.white : colors.primary) }]}>Público</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, commentsVisibility === 'friends' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (commentsVisibility === 'friends' ? colors.accent : 'transparent')
+                        : (commentsVisibility === 'friends' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateCommentsVisibility('friends')}
                   >
-                    <Ionicons name="people-outline" size={20} color={commentsVisibility === 'friends' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, commentsVisibility === 'friends' && styles.privacyRadioTextSelected]}>Solo amigos</Text>
+                    <Ionicons name="people-outline" size={20} color={isDarkMode ? (commentsVisibility === 'friends' ? '#181C22' : colors.accent) : (commentsVisibility === 'friends' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (commentsVisibility === 'friends' ? '#181C22' : colors.accent) : (commentsVisibility === 'friends' ? colors.white : colors.primary) }]}>Solo amigos</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.privacyRadio, commentsVisibility === 'private' && styles.privacyRadioSelected]}
+                    style={[styles.privacyRadio, {
+                      backgroundColor: isDarkMode
+                        ? (commentsVisibility === 'private' ? colors.accent : 'transparent')
+                        : (commentsVisibility === 'private' ? colors.primary : colors.white),
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                    }]}
                     onPress={() => updateCommentsVisibility('private')}
                   >
-                    <Ionicons name="lock-closed-outline" size={20} color={commentsVisibility === 'private' ? 'white' : '#005F9E'} />
-                    <Text style={[styles.privacyRadioText, commentsVisibility === 'private' && styles.privacyRadioTextSelected]}>Nadie</Text>
+                    <Ionicons name="lock-closed-outline" size={20} color={isDarkMode ? (commentsVisibility === 'private' ? '#181C22' : colors.accent) : (commentsVisibility === 'private' ? colors.white : colors.primary)} />
+                    <Text style={[styles.privacyRadioText, { color: isDarkMode ? (commentsVisibility === 'private' ? '#181C22' : colors.accent) : (commentsVisibility === 'private' ? colors.white : colors.primary) }]}>Nadie</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -808,24 +935,49 @@ const ProfileScreen = () => {
           )}
         </View>
 
+        {/* Apariencia */}
+        <View style={[styles.section, { backgroundColor: isDarkMode ? colors.surface : '#EDF6F9' }]}>
+          <Text style={[styles.sectionTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Apariencia</Text>
+          <Text style={[styles.sectionDescription, { color: colors.text.secondary }]}>Cambia entre modo claro y oscuro.</Text>
+          <View style={styles.privacyContainer}>
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: isDarkMode ? colors.accent : colors.primary }]}
+              onPress={toggleTheme}
+            >
+              <View style={styles.socialButtonContent}>
+                <Ionicons
+                  name={isDarkMode ? "sunny" : "moon"}
+                  size={24}
+                  color={isDarkMode ? '#181C22' : colors.surface}
+                />
+                <Text style={[styles.socialButtonText, { color: isDarkMode ? '#181C22' : colors.surface }]}>
+                  {isDarkMode ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color={isDarkMode ? '#181C22' : colors.surface} />
+              </View>
+            </TouchableOpacity>
+            <Text style={[styles.socialDescription, { color: colors.text.secondary }]}>Personaliza la apariencia de la aplicación</Text>
+          </View>
+        </View>
+
         {/* Estadísticas Avanzadas */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.sectionHeader} 
+        <View style={[styles.section, { backgroundColor: isDarkMode ? colors.surface : '#EDF6F9' }]}>
+          <TouchableOpacity
+            style={styles.sectionHeader}
             onPress={() => setShowAdvancedStats(!showAdvancedStats)}
           >
-            <Text style={styles.sectionTitle}>Estadísticas Avanzadas</Text>
-            <Ionicons 
-              name={showAdvancedStats ? "chevron-up" : "chevron-down"} 
-              size={24} 
-              color="#EDF6F9" 
+            <Text style={[styles.sectionTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Estadísticas Avanzadas</Text>
+            <Ionicons
+              name={showAdvancedStats ? "chevron-up" : "chevron-down"}
+              size={24}
+              color={isDarkMode ? colors.accent : colors.primary}
             />
           </TouchableOpacity>
-          
+          <Text style={[styles.sectionDescription, { color: colors.text.secondary }]}>Analiza tu progreso en detalle.</Text>
           {showAdvancedStats && (
-            <View style={styles.advancedStatsContainer}>
+            <View style={[styles.advancedStatsContainer, { backgroundColor: isDarkMode ? colors.surface : '#f5f5f5' }]}>
               {loadingAdvancedStats ? (
-                <ActivityIndicator size="large" color="#005F9E" style={styles.loader} />
+                <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
               ) : advancedStats ? (
                 <>
                   {/* Información de estado de misiones */}
@@ -833,151 +985,157 @@ const ProfileScreen = () => {
                     <View style={styles.missionStatusRow}>
                       <View style={styles.missionStatusItem}>
                         <View style={[styles.colorBox, { backgroundColor: '#4CAF50' }]} />
-                        <Text style={styles.missionStatusCount}>{advancedStats.completedMissions}</Text>
-                        <Text style={styles.missionStatusLabel}>Completadas</Text>
+                        <Text style={[
+                          styles.missionStatusCount,
+                          { color: isDarkMode ? colors.accent : '#4CAF50' }
+                        ]}>{advancedStats.completedMissions}</Text>
+                        <Text style={[
+                          styles.missionStatusLabel,
+                          { color: isDarkMode ? colors.accent : '#4CAF50' }
+                        ]}>Completadas</Text>
                       </View>
-                      
+
                       <View style={styles.missionStatusItem}>
                         <View style={[styles.colorBox, { backgroundColor: '#FF9800' }]} />
-                        <Text style={styles.missionStatusCount}>{advancedStats.pendingMissions}</Text>
-                        <Text style={styles.missionStatusLabel}>Pendientes</Text>
+                        <Text style={[
+                          styles.missionStatusCount,
+                          { color: isDarkMode ? colors.accent : '#FF9800' }
+                        ]}>{advancedStats.pendingMissions}</Text>
+                        <Text style={[
+                          styles.missionStatusLabel,
+                          { color: isDarkMode ? colors.accent : '#FF9800' }
+                        ]}>Pendientes</Text>
                       </View>
-                      
+
                       <View style={styles.missionStatusItem}>
                         <View style={[styles.colorBox, { backgroundColor: '#F44336' }]} />
-                        <Text style={styles.missionStatusCount}>{advancedStats.expiredMissions}</Text>
-                        <Text style={styles.missionStatusLabel}>Expiradas</Text>
+                        <Text style={[
+                          styles.missionStatusCount,
+                          { color: isDarkMode ? colors.accent : '#F44336' }
+                        ]}>{advancedStats.expiredMissions}</Text>
+                        <Text style={[
+                          styles.missionStatusLabel,
+                          { color: isDarkMode ? colors.accent : '#F44336' }
+                        ]}>Expiradas</Text>
                       </View>
                     </View>
                   </View>
-                  
+
                   {/* Top 3 ciudades con más misiones */}
                   {advancedStats.topCities && advancedStats.topCities.length > 0 && (
-                    <View style={styles.topCitiesSection}>
-                      <Text style={styles.topCitiesTitle}>Top Ciudades</Text>
-                      
+                    <View style={[
+                      styles.topCitiesSection,
+                      { backgroundColor: isDarkMode ? colors.surface : '#F7F7F7' }
+                    ]}>
+                      <Text style={[styles.topCitiesTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Top Ciudades</Text>
+
                       {advancedStats.topCities.map((city, index) => (
-                        <View key={city.name} style={styles.topCityItem}>
+                        <View key={city.name} style={[
+                          styles.topCityItem,
+                          { backgroundColor: isDarkMode ? colors.surface : '#F7F7F7' }
+                        ]}>
                           <View style={[
                             styles.topCityRank,
-                            { backgroundColor: index === 0 ? '#005F9E' : index === 1 ? '#0277BD' : '#0288D1' }
+                            { backgroundColor: isDarkMode ? (index === 0 ? colors.accent : colors.surface) : (index === 0 ? '#FFD700' : '#005F9E') }
                           ]}>
-                            <Text style={styles.topCityRankText}>{index + 1}</Text>
+                            <Text style={[
+                              styles.topCityRankText,
+                              { color: isDarkMode ? (index === 0 ? '#181C22' : colors.accent) : '#fff' }
+                            ]}>{index + 1}</Text>
                           </View>
                           <View style={styles.topCityInfo}>
-                            <Text style={styles.topCityName}>{city.name}</Text>
+                            <Text style={[
+                              styles.topCityName,
+                              { color: isDarkMode ? (index === 0 ? colors.accent : colors.text.primary) : '#333' }
+                            ]}>{city.name}</Text>
                             <View style={styles.topCityBarContainer}>
-                              <View 
+                              <View
                                 style={[
                                   styles.topCityBar,
                                   {
                                     width: `${Math.min(100, (city.count / (advancedStats.topCities[0]?.count || 1)) * 100)}%`,
-                                    backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : '#CD7F32'
+                                    backgroundColor: isDarkMode ? (index === 0 ? colors.accent : colors.text.secondary) : '#E0E0E0'
                                   }
                                 ]}
                               />
                             </View>
-                            <Text style={styles.topCityCount}>{city.count} misiones</Text>
+                            <Text style={[
+                              styles.topCityCount,
+                              { color: isDarkMode ? (index === 0 ? colors.accent : colors.text.secondary) : '#666' }
+                            ]}>{city.count} misiones</Text>
                           </View>
                         </View>
                       ))}
                     </View>
                   )}
-                  
+
                   {/* Estadísticas detalladas */}
                   <View style={styles.detailedStats}>
                     <View style={styles.statRow}>
-                      <Text style={styles.statTitle}>Puntos ganados en misiones:</Text>
-                      <Text style={styles.statDetail}>{advancedStats.pointsEarned}</Text>
+                      <Text style={[styles.statTitle, { color: isDarkMode ? colors.accent : '#333' }]}>Puntos ganados en misiones:</Text>
+                      <Text style={[styles.statDetail, { color: isDarkMode ? colors.accent : '#005F9E' }]}>{advancedStats.pointsEarned}</Text>
                     </View>
-                    
+
                     <View style={styles.statRow}>
-                      <Text style={styles.statTitle}>Tiempo promedio para completar:</Text>
-                      <Text style={styles.statDetail}>{advancedStats.averageTimeToComplete} días</Text>
+                      <Text style={[styles.statTitle, { color: isDarkMode ? colors.accent : '#333' }]}>Tiempo promedio para completar:</Text>
+                      <Text style={[styles.statDetail, { color: isDarkMode ? colors.accent : '#005F9E' }]}>{advancedStats.averageTimeToComplete} días</Text>
                     </View>
-                    
+
                     <View style={styles.statRow}>
-                      <Text style={styles.statTitle}>Categoría más completada:</Text>
-                      <Text style={styles.statDetail}>{advancedStats.mostCompletedCategory}</Text>
+                      <Text style={[styles.statTitle, { color: isDarkMode ? colors.accent : '#333' }]}>Categoría más completada:</Text>
+                      <Text style={[styles.statDetail, { color: isDarkMode ? colors.accent : '#005F9E' }]}>{advancedStats.mostCompletedCategory}</Text>
                     </View>
-                    
+
                     {/* Resumen por categorías */}
-                    <Text style={styles.categoryTitle}>Misiones completadas por categoría:</Text>
+                    <Text style={[styles.categoryTitle, { color: isDarkMode ? colors.accent : '#333' }]}>Misiones completadas por categoría:</Text>
                     {Object.entries(advancedStats.completedByCategory).map(([category, count]) => (
                       <View key={category} style={styles.categoryRow}>
-                        <Text style={styles.categoryName}>{category}</Text>
+                        <Text style={[styles.categoryName, { color: isDarkMode ? colors.accent : '#333' }]}>{category}</Text>
                         <View style={styles.categoryBar}>
-                          <View 
+                          <View
                             style={[
-                              styles.categoryFill, 
-                              { 
+                              styles.categoryFill,
+                              {
                                 width: `${(count / advancedStats.completedMissions) * 100}%`,
-                                backgroundColor: getCategoryColor(category)
+                                backgroundColor: isDarkMode ? colors.accent : getCategoryColor(category)
                               }
-                            ]} 
+                            ]}
                           />
                         </View>
-                        <Text style={styles.categoryCount}>{count}</Text>
+                        <Text style={[styles.categoryCount, { color: isDarkMode ? colors.accent : '#333' }]}>{count}</Text>
                       </View>
                     ))}
                   </View>
                 </>
               ) : (
-                <Text style={styles.noStatsText}>No hay suficientes datos para mostrar estadísticas avanzadas.</Text>
+                <Text style={[styles.noStatsText, { color: colors.text.secondary }]}>No hay suficientes datos para mostrar estadísticas avanzadas.</Text>
               )}
             </View>
           )}
         </View>
 
-        {/* Sección Apariencia */}
-        <View style={[styles.section, isDarkMode && styles.darkSection]}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>Apariencia</Text>
+        {/* Seguridad */}
+        <View style={[styles.section, { backgroundColor: isDarkMode ? colors.surface : '#EDF6F9' }]}>
+          <Text style={[styles.sectionTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Seguridad</Text>
+          <Text style={[styles.sectionDescription, { color: colors.text.secondary }]}>Cambia tu contraseña.</Text>
           <View style={styles.privacyContainer}>
             <TouchableOpacity
-              style={[styles.socialButton, isDarkMode && styles.darkButton]}
-              onPress={toggleTheme}
-            >
-              <View style={styles.socialButtonContent}>
-                <Ionicons 
-                  name={isDarkMode ? "sunny" : "moon"} 
-                  size={24} 
-                  color={isDarkMode ? "#FFD700" : "#EDF6F9"} 
-                />
-                <Text style={styles.socialButtonText}>
-                  {isDarkMode ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
-                </Text>
-                <Ionicons name="chevron-forward" size={20} color="#EDF6F9" />
-              </View>
-            </TouchableOpacity>
-            <Text style={[styles.socialDescription, isDarkMode && styles.darkText]}>
-              Personaliza la apariencia de la aplicación
-            </Text>
-          </View>
-        </View>
-
-        {/* Sección Seguridad */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Seguridad</Text>
-          <View style={styles.privacyContainer}>
-            <TouchableOpacity
-              style={styles.socialButton}
+              style={[styles.socialButton, { backgroundColor: isDarkMode ? colors.accent : colors.primary }]}
               onPress={() => setIsChangePasswordVisible(true)}
             >
-              <Text style={styles.socialButtonText}>Cambiar Contraseña</Text>
+              <Text style={[styles.socialButtonText, { color: colors.surface }]}>Cambiar Contraseña</Text>
             </TouchableOpacity>
-            <Text style={styles.privacyDescription}>
-              Actualiza tu contraseña para mantener tu cuenta segura
-            </Text>
+            <Text style={[styles.privacyDescription, { color: colors.text.secondary }]}>Actualiza tu contraseña para mantener tu cuenta segura</Text>
           </View>
         </View>
 
         {/* Botón de cerrar sesión */}
         <TouchableOpacity
-          style={[styles.logoutButton, loading && styles.disabledButton]}
+          style={[styles.logoutButton, { backgroundColor: colors.error }]}
           onPress={handleLogout}
           disabled={loading}
         >
-          <Text style={styles.logoutButtonText}>
+          <Text style={[styles.logoutButtonText, { color: colors.surface }]}>
             {loading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
           </Text>
         </TouchableOpacity>
@@ -989,8 +1147,8 @@ const ProfileScreen = () => {
           animationType="slide"
         >
           <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
+            <View style={getModalContentStyle()}>
+              <Text style={getModalTitleStyle()}>Cambiar Contraseña</Text>
 
               {message.text ? (
                 <Text style={[styles.messageText, message.type === 'error' ? styles.errorMessage : styles.successMessage]}>
@@ -999,9 +1157,9 @@ const ProfileScreen = () => {
               ) : null}
 
               <TextInput
-                style={styles.input}
+                style={getInputStyle()}
                 placeholder="Contraseña actual"
-                placeholderTextColor="#A9D6E5"
+                placeholderTextColor={isDarkMode ? '#A9D6E5' : colors.text.secondary}
                 secureTextEntry
                 value={currentPassword}
                 onChangeText={(text) => {
@@ -1011,9 +1169,9 @@ const ProfileScreen = () => {
               />
 
               <TextInput
-                style={styles.input}
+                style={getInputStyle()}
                 placeholder="Nueva contraseña"
-                placeholderTextColor="#A9D6E5"
+                placeholderTextColor={isDarkMode ? '#A9D6E5' : colors.text.secondary}
                 secureTextEntry
                 value={newPassword}
                 onChangeText={(text) => {
@@ -1023,9 +1181,9 @@ const ProfileScreen = () => {
               />
 
               <TextInput
-                style={styles.input}
+                style={getInputStyle()}
                 placeholder="Confirmar nueva contraseña"
-                placeholderTextColor="#A9D6E5"
+                placeholderTextColor={isDarkMode ? '#A9D6E5' : colors.text.secondary}
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={(text) => {
@@ -1036,7 +1194,7 @@ const ProfileScreen = () => {
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
+                  style={getCancelButtonStyle()}
                   onPress={() => {
                     setIsChangePasswordVisible(false);
                     setCurrentPassword('');
@@ -1045,15 +1203,15 @@ const ProfileScreen = () => {
                     setMessage({ type: '', text: '' });
                   }}
                 >
-                  <Text style={styles.modalButtonText}>Cancelar</Text>
+                  <Text style={getModalButtonTextStyle()}>Cancelar</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.modalButton, styles.saveButton, loading && styles.disabledButton]}
+                  style={[getSaveButtonStyle(), loading && styles.disabledButton]}
                   onPress={handleChangePassword}
                   disabled={loading}
                 >
-                  <Text style={styles.modalButtonText}>
+                  <Text style={getModalButtonTextStyle()}>
                     {loading ? 'Guardando...' : 'Guardar'}
                   </Text>
                 </TouchableOpacity>
@@ -1081,30 +1239,15 @@ const getCategoryColor = (category: string): string => {
     'compras': '#F39C12',     // Ámbar
     'social': '#16A085',      // Verde azulado
   };
-  
+
   return colors[category.toLowerCase()] || '#F39C12'; // Naranja por defecto
 };
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary, 
   },
   headerBackground: {
-    backgroundColor: colors.text.light,
     paddingTop: 20,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
@@ -1126,7 +1269,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     marginRight: 20,
-    backgroundColor: colors.primary,
+    backgroundColor: '#274472',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1135,13 +1278,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
     borderWidth: 3,
-    borderColor: colors.text.light,
+    borderColor: '#EDF6F9',
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: colors.background,
+    backgroundColor: '#EDF6F9',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -1157,7 +1300,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.text.light,
+    borderColor: '#EDF6F9',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -1167,7 +1310,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: '#EDF6F9',
   },
   userInfo: {
     flex: 1,
@@ -1176,18 +1319,18 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: '#EDF6F9',
     marginBottom: 5,
   },
   email: {
     fontSize: 16,
-    color: colors.text.primary,
+    color: '#EDF6F9',
     marginBottom: 10,
   },
   stats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: colors.text.primary,
+    backgroundColor: '#274472',
     marginTop: -30,
     marginHorizontal: 20,
     borderRadius: 20,
@@ -1209,25 +1352,19 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 14,
-    color: colors.text.light,
+    color: '#EDF6F9',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   section: {
     margin: 20,
-    backgroundColor: colors.text.light,
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    Color: colors.text.primary,
+    Color: '#274472',
     letterSpacing: 1,
   },
   privacyContainer: {
@@ -1235,7 +1372,7 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   privacyButton: {
-    backgroundColor: colors.success,
+    backgroundColor: '#2ECC71',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -1244,11 +1381,11 @@ const styles = StyleSheet.create({
   privacyButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.white,
+    color: '#EDF6F9',
   },
   privacyDescription: {
     fontSize: 14,
-    color: colors.text.primary,
+    color: '#EDF6F9',
     textAlign: 'center',
   },
   levelContainer: {
@@ -1277,12 +1414,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   xpText: {
-    color: '#A9D6E5',
+    color: '#EDF6F9',
     fontSize: 12,
     textAlign: 'right',
   },
   socialButton: {
-    backgroundColor: '#274472',
     borderRadius: 15,
     padding: 15,
     alignItems: 'center',
@@ -1311,12 +1447,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.secondary,
+    borderColor: '#70C1B3',
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 14,
     marginHorizontal: 2,
-    backgroundColor: colors.white,
+    backgroundColor: '#EDF6F9',
     minWidth: 90,
     flexGrow: 1,
     marginVertical: 4,
@@ -1324,11 +1460,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   privacyRadioSelected: {
-    backgroundColor: colors.secondary,
+    backgroundColor: '#70C1B3',
   },
   privacyRadioText: {
     marginLeft: 6,
-    color: colors.secondary,
+    color: '#274472',
     fontWeight: 'bold',
   },
   privacyRadioTextSelected: {
@@ -1359,33 +1495,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContent: {
-    backgroundColor: '#1B263B',
-    padding: 25,
-    borderRadius: 20,
-    width: '90%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
+    // El color de fondo del modal ahora se maneja solo con getModalContentStyle()
   },
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 25,
     textAlign: 'center',
-    color: '#EDF6F9',
+    // El color del título ahora se maneja solo con getModalTitleStyle()
     letterSpacing: 1,
   },
   input: {
     borderWidth: 2,
-    borderColor: '#41729F',
+    // El color del borde y fondo ahora se maneja solo con getInputStyle()
     borderRadius: 12,
     padding: 15,
     marginBottom: 20,
-    backgroundColor: '#274472',
-    color: '#EDF6F9',
+    // El color de fondo y texto ahora se maneja solo con getInputStyle()
     fontSize: 16,
   },
   modalButtons: {
@@ -1393,26 +1519,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 20,
   },
-  modalButton: {
-    flex: 1,
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   cancelButton: {
-    backgroundColor: '#F44336',
+    // El color del botón cancelar ahora se maneja solo con getCancelButtonStyle()
   },
   saveButton: {
-    backgroundColor: '#669BBC',
+    // El color del botón guardar ahora se maneja solo con getSaveButtonStyle()
   },
   modalButtonText: {
-    color: '#EDF6F9',
+    // El color del texto del botón ahora se maneja solo con getModalButtonTextStyle()
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 1,
@@ -1472,7 +1586,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 0,
     fontSize: 14,
-    color: '#A9D6E5',
+    color: '#EDF6F9',
     letterSpacing: 0.5,
   },
   sectionHeader: {
@@ -1483,7 +1597,6 @@ const styles = StyleSheet.create({
   },
   advancedStatsContainer: {
     marginTop: 15,
-    backgroundColor: '#f5f5f5',
     borderRadius: 10,
     padding: 15,
   },
@@ -1668,6 +1781,23 @@ const styles = StyleSheet.create({
   },
   darkText: {
     color: '#EDF6F9',
+  },
+  sectionDescription: {
+    marginTop: 6,
+    marginBottom: 0,
+    fontSize: 14,
+    color: '#EDF6F9',
+    letterSpacing: 0.5,
+  },
+  statsSummaryCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 18,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -506,14 +506,12 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
   },
   headerTitle: {
     ...typography.h2,
     color: isDarkMode ? colors.accent : colors.surface,
     letterSpacing: 1,
-    marginTop: spacing.xl,
   },
   backButton: {
     backgroundColor: isDarkMode ? colors.accent : colors.primary,

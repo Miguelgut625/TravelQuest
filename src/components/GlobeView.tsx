@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 import { useSelector } from 'react-redux';
 import { getWeatherByCity, getWeatherByCoordinates, getUserJourneyCities, getForecastByCity, getForecastByCoordinates } from '../services/weatherService';
 import FallbackView from './FallbackView';
+import { useTheme } from '../context/ThemeContext';
 
 // Token de Cesium
 const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiNGNjYzBhOS0wYzA1LTRiNTQtYWJhYi01YjEwNTZiZmJhNDQiLCJpZCI6MjkwMjQyLCJpYXQiOjE3NDM1ODE4NTB9.M05o3luP4BS1qlxa46iP5PWBPIos1RpFjsXhqj8Xl0Q';
@@ -636,6 +637,10 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
   const userId = useSelector((state: any) => state.auth?.user?.id);
 
+  const { isDarkMode, colors } = useTheme();
+
+  const dynamicStyles = getDynamicStyles(isDarkMode, colors);
+
   // Efecto para logging del ciclo de vida
   useEffect(() => {
     console.log("GlobeView: Componente montado");
@@ -680,7 +685,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   // Función para cargar las ciudades del usuario
   const loadUserCities = async () => {
     if (!userId) return;
-    
+
     try {
       setIsLoadingCities(true);
       const cities = await getUserJourneyCities(userId);
@@ -1063,7 +1068,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
   const fetchWeatherData = async (city: string | null) => {
     try {
       setError(null);
-      
+
       if (city) {
         console.log('Obteniendo clima para ciudad específica:', city);
         try {
@@ -1071,7 +1076,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           const weatherResponse = await getWeatherByCity(city, OPENWEATHERMAP_API_KEY);
           console.log('Respuesta del clima recibida para ciudad:', weatherResponse);
           setWeatherData(weatherResponse);
-          
+
           const forecastResponse = await getForecastByCity(city, OPENWEATHERMAP_API_KEY);
           console.log('Respuesta del pronóstico recibida para ciudad:', forecastResponse);
           setForecastData(forecastResponse);
@@ -1119,7 +1124,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         // Abrir el modal primero
         setWeatherModalVisible(true);
       }
-      
+
       setIsLoadingWeather(true);
       setError(null);
 
@@ -1150,10 +1155,10 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
     const selectCity = (cityName: string) => {
       console.log('Seleccionando ciudad:', cityName);
-      
+
       // Cerrar el dropdown primero
       setCityDropdownVisible(false);
-      
+
       // No cerrar el modal, solo actualizar la selección
       if (cityName === 'Mi ubicación actual') {
         console.log('Cambiando a ubicación actual');
@@ -1162,14 +1167,14 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         console.log('Cambiando a ciudad específica:', cityName);
         setSelectedCity(cityName);
       }
-      
+
       // Limpiar datos anteriores
       setWeatherData(null);
       setForecastData(null);
-      
+
       // Iniciar la carga inmediatamente
       setIsLoadingWeather(true);
-      
+
       // Usar setTimeout para asegurar que el estado se actualice antes de obtener los datos
       setTimeout(() => {
         console.log('Obteniendo datos del clima después de seleccionar ciudad:', cityName === 'Mi ubicación actual' ? 'ubicación actual' : cityName);
@@ -1184,12 +1189,12 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
         animationType="slide"
         onRequestClose={() => setWeatherModalVisible(false)}
       >
-        <View style={styles.weatherModalOverlay}>
-          <View style={styles.weatherModalContent}>
-            <View style={styles.weatherModalHeader}>
-              <Text style={styles.weatherModalTitle}>
+        <View style={dynamicStyles.weatherModalOverlay}>
+          <View style={dynamicStyles.weatherModalContent}>
+            <View style={dynamicStyles.weatherModalHeader}>
+              <Text style={dynamicStyles.weatherModalTitle}>
                 {selectedCity ? `Clima en ${selectedCity}` : 'Clima en tu ubicación'}
-                {isLoadingWeather && <Text style={styles.loadingIndicatorText}> (Cargando...)</Text>}
+                {isLoadingWeather && <Text style={dynamicStyles.loadingIndicatorText}> (Cargando...)</Text>}
               </Text>
               <TouchableOpacity onPress={() => setWeatherModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#333" />
@@ -1197,108 +1202,113 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
             </View>
 
             {/* Pestañas para alternar entre clima actual y pronóstico */}
-            <View style={styles.weatherTabs}>
+            <View style={dynamicStyles.weatherTabs}>
               <TouchableOpacity
-                style={[styles.weatherTab, !showForecast && styles.weatherTabActive]}
+                style={[dynamicStyles.weatherTab, !showForecast && dynamicStyles.weatherTabActive]}
                 onPress={() => setShowForecast(false)}
               >
-                <Text style={[styles.weatherTabText, !showForecast && styles.weatherTabTextActive]}>
+                <Text style={[dynamicStyles.weatherTabText, !showForecast && dynamicStyles.weatherTabTextActive]}>
                   Actual
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.weatherTab, showForecast && styles.weatherTabActive]}
+                style={[dynamicStyles.weatherTab, showForecast && dynamicStyles.weatherTabActive]}
                 onPress={() => setShowForecast(true)}
               >
-                <Text style={[styles.weatherTabText, showForecast && styles.weatherTabTextActive]}>
+                <Text style={[dynamicStyles.weatherTabText, showForecast && dynamicStyles.weatherTabTextActive]}>
                   Próximos 7 días
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.weatherModalBody}>
+            <ScrollView style={dynamicStyles.weatherModalBody}>
               {isLoadingWeather ? (
-                <View style={styles.weatherLoading}>
+                <View style={dynamicStyles.weatherLoading}>
                   <ActivityIndicator size="large" color="#005F9E" />
-                  <Text style={styles.weatherLoadingText}>Cargando información del clima...</Text>
+                  <Text style={dynamicStyles.weatherLoadingText}>Cargando información del clima...</Text>
                 </View>
               ) : showForecast ? (
                 // Vista de pronóstico de 7 días
                 forecastData ? (
-                  <View style={styles.forecastContainer}>
-                    <Text style={styles.forecastTitle}>
+                  <View style={dynamicStyles.forecastContainer}>
+                    <Text style={dynamicStyles.forecastTitle}>
                       Pronóstico para {forecastData.city_name || weatherData?.name || 'la ubicación seleccionada'}
                     </Text>
-                    {forecastData.daily.slice(0, 7).map((day, index) => (
-                      <Card key={index} style={styles.forecastCard}>
-                        <Card.Content>
-                          <View style={styles.forecastDayHeader}>
-                            <Text style={styles.forecastDay}>
-                              {index === 0 ? 'Hoy' : getDayOfWeek(day.date)}
-                            </Text>
-                            <Text style={styles.forecastDate}>
-                              {formatDate(day.date)}
-                            </Text>
-                          </View>
-
-                          <View style={styles.forecastRow}>
-                            <View style={styles.forecastIconContainer}>
-                              <Image
-                                source={{ uri: `https://openweathermap.org/img/wn/${day.weather[0].icon}@2x.png` }}
-                                style={styles.forecastIcon}
-                              />
-                              <Text style={styles.forecastDescription}>
-                                {day.weather[0].description}
+                    {forecastData.daily.slice(0, 7).map((day, index) => {
+                      const weatherIcon = (day.weather[0].main.toLowerCase() === 'cielo claro' && day.weather[0].icon.endsWith('n'))
+                        ? '01d'
+                        : day.weather[0].icon;
+                      return (
+                        <Card key={index} style={dynamicStyles.forecastCard}>
+                          <Card.Content>
+                            <View style={dynamicStyles.forecastDayHeader}>
+                              <Text style={dynamicStyles.forecastDay}>
+                                {index === 0 ? 'Hoy' : getDayOfWeek(day.date)}
+                              </Text>
+                              <Text style={dynamicStyles.forecastDate}>
+                                {formatDate(day.date)}
                               </Text>
                             </View>
 
-                            <View style={styles.forecastTemps}>
-                              <Text style={styles.forecastTempMax}>
-                                <Ionicons name="arrow-up" size={16} color="#FF5722" />
-                                {Math.round(day.temp.max)}°C
-                              </Text>
-                              <Text style={styles.forecastTempMin}>
-                                <Ionicons name="arrow-down" size={16} color="#2196F3" />
-                                {Math.round(day.temp.min)}°C
-                              </Text>
-                            </View>
-                          </View>
+                            <View style={dynamicStyles.forecastRow}>
+                              <View style={dynamicStyles.forecastIconContainer}>
+                                <Image
+                                  source={{ uri: `https://openweathermap.org/img/wn/${weatherIcon}@2x.png` }}
+                                  style={dynamicStyles.forecastIcon}
+                                />
+                                <Text style={dynamicStyles.forecastDescription}>
+                                  {day.weather[0].description}
+                                </Text>
+                              </View>
 
-                          <View style={styles.forecastDetails}>
-                            <View style={styles.forecastDetailItem}>
-                              <Ionicons name="water-outline" size={18} color="#005F9E" />
-                              <Text style={styles.forecastDetailText}>{day.humidity}%</Text>
+                              <View style={dynamicStyles.forecastTemps}>
+                                <Text style={dynamicStyles.forecastTempMax}>
+                                  <Ionicons name="arrow-up" size={16} color="#FF5722" />
+                                  {Math.round(day.temp.max)}°C
+                                </Text>
+                                <Text style={dynamicStyles.forecastTempMin}>
+                                  <Ionicons name="arrow-down" size={16} color="#2196F3" />
+                                  {Math.round(day.temp.min)}°C
+                                </Text>
+                              </View>
                             </View>
 
-                            <View style={styles.forecastDetailItem}>
-                              <Ionicons name="umbrella-outline" size={18} color="#005F9E" />
-                              <Text style={styles.forecastDetailText}>{Math.round(day.pop * 100)}%</Text>
-                            </View>
+                            <View style={dynamicStyles.forecastDetails}>
+                              <View style={dynamicStyles.forecastDetailItem}>
+                                <Ionicons name="water-outline" size={18} color={isDarkMode ? colors.accent : '#005F9E'} />
+                                <Text style={dynamicStyles.forecastDetailText}>{day.humidity}%</Text>
+                              </View>
 
-                            <View style={styles.forecastDetailItem}>
-                              <Ionicons name="compass-outline" size={18} color="#005F9E" />
-                              <Text style={styles.forecastDetailText}>{Math.round(day.speed * 3.6)} km/h</Text>
+                              <View style={dynamicStyles.forecastDetailItem}>
+                                <Ionicons name="umbrella-outline" size={18} color={isDarkMode ? colors.accent : '#005F9E'} />
+                                <Text style={dynamicStyles.forecastDetailText}>{Math.round(day.pop * 100)}%</Text>
+                              </View>
+
+                              <View style={dynamicStyles.forecastDetailItem}>
+                                <Ionicons name="compass-outline" size={18} color={isDarkMode ? colors.accent : '#005F9E'} />
+                                <Text style={dynamicStyles.forecastDetailText}>{Math.round(day.speed * 3.6)} km/h</Text>
+                              </View>
                             </View>
-                          </View>
-                        </Card.Content>
-                      </Card>
-                    ))}
+                          </Card.Content>
+                        </Card>
+                      );
+                    })}
                   </View>
                 ) : (
-                  <View style={styles.weatherLoading}>
-                    <Text style={styles.weatherErrorText}>No hay datos de pronóstico disponibles</Text>
+                  <View style={dynamicStyles.weatherLoading}>
+                    <Text style={dynamicStyles.weatherErrorText}>No hay datos de pronóstico disponibles</Text>
                   </View>
                 )
               ) : (
                 // Vista de clima actual
                 weatherData ? (
                   <>
-                    <View style={styles.weatherMainInfo}>
+                    <View style={dynamicStyles.weatherMainInfo}>
                       <TouchableOpacity
-                        style={styles.citySelector}
+                        style={dynamicStyles.citySelector}
                         onPress={() => setCityDropdownVisible(!cityDropdownVisible)}
                       >
-                        <Text style={styles.weatherLocation}>
+                        <Text style={dynamicStyles.weatherLocation}>
                           {weatherData?.name || 'Ubicación desconocida'}
                           {weatherData?.sys?.country ? `, ${weatherData.sys.country}` : ''}
                         </Text>
@@ -1306,26 +1316,26 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                       </TouchableOpacity>
 
                       {cityDropdownVisible && (
-                        <View style={styles.citiesDropdown}>
+                        <View style={dynamicStyles.citiesDropdown}>
                           <TouchableOpacity
                             style={[
-                              styles.cityItem, 
-                              !selectedCity && styles.selectedCityItem
+                              dynamicStyles.cityItem,
+                              !selectedCity && dynamicStyles.selectedCityItem
                             ]}
                             onPress={() => {
                               console.log('Seleccionando Mi ubicación actual');
                               selectCity('Mi ubicación actual');
                             }}
                           >
-                            <Ionicons 
-                              name={!selectedCity ? "locate" : "locate-outline"} 
-                              size={16} 
-                              color={!selectedCity ? "#FF5722" : "#005F9E"} 
+                            <Ionicons
+                              name={!selectedCity ? "locate" : "locate-outline"}
+                              size={16}
+                              color={!selectedCity ? "#FF5722" : "#005F9E"}
                             />
-                            <Text 
+                            <Text
                               style={[
-                                styles.cityItemText,
-                                !selectedCity && styles.selectedCityItemText
+                                dynamicStyles.cityItemText,
+                                !selectedCity && dynamicStyles.selectedCityItemText
                               ]}
                             >
                               Mi ubicación actual
@@ -1333,32 +1343,32 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                           </TouchableOpacity>
 
                           {isLoadingCities ? (
-                            <View style={styles.loadingCitiesContainer}>
+                            <View style={dynamicStyles.loadingCitiesContainer}>
                               <ActivityIndicator size="small" color="#005F9E" />
-                              <Text style={styles.loadingCitiesText}>Cargando ciudades...</Text>
+                              <Text style={dynamicStyles.loadingCitiesText}>Cargando ciudades...</Text>
                             </View>
                           ) : userCities.length > 0 ? (
                             userCities.map(city => (
                               <TouchableOpacity
                                 key={city.id}
                                 style={[
-                                  styles.cityItem,
-                                  selectedCity === city.name && styles.selectedCityItem
+                                  dynamicStyles.cityItem,
+                                  selectedCity === city.name && dynamicStyles.selectedCityItem
                                 ]}
                                 onPress={() => {
                                   console.log('Seleccionando ciudad desde lista:', city.name);
                                   selectCity(city.name);
                                 }}
                               >
-                                <Ionicons 
-                                  name={selectedCity === city.name ? "location" : "location-outline"} 
-                                  size={16} 
-                                  color={selectedCity === city.name ? "#FF5722" : "#005F9E"} 
+                                <Ionicons
+                                  name={selectedCity === city.name ? "location" : "location-outline"}
+                                  size={16}
+                                  color={selectedCity === city.name ? "#FF5722" : "#005F9E"}
                                 />
-                                <Text 
+                                <Text
                                   style={[
-                                    styles.cityItemText,
-                                    selectedCity === city.name && styles.selectedCityItemText
+                                    dynamicStyles.cityItemText,
+                                    selectedCity === city.name && dynamicStyles.selectedCityItemText
                                   ]}
                                 >
                                   {city.name}
@@ -1366,66 +1376,66 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
                               </TouchableOpacity>
                             ))
                           ) : (
-                            <Text style={styles.noCitiesText}>No tienes viajes guardados</Text>
+                            <Text style={dynamicStyles.noCitiesText}>No tienes viajes guardados</Text>
                           )}
-                          
-                          <TouchableOpacity 
-                            style={styles.refreshCitiesButton}
+
+                          <TouchableOpacity
+                            style={dynamicStyles.refreshCitiesButton}
                             onPress={loadUserCities}
                           >
                             <Ionicons name="refresh" size={16} color="#005F9E" />
-                            <Text style={styles.refreshCitiesText}>Actualizar ciudades</Text>
+                            <Text style={dynamicStyles.refreshCitiesText}>Actualizar ciudades</Text>
                           </TouchableOpacity>
                         </View>
                       )}
 
-                      <View style={styles.weatherMainRow}>
-                        <Text style={styles.weatherTemp}>{Math.round(weatherData?.main?.temp || 0)}°C</Text>
+                      <View style={dynamicStyles.weatherMainRow}>
+                        <Text style={dynamicStyles.weatherTemp}>{Math.round(weatherData?.main?.temp || 0)}°C</Text>
                         {weatherData?.weather?.[0]?.icon && (
-                          <View style={styles.weatherIconContainer}>
+                          <View style={dynamicStyles.weatherIconContainer}>
                             <Image
                               source={{ uri: `https://openweathermap.org/img/wn/${weatherData.weather[0].icon}@2x.png` }}
-                              style={styles.weatherIcon}
+                              style={dynamicStyles.weatherIcon}
                             />
                           </View>
                         )}
                       </View>
-                      <Text style={styles.weatherDescription}>
+                      <Text style={dynamicStyles.weatherDescription}>
                         {weatherData?.weather?.[0]?.description || 'Información no disponible'}
                       </Text>
                     </View>
 
-                    <View style={styles.weatherDetails}>
-                      <View style={styles.weatherDetailRow}>
-                        <View style={styles.weatherDetailItem}>
-                          <Ionicons name="thermometer-outline" size={24} color="#005F9E" />
-                          <Text style={styles.weatherDetailLabel}>Sensación</Text>
-                          <Text style={styles.weatherDetailValue}>{Math.round(weatherData?.main?.feels_like || 0)}°C</Text>
+                    <View style={dynamicStyles.weatherDetails}>
+                      <View style={dynamicStyles.weatherDetailRow}>
+                        <View style={dynamicStyles.weatherDetailItem}>
+                          <Ionicons name="thermometer-outline" size={24} color={isDarkMode ? colors.accent : '#005F9E'} />
+                          <Text style={dynamicStyles.weatherDetailLabel}>Sensación</Text>
+                          <Text style={dynamicStyles.weatherDetailValue}>{Math.round(weatherData?.main?.feels_like || 0)}°C</Text>
                         </View>
-                        <View style={styles.weatherDetailItem}>
-                          <Ionicons name="water-outline" size={24} color="#005F9E" />
-                          <Text style={styles.weatherDetailLabel}>Humedad</Text>
-                          <Text style={styles.weatherDetailValue}>{weatherData?.main?.humidity || 0}%</Text>
+                        <View style={dynamicStyles.weatherDetailItem}>
+                          <Ionicons name="water-outline" size={24} color={isDarkMode ? colors.accent : '#005F9E'} />
+                          <Text style={dynamicStyles.weatherDetailLabel}>Humedad</Text>
+                          <Text style={dynamicStyles.weatherDetailValue}>{weatherData?.main?.humidity || 0}%</Text>
                         </View>
                       </View>
 
-                      <View style={styles.weatherDetailRow}>
-                        <View style={styles.weatherDetailItem}>
-                          <Ionicons name="speedometer-outline" size={24} color="#005F9E" />
-                          <Text style={styles.weatherDetailLabel}>Presión</Text>
-                          <Text style={styles.weatherDetailValue}>{weatherData?.main?.pressure || 0} hPa</Text>
+                      <View style={dynamicStyles.weatherDetailRow}>
+                        <View style={dynamicStyles.weatherDetailItem}>
+                          <Ionicons name="speedometer-outline" size={24} color={isDarkMode ? colors.accent : '#005F9E'} />
+                          <Text style={dynamicStyles.weatherDetailLabel}>Presión</Text>
+                          <Text style={dynamicStyles.weatherDetailValue}>{weatherData?.main?.pressure || 0} hPa</Text>
                         </View>
-                        <View style={styles.weatherDetailItem}>
-                          <Ionicons name="compass-outline" size={24} color="#005F9E" />
-                          <Text style={styles.weatherDetailLabel}>Viento</Text>
-                          <Text style={styles.weatherDetailValue}>{Math.round((weatherData?.wind?.speed || 0) * 3.6)} km/h</Text>
+                        <View style={dynamicStyles.weatherDetailItem}>
+                          <Ionicons name="compass-outline" size={24} color={isDarkMode ? colors.accent : '#005F9E'} />
+                          <Text style={dynamicStyles.weatherDetailLabel}>Viento</Text>
+                          <Text style={dynamicStyles.weatherDetailValue}>{Math.round((weatherData?.wind?.speed || 0) * 3.6)} km/h</Text>
                         </View>
                       </View>
                     </View>
                   </>
                 ) : (
-                  <View style={styles.weatherLoading}>
-                    <Text style={styles.weatherErrorText}>No hay datos del clima disponibles</Text>
+                  <View style={dynamicStyles.weatherLoading}>
+                    <Text style={dynamicStyles.weatherErrorText}>No hay datos del clima disponibles</Text>
                   </View>
                 )
               )}
@@ -1438,7 +1448,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
 
   // Renderización del componente
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Usar respaldo o mostrar error incorregible */}
       {(hasError && retryCount >= 3) ? (
         <ErrorView
@@ -1457,7 +1467,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
             ref={webViewRef}
             source={{ html: htmlContent }}
             style={[
-              styles.webview,
+              dynamicStyles.webview,
               // Visible solo en modo 3D, pero siempre presente
               !is3DMode && { opacity: 0, position: 'absolute', width: 1, height: 1, top: -1000 }
             ]}
@@ -1477,7 +1487,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
           {/* MapView para modo 2D (solo visible en modo 2D) */}
           {!is3DMode && (
             <MapView
-              style={styles.map}
+              style={dynamicStyles.map}
               region={mapRegion || {
                 latitude: 0,
                 longitude: 0,
@@ -1495,14 +1505,14 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       )}
 
       {isLoading && is3DMode && (
-        <View style={styles.loadingContainer}>
+        <View style={dynamicStyles.loadingContainer}>
           <ActivityIndicator size="large" color="#F57C00" />
-          <Text style={styles.loadingText}>Cargando el globo...</Text>
-          <Text style={styles.loadingPhaseText}>{loadingPhase}</Text>
-          <View style={styles.progressBarContainer}>
+          <Text style={dynamicStyles.loadingText}>Cargando el globo...</Text>
+          <Text style={dynamicStyles.loadingPhaseText}>{loadingPhase}</Text>
+          <View style={dynamicStyles.progressBarContainer}>
             <View
               style={[
-                styles.progressBar,
+                dynamicStyles.progressBar,
                 { width: `${getLoadingProgress(loadingPhase)}%` }
               ]}
             />
@@ -1511,17 +1521,17 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       )}
 
       {hasError && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error: {errorMessage}</Text>
-          <Text style={styles.errorDescription}>
+        <View style={dynamicStyles.errorContainer}>
+          <Text style={dynamicStyles.errorText}>Error: {errorMessage}</Text>
+          <Text style={dynamicStyles.errorDescription}>
             Esto puede deberse a problemas de red o de rendimiento.
             Intente nuevamente.
           </Text>
-          <View style={styles.buttonRow}>
+          <View style={dynamicStyles.buttonRow}>
             <Button
               mode="contained"
               onPress={handleRetry}
-              style={styles.retryButton}
+              style={dynamicStyles.retryButton}
             >
               Intentar de nuevo
             </Button>
@@ -1530,9 +1540,9 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
       )}
 
       {props.showsUserLocation && !isLoading && !hasError && (
-        <View style={styles.buttonContainer}>
+        <View style={dynamicStyles.buttonContainer}>
           <FAB
-            style={styles.fab}
+            style={dynamicStyles.fab}
             icon="weather-partly-cloudy"
             color="#fff"
             loading={isLoadingWeather}
@@ -1542,7 +1552,7 @@ const GlobeView = forwardRef<GlobeViewRef, Props>((props, ref) => {
             }}
           />
           <FAB
-            style={styles.fab}
+            style={dynamicStyles.fab}
             icon={is3DMode ? "map" : "earth"}
             color="#fff"
             loading={isLocating}
@@ -1572,7 +1582,7 @@ function getLoadingProgress(phase: string): number {
 }
 
 // Estilos para el componente
-const styles = StyleSheet.create({
+const getDynamicStyles = (isDarkMode, colors) => StyleSheet.create({
   container: {
     flex: 1,
     position: 'relative'
@@ -1660,7 +1670,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   weatherModalContent: {
-    backgroundColor: 'white',
+    backgroundColor: isDarkMode ? (colors.background || '#181C22') : colors.surface,
     borderRadius: 12,
     width: '90%',
     maxHeight: '80%',
@@ -1678,15 +1688,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: isDarkMode ? '#232A36' : colors.border,
+    backgroundColor: isDarkMode ? (colors.background || '#181C22') : colors.surface,
   },
   weatherModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: isDarkMode ? colors.accent || '#FFD700' : '#333',
   },
   weatherModalBody: {
     padding: 16,
+    backgroundColor: isDarkMode ? (colors.background || '#181C22') : colors.surface,
   },
   weatherMainInfo: {
     alignItems: 'center',
@@ -1697,6 +1709,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
+    color: isDarkMode ? colors.accent || '#FFD700' : '#005F9E',
   },
   weatherMainRow: {
     flexDirection: 'row',
@@ -1706,18 +1719,20 @@ const styles = StyleSheet.create({
   weatherTemp: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: isDarkMode ? colors.accent || '#FFD700' : '#005F9E',
   },
   weatherIconContainer: {
     marginLeft: 10,
   },
   weatherIcon: {
-    width: 80,
-    height: 80,
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
+    backgroundColor: 'transparent',
   },
   weatherDescription: {
     fontSize: 18,
-    color: '#666',
+    color: isDarkMode ? '#CCC' : '#666',
     textTransform: 'capitalize',
     textAlign: 'center',
   },
@@ -1733,19 +1748,19 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     padding: 10,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: isDarkMode ? '#232A36' : '#f5f5f5',
     borderRadius: 8,
     marginHorizontal: 4,
   },
   weatherDetailLabel: {
     fontSize: 14,
-    color: '#666',
+    color: isDarkMode ? '#CCC' : '#666',
     marginVertical: 4,
   },
   weatherDetailValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: isDarkMode ? '#FFF' : '#333',
   },
   weatherLoading: {
     alignItems: 'center',
@@ -1764,13 +1779,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   citiesDropdown: {
-    backgroundColor: '#fff',
+    backgroundColor: isDarkMode ? colors.surface : colors.surface,
     borderRadius: 8,
     padding: 10,
     marginTop: 5,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: isDarkMode ? colors.border : colors.border,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1784,12 +1799,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: isDarkMode ? colors.border : colors.border,
   },
   cityItemText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#333',
+    color: isDarkMode ? colors.text.primary : colors.text.primary,
   },
   noCitiesText: {
     textAlign: 'center',
@@ -1806,25 +1821,33 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     alignItems: 'center',
+    backgroundColor: isDarkMode ? (colors.background || '#181C22') : 'white',
   },
   weatherTabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: '#005F9E',
+    borderBottomColor: isDarkMode ? (colors.accent || '#FFD700') : '#005F9E',
   },
   weatherTabText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#666',
+    color: isDarkMode ? '#CCC' : '#666',
     textAlign: 'center',
   },
   weatherTabTextActive: {
-    color: '#005F9E',
+    color: isDarkMode ? (colors.accent || '#FFD700') : '#005F9E',
   },
   forecastContainer: {
     padding: 10,
   },
   forecastCard: {
-    marginBottom: 10,
+    backgroundColor: isDarkMode ? colors.surface : '#fff',
+    borderRadius: 12,
+    marginBottom: 14,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   forecastDayHeader: {
@@ -1834,13 +1857,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   forecastDay: {
-    fontSize: 18,
+    color: isDarkMode ? colors.text.primary : '#333',
     fontWeight: 'bold',
-    color: '#333',
+    fontSize: 16,
   },
   forecastDate: {
+    color: isDarkMode ? colors.text.secondary : '#666',
     fontSize: 14,
-    color: '#666',
   },
   forecastRow: {
     flexDirection: 'row',
@@ -1856,10 +1879,12 @@ const styles = StyleSheet.create({
   forecastIcon: {
     width: 50,
     height: 50,
+    resizeMode: 'contain',
+    backgroundColor: 'transparent',
   },
   forecastDescription: {
     fontSize: 14,
-    color: '#666',
+    color: isDarkMode ? colors.text.secondary : '#666',
     textTransform: 'capitalize',
     flex: 1,
     flexWrap: 'wrap',
@@ -1870,20 +1895,20 @@ const styles = StyleSheet.create({
   },
   forecastTempMax: {
     fontSize: 16,
-    fontWeight: 'bold',
     color: '#FF5722',
     marginBottom: 4,
   },
   forecastTempMin: {
     fontSize: 16,
-    color: '#2196F3',
+    color: isDarkMode ? colors.accent : '#2196F3',
   },
   forecastDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: isDarkMode ? colors.background : '#f5f5f5',
     borderRadius: 8,
     padding: 8,
+    marginTop: 10,
   },
   forecastDetailItem: {
     flexDirection: 'row',
@@ -1893,7 +1918,8 @@ const styles = StyleSheet.create({
   forecastDetailText: {
     marginLeft: 4,
     fontSize: 14,
-    color: '#666',
+    color: isDarkMode ? colors.text.primary : '#666',
+    fontWeight: 'bold',
   },
   weatherErrorText: {
     marginTop: 10,
