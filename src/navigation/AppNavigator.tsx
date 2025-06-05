@@ -119,6 +119,7 @@ const TabNavigator = () => {
     >
       <Tab.Screen name="Map" component={MapScreen} options={{ title: 'Mapa' }} />
       <Tab.Screen name="Missions" component={MissionsScreen} options={{ title: 'Misiones' }} />
+      <Tab.Screen name="Journal" component={JournalScreen} options={{ title: 'Diario' }} />
       <Tab.Screen name="Conversations" component={ConversationsScreen} options={{ title: 'Mensajes' }} />
       {isAdmin && (
         <Tab.Screen 
