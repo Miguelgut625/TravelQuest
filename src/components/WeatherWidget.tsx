@@ -48,7 +48,7 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForecast, setShowForecast] = useState(false);
-  
+
   // Ref para cancelar requests en cleanup
   const abortControllerRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
@@ -70,8 +70,8 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
       // Verificar la API key
       if (!OPENWEATHERMAP_API_KEY || OPENWEATHERMAP_API_KEY === 'TU_API_KEY_AQUI') {
         if (isMountedRef.current) {
-          setError('API Key de OpenWeatherMap no configurada');
-          setIsLoading(false);
+        setError('API Key de OpenWeatherMap no configurada');
+        setIsLoading(false);
         }
         return;
       }
@@ -80,15 +80,15 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
       
       // Promise race para timeout
       const weatherPromise = (async () => {
-        // Obtener clima por nombre de ciudad o coordenadas
-        if (cityName) {
+      // Obtener clima por nombre de ciudad o coordenadas
+      if (cityName) {
           return await getWeatherByCity(cityName, OPENWEATHERMAP_API_KEY);
-        } else if (latitude !== undefined && longitude !== undefined) {
+      } else if (latitude !== undefined && longitude !== undefined) {
           return await getWeatherByCoordinates(latitude, longitude, OPENWEATHERMAP_API_KEY);
-        } else {
+      } else {
           // Intentar usar la ubicación actual con timeout
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
             throw new Error('Permiso para acceder a la ubicación denegado');
           }
           
@@ -105,11 +105,11 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
           
           const location = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
           return await getWeatherByCoordinates(
-            location.coords.latitude,
-            location.coords.longitude,
-            OPENWEATHERMAP_API_KEY
-          );
-        }
+          location.coords.latitude,
+          location.coords.longitude,
+          OPENWEATHERMAP_API_KEY
+        );
+      }
       })();
       
       // Timeout para weather request
@@ -138,7 +138,7 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
       }
     } finally {
       if (isMountedRef.current) {
-        setIsLoading(false);
+      setIsLoading(false);
       }
     }
   };
@@ -270,21 +270,19 @@ const WeatherWidget = ({ cityName, latitude, longitude, compact = false }: Weath
 
               <View style={styles.weatherDetails}>
                 <View style={styles.detailItem}>
-                  <Ionicons name="water" size={20} color="#005F9E" />
-                  <Text style={styles.detailValue}>{weatherData.main.humidity}%</Text>
+                  <Ionicons name="water" size={20} color="#003366" />
                   <Text style={styles.detailLabel}>Humedad</Text>
+                  <Text style={styles.detailValue}>{weatherData.main.humidity}%</Text>
                 </View>
-                
                 <View style={styles.detailItem}>
-                  <Ionicons name="speedometer" size={20} color="#005F9E" />
-                  <Text style={styles.detailValue}>{weatherData.main.pressure}</Text>
+                  <Ionicons name="speedometer" size={20} color="#003366" />
                   <Text style={styles.detailLabel}>Presión</Text>
+                  <Text style={styles.detailValue}>{weatherData.main.pressure} hPa</Text>
                 </View>
-                
                 <View style={styles.detailItem}>
-                  <Ionicons name="flag" size={20} color="#005F9E" />
-                  <Text style={styles.detailValue}>{weatherData.wind.speed}</Text>
+                  <Ionicons name="flag" size={20} color="#003366" />
                   <Text style={styles.detailLabel}>Viento</Text>
+                  <Text style={styles.detailValue}>{weatherData.wind.speed}</Text>
                 </View>
               </View>
 
@@ -350,7 +348,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: 15,
-    backgroundColor: '#005F9E',
+    backgroundColor: '#003366',
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 5,
@@ -380,7 +378,7 @@ const styles = StyleSheet.create({
   temperature: {
     fontSize: 40,
     fontWeight: 'bold',
-    color: '#005F9E',
+    color: '#003366',
   },
   feelsLike: {
     fontSize: 14,
@@ -423,7 +421,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   forecastButton: {
-    backgroundColor: '#005F9E',
+    backgroundColor: '#003366',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

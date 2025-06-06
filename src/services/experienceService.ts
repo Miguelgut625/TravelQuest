@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import NotificationService from './NotificationService';
 
 /**
  * Calcula la experiencia necesaria para el siguiente nivel
@@ -82,6 +83,29 @@ export const addExperienceToUser = async (userId: string, experience: number) =>
       .eq('id', userId);
 
     if (error) throw error;
+
+    // Enviar notificación si subió de nivel
+    if (leveledUp) {
+      try {
+        const notificationService = NotificationService.getInstance();
+        // Obtener puntos actuales del usuario para la notificación
+        const { data: userData } = await supabase
+          .from('users')
+          .select('points')
+          .eq('id', userId)
+          .single();
+        
+        await notificationService.notifyLevelUp(
+          userId,
+          newLevel,
+          userData?.points || 0
+        );
+        console.log(`✅ Notificación de subida de nivel enviada: Nivel ${newLevel}`);
+      } catch (notificationError) {
+        console.error('Error enviando notificación de subida de nivel:', notificationError);
+        // No afectar el flujo principal si falla la notificación
+      }
+    }
 
     return {
       level: newLevel,

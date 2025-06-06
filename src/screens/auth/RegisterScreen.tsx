@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { setUser, setToken } from '../../features/authSlice';
+import { setUser, setToken, setAuthState, setError } from '../../features/authSlice';
 import { supabase } from '../../services/supabase';
 
 const RegisterScreen = ({ navigation }: any) => {
@@ -54,6 +54,7 @@ const RegisterScreen = ({ navigation }: any) => {
         id: authData.user.id,
         email: authData.user.email!,
         username: username,
+        role: 'user'
       }));
 
       // Redirigir a la pantalla de verificación de email
@@ -65,9 +66,12 @@ const RegisterScreen = ({ navigation }: any) => {
     }
   };
 
+
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Crear Cuenta</Text>
+      
       <TextInput
         style={styles.input}
         placeholder="Nombre de usuario"
@@ -150,6 +154,7 @@ const styles = StyleSheet.create({
     color: 'red',
     marginTop: 10,
   },
+
 });
 
 export default RegisterScreen; 

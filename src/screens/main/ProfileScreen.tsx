@@ -17,6 +17,7 @@ import { getUserBadges } from '../../services/badgeService';
 import { lightBlue100 } from 'react-native-paper/lib/typescript/styles/themes/v2/colors';
 import { getAdvancedMissionStats, AdvancedMissionStats } from '../../services/statisticsService';
 import { useThemeContext } from '../../context/ThemeContext';
+import NotificationService from '../../services/NotificationService';
 
 // Definir interfaces para los tipos de datos
 interface Journey {
@@ -575,6 +576,93 @@ const ProfileScreen = () => {
     }
   };
 
+  // Función para probar notificaciones
+  const handleTestNotifications = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const notificationService = NotificationService.getInstance();
+      
+      // Probar todas las notificaciones
+      Alert.alert(
+        '🧪 Prueba de Notificaciones',
+        'Se enviarán notificaciones de prueba. Nota: Las notificaciones push no funcionan en Expo Go (SDK 53), solo locales.',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel'
+          },
+          {
+            text: 'Probar',
+            onPress: async () => {
+              try {
+                // Probar notificación general
+                await notificationService.testNotifications(user.id);
+                
+                // Probar notificación de nivel
+                await notificationService.notifyLevelUp(user.id, 5, 1250);
+                
+                // Probar notificación de insignia
+                await notificationService.notifyBadgeEarned(
+                  user.id,
+                  'Explorador',
+                  'Has desbloqueado una nueva insignia por completar 5 misiones',
+                  'achievement'
+                );
+                
+                Alert.alert('✅ Éxito', 'Notificaciones de prueba enviadas');
+              } catch (error) {
+                console.error('Error en prueba de notificaciones:', error);
+                Alert.alert('❌ Error', 'Error en las notificaciones de prueba');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error en handleTestNotifications:', error);
+      Alert.alert('Error', 'No se pudieron probar las notificaciones');
+    }
+  };
+
+  // Función para crear tabla de misiones compartidas
+  const handleCreateMissionsSharedTable = async () => {
+    try {
+      const { createMissionsSharedTable } = await import('../../services/testConnection');
+      
+      Alert.alert(
+        '🔧 Crear Tabla Misiones Compartidas',
+        'Esta función verificará si existe la tabla missions_shared y te dará el SQL para crearla si no existe.',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel'
+          },
+          {
+            text: 'Verificar',
+            onPress: async () => {
+              try {
+                const result = await createMissionsSharedTable();
+                
+                if (result.success) {
+                  Alert.alert('✅ Tabla existe', result.message);
+                } else {
+                  Alert.alert('📋 Información', `${result.message}\n\nRevisa la consola para ver el comando SQL.`);
+                }
+              } catch (error) {
+                console.error('Error creando tabla:', error);
+                Alert.alert('❌ Error', 'Error al verificar/crear la tabla');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error en handleCreateMissionsSharedTable:', error);
+      Alert.alert('Error', 'No se pudo verificar la tabla');
+    }
+  };
+
   const fetchAdvancedStats = async () => {
     if (!user?.id) return;
     
@@ -966,6 +1054,28 @@ const ProfileScreen = () => {
             </TouchableOpacity>
             <Text style={styles.privacyDescription}>
               Actualiza tu contraseña para mantener tu cuenta segura
+            </Text>
+
+            {/* Botón de prueba de notificaciones */}
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: '#E74C3C' }]}
+              onPress={handleTestNotifications}
+            >
+              <Text style={styles.socialButtonText}>🧪 Probar Notificaciones</Text>
+            </TouchableOpacity>
+            <Text style={styles.privacyDescription}>
+              Envía notificaciones de prueba (solo locales en Expo Go)
+            </Text>
+
+            {/* Botón para crear tabla de misiones compartidas */}
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: '#9B59B6' }]}
+              onPress={handleCreateMissionsSharedTable}
+            >
+              <Text style={styles.socialButtonText}>🔧 Verificar Tabla Misiones</Text>
+            </TouchableOpacity>
+            <Text style={styles.privacyDescription}>
+              Verificar si existe la tabla para compartir misiones con amigos
             </Text>
           </View>
         </View>

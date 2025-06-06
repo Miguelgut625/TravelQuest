@@ -58,18 +58,24 @@ export const shareJourney = async (
         const endDate = new Date(journeyData.end_date);
         const cityName = journeyData.cities?.name || 'destino desconocido';
 
-        // Crear un grupo para el viaje con todos los amigos
-        const groupResult = await createJourneyGroup(
-            journeyId,
-            ownerId,
-            friendsArray.map(friend => friend.user2Id),
-            cityName,
-            startDate,
-            endDate
-        );
+        // *** LÓGICA MODIFICADA: Solo crear grupo si hay más de 2 personas en total ***
+        let groupResult = null;
+        const totalPeople = friendsArray.length + 1; // +1 por el propietario
 
-        if (!groupResult.success) {
-            throw new Error('No se pudo crear el grupo para el viaje');
+        if (totalPeople > 2) {
+            // Crear un grupo para el viaje con todos los amigos
+            groupResult = await createJourneyGroup(
+                journeyId,
+                ownerId,
+                friendsArray.map(friend => friend.user2Id),
+                cityName,
+                startDate,
+                endDate
+            );
+
+            if (!groupResult.success) {
+                throw new Error('No se pudo crear el grupo para el viaje');
+            }
         }
 
         // Procesar cada amigo
@@ -91,27 +97,40 @@ export const shareJourney = async (
                     continue;
                 }
 
+                // Preparar datos para journeys_shared
+                const sharedData: any = {
+                    journeyId,
+                    ownerId,
+                    sharedWithUserId: friend.user2Id,
+                    status: 'pending'
+                };
+
+                // Solo agregar group_id si se creó un grupo (más de 2 personas)
+                if (groupResult && groupResult.groupId) {
+                    sharedData.group_id = groupResult.groupId;
+                }
+
                 // Guardar en journeys_shared con estado pendiente si no existía antes
                 if (existingShareError || !existingShare) {
                     const { error } = await supabase
                         .from('journeys_shared')
-                        .insert({
-                            journeyId,
-                            ownerId,
-                            sharedWithUserId: friend.user2Id,
-                            status: 'pending',
-                            group_id: groupResult.groupId
-                        });
+                        .insert(sharedData);
 
                     if (error) throw error;
                 } else {
-                    // Actualizar el registro existente para agregarle el groupId si no lo tenía
+                    // Actualizar el registro existente
+                    const updateData: any = {
+                        status: 'pending'
+                    };
+
+                    // Solo agregar group_id si se creó un grupo
+                    if (groupResult && groupResult.groupId) {
+                        updateData.group_id = groupResult.groupId;
+                    }
+
                     const { error } = await supabase
                         .from('journeys_shared')
-                        .update({
-                            group_id: groupResult.groupId,
-                            status: 'pending'
-                        })
+                        .update(updateData)
                         .eq('id', existingShare.id);
 
                     if (error) throw error;
@@ -144,7 +163,13 @@ export const shareJourney = async (
             const friendsText = friendsArray.length === 1
                 ? friendsArray[0].username
                 : `${friendsArray.length} amigos`;
-            Alert.alert('Éxito', `Se ha enviado una invitación de viaje a ${friendsText}. Se te notificará cuando acepten.`);
+            
+            // Mensaje diferente dependiendo si se creó grupo o no
+            if (totalPeople > 2) {
+                Alert.alert('Éxito', `Se ha enviado una invitación de viaje a ${friendsText}. Se creó un grupo de chat para organizar el viaje. Se te notificará cuando acepten.`);
+            } else {
+                Alert.alert('Éxito', `Se ha enviado una invitación de viaje a ${friendsText}. Podrán comunicarse por chat directo. Se te notificará cuando acepten.`);
+            }
         }
 
         return true;
@@ -162,6 +187,16 @@ export const acceptJourneyInvitation = async (
     groupInvitationId: string
 ): Promise<boolean> => {
     try {
+        // Obtener información del viaje compartido para verificar si hay grupo
+        const { data: shareData, error: shareError } = await supabase
+            .from('journeys_shared')
+            .select('group_id')
+            .eq('journeyId', journeyId)
+            .eq('sharedWithUserId', userId)
+            .single();
+
+        if (shareError) throw shareError;
+
         // Actualizar el estado en journeys_shared
         const { error: journeyShareError } = await supabase
             .from('journeys_shared')
@@ -171,16 +206,21 @@ export const acceptJourneyInvitation = async (
 
         if (journeyShareError) throw journeyShareError;
 
-        // Aceptar la invitación al grupo desde el servicio de grupos
-        const { error: memberError } = await supabase
-            .from('group_members')
-            .update({
-                status: 'accepted',
-                joined_at: new Date().toISOString()
-            })
-            .eq('id', groupInvitationId);
+        // Solo aceptar invitación al grupo si existe un grupo (más de 2 personas)
+        if (shareData.group_id && groupInvitationId) {
+            const { error: memberError } = await supabase
+                .from('group_members')
+                .update({
+                    status: 'accepted',
+                    joined_at: new Date().toISOString()
+                })
+                .eq('id', groupInvitationId);
 
-        if (memberError) throw memberError;
+            if (memberError) {
+                console.error('Error al aceptar invitación al grupo:', memberError);
+                // No lanzamos error porque el viaje fue aceptado correctamente
+            }
+        }
 
         return true;
     } catch (error) {
@@ -196,6 +236,16 @@ export const rejectJourneyInvitation = async (
     groupInvitationId: string
 ): Promise<boolean> => {
     try {
+        // Obtener información del viaje compartido para verificar si hay grupo
+        const { data: shareData, error: shareError } = await supabase
+            .from('journeys_shared')
+            .select('group_id')
+            .eq('journeyId', journeyId)
+            .eq('sharedWithUserId', userId)
+            .single();
+
+        if (shareError) throw shareError;
+
         // Actualizar el estado en journeys_shared
         const { error: journeyShareError } = await supabase
             .from('journeys_shared')
@@ -205,13 +255,18 @@ export const rejectJourneyInvitation = async (
 
         if (journeyShareError) throw journeyShareError;
 
-        // Rechazar la invitación al grupo
-        const { error: memberError } = await supabase
-            .from('group_members')
-            .update({ status: 'rejected' })
-            .eq('id', groupInvitationId);
+        // Solo rechazar la invitación al grupo si existe un grupo (más de 2 personas)
+        if (shareData.group_id && groupInvitationId) {
+            const { error: memberError } = await supabase
+                .from('group_members')
+                .update({ status: 'rejected' })
+                .eq('id', groupInvitationId);
 
-        if (memberError) throw memberError;
+            if (memberError) {
+                console.error('Error al rechazar invitación al grupo:', memberError);
+                // No lanzamos error porque el viaje fue rechazado correctamente
+            }
+        }
 
         return true;
     } catch (error) {

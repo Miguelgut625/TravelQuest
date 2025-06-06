@@ -21,6 +21,7 @@ import { RouteProp } from '@react-navigation/native';
 import { getOrCreateCity } from '../../services/missionGenerator';
 import MissionHintModal from '../../components/MissionHintModal';
 import CreateMissionForm from '../../components/CreateMissionForm';
+import ShareMissionModal from '../../components/ShareMissionModal';
 
 type MissionsScreenRouteProp = RouteProp<{
   Missions: {
@@ -555,6 +556,20 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       // Organizar misiones por ciudad
       const missionsByCity: CityMissions = {};
+      
+      // Función para eliminar duplicados basándose en el ID de la misión
+      const removeDuplicateMissions = (missions: JourneyMission[]) => {
+        const seen = new Set();
+        return missions.filter(mission => {
+          if (seen.has(mission.id)) {
+            console.log(`⚠️ Misión duplicada eliminada: ${mission.id}`);
+            return false;
+          }
+          seen.add(mission.id);
+          return true;
+        });
+      };
+
       allMissions.forEach((mission: JourneyMission) => {
         if (!missionsByCity[mission.cityName]) {
           missionsByCity[mission.cityName] = {
@@ -584,6 +599,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         } else {
           missionsByCity[mission.cityName].pending.push(mission);
         }
+      });
+
+      // Eliminar duplicados en cada categoría de cada ciudad
+      Object.keys(missionsByCity).forEach(cityName => {
+        missionsByCity[cityName].completed = removeDuplicateMissions(missionsByCity[cityName].completed);
+        missionsByCity[cityName].pending = removeDuplicateMissions(missionsByCity[cityName].pending);
+        missionsByCity[cityName].expired = removeDuplicateMissions(missionsByCity[cityName].expired);
       });
 
       setCityMissions(missionsByCity);
@@ -885,27 +907,34 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   }, [missionCompleted, navigation]);
 
   const handleShareJourney = async (friend: Friend) => {
-    if (!journeyId) {
-      Alert.alert('Error', 'No se pudo compartir el journey porque no se encontró el ID del viaje.');
-      return;
-    }
-
     try {
       const { error } = await supabase
         .from('journeys_shared')
         .insert({
           journeyId: journeyId,
-          ownerId: user?.id || '',
-          sharedWithUserId: friend.user2Id
+          sharedWithUserId: friend.user2Id,
+          sharedByUserId: user?.id,
+          status: 'accepted',
+          shared_at: new Date().toISOString()
         });
+
       if (error) throw error;
-      Alert.alert('Éxito', `Journey compartido con ${friend.username}`);
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'No se pudo compartir el journey');
-    } finally {
+
+      Alert.alert('Éxito', `Viaje compartido con ${friend.username}`);
       setIsShareModalVisible(false);
+    } catch (error) {
+      console.error('Error al compartir viaje:', error);
+      Alert.alert('Error', 'No se pudo compartir el viaje');
     }
+  };
+
+  // Función para manejar compartir una misión individual
+  const handleShareMission = (mission: JourneyMission) => {
+    setMissionToShare(mission);
+  };
+
+  const handleCloseMissionShareModal = () => {
+    setMissionToShare(null);
   };
 
   // Renderizar el loader de generación de descripción
@@ -1111,19 +1140,19 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             {cityData.pending.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
-                {sortMissions(cityData.pending).map(mission =>
+                {sortMissions(cityData.pending).map((mission, index) =>
                   mission.challenge && mission.challenge.is_event ? (
-                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                    <View key={`pending-event-${mission.id}-${index}`} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
                       <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
                       <Text>{mission.challenge.description}</Text>
                       <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
                     </View>
                   ) : (
                     <MissionCard
-                      key={mission.id}
+                      key={`pending-${mission.id}-${index}`}
                       mission={mission}
                       onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
-                      onShare={() => setIsShareModalVisible(true)}
+                      onShare={() => handleShareMission(mission)}
                     />
                   )
                 )}
@@ -1140,19 +1169,19 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                   <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
                   <View style={styles.dividerLine} />
                 </View>
-                {sortMissions(cityData.expired).map(mission =>
+                {sortMissions(cityData.expired).map((mission, index) =>
                   mission.challenge && mission.challenge.is_event ? (
-                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                    <View key={`expired-event-${mission.id}-${index}`} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
                       <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
                       <Text>{mission.challenge.description}</Text>
                       <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
                     </View>
                   ) : (
                     <MissionCard
-                      key={mission.id}
+                      key={`expired-${mission.id}-${index}`}
                       mission={mission}
                       onComplete={() => { }}
-                      onShare={() => setIsShareModalVisible(true)}
+                      onShare={() => handleShareMission(mission)}
                     />
                   )
                 )}
@@ -1166,19 +1195,19 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                   <Text style={styles.completedText}>Completadas</Text>
                   <View style={styles.dividerLine} />
                 </View>
-                {sortMissions(cityData.completed).map(mission =>
+                {sortMissions(cityData.completed).map((mission, index) =>
                   mission.challenge && mission.challenge.is_event ? (
-                    <View key={mission.id} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                    <View key={`completed-event-${mission.id}-${index}`} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
                       <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
                       <Text>{mission.challenge.description}</Text>
                       <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
                     </View>
                   ) : (
                     <MissionCard
-                      key={mission.id}
+                      key={`completed-${mission.id}-${index}`}
                       mission={mission}
                       onComplete={() => { }}
-                      onShare={() => setIsShareModalVisible(true)}
+                      onShare={() => handleShareMission(mission)}
                     />
                   )
                 )}
@@ -1259,6 +1288,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           </View>
         </View>
       </Modal>
+
+      {/* Modal de Compartir Misión Individual */}
+      <ShareMissionModal
+        visible={!!missionToShare}
+        onClose={handleCloseMissionShareModal}
+        mission={missionToShare}
+      />
     </SafeAreaView>
   );
 };

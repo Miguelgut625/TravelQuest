@@ -100,6 +100,8 @@ const LoginScreen = () => {
     navigation.navigate('ForgotPassword');
   };
 
+
+
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
@@ -219,6 +221,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
+
 });
 
 export default LoginScreen; 

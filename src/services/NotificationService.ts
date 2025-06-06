@@ -11,6 +11,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -220,47 +222,36 @@ export async function sendPushNotification(
   data: Record<string, any> = {}
 ) {
   try {
-    // Implementación más directa: intentar obtener el token sin consultar metadatos
+    console.log('🔔 Enviando notificación push a usuario:', receiverId);
     
-    // Método 1: Intentar directamente con columna 'token'
-    try {
-      const { data: tokenData, error: tokenError } = await supabase
-        .from('user_push_tokens')
-        .select('token')
-        .eq('user_id', receiverId)
-        .maybeSingle();
-        
-      if (!tokenError && tokenData && tokenData.token) {
-        console.log('Token encontrado en columna "token"');
-        return await sendPushNotificationToExpo(tokenData.token, title, body, data);
-      }
+    // Intentar con columna 'token' primero
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('user_push_tokens')
+      .select('token')
+      .eq('user_id', receiverId)
+      .maybeSingle();
       
-      // Si hay error de columna inexistente, probar con otra columna
-      if (tokenError && tokenError.message && (
-          tokenError.message.includes("column") || 
-          tokenError.message.includes("does not exist")
-      )) {
-        // Método 2: Intentar con columna 'push_token'
-        const { data: pushTokenData, error: pushTokenError } = await supabase
-          .from('user_push_tokens')
-          .select('push_token')
-          .eq('user_id', receiverId)
-          .maybeSingle();
-          
-        if (!pushTokenError && pushTokenData && pushTokenData.push_token) {
-          console.log('Token encontrado en columna "push_token"');
-          return await sendPushNotificationToExpo(pushTokenData.push_token, title, body, data);
-        }
-      }
-    } catch (directError) {
-      console.log('Error al intentar enviar notificación con método directo:', directError);
+    if (!tokenError && tokenData?.token) {
+      console.log('✅ Token encontrado, enviando notificación...');
+      return await sendPushNotificationToExpo(tokenData.token, title, body, data);
     }
     
-    // Si llegamos aquí, no hemos podido obtener el token o enviar la notificación
-    console.error('No se encontró un token válido para el usuario', receiverId);
+    // Si no funciona, intentar con columna 'push_token'
+    const { data: pushTokenData, error: pushTokenError } = await supabase
+      .from('user_push_tokens')
+      .select('push_token')
+      .eq('user_id', receiverId)
+      .maybeSingle();
+      
+    if (!pushTokenError && pushTokenData?.push_token) {
+      console.log('✅ Push token encontrado, enviando notificación...');
+      return await sendPushNotificationToExpo(pushTokenData.push_token, title, body, data);
+    }
+    
+    console.log('❌ No se encontró token para el usuario:', receiverId);
     return false;
   } catch (error) {
-    console.error('Error enviando notificación push:', error);
+    console.error('❌ Error enviando notificación push:', error);
     return false;
   }
 }
@@ -278,7 +269,9 @@ export async function scheduleMissionExpirationReminder(
     const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
     const existingNotification = scheduledNotifications.find(notification => 
       notification.content.data?.missionId === missionId && 
-      notification.content.data?.type?.includes('mission_expiration')
+      notification.content.data?.type && 
+      typeof notification.content.data.type === 'string' &&
+      notification.content.data.type.includes('mission_expiration')
     );
     
     // Si ya existe una notificación programada para esta misión, no crear otra
@@ -721,6 +714,185 @@ class NotificationService {
       return true;
     } catch (error) {
       console.error('Error al enviar notificación de solicitud de amistad:', error);
+      return false;
+    }
+  }
+
+  // Función para notificar cuando un usuario sube de nivel
+  public async notifyLevelUp(
+    userId: string,
+    newLevel: number,
+    points: number
+  ) {
+    const title = '🎉 ¡Subiste de nivel!';
+    const body = `¡Felicidades! Has alcanzado el nivel ${newLevel} con ${points} puntos`;
+
+    try {
+      // Guardar en base de datos
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          userid: userId,
+          title,
+          message: body,
+          type: 'level_up',
+          read: false,
+          data: {
+            newLevel,
+            points
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error al guardar notificación de subida de nivel:', error);
+        return false;
+      }
+
+      // Para plataformas móviles
+      if (Platform.OS !== 'web') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            data: {
+              type: 'level_up',
+              newLevel,
+              points
+            },
+            sound: 'default',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null, // Mostrar inmediatamente
+        });
+      }
+
+      // También enviar notificación push
+      await sendPushNotification(
+        userId,
+        title,
+        body,
+        { type: 'level_up', newLevel, points }
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Error al enviar notificación de subida de nivel:', error);
+      return false;
+    }
+  }
+
+  // Función para notificar cuando un usuario consigue una insignia por primera vez
+  public async notifyBadgeEarned(
+    userId: string,
+    badgeName: string,
+    badgeDescription: string,
+    badgeCategory: string
+  ) {
+    const title = '🏆 ¡Nueva insignia desbloqueada!';
+    const body = `Has conseguido la insignia "${badgeName}" - ${badgeDescription}`;
+
+    try {
+      // Guardar en base de datos
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          userid: userId,
+          title,
+          message: body,
+          type: 'badge_earned',
+          read: false,
+          data: {
+            badgeName,
+            badgeDescription,
+            badgeCategory
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error al guardar notificación de insignia conseguida:', error);
+        return false;
+      }
+
+      // Para plataformas móviles
+      if (Platform.OS !== 'web') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            data: {
+              type: 'badge_earned',
+              badgeName,
+              badgeDescription,
+              badgeCategory
+            },
+            sound: 'default',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null, // Mostrar inmediatamente
+        });
+      }
+
+      // También enviar notificación push
+      await sendPushNotification(
+        userId,
+        title,
+        body,
+        { type: 'badge_earned', badgeName, badgeDescription, badgeCategory }
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Error al enviar notificación de insignia conseguida:', error);
+      return false;
+    }
+  }
+
+  // Función de prueba para verificar que las notificaciones funcionen
+  public async testNotifications(userId: string) {
+    try {
+      console.log('🧪 Iniciando prueba de notificaciones...');
+      
+      // Verificar permisos
+      const { status } = await Notifications.getPermissionsAsync();
+      console.log('Estado de permisos:', status);
+      
+      if (status !== 'granted') {
+        console.log('❌ Permisos de notificaciones no concedidos');
+        return false;
+      }
+      
+      // Probar notificación local inmediata
+      if (Platform.OS !== 'web') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '🧪 Prueba de notificación',
+            body: '¡Las notificaciones están funcionando correctamente!',
+            data: { type: 'test' },
+            sound: 'default',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null, // Mostrar inmediatamente
+        });
+        console.log('✅ Notificación local enviada');
+      }
+      
+      // Probar notificación push
+      const success = await sendPushNotification(
+        userId,
+        '🧪 Prueba push',
+        '¡Las notificaciones push están funcionando!',
+        { type: 'test_push' }
+      );
+      
+      console.log(success ? '✅ Notificación push enviada' : '❌ Error enviando notificación push');
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error en prueba de notificaciones:', error);
       return false;
     }
   }

@@ -10,6 +10,10 @@ import { Provider as PaperProvider, DefaultTheme, MD3DarkTheme } from 'react-nat
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
 import { ThemeProvider, useThemeContext } from './src/context/ThemeContext';
+import { registerForPushNotificationsAsync, saveUserPushToken } from './src/services/NotificationService';
+import NotificationService from './src/services/NotificationService';
+import * as Notifications from 'expo-notifications';
+
 
 const lightTheme = {
   ...DefaultTheme,
@@ -54,6 +58,34 @@ const AppContent = () => {
           console.log('Ejecutando en modo web');
         }
 
+        // **INICIALIZAR SISTEMA DE NOTIFICACIONES**
+        console.log('🔔 Inicializando sistema de notificaciones...');
+        
+        // Inicializar el servicio de notificaciones
+        const notificationService = NotificationService.getInstance();
+        await notificationService.init();
+        
+        // Registrar para notificaciones push (solo en dispositivos móviles)
+        if (Platform.OS !== 'web') {
+          try {
+            const pushToken = await registerForPushNotificationsAsync();
+            if (pushToken) {
+              console.log('✅ Token de notificaciones push obtenido:', String(pushToken).slice(0, 20) + '...');
+              
+              // Verificar sesión para guardar token si hay usuario autenticado
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user) {
+                await saveUserPushToken(session.user.id, pushToken);
+                console.log('✅ Token de notificaciones guardado para el usuario');
+              }
+            } else {
+              console.log('⚠️ No se pudo obtener token de notificaciones push');
+            }
+          } catch (notificationError) {
+            console.error('❌ Error configurando notificaciones:', notificationError);
+          }
+        }
+
         // Verificar sesión actual
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -90,6 +122,19 @@ const AppContent = () => {
             role: userData?.role || 'user'
           }));
           store.dispatch(setAuthState('authenticated'));
+
+          // **REGISTRAR TOKEN PUSH PARA USUARIO AUTENTICADO**
+          if (Platform.OS !== 'web') {
+            try {
+              const pushToken = await registerForPushNotificationsAsync();
+              if (pushToken) {
+                await saveUserPushToken(session.user.id, pushToken);
+                console.log('✅ Token de notificaciones actualizado para usuario autenticado');
+              }
+            } catch (tokenError) {
+              console.error('❌ Error actualizando token de notificaciones:', tokenError);
+            }
+          }
         } else {
           console.log('No hay sesión activa');
           store.dispatch(setAuthState('unauthenticated'));
@@ -107,6 +152,28 @@ const AppContent = () => {
     };
 
     initializeApp();
+
+    // **CONFIGURAR LISTENERS DE NOTIFICACIONES**
+    let notificationListener: any;
+    let responseListener: any;
+
+    if (Platform.OS !== 'web') {
+      // Listener para notificaciones recibidas mientras la app está activa
+      notificationListener = Notifications.addNotificationReceivedListener(notification => {
+        console.log('�� Notificación recibida:', notification);
+      });
+
+      // Listener para cuando el usuario toca una notificación
+      responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log('👆 Usuario tocó notificación:', response);
+        // Aquí puedes agregar navegación basada en el tipo de notificación
+        const notificationData = response.notification.request.content.data;
+        if (notificationData?.type) {
+          console.log('Tipo de notificación:', notificationData.type);
+          // Implementar navegación según el tipo
+        }
+      });
+    }
 
     // Manejador global de errores no capturados
     const handleError = (error: Error) => {
@@ -132,6 +199,16 @@ const AppContent = () => {
         });
       };
     }
+
+    // Cleanup de listeners de notificaciones
+    return () => {
+      if (notificationListener) {
+        notificationListener.remove();
+      }
+      if (responseListener) {
+        responseListener.remove();
+      }
+    };
   }, []);
 
   if (isLoading) {

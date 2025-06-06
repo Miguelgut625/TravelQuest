@@ -1,31 +1,17 @@
-const { getDefaultConfig } = require('@expo/metro-config');
+const { getDefaultConfig } = require('expo/metro-config');
 
-const defaultConfig = getDefaultConfig(__dirname);
+const config = getDefaultConfig(__dirname);
 
-module.exports = {
-    ...defaultConfig,
-    resolver: {
-        ...defaultConfig.resolver,
-        sourceExts: ['jsx', 'js', 'ts', 'tsx', 'json'],
-        // Deshabilitar package exports para resolver problemas con ws en SDK 53
-        unstable_enablePackageExports: false,
-        alias: {
-            // Solo los aliases más esenciales
-            'stream': false,
-            'crypto': false,
-            'fs': false,
-            'net': false,
-            'tls': false,
-        },
-        platforms: ['ios', 'android', 'web', 'native'],
-    },
-    transformer: {
-        ...defaultConfig.transformer,
-        getTransformOptions: async () => ({
-            transform: {
-                experimentalImportSupport: false,
-                inlineRequires: false,
-            },
-        }),
-    },
-}; 
+// Optimización básica de memoria
+config.maxWorkers = 2;
+
+// Configuración simple del resolver
+config.resolver.platforms = ['ios', 'android', 'native', 'web'];
+
+// Excluir archivos problemáticos
+config.resolver.blockList = [
+  /node_modules\/.*\/Podfile\.lock$/,
+  /\.git\/.*/,
+];
+
+module.exports = config; 

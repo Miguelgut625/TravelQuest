@@ -63,7 +63,7 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
   const [forecastData, setForecastData] = useState<ForecastData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Refs para cleanup
   const abortControllerRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
@@ -85,8 +85,8 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
       // Verificar la API key
       if (!OPENWEATHERMAP_API_KEY || OPENWEATHERMAP_API_KEY === 'TU_API_KEY_AQUI') {
         if (isMountedRef.current) {
-          setError('API Key de OpenWeatherMap no configurada');
-          setIsLoading(false);
+        setError('API Key de OpenWeatherMap no configurada');
+        setIsLoading(false);
         }
         return;
       }
@@ -95,15 +95,15 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
       
       // Promise con timeout
       const forecastPromise = (async () => {
-        // Obtener pronóstico por nombre de ciudad o coordenadas
-        if (cityName) {
+      // Obtener pronóstico por nombre de ciudad o coordenadas
+      if (cityName) {
           return await getForecastByCity(cityName, OPENWEATHERMAP_API_KEY);
-        } else if (latitude !== undefined && longitude !== undefined) {
+      } else if (latitude !== undefined && longitude !== undefined) {
           return await getForecastByCoordinates(latitude, longitude, OPENWEATHERMAP_API_KEY);
-        } else {
+      } else {
           // Intentar usar la ubicación actual con timeout
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
             throw new Error('Permiso para acceder a la ubicación denegado');
           }
           
@@ -120,11 +120,11 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
           
           const location = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
           return await getForecastByCoordinates(
-            location.coords.latitude,
-            location.coords.longitude,
-            OPENWEATHERMAP_API_KEY
-          );
-        }
+          location.coords.latitude,
+          location.coords.longitude,
+          OPENWEATHERMAP_API_KEY
+        );
+      }
       })();
       
       // Timeout para forecast request
@@ -153,7 +153,7 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
       }
     } finally {
       if (isMountedRef.current) {
-        setIsLoading(false);
+      setIsLoading(false);
       }
     }
   };
@@ -271,18 +271,18 @@ const WeatherForecast = ({ visible, onClose, cityName, latitude, longitude }: We
                       
                       <View style={styles.forecastDetails}>
                         <View style={styles.forecastDetailItem}>
-                          <Ionicons name="water-outline" size={18} color="#005F9E" />
+                          <Ionicons name="water-outline" size={18} color="#003366" />
                           <Text style={styles.forecastDetailText}>{day.humidity}%</Text>
                         </View>
                         
                         <View style={styles.forecastDetailItem}>
-                          <Ionicons name="umbrella-outline" size={18} color="#005F9E" />
+                          <Ionicons name="umbrella-outline" size={18} color="#003366" />
                           <Text style={styles.forecastDetailText}>{Math.round(day.pop * 100)}%</Text>
                         </View>
                         
                         <View style={styles.forecastDetailItem}>
-                          <Ionicons name="compass-outline" size={18} color="#005F9E" />
-                          <Text style={styles.forecastDetailText}>{Math.round(day.speed * 3.6)} km/h</Text>
+                          <Ionicons name="compass-outline" size={18} color="#003366" />
+                          <Text style={styles.forecastDetailText}>{Math.round(day.speed)} km/h</Text>
                         </View>
                       </View>
                     </Card.Content>
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: 15,
-    backgroundColor: '#005F9E',
+    backgroundColor: '#003366',
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 5,

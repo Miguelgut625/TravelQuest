@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import NotificationService from './NotificationService';
 
 // Tipos de datos para insignias
 export interface Badge {
@@ -130,6 +131,22 @@ export const unlockBadge = async (userId: string, badgeId: string): Promise<bool
     }
     
     console.log(`¡Insignia otorgada exitosamente! Datos insertados:`, insertData);
+    
+    // Enviar notificación de nueva insignia
+    try {
+      const notificationService = NotificationService.getInstance();
+      await notificationService.notifyBadgeEarned(
+        userId,
+        badgeExists.name,
+        'Has desbloqueado una nueva insignia',
+        'achievement'
+      );
+      console.log(`✅ Notificación de nueva insignia enviada: ${badgeExists.name}`);
+    } catch (notificationError) {
+      console.error('Error enviando notificación de nueva insignia:', notificationError);
+      // No afectar el flujo principal si falla la notificación
+    }
+    
     return true;
   } catch (error) {
     console.error('Error al desbloquear insignia:', error);

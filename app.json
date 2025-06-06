@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "scheme": "travelquest",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -46,7 +47,6 @@
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.travelquest.app",
-      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "MAPS_API_KEY"

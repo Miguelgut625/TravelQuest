@@ -11,6 +11,17 @@ export interface MissionHint {
   missionId: string;
 }
 
+export interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  points: number;
+  completed: boolean;
+  cityName: string;
+  end_date: string;
+}
+
 /**
  * Obtiene una pista para una misión específica
  * @param userId ID del usuario que solicita la pista
@@ -95,6 +106,176 @@ export const getMissionsByCityAndDuration = async (city: string, duration: numbe
     return data;
   } catch (error) {
     console.error('Error fetching missions:', error);
+    throw error;
+  }
+};
+
+export const getUserMissions = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('journeys_missions')
+      .select(`
+        id,
+        completed,
+        end_date,
+        challenges (
+          title,
+          description,
+          difficulty,
+          points
+        ),
+        journeys!inner (
+          userId,
+          cities!inner (
+            name
+          )
+        )
+      `)
+      .eq('journeys.userId', userId);
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error obteniendo misiones del usuario:', error);
+    return [];
+  }
+};
+
+// Función para compartir una misión con un amigo dentro de la app
+export const shareMissionWithFriend = async (
+  missionId: string,
+  sharedByUserId: string,
+  sharedWithUserId: string,
+  missionTitle: string,
+  cityName: string
+) => {
+  try {
+    console.log('🚀 Compartiendo misión con amigo:', {
+      missionId,
+      sharedByUserId,
+      sharedWithUserId,
+      missionTitle
+    });
+
+    // Verificar si ya se compartió esta misión con este amigo
+    const { data: existingShare } = await supabase
+      .from('missions_shared')
+      .select('id')
+      .eq('mission_id', missionId)
+      .eq('shared_by_user_id', sharedByUserId)
+      .eq('shared_with_user_id', sharedWithUserId)
+      .single();
+
+    if (existingShare) {
+      throw new Error('Ya compartiste esta misión con este amigo');
+    }
+
+    // Crear el registro de misión compartida
+    const { data, error } = await supabase
+      .from('missions_shared')
+      .insert({
+        mission_id: missionId,
+        shared_by_user_id: sharedByUserId,
+        shared_with_user_id: sharedWithUserId,
+        shared_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Obtener el username del usuario que comparte
+    const { data: sharedByUser } = await supabase
+      .from('users')
+      .select('username')
+      .eq('id', sharedByUserId)
+      .single();
+
+    // Crear notificación para el amigo
+    const notificationTitle = '🎯 Nueva misión compartida';
+    const notificationMessage = `${sharedByUser?.username || 'Un amigo'} compartió contigo la misión "${missionTitle}" en ${cityName}`;
+
+    await supabase
+      .from('notifications')
+      .insert({
+        userid: sharedWithUserId,
+        title: notificationTitle,
+        message: notificationMessage,
+        type: 'mission_shared',
+        read: false,
+        data: {
+          missionId,
+          sharedByUserId,
+          missionTitle,
+          cityName
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    console.log('✅ Misión compartida exitosamente');
+    return { success: true, data };
+
+  } catch (error) {
+    console.error('Error al compartir misión:', error);
+    throw error;
+  }
+};
+
+// Función para obtener misiones compartidas contigo
+export const getSharedMissions = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('missions_shared')
+      .select(`
+        id,
+        mission_id,
+        shared_at,
+        shared_by_user:users!missions_shared_shared_by_user_id_fkey (
+          id,
+          username
+        ),
+        journeys_missions!inner (
+          id,
+          completed,
+          end_date,
+          challenges (
+            title,
+            description,
+            difficulty,
+            points
+          ),
+          journeys (
+            cities (
+              name
+            )
+          )
+        )
+      `)
+      .eq('shared_with_user_id', userId)
+      .order('shared_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error obteniendo misiones compartidas:', error);
+    return [];
+  }
+};
+
+// Función para eliminar una misión compartida
+export const removeMissionShare = async (shareId: string, userId: string) => {
+  try {
+    const { error } = await supabase
+      .from('missions_shared')
+      .delete()
+      .eq('id', shareId)
+      .eq('shared_with_user_id', userId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error al eliminar misión compartida:', error);
     throw error;
   }
 };
