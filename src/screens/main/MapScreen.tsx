@@ -54,17 +54,20 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width, height } = Dimensions.get('window');
 
-const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep: string }) => (
-  <Modal transparent={true} visible={visible} animationType="fade">
-    <View style={styles.modalContainer}>
-      <View style={styles.loadingCard}>
-        <ActivityIndicator size={40} color="#005F9E" />
-        <Text style={styles.loadingTitle}>Generando viaje</Text>
-        <Text style={styles.loadingStep}>{currentStep}</Text>
+const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep: string }) => {
+  const { isDarkMode, colors } = useTheme();
+  return (
+    <Modal transparent={true} visible={visible} animationType="fade">
+      <View style={styles.modalContainer}>
+        <View style={[styles.loadingCard, { backgroundColor: isDarkMode ? colors.surface : colors.white }]}>
+          <ActivityIndicator size={40} color={isDarkMode ? colors.accent : colors.primary} />
+          <Text style={[styles.loadingTitle, { color: isDarkMode ? colors.text.primary : colors.text.primary }]}>Generando viaje</Text>
+          <Text style={[styles.loadingStep, { color: isDarkMode ? colors.text.secondary : colors.text.secondary }]}>{currentStep}</Text>
+        </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 const DateRangePickerMobile: React.FC<{
   startDateProp: Date | null;
@@ -1333,6 +1336,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   onClose: () => void;
   onSelect: (friends: Friend[]) => void;
 }) => {
+  const { isDarkMode, colors } = useTheme();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1428,17 +1432,17 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
       transparent
     >
       <View style={styles.shareModalOverlay}>
-        <View style={styles.shareModalContent}>
+        <View style={[styles.shareModalContent, { backgroundColor: isDarkMode ? colors.surface : colors.white }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.shareModalTitle}>Compartir Aventura</Text>
+            <Text style={[styles.shareModalTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Compartir Aventura</Text>
             {!isSharing && (
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={isDarkMode ? colors.text.secondary : "#666"} />
               </TouchableOpacity>
             )}
           </View>
 
-          <Text style={styles.shareModalSubtitle}>
+          <Text style={[styles.shareModalSubtitle, { color: isDarkMode ? colors.text.secondary : colors.text.secondary }]}>
             Selecciona a los amigos con los que quieres compartir este viaje
           </Text>
 
@@ -1446,12 +1450,12 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
             <TouchableOpacity
               style={[
                 styles.selectAllButton,
-                isSharing && styles.disabledButton
+                isDarkMode && { backgroundColor: colors.surface, borderColor: colors.accent, borderWidth: 1 }
               ]}
               onPress={selectAllFriends}
               disabled={isSharing}
             >
-              <Text style={styles.selectAllText}>
+              <Text style={[styles.selectAllText, { color: isDarkMode ? colors.accent : colors.primary }]}>
                 {selectedFriends.length === friends.length
                   ? "Deseleccionar todos"
                   : "Seleccionar todos"}
@@ -1461,15 +1465,15 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
                   ? "checkmark-circle"
                   : "checkmark-circle-outline"}
                 size={20}
-                color="#005F9E"
+                color={isDarkMode ? colors.accent : colors.primary}
               />
             </TouchableOpacity>
           )}
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#005F9E" />
-              <Text style={styles.loadingText}>Cargando amigos...</Text>
+              <ActivityIndicator size="large" color={isDarkMode ? colors.accent : colors.primary} />
+              <Text style={[styles.loadingText, { color: isDarkMode ? colors.text.primary : colors.text.primary }]}>Cargando amigos...</Text>
             </View>
           ) : (
             <ScrollView
@@ -1481,22 +1485,23 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
                   key={item.user2Id}
                   style={[
                     styles.friendItem,
-                    selectedFriends.includes(item.user2Id) && styles.friendItemSelected,
-                    isSharing && styles.disabledItem
+                    selectedFriends.includes(item.user2Id) && (isDarkMode ? { backgroundColor: '#3A4256' } : styles.friendItemSelected),
+                    isSharing && styles.disabledItem,
+                    isDarkMode && { borderBottomColor: colors.accent, borderBottomWidth: 1 }
                   ]}
                   onPress={() => toggleFriendSelection(item.user2Id)}
                   disabled={isSharing}
                 >
                   <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{item.username}</Text>
-                    <Text style={styles.friendPoints}>Puntos: {item.points}</Text>
+                    <Text style={[styles.friendName, { color: isDarkMode ? colors.accent : colors.text.primary }]}>{item.username}</Text>
+                    <Text style={[styles.friendPoints, { color: isDarkMode ? colors.white : colors.text.secondary }]}>Puntos: {item.points}</Text>
                   </View>
                   <Ionicons
                     name={selectedFriends.includes(item.user2Id)
                       ? "checkmark-circle"
                       : "ellipse-outline"}
                     size={24}
-                    color={selectedFriends.includes(item.user2Id) ? "#005F9E" : "#ccc"}
+                    color={selectedFriends.includes(item.user2Id) ? colors.accent : (isDarkMode ? colors.white : "#ccc")}
                   />
                 </TouchableOpacity>
               ))}
@@ -1511,11 +1516,12 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
           )}
 
           <View style={styles.footerContainer}>
-            {selectedFriends.length > 0 && (
-              <Text style={styles.selectedCountText}>
-                {selectedFriends.length} {selectedFriends.length === 1 ? 'amigo seleccionado' : 'amigos seleccionados'}
-              </Text>
-            )}
+            <Text style={[
+              styles.selectedCountText,
+              { color: isDarkMode ? colors.accent : colors.primary }
+            ]}>
+              {selectedFriends.length} {selectedFriends.length === 1 ? 'amigo seleccionado' : 'amigos seleccionados'}
+            </Text>
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -1532,6 +1538,9 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
               <TouchableOpacity
                 style={[
                   styles.shareButton,
+                  isDarkMode && {
+                    backgroundColor: selectedFriends.length > 0 ? colors.accent : colors.surface
+                  },
                   (selectedFriends.length === 0 || isSharing) && styles.disabledButton
                 ]}
                 onPress={handleShareWithSelected}
@@ -1539,11 +1548,16 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
               >
                 {isSharing ? (
                   <View style={styles.sharingButtonContent}>
-                    <ActivityIndicator size="small" color="#fff" />
-                    <Text style={[styles.shareButtonText, { marginLeft: 8 }]}>Compartiendo...</Text>
+                    <ActivityIndicator size="small" color={isDarkMode ? colors.white : "#fff"} />
+                    <Text style={[styles.shareButtonText, { marginLeft: 8, color: isDarkMode ? colors.white : '#fff' }]}>Compartiendo...</Text>
                   </View>
                 ) : (
-                  <Text style={styles.shareButtonText}>
+                  <Text style={{
+                    color: isDarkMode
+                      ? (selectedFriends.length > 0 ? colors.white : colors.text.secondary)
+                      : (selectedFriends.length > 0 ? '#fff' : '#EDF6F9'),
+                    fontWeight: 'bold'
+                  }}>
                     {selectedFriends.length === 0
                       ? "Selecciona amigos"
                       : `Compartir (${selectedFriends.length})`}

@@ -92,9 +92,14 @@ interface Journey {
 const getTimeRemaining = (endDate: string) => {
   const now = new Date();
   const end = new Date(endDate);
-  const diff = end.getTime() - now.getTime();
 
-  if (diff <= 0) {
+  // Ignorar la hora, comparar solo año, mes, día
+  const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+  const diff = endDateOnly.getTime() - nowDate.getTime();
+
+  if (diff < 0) {
     return {
       isExpired: true,
       text: 'Tiempo expirado'
@@ -102,24 +107,26 @@ const getTimeRemaining = (endDate: string) => {
   }
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
   if (days > 0) {
     return {
       isExpired: false,
       text: `${days} días restantes`
     };
-  } else if (hours > 0) {
-    return {
-      isExpired: false,
-      text: `${hours} horas restantes`
-    };
   } else {
-    return {
-      isExpired: false,
-      text: `${minutes} minutos restantes`
-    };
+    // Si es hoy, calcula horas y minutos restantes
+    const hours = end.getHours() - now.getHours();
+    const minutes = end.getMinutes() - now.getMinutes();
+    if (hours > 0) {
+      return {
+        isExpired: false,
+        text: `${hours} horas restantes`
+      };
+    } else {
+      return {
+        isExpired: false,
+        text: `${minutes} minutos restantes`
+      };
+    }
   }
 };
 
@@ -133,7 +140,7 @@ const MissionCard = ({ mission, onComplete, onShare, styles, colors }: {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showHintModal, setShowHintModal] = useState(false);
   let timeRemaining = getTimeRemaining(mission.end_date);
-  let isExpired = timeRemaining.isExpired && !mission.completed;
+  let isExpired = false;
   let isNotStarted = false;
   if (mission.challenge.is_event) {
     // Usar el end_date y start_date del challenge para el contador
@@ -150,8 +157,19 @@ const MissionCard = ({ mission, onComplete, onShare, styles, colors }: {
     }
   }
 
+  // Log temporal para depuración
+  console.log('Mission:', mission.challenge.title, {
+    completed: mission.completed,
+    end_date: mission.end_date,
+    isExpired,
+    isNotStarted
+  });
+
+  // Nueva lógica para deshabilitar el botón
+  const isButtonDisabled = mission.completed || (mission.challenge.is_event && (isExpired || isNotStarted));
+
   const handleMissionPress = () => {
-    if (!mission.completed && !isExpired && !isNotStarted) {
+    if (!isButtonDisabled) {
       setShowUploadModal(true);
     }
   };
@@ -177,7 +195,7 @@ const MissionCard = ({ mission, onComplete, onShare, styles, colors }: {
           !mission.completed && !isExpired && !isNotStarted && mission.challenge.difficulty === 'difícil' && { borderColor: colors.warningCard, borderWidth: 1 }
         ]}
         onPress={handleMissionPress}
-        disabled={mission.completed || isExpired || isNotStarted}
+        disabled={isButtonDisabled}
       >
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>{mission.challenge.title}</Text>
@@ -591,7 +609,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           now.setHours(0, 0, 0, 0);
           const end = new Date(endDate);
           end.setHours(0, 0, 0, 0);
-          if (end < now) {
+          // Solo expira si la fecha de fin es menor que hoy
+          if (end.getTime() < now.getTime()) {
             isExpired = true;
           }
         }
@@ -841,6 +860,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             console.error('❌ Error al actualizar puntos:', pointsError);
           }
 
+          // Forzar refresco de misiones para asegurar que el estado local refleje el valor correcto de 'completed'
+          await fetchMissions();
         } catch (error) {
           console.error('Error en proceso de fondo:', error);
           Alert.alert('Error', 'Hubo un problema al procesar la misión. Por favor, inténtalo de nuevo.');
@@ -1114,6 +1135,11 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   }
 
   const cityData = cityMissions[selectedCity];
+
+  // Logs para depuración de listas de misiones
+  console.log('Misiones pendientes:', cityData?.pending);
+  console.log('Misiones expiradas:', cityData?.expired);
+  console.log('Misiones completadas:', cityData?.completed);
 
   return (
     <>
