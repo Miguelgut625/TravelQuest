@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, ScrollView } from 'react-native';
-import { TextInput, Button, Switch } from 'react-native-paper';
+import { TextInput as RNTextInput } from 'react-native';
+import { Button, Switch } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { format } from 'date-fns';
+import { colors as defaultColors, commonStyles, typography, spacing, shadows, borderRadius, getCreateMissionStyles, missionFormCard, missionInput, missionTextInput } from '../../styles/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface City {
   id: string;
@@ -15,6 +18,8 @@ interface City {
 
 const CreateMissionScreen = () => {
   const navigation = useNavigation();
+  const { colors, isDarkMode } = useTheme();
+  const styles = getCreateMissionStyles(colors, isDarkMode);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [city, setCity] = useState('');
@@ -133,47 +138,62 @@ const CreateMissionScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-          <Text style={styles.backButtonText}>Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Crear Nueva Misión</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+          <Text style={styles.title}>Crear Nueva Misión</Text>
+          <View style={{ width: 40, height: 40, marginLeft: 8 }} />
+        </View>
       </View>
-      <View style={styles.formContainer}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-          <TextInput
-            label="Título de la misión"
-            value={title}
-            onChangeText={setTitle}
-            style={styles.input}
-            mode="outlined"
-          />
-          <TextInput
-            label="Descripción"
-            value={description}
-            onChangeText={setDescription}
-            style={styles.input}
-            mode="outlined"
-            multiline
-            numberOfLines={4}
-          />
-          <View style={{ position: 'relative' }}>
-            <TextInput
-              label="Ciudad"
-              value={city}
-              onChangeText={handleCitySearch}
-              style={styles.input}
-              mode="outlined"
-              left={<TextInput.Icon icon="map-marker" color="#005F9E" />}
-              autoCorrect={false}
-              autoCapitalize="words"
-              onFocus={() => city.length > 2 && filteredCities.length > 0 && setShowSuggestions(true)}
-            />
+      <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ flexGrow: 1, alignItems: 'center', paddingVertical: spacing.xl }} keyboardShouldPersistTaps="handled">
+        <View style={styles.formCard}>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Título de la misión</Text>
+            <View style={[
+              styles.input,
+              { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, borderRadius: borderRadius.medium }
+            ]}>
+              <RNTextInput
+                value={title}
+                onChangeText={setTitle}
+                style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0, borderWidth: 0 }}
+                placeholder="Escribe el título"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Descripción</Text>
+            <View style={[
+              styles.input,
+              { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, borderRadius: borderRadius.medium }
+            ]}>
+              <RNTextInput
+                value={description}
+                onChangeText={setDescription}
+                style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0, borderWidth: 0 }}
+                multiline
+                numberOfLines={4}
+                placeholder="Describe la misión"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Ciudad</Text>
+            <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm }]}>
+              <Ionicons name="location-outline" size={20} color={isDarkMode ? colors.accent : colors.primary} style={{ marginRight: spacing.sm }} />
+              <RNTextInput
+                value={city}
+                onChangeText={handleCitySearch}
+                style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0 }}
+                autoCorrect={false}
+                autoCapitalize="words"
+                placeholder="¿En qué ciudad?"
+                placeholderTextColor={colors.text.secondary}
+                onFocus={() => city.length > 2 && filteredCities.length > 0 && setShowSuggestions(true)}
+              />
+            </View>
             {showSuggestions && filteredCities.length > 0 && (
-              <View style={styles.suggestionsDropdown}>
+              <View style={[styles.suggestionsDropdown, { backgroundColor: isDarkMode ? colors.surface : '#FFF' }]}>
                 <FlatList
                   data={filteredCities}
                   keyExtractor={item => item.id}
@@ -182,7 +202,7 @@ const CreateMissionScreen = () => {
                       style={styles.suggestionItem}
                       onPress={() => handleCitySelect(item)}
                     >
-                      <Ionicons name="location" size={18} color="#005F9E" style={styles.locationIcon} />
+                      <Ionicons name="location" size={18} color={colors.primary} style={styles.locationIcon} />
                       <Text style={styles.suggestionText}>{item.name}</Text>
                     </TouchableOpacity>
                   )}
@@ -190,70 +210,95 @@ const CreateMissionScreen = () => {
               </View>
             )}
           </View>
-          <View style={styles.difficultyContainer}>
-            <Text style={styles.label}>Dificultad:</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Dificultad</Text>
             <View style={styles.difficultyButtons}>
-              {['fácil', 'media', 'difícil'].map((level) => (
-                <Button
-                  key={level}
-                  mode={difficulty === level ? 'contained' : 'outlined'}
-                  onPress={() => setDifficulty(level)}
-                  style={styles.difficultyButton}
-                >
-                  {level}
-                </Button>
-              ))}
+              {['fácil', 'media', 'difícil'].map((level) => {
+                const isActive = difficulty === level;
+                return (
+                  <Button
+                    key={level}
+                    mode="contained"
+                    onPress={() => setDifficulty(level)}
+                    style={[styles.difficultyButton, isActive && styles.difficultyButtonActive]}
+                    labelStyle={isActive ? styles.difficultyButtonTextActive : styles.difficultyButtonText}
+                    contentStyle={{ height: 40 }}
+                  >
+                    {level}
+                  </Button>
+                );
+              })}
             </View>
           </View>
-          <TextInput
-            label="Puntos"
-            value={points}
-            onChangeText={setPoints}
-            style={styles.input}
-            mode="outlined"
-            keyboardType="numeric"
-          />
-          <View style={{ marginBottom: 16 }}>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Puntos</Text>
+            <View style={[
+              styles.input,
+              { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border, borderRadius: borderRadius.medium }
+            ]}>
+              <RNTextInput
+                value={points}
+                onChangeText={setPoints}
+                style={{ flex: 1, backgroundColor: 'transparent', color: colors.text.primary, fontSize: 15, paddingVertical: 4, paddingLeft: 0, borderWidth: 0 }}
+                keyboardType="numeric"
+                placeholder="¿Cuántos puntos?"
+                placeholderTextColor={colors.text.secondary}
+              />
+            </View>
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Rango de fechas</Text>
             <TouchableOpacity
-              style={{
-                backgroundColor: '#FFF',
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: '#89C2D9',
-                padding: 12,
-                marginBottom: 8,
-              }}
+              style={[styles.dateCard, { backgroundColor: isDarkMode ? colors.surface : '#F5F7FA' }]}
               onPress={() => setShowCalendar(true)}
             >
-              <Text style={{ color: '#1D3557', fontWeight: 'bold' }}>
-                Seleccionar rango de fechas para la misión
-              </Text>
-              <Text style={{ color: '#1D3557', marginTop: 4 }}>
-                {startDate && endDate
-                  ? `Del ${formatDate(startDate)} al ${formatDate(endDate)}`
-                  : 'No seleccionado'}
-              </Text>
+              <Ionicons name="calendar" size={22} color={isDarkMode ? colors.accent : colors.primary} />
+              <View>
+                <Text style={styles.dateCardText}>Seleccionar rango de fechas para la misión</Text>
+                <Text style={styles.dateCardSub}>
+                  {startDate && endDate
+                    ? `Del ${formatDate(startDate)} al ${formatDate(endDate)}`
+                    : 'No seleccionado'}
+                </Text>
+              </View>
             </TouchableOpacity>
             {showCalendar && (
               <ScrollView style={{ maxHeight: 400 }}>
                 <Calendar
                   markingType={'period'}
+                  theme={{
+                    backgroundColor: isDarkMode ? '#101828' : '#fff',
+                    calendarBackground: isDarkMode ? '#101828' : '#fff',
+                    textSectionTitleColor: isDarkMode ? colors.accent : colors.primary,
+                    selectedDayBackgroundColor: colors.accent,
+                    selectedDayTextColor: '#181C22',
+                    todayTextColor: isDarkMode ? colors.accent : colors.primary,
+                    dayTextColor: isDarkMode ? '#fff' : colors.text.primary,
+                    textDisabledColor: isDarkMode ? '#334155' : '#d9e1e8',
+                    monthTextColor: isDarkMode ? colors.accent : colors.primary,
+                    arrowColor: isDarkMode ? colors.accent : colors.primary,
+                    dotColor: colors.accent,
+                    indicatorColor: colors.accent,
+                    textDayFontFamily: 'System',
+                    textMonthFontFamily: 'System',
+                    textDayHeaderFontFamily: 'System',
+                  }}
                   markedDates={(() => {
                     if (!startDate) return {};
                     const marked: any = {};
                     const startStr = startDate.toISOString().split('T')[0];
-                    marked[startStr] = { startingDay: true, color: '#005F9E', textColor: 'white' };
+                    marked[startStr] = { startingDay: true, color: colors.accent, textColor: '#181C22' };
                     if (endDate) {
                       let current = new Date(startDate);
                       while (current < endDate) {
                         current.setDate(current.getDate() + 1);
                         const dStr = current.toISOString().split('T')[0];
                         if (dStr !== endDate.toISOString().split('T')[0]) {
-                          marked[dStr] = { color: '#e6f2ff', textColor: '#005F9E' };
+                          marked[dStr] = { color: isDarkMode ? '#232B3A' : '#e6f2ff', textColor: isDarkMode ? '#fff' : colors.primary };
                         }
                       }
                       const endStr = endDate.toISOString().split('T')[0];
-                      marked[endStr] = { endingDay: true, color: '#005F9E', textColor: 'white' };
+                      marked[endStr] = { endingDay: true, color: colors.accent, textColor: '#181C22' };
                     }
                     return marked;
                   })()}
@@ -262,12 +307,25 @@ const CreateMissionScreen = () => {
                 />
                 <Button
                   mode="outlined"
-                  style={{ marginTop: 12, alignSelf: 'center' }}
+                  style={{
+                    marginTop: spacing.md,
+                    alignSelf: 'center',
+                    borderColor: isDarkMode ? colors.accent : colors.primary,
+                    backgroundColor: isDarkMode ? colors.accent : 'transparent',
+                    borderWidth: 1,
+                    borderRadius: 24,
+                    paddingHorizontal: 24,
+                  }}
+                  labelStyle={{
+                    color: isDarkMode ? '#181C22' : colors.primary,
+                    fontWeight: 'bold',
+                  }}
                   onPress={() => {
                     setStartDate(null);
                     setEndDate(null);
                     setShowCalendar(false);
                   }}
+                  disabled={false}
                 >
                   Borrar selección
                 </Button>
@@ -280,102 +338,14 @@ const CreateMissionScreen = () => {
             loading={loading}
             disabled={loading || !selectedCity}
             style={styles.submitButton}
+            labelStyle={styles.submitButtonText}
           >
             Crear Misión
           </Button>
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#26547C',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#26547C',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  backButtonText: {
-    color: '#FFF',
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  formContainer: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#F1FAEE',
-  },
-  input: {
-    marginBottom: 16,
-    backgroundColor: '#FFF',
-  },
-  suggestionsDropdown: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFF',
-    borderRadius: 8,
-    elevation: 5,
-    zIndex: 10,
-    borderWidth: 1,
-    borderColor: '#89C2D9',
-    maxHeight: 180,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E4EAFF',
-  },
-  suggestionText: {
-    fontSize: 16,
-    color: '#1D3557',
-    marginLeft: 8,
-  },
-  locationIcon: {
-    color: '#005F9E',
-  },
-  difficultyContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#1D3557',
-  },
-  difficultyButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  difficultyButton: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  submitButton: {
-    marginTop: 16,
-    backgroundColor: '#06D6A0',
-  },
-});
 
 export default CreateMissionScreen; 

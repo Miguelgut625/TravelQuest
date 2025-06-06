@@ -51,6 +51,8 @@ import { uploadImage } from '../../services/cloudinaryService';
 import NotificationService from '../../services/NotificationService';
 import { getUserInfoById as getUserInfo } from '../../services/userService';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
+import { typography, spacing, borderRadius, shadows } from '../../styles/theme';
 
 
 const ChatScreen = () => {
@@ -71,6 +73,8 @@ const ChatScreen = () => {
   const subscriptionRef = React.useRef(null);
   const initialLoadRef = React.useRef(true);
   const messageCountRef = React.useRef(0);
+  const { colors, isDarkMode } = useTheme();
+  const styles = getChatStyles(colors, isDarkMode);
 
   // Añadir configuración del StatusBar
   useEffect(() => {
@@ -163,7 +167,7 @@ const ChatScreen = () => {
       // Asegurarse de que la referencia se limpie completamente
       subscriptionRef.current = null;
     }
-    
+
     // Crear nueva suscripción después de un pequeño retraso para asegurar limpieza
     setTimeout(() => {
       if (!subscriptionRef.current) {
@@ -382,8 +386,6 @@ const ChatScreen = () => {
         item.content.includes('cloudinary.com'));
 
     const messageStyle = isMyMessage ? styles.myMessage : styles.friendMessage;
-    const textColor = isMyMessage ? colors.white : colors.text.primary;
-    const timeColor = isMyMessage ? colors.white : colors.text.light;
 
     return (
       <View style={[
@@ -399,11 +401,11 @@ const ChatScreen = () => {
             />
           </TouchableOpacity>
         ) : (
-          <Text style={[styles.messageText, { color: textColor }]}>
+          <Text style={isMyMessage ? styles.messageText : [styles.friendMessageText]}>
             {item.content}
           </Text>
         )}
-        <Text style={[styles.messageTime, { color: timeColor }]}>
+        <Text style={styles.messageTime}>
           {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
       </View>
@@ -421,15 +423,9 @@ const ChatScreen = () => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.text.light} />
+            <Ionicons name="arrow-back" size={22} color={isDarkMode ? '#181C22' : '#FFF'} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{friendName || 'Chat'}</Text>
-          <TouchableOpacity
-            style={styles.groupsButton}
-            onPress={() => navigation.navigate('Groups')}
-          >
-            <Ionicons name="people" size={22} color={colors.text.light} />
-          </TouchableOpacity>
         </View>
 
         <FlatList
@@ -455,14 +451,14 @@ const ChatScreen = () => {
             style={styles.attachButton}
             onPress={pickImage}
           >
-            <Ionicons name="image-outline" size={24} color={colors.primary} />
+            <Ionicons name="image-outline" size={24} color={isDarkMode ? '#181C22' : '#FFF'} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.attachButton}
             onPress={takePhoto}
           >
-            <Ionicons name="camera-outline" size={24} color={colors.primary} />
+            <Ionicons name="camera-outline" size={24} color={isDarkMode ? '#181C22' : '#FFF'} />
           </TouchableOpacity>
 
           <TextInput
@@ -485,7 +481,7 @@ const ChatScreen = () => {
             {sending ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
-              <Ionicons name="send" size={22} color={colors.white} />
+              <Ionicons name="send" size={22} color={isDarkMode ? '#181C22' : '#FFF'} />
             )}
           </TouchableOpacity>
         </View>
@@ -557,226 +553,218 @@ const ChatScreen = () => {
   );
 };
 
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.primary,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: colors.primary,
-    height: Platform.OS === 'ios' ? 44 : 56,
-    paddingTop: Platform.OS === 'ios' ? 0 : 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  backButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-    position: 'absolute',
-    left: 16,
-    zIndex: 1,
-  },
-  groupsButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    position: 'absolute',
-    right: 16,
-    zIndex: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.light,
-    textAlign: 'center',
-    flex: 1,
-  },
-  messagesContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  messageContainer: {
-    maxWidth: '80%',
-    padding: 12,
-    marginVertical: 4,
-    borderRadius: 16,
-  },
-  myMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: colors.secondary,
-  },
-  friendMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.background,
-    borderWidth: 0,
-  },
-  messageText: {
-    fontSize: 16,
-    color: props => props.style.backgroundColor === colors.primary ? colors.white : colors.text.primary,
-  },
-  messageImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  messageTime: {
-    fontSize: 12,
-    color: props => props.style.backgroundColor === colors.primary ? colors.white : colors.text.light,
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  attachButton: {
-    padding: 8,
-    marginRight: 8,
-    borderRadius: 20,
-    borderColor: colors.border,
-    borderWidth: 1,
-    backgroundColor: colors.background,
-  },
-  input: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: colors.background,
-    borderRadius: 20,
-    maxHeight: 100,
-    color: colors.text.primary,
-    marginRight: 8,
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  sendButton: {
-    backgroundColor: colors.primary,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.text.light,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  imagePreviewContainer: {
-    width: '90%',
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-  },
-  previewTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 15,
-  },
-  previewImage: {
-    width: '100%',
-    height: 300,
-    borderRadius: 12,
-  },
-  previewButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 20,
-  },
-  previewButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  previewButtonText: {
-    color: colors.white,
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    backgroundColor: colors.error,
-  },
-  fullImageContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullImage: {
-    width: '100%',
-    height: '80%',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+function getChatStyles(colors, isDarkMode) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      backgroundColor: isDarkMode ? colors.background : colors.primary,
+      height: Platform.OS === 'ios' ? 44 : 56,
+      paddingTop: Platform.OS === 'ios' ? 0 : 8,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+    },
+    backButton: {
+      backgroundColor: isDarkMode ? colors.accent : colors.primary,
+      borderRadius: 20,
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 2,
+      position: 'absolute',
+      left: 16,
+      zIndex: 1,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: isDarkMode ? colors.accent : '#FFF',
+      textAlign: 'center',
+      flex: 1,
+    },
+    messagesContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    messageContainer: {
+      maxWidth: '80%',
+      padding: 16,
+      marginVertical: 8,
+      borderRadius: 22,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.10,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    myMessage: {
+      alignSelf: 'flex-end',
+      backgroundColor: isDarkMode ? 'rgba(255, 200, 80, 0.95)' : colors.primary,
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? colors.accent : 'transparent',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.10,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    friendMessage: {
+      alignSelf: 'flex-start',
+      backgroundColor: isDarkMode ? colors.surface : colors.surface,
+      borderWidth: 0,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.10,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    messageText: {
+      fontSize: 16,
+      color: isDarkMode ? '#181C22' : '#FFF',
+    },
+    friendMessageText: {
+      fontSize: 16,
+      color: isDarkMode ? '#FFF' : '#181C22',
+    },
+    messageImage: {
+      width: 200,
+      height: 200,
+      borderRadius: 12,
+      marginBottom: 4,
+    },
+    messageTime: {
+      fontSize: 12,
+      color: isDarkMode ? '#7A6F4E' : 'rgba(255,255,255,0.8)',
+      marginTop: 4,
+      textAlign: 'right',
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? colors.surface : '#FFF',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    attachButton: {
+      padding: 8,
+      marginRight: 8,
+      borderRadius: 20,
+      borderColor: colors.border,
+      borderWidth: 1,
+      backgroundColor: isDarkMode ? colors.accent : colors.primary,
+    },
+    input: {
+      flex: 1,
+      padding: 10,
+      backgroundColor: isDarkMode ? colors.background : '#FFF',
+      borderRadius: 20,
+      maxHeight: 100,
+      color: colors.text.primary,
+      marginRight: 8,
+      borderColor: isDarkMode ? colors.border : colors.primary,
+      borderWidth: 1,
+    },
+    sendButton: {
+      backgroundColor: isDarkMode ? colors.accent : colors.primary,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sendButtonDisabled: {
+      backgroundColor: colors.text.secondary,
+    },
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    imagePreviewContainer: {
+      width: '90%',
+      backgroundColor: colors.white,
+      borderRadius: 16,
+      padding: 20,
+      alignItems: 'center',
+    },
+    previewTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.primary,
+      marginBottom: 15,
+    },
+    previewImage: {
+      width: '100%',
+      height: 300,
+      borderRadius: 12,
+    },
+    previewButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      width: '100%',
+      marginTop: 20,
+    },
+    previewButton: {
+      flex: 1,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginHorizontal: 5,
+    },
+    previewButtonText: {
+      color: colors.white,
+      fontWeight: 'bold',
+    },
+    cancelButton: {
+      backgroundColor: colors.error,
+    },
+    fullImageContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.9)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fullImage: {
+      width: '100%',
+      height: '80%',
+    },
+    closeButton: {
+      position: 'absolute',
+      top: 40,
+      right: 20,
+      zIndex: 10,
+      backgroundColor: colors.white,
+      borderRadius: 20,
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });
+}
 
 export default ChatScreen; 

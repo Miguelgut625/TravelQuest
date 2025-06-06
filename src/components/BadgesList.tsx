@@ -1,11 +1,10 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { Badge, UserBadge } from '../services/badgeService';
 import { Ionicons } from '@expo/vector-icons';
 import { Surface } from 'react-native-paper';
-import { colors, sharedStyles } from '../styles/sharedStyles';
-
-// Importar la imagen local
+import { colors, commonStyles, typography, spacing, shadows, borderRadius } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface BadgesListProps {
   userBadges: UserBadge[];
@@ -16,6 +15,10 @@ interface BadgesListProps {
 }
 
 const BadgesList = ({ userBadges, loading, onBadgePress, onSetTitle, currentTitle }: BadgesListProps) => {
+  const { colors, isDarkMode } = useTheme();
+  const { width } = Dimensions.get('window');
+  const styles = getBadgesListStyles(colors, isDarkMode, width);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -157,141 +160,151 @@ const BadgesList = ({ userBadges, loading, onBadgePress, onSetTitle, currentTitl
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: colors.primary,
-  },
-  loadingContainer: {
-    ...sharedStyles.loadingContainer,
-    backgroundColor: colors.background,
-  },
-  loadingText: {
-    color: colors.text.light,
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    ...sharedStyles.emptyContainer,
-    backgroundColor: colors.background,
-    padding: 40,
-  },
-  emptyText: {
-    ...sharedStyles.emptyText,
-    fontSize: 18,
-    color: colors.text.light,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  tipText: {
-    fontSize: 15,
-    color: colors.text.light,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  categoryContainer: {
-    marginBottom: 28,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    paddingHorizontal: 5,
-  },
-  categoryTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.light,
-    marginLeft: 10,
-    letterSpacing: 0.5,
-  },
-  badgeContainer: {
-    marginBottom: 14,
-  },
-  badgeSurface: {
-    ...sharedStyles.card,
-    padding: 18,
-    borderRadius: 16,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginHorizontal: 0,
-    marginVertical: 0,
-  },
-  badgeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  badgeIconContainer: {
-    width: 64,
-    height: 64,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 18,
-    borderRadius: 32,
-    backgroundColor: colors.background,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: colors.text.light,
-    shadowColor: colors.secondary,
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-  },
-  badgeIcon: {
-    width: 60,
-    height: 60,
-  },
-  badgeInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 2,
-  },
-  badgeName: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 3,
-    letterSpacing: 0.2,
-  },
-  badgeDescription: {
-    fontSize: 15,
-    color: colors.text.primary,
-    marginBottom: 6,
-    lineHeight: 20,
-  },
-  unlockDate: {
-    fontSize: 13,
-    color: colors.secondary,
-    fontStyle: 'italic',
-    marginBottom: 2,
-  },
-  setTitleButton: {
-    marginTop: 10,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 22,
-    alignSelf: 'flex-start',
-    shadowColor: colors.primary,
-    shadowOpacity: 0.10,
-    shadowRadius: 4,
-  },
-  setTitleButtonActive: {
-    backgroundColor: colors.success,
-  },
-  setTitleButtonText: {
-    color: colors.white,
-    fontWeight: 'bold',
-    fontSize: 15,
-    letterSpacing: 0.2,
-  },
-  setTitleButtonTextActive: {
-    color: colors.white,
-    fontWeight: 'bold',
-    fontSize: 15,
-    letterSpacing: 0.2,
-  },
-});
+function getBadgesListStyles(colors, isDarkMode, width) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 0,
+      backgroundColor: 'transparent',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: isDarkMode ? colors.text.secondary : colors.text.primary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      padding: 32,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: isDarkMode ? colors.text.secondary : colors.text.primary,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    tipText: {
+      fontSize: 13,
+      color: isDarkMode ? colors.text.secondary : colors.text.secondary,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    categoryContainer: {
+      marginBottom: 24,
+    },
+    categoryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+      paddingHorizontal: 4,
+    },
+    categoryTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: isDarkMode ? colors.accent : colors.primary,
+      marginLeft: 8,
+      letterSpacing: 0.5,
+    },
+    badgeContainer: {
+      marginBottom: 10,
+    },
+    badgeSurface: {
+      backgroundColor: isDarkMode ? colors.surface : '#fff',
+      borderRadius: 16,
+      borderWidth: isDarkMode ? 1.5 : 1,
+      borderColor: isDarkMode ? colors.accent : colors.primary,
+      padding: 18,
+      marginHorizontal: 12,
+      marginVertical: 0,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      elevation: 2,
+      borderBottomWidth: 3,
+      borderBottomColor: isDarkMode ? colors.accent : colors.primary,
+    },
+    badgeContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    badgeIconContainer: {
+      width: 64,
+      height: 64,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 18,
+      borderRadius: 32,
+      backgroundColor: isDarkMode ? colors.background : colors.background,
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: isDarkMode ? colors.accent : colors.primary,
+    },
+    badgeIcon: {
+      width: 60,
+      height: 60,
+    },
+    badgeInfo: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingVertical: 2,
+    },
+    badgeName: {
+      fontSize: 17,
+      fontWeight: 'bold',
+      color: isDarkMode ? colors.accent : colors.primary,
+      marginBottom: 3,
+      letterSpacing: 0.2,
+    },
+    badgeDescription: {
+      fontSize: 15,
+      color: isDarkMode ? colors.text.primary : '#222',
+      marginBottom: 6,
+      lineHeight: 20,
+    },
+    unlockDate: {
+      fontSize: 13,
+      color: isDarkMode ? colors.secondary : colors.secondary,
+      fontStyle: 'italic',
+      marginBottom: 2,
+    },
+    setTitleButton: {
+      marginTop: 10,
+      backgroundColor: isDarkMode ? colors.accent : colors.primary,
+      borderRadius: 12,
+      paddingVertical: 8,
+      paddingHorizontal: 22,
+      alignSelf: 'flex-start',
+      shadowColor: isDarkMode ? colors.accent : colors.primary,
+      shadowOpacity: 0.10,
+      shadowRadius: 4,
+    },
+    setTitleButtonActive: {
+      backgroundColor: isDarkMode ? 'transparent' : colors.success,
+      borderWidth: 2,
+      borderColor: isDarkMode ? colors.accent : colors.success,
+    },
+    setTitleButtonText: {
+      color: colors.white,
+      fontWeight: 'bold',
+      fontSize: 15,
+      letterSpacing: 0.2,
+    },
+    setTitleButtonTextActive: {
+      color: isDarkMode ? colors.accent : colors.white,
+      fontWeight: 'bold',
+      fontSize: 15,
+      letterSpacing: 0.2,
+    },
+  });
+}
 
 export default BadgesList; 

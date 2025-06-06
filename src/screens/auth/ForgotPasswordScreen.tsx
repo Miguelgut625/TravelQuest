@@ -12,6 +12,7 @@ import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { colors, commonStyles, typography, spacing, borderRadius } from '../../styles/theme';
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -91,54 +92,42 @@ export const ForgotPasswordScreen = () => {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        padding: 20,
+        ...commonStyles.container,
+        padding: spacing.lg,
         justifyContent: 'center',
-        backgroundColor: '#f5f5f5',
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 10,
+        ...typography.h2,
+        marginBottom: spacing.sm,
         textAlign: 'center',
-        color: '#333',
+        color: colors.text.primary,
     },
     subtitle: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 20,
+        ...typography.body,
+        color: colors.text.secondary,
+        marginBottom: spacing.lg,
         textAlign: 'center',
     },
     input: {
-        backgroundColor: 'white',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#ddd',
+        ...commonStyles.input,
     },
     button: {
-        backgroundColor: '#005F9E',
-        padding: 15,
-        borderRadius: 10,
-        alignItems: 'center',
-        marginTop: 10,
+        ...commonStyles.button,
+        marginTop: spacing.sm,
     },
     buttonDisabled: {
-        backgroundColor: '#78909C',
+        backgroundColor: colors.text.secondary,
     },
     buttonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
+        ...commonStyles.buttonText,
     },
     cancelButton: {
-        marginTop: 20,
+        marginTop: spacing.lg,
         alignItems: 'center',
     },
     cancelButtonText: {
-        color: '#666',
-        fontSize: 16,
+        color: colors.text.secondary,
+        ...typography.body,
     },
 });
 

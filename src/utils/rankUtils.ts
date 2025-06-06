@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { colors, typography } from '../styles/theme';
 
 export function getRankTitle(rankIndex?: number) {
     if (rankIndex === 0) return '🏆 Explorador Supremo';
@@ -19,28 +20,28 @@ export function getRankTitleStyle(rankIndex?: number) {
 const styles = StyleSheet.create({
     firstPlaceText: {
         color: '#FFD700',
-        fontSize: 16,
+        ...typography.body,
         fontWeight: 'bold',
         textAlign: 'center',
         marginTop: 5,
     },
     secondPlaceText: {
         color: '#C0C0C0',
-        fontSize: 16,
+        ...typography.body,
         fontWeight: 'bold',
         textAlign: 'center',
         marginTop: 5,
     },
     thirdPlaceText: {
         color: '#CD7F32',
-        fontSize: 16,
+        ...typography.body,
         fontWeight: 'bold',
         textAlign: 'center',
         marginTop: 5,
     },
     titleText: {
-        color: '#005F9E',
-        fontSize: 16,
+        color: colors.primary,
+        ...typography.body,
         fontWeight: 'bold',
         textAlign: 'center',
         marginTop: 5,

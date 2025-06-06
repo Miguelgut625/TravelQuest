@@ -7,6 +7,7 @@ import { supabase } from '../../services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { colors, commonStyles, typography, spacing, borderRadius } from '../../styles/theme';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -160,65 +161,49 @@ const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
+    ...commonStyles.container,
+    padding: spacing.lg,
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 40,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#005F9E',
+    ...typography.h1,
+    color: colors.primary,
   },
   formContainer: {
     flex: 1,
     justifyContent: 'center',
   },
   input: {
-    width: '100%',
-    height: 50,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    ...commonStyles.input,
   },
   button: {
-    width: '100%',
-    height: 50,
-    backgroundColor: '#005F9E',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
+    ...commonStyles.button,
+    marginTop: spacing.lg,
   },
   buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...commonStyles.buttonText,
   },
   forgotPasswordButton: {
-    marginTop: 15,
+    marginTop: spacing.md,
     alignItems: 'center',
   },
   forgotPasswordText: {
-    color: '#005F9E',
-    fontSize: 14,
+    color: colors.primary,
+    ...typography.small,
     textDecorationLine: 'underline',
   },
   link: {
-    marginTop: 20,
-    color: '#005F9E',
-    textAlign: 'center'
+    marginTop: spacing.lg,
+    color: colors.primary,
+    textAlign: 'center',
   },
   errorText: {
-    color: '#f44336',
-    marginBottom: 10,
+    color: colors.error,
+    marginBottom: spacing.sm,
     textAlign: 'center',
   },
 

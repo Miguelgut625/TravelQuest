@@ -10,15 +10,20 @@ import { useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { TabParamList } from '../../navigation/AppNavigator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, commonStyles, carouselStyles, typography, spacing, shadows, borderRadius } from '../../styles/theme';
+import { useTheme } from '../../context/ThemeContext';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/types';
 
 interface JournalScreenProps {
   route: RouteProp<TabParamList, 'Journal'>;
 }
 
-const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
+const JournalEntryCard = ({ entry, styles }: { entry: CityJournalEntry, styles: any }) => {
   const [expanded, setExpanded] = useState(false);
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { colors, isDarkMode } = useTheme();
 
   const handlePress = () => {
     setExpanded(!expanded);
@@ -35,8 +40,8 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
   // Determinar si la descripción es detallada (generada por IA)
   const isDetailedDescription = entry.content && entry.content.length > 150;
   const isAIGenerated = entry.content && (
-    entry.content.includes("nombre científico") || 
-    entry.content.includes("año de construcción") || 
+    entry.content.includes("nombre científico") ||
+    entry.content.includes("año de construcción") ||
     entry.content.includes("estilo arquitectónico") ||
     entry.content.includes("CURIOSIDADES") ||
     entry.content.includes("curiosidades") ||
@@ -70,7 +75,7 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
           style={styles.detailButton}
           onPress={openDetailView}
         >
-          <Ionicons name="expand-outline" size={20} color="#005F9E" />
+          <Ionicons name="expand-outline" size={20} color={isDarkMode ? colors.accent : colors.primary} />
         </TouchableOpacity>
       </View>
       <Text style={styles.cardDate}>{formatDate(entry.created_at)}</Text>
@@ -142,15 +147,15 @@ const JournalEntryCard = ({ entry }: { entry: CityJournalEntry }) => {
   );
 };
 
-const EmptyState = ({ message }: { message: string }) => (
+const EmptyState = ({ message, styles }: { message: string, styles: any }) => (
   <View style={styles.emptyContainer}>
     {/* @ts-ignore */}
-    <Ionicons name="journal-outline" size={64} color="#ccc" />
+    <Ionicons name="journal-outline" size={64} color={styles.emptyText?.color || '#ccc'} />
     <Text style={styles.emptyText}>{message}</Text>
   </View>
 );
 
-const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJournalEntry[]; onPress: () => void }) => {
+const CityCard = ({ city, entries, onPress, styles }: { city: string; entries: CityJournalEntry[]; onPress: () => void, styles: any }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [nextImageIndex, setNextImageIndex] = useState(1);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -258,6 +263,8 @@ const CityCard = ({ city, entries, onPress }: { city: string; entries: CityJourn
 };
 
 const JournalScreen = ({ route }: JournalScreenProps) => {
+  const { colors, isDarkMode } = useTheme();
+  const styles = getStyles(colors, isDarkMode);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
   const [loading, setLoading] = useState(true);
@@ -379,7 +386,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
           </View>
         </SafeAreaView>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size={40} color="#005F9E" />
+          <ActivityIndicator size={40} color={colors.primary} />
           <Text style={styles.loadingText}>Cargando diario de viaje...</Text>
         </View>
       </SafeAreaView>
@@ -412,12 +419,12 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
         <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color="#005F9E" />
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Diario de Viaje</Text>
           </View>
         </SafeAreaView>
-        <EmptyState message="Aún no tienes entradas en tu diario. Completa misiones para añadir fotos a tu diario de viaje." />
+        <EmptyState message="Aún no tienes entradas en tu diario. Completa misiones para añadir fotos a tu diario de viaje." styles={styles} />
       </SafeAreaView>
     );
   }
@@ -444,12 +451,12 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
           <Image source={{ uri: firstPhoto }} style={styles.cityImage} resizeMode="cover" />
         ) : (
           <View style={styles.cityImagePlaceholder}>
-            <Ionicons name="image-outline" size={48} color="#ccc" />
+            <Ionicons name="image-outline" size={48} color={styles.emptyText?.color || '#ccc'} />
           </View>
         )}
         {/* Overlay de controles y texto */}
         <View style={styles.cityOverlay}>
-          <Ionicons name="location" size={32} color="#fff" />
+          <Ionicons name="location" size={32} color={styles.cityName?.color || '#fff'} />
           <Text style={styles.cityName}>{selectedCityName}</Text>
           <Text style={styles.cityMissionsButton}>
             Ver misiones ({selectedCityEntries.length})
@@ -459,10 +466,10 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
         {cities.length > 1 && (
           <>
             <TouchableOpacity style={styles.carouselLeft} onPress={handlePrevCity} disabled={currentCityIndex === 0}>
-              <Ionicons name="chevron-back" size={32} color="#fff" />
+              <Ionicons name="chevron-back" size={32} color={styles.cityName?.color || '#fff'} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.carouselRight} onPress={handleNextCity} disabled={currentCityIndex === cities.length - 1}>
-              <Ionicons name="chevron-forward" size={32} color="#fff" />
+              <Ionicons name="chevron-forward" size={32} color={styles.cityName?.color || '#fff'} />
             </TouchableOpacity>
           </>
         )}
@@ -474,10 +481,10 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
         <View style={styles.contentContainer}>
           {selectedCityEntries.length > 0 ? (
             selectedCityEntries.map(entry => (
-              <JournalEntryCard key={entry.id} entry={entry} />
+              <JournalEntryCard key={entry.id} entry={entry} styles={styles} />
             ))
           ) : (
-            <EmptyState message={`No hay entradas de diario para ${selectedCityName}`} />
+            <EmptyState message={`No hay entradas de diario para ${selectedCityName}`} styles={styles} />
           )}
         </View>
       </ScrollView>
@@ -485,48 +492,29 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   );
 };
 
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
-
-
-const styles = StyleSheet.create({
+const getStyles = (colors, isDarkMode) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
   },
   headerSafeArea: {
-    backgroundColor: colors.primary,
+    backgroundColor: isDarkMode ? colors.background : colors.primary,
     zIndex: 10,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 15,
-    marginTop: 20
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.xl,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.light,
+    ...typography.h2,
+    color: isDarkMode ? colors.accent : colors.surface,
     letterSpacing: 1,
-    marginTop: 30,
   },
   backButton: {
-    backgroundColor: '#EDF6F9',
+    backgroundColor: isDarkMode ? colors.accent : colors.primary,
     borderRadius: 20,
     width: 36,
     height: 36,
@@ -543,7 +531,7 @@ const styles = StyleSheet.create({
     height: 180,
     position: 'relative',
     marginBottom: 12,
-    backgroundColor: '#1B263B',
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     overflow: 'hidden',
@@ -561,7 +549,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1B263B',
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     borderTopLeftRadius: 0,
@@ -581,20 +569,20 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#EDF6F9',
+    color: isDarkMode ? colors.accent : colors.surface,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.15)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
     marginTop: 8,
   },
   cityMissionsButton: {
-    color: '#EDF6F9',
+    color: isDarkMode ? colors.accent : colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
     marginTop: 8,
     textAlign: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(43,108,176,0.12)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
@@ -622,9 +610,9 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   contentContainer: {
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   cityCardContainer: {
     flex: 1,
@@ -654,100 +642,94 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   card: {
-    backgroundColor: colors.text.light,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    backgroundColor: isDarkMode ? colors.background : colors.surface,
+    borderRadius: borderRadius.medium,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.medium,
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.accent : colors.primary,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: spacing.xs,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...typography.h3,
     flex: 1,
-    color: '#005F9E',
+    color: isDarkMode ? colors.accent : colors.primary,
     letterSpacing: 1,
   },
   detailButton: {
-    padding: 5,
+    padding: spacing.xs,
   },
   cardDate: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 10,
+    color: isDarkMode ? colors.accent : colors.primary,
+    ...typography.small,
+    marginBottom: spacing.sm,
   },
   cardAuthor: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 10,
+    color: isDarkMode ? colors.accent : colors.primary,
+    ...typography.small,
+    marginBottom: spacing.sm,
     fontStyle: 'italic',
   },
   cardContent: {
-    color: '#333',
-    marginBottom: 10,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
     lineHeight: 20,
   },
   expandText: {
-    color: '#005F9E',
+    color: isDarkMode ? colors.accent : colors.primary,
     fontStyle: 'italic',
-    marginBottom: 10,
-    fontSize: 12,
+    marginBottom: spacing.sm,
+    ...typography.small,
   },
   collapseText: {
-    color: '#005F9E',
+    color: isDarkMode ? colors.accent : colors.primary,
     fontStyle: 'italic',
-    fontSize: 12,
+    ...typography.small,
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   viewDetailButton: {
-    backgroundColor: '#005F9E',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
+    backgroundColor: isDarkMode ? colors.accent : colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.small,
   },
   viewDetailText: {
-    color: 'white',
-    fontSize: 12,
+    color: isDarkMode ? colors.background : colors.surface,
+    ...typography.small,
     fontWeight: 'bold',
   },
   photoGrid: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   thumbnail: {
     width: 80,
     height: 80,
-    borderRadius: 5,
-    marginRight: 5,
+    borderRadius: borderRadius.small,
+    marginRight: spacing.xs,
   },
   morePhotos: {
     width: 80,
     height: 80,
-    backgroundColor: '#005F9E',
-    borderRadius: 5,
+    backgroundColor: isDarkMode ? colors.accent : colors.primary,
+    borderRadius: borderRadius.small,
     justifyContent: 'center',
     alignItems: 'center',
   },
   morePhotosText: {
-    color: 'white',
-    fontSize: 16,
+    color: isDarkMode ? colors.background : colors.surface,
+    ...typography.body,
     fontWeight: 'bold',
   },
   tags: {
@@ -755,9 +737,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tag: {
-    color: '#005F9E',
-    marginRight: 10,
-    fontSize: 12,
+    color: isDarkMode ? colors.accent : colors.primary,
+    marginRight: spacing.sm,
+    ...typography.small,
   },
   loadingContainer: {
     flex: 1,
@@ -845,24 +827,24 @@ const styles = StyleSheet.create({
   },
   aiGeneratedContent: {
     fontStyle: 'normal',
-    color: '#333',
+    color: colors.text.primary,
     lineHeight: 22,
   },
   aiGeneratedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#7F5AF0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.medium,
     alignSelf: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   aiGeneratedText: {
-    color: '#FFF',
-    fontSize: 12,
+    color: colors.white,
+    ...typography.small,
     fontWeight: 'bold',
-    marginLeft: 4,
+    marginLeft: spacing.xs,
   },
 });
 

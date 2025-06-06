@@ -9,11 +9,12 @@ import { setAuthState, setUser } from './src/features/auth/authSlice';
 import { Provider as PaperProvider, DefaultTheme, MD3DarkTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getCloudinaryConfigInfo } from './src/services/cloudinaryService';
-import { ThemeProvider, useThemeContext } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { NavigationContainer } from '@react-navigation/native';
+import { linking } from './src/navigation/linking';
 import { registerForPushNotificationsAsync, saveUserPushToken } from './src/services/NotificationService';
 import NotificationService from './src/services/NotificationService';
 import * as Notifications from 'expo-notifications';
-
 
 const lightTheme = {
   ...DefaultTheme,
@@ -43,8 +44,8 @@ const darkTheme = {
   },
 };
 
-const AppContent = () => {
-  const { isDarkMode } = useThemeContext();
+const App = () => {
+  const { isDarkMode, colors } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +54,6 @@ const AppContent = () => {
       try {
         console.log(`Iniciando la aplicación en plataforma: ${Platform.OS}`);
 
-        // Comprobar si hay alguna incompatibilidad específica de la plataforma
         if (Platform.OS === 'web') {
           console.log('Ejecutando en modo web');
         }
@@ -65,27 +65,6 @@ const AppContent = () => {
         const notificationService = NotificationService.getInstance();
         await notificationService.init();
         
-        // Registrar para notificaciones push (solo en dispositivos móviles)
-        if (Platform.OS !== 'web') {
-          try {
-            const pushToken = await registerForPushNotificationsAsync();
-            if (pushToken) {
-              console.log('✅ Token de notificaciones push obtenido:', String(pushToken).slice(0, 20) + '...');
-              
-              // Verificar sesión para guardar token si hay usuario autenticado
-              const { data: { session } } = await supabase.auth.getSession();
-              if (session?.user) {
-                await saveUserPushToken(session.user.id, pushToken);
-                console.log('✅ Token de notificaciones guardado para el usuario');
-              }
-            } else {
-              console.log('⚠️ No se pudo obtener token de notificaciones push');
-            }
-          } catch (notificationError) {
-            console.error('❌ Error configurando notificaciones:', notificationError);
-          }
-        }
-
         // Verificar sesión actual
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -94,7 +73,6 @@ const AppContent = () => {
           throw sessionError;
         }
 
-        // Verificar configuración de Cloudinary
         const cloudinaryConfig = getCloudinaryConfigInfo();
         console.log('Estado configuración Cloudinary:',
           cloudinaryConfig.isConfigured ? 'OK' : 'No configurado',
@@ -103,8 +81,7 @@ const AppContent = () => {
 
         if (session?.user) {
           console.log('Usuario autenticado encontrado:', session.user.email);
-          
-          // Obtener datos adicionales del usuario
+
           const { data: userData, error: userError } = await supabase
             .from('users')
             .select('username, role')
@@ -160,7 +137,7 @@ const AppContent = () => {
     if (Platform.OS !== 'web') {
       // Listener para notificaciones recibidas mientras la app está activa
       notificationListener = Notifications.addNotificationReceivedListener(notification => {
-        console.log('�� Notificación recibida:', notification);
+        console.log('🔔 Notificación recibida:', notification);
       });
 
       // Listener para cuando el usuario toca una notificación
@@ -175,13 +152,11 @@ const AppContent = () => {
       });
     }
 
-    // Manejador global de errores no capturados
-    const handleError = (error: Error) => {
-      console.error('Error no capturado:', error);
-    };
-
-    // Configurar listeners globales de error
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const handleError = (error: Error) => {
+        console.error('Error no capturado:', error);
+      };
+
       window.addEventListener('error', (event) => {
         handleError(event.error);
       });
@@ -213,20 +188,20 @@ const AppContent = () => {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#1B263B' : '#F5F7FA' }}>
-        <ActivityIndicator size={24} color={isDarkMode ? '#41729F' : '#005F9E'} />
-        <Text style={{ marginTop: 10, color: isDarkMode ? '#EDF6F9' : '#333333' }}>Cargando TravelQuest...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size={24} color={colors.primary} />
+        <Text style={{ marginTop: 10, color: colors.text.primary }}>Cargando TravelQuest...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: isDarkMode ? '#1B263B' : '#F5F7FA' }}>
-        <Text style={{ color: 'red', textAlign: 'center', marginBottom: 10 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: colors.background }}>
+        <Text style={{ color: colors.error, textAlign: 'center', marginBottom: 10 }}>
           {error}
         </Text>
-        <Text style={{ textAlign: 'center', color: isDarkMode ? '#EDF6F9' : '#333333' }}>
+        <Text style={{ textAlign: 'center', color: colors.text.primary }}>
           Por favor, intenta recargar la aplicación o contacta con soporte.
         </Text>
       </View>
@@ -234,20 +209,28 @@ const AppContent = () => {
   }
 
   return (
-    <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
-      <SafeAreaProvider>
-        <AppNavigator />
-      </SafeAreaProvider>
-    </PaperProvider>
-  );
-};
-
-const App = () => {
-  return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <ThemeProvider>
-          <AppContent />
+          <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
+            <SafeAreaProvider>
+              <View style={{ flex: 1, backgroundColor: colors.background }}>
+                <NavigationContainer linking={linking} theme={{
+                  dark: isDarkMode,
+                  colors: {
+                    background: colors.background,
+                    border: colors.border,
+                    card: colors.surface,
+                    text: colors.text.primary,
+                    notification: colors.primary,
+                    primary: colors.primary,
+                  },
+                }}>
+                  <AppNavigator />
+                </NavigationContainer>
+              </View>
+            </SafeAreaProvider>
+          </PaperProvider>
         </ThemeProvider>
       </PersistGate>
     </Provider>

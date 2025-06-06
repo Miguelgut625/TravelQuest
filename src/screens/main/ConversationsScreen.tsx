@@ -19,6 +19,8 @@ import { RootState } from '../../features/store';
 import { getRecentConversations } from '../../services/messageService';
 import { supabase } from '../../services/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
+import { typography, spacing, borderRadius, shadows } from '../../styles/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,6 +38,8 @@ const ConversationsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDarkMode } = useTheme();
+  const styles = getConversationStyles(colors, isDarkMode);
 
   useEffect(() => {
     checkUserAuth();
@@ -180,15 +184,17 @@ const ConversationsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.headerRowCustom}>
-        <Text style={styles.title}>Mensajes</Text>
-        <TouchableOpacity
-          style={styles.groupsButton}
-          onPress={() => navigation.navigate('Groups')}
-        >
-          <Ionicons name="people" size={22} color={colors.text.light} />
-        </TouchableOpacity>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.headerSafeArea}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Mensajes</Text>
+          <TouchableOpacity
+            style={styles.groupsButton}
+            onPress={() => navigation.navigate('Groups')}
+          >
+            <Ionicons name="people-circle" size={26} color={isDarkMode ? '#222' : colors.surface} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {conversations.length === 0 ? (
@@ -220,176 +226,159 @@ const ConversationsScreen = () => {
     </SafeAreaView>
   );
 };
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary,
-  },
-  headerRowCustom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: colors.primary,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    height: Platform.OS === 'ios' ? 44 : 56,
-    paddingTop: Platform.OS === 'ios' ? 0 : 8,
-  },
-  groupsButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    position: 'absolute',
-    right: 16,
-    zIndex: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.light,
-    textAlign: 'center',
-    flex: 1,
-  },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  conversationItem: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: width < 400 ? 10 : 16,
-    marginHorizontal: width < 400 ? 4 : 8,
-    marginVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: width < 400 ? 40 : 50,
-    height: width < 400 ? 40 : 50,
-    borderRadius: 25,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    color: colors.white,
-    fontSize: width < 400 ? 16 : 20,
-    fontWeight: 'bold',
-  },
-  conversationInfo: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  username: {
-    fontSize: width < 400 ? 14 : 16,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-  },
-  lastMessage: {
-    fontSize: width < 400 ? 12 : 14,
-    color: colors.text.secondary,
-    flex: 1,
-    marginRight: 8,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: colors.text.light,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  unreadMessage: {
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  badgeContainer: {
-    backgroundColor: colors.secondary,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 10,
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    backgroundColor: colors.background,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.text.light,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-});
+function getConversationStyles(colors, isDarkMode) {
+  const { width } = Dimensions.get('window');
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerSafeArea: {
+      backgroundColor: isDarkMode ? colors.background : colors.primary,
+      zIndex: 10,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      marginBottom: 8,
+      marginTop: 8,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: isDarkMode ? colors.accent : colors.surface,
+      textAlign: 'center',
+      flex: 1,
+    },
+    groupsButton: {
+      backgroundColor: isDarkMode ? colors.accent : 'transparent',
+      borderRadius: 20,
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: 'transparent',
+      elevation: 0,
+      position: 'absolute',
+      right: 16,
+      zIndex: 1,
+    },
+    listContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 16,
+    },
+    conversationItem: {
+      backgroundColor: isDarkMode ? colors.surface : colors.surface,
+      borderRadius: 12,
+      padding: width < 400 ? 10 : 16,
+      marginHorizontal: width < 400 ? 4 : 8,
+      marginVertical: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    avatar: {
+      width: width < 400 ? 40 : 50,
+      height: width < 400 ? 40 : 50,
+      borderRadius: 25,
+      backgroundColor: isDarkMode ? colors.accent : colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    avatarText: {
+      color: isDarkMode ? '#222' : colors.surface,
+      fontSize: width < 400 ? 16 : 20,
+      fontWeight: 'bold',
+    },
+    conversationInfo: {
+      flex: 1,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    username: {
+      fontSize: width < 400 ? 14 : 16,
+      fontWeight: 'bold',
+      color: isDarkMode ? '#fff' : colors.text.primary,
+    },
+    lastMessage: {
+      fontSize: width < 400 ? 12 : 14,
+      color: isDarkMode ? colors.text.light : colors.text.secondary,
+      flex: 1,
+      marginRight: 8,
+    },
+    timestamp: {
+      fontSize: 12,
+      color: isDarkMode ? colors.text.light : colors.text.light,
+    },
+    messageRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    unreadMessage: {
+      color: isDarkMode ? colors.accent : colors.primary,
+      fontWeight: '500',
+    },
+    badgeContainer: {
+      backgroundColor: isDarkMode ? colors.accent : colors.secondary,
+      borderRadius: 12,
+      minWidth: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 10,
+      paddingHorizontal: 6,
+    },
+    badgeText: {
+      color: isDarkMode ? '#222' : colors.surface,
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    emptyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 32,
+      backgroundColor: colors.background,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: isDarkMode ? colors.text.light : colors.text.secondary,
+      textAlign: 'center',
+      marginTop: 16,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: isDarkMode ? colors.text.light : colors.text.light,
+      textAlign: 'center',
+      marginTop: 8,
+    },
+    errorText: {
+      color: colors.error,
+      fontSize: 14,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+  });
+}
 
 export default ConversationsScreen; 

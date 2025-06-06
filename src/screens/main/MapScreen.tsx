@@ -27,6 +27,8 @@ import NotificationService from '../../services/NotificationService';
 import { getFriends } from '../../services/friendService';
 import { Button } from 'react-native-paper';
 import { createClient } from '@supabase/supabase-js';
+import { colors, commonStyles, typography, spacing, borderRadius, shadows, motivationalButton, motivationalButtonText, motivationalButtonSubtitle, mapContainer, missionFormWrapper, missionFormCard, missionFormScroll, missionInputRow, missionInput, missionTextInput, missionTagsRow, missionTag, missionTagText, missionOrderButton, missionGenerateButton, fabButton, fabButtonIcon, fabContainer, overlayLoading } from '../../styles/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface City {
   id: string;
@@ -52,17 +54,20 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width, height } = Dimensions.get('window');
 
-const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep: string }) => (
-  <Modal transparent={true} visible={visible} animationType="fade">
-    <View style={styles.modalContainer}>
-      <View style={styles.loadingCard}>
-        <ActivityIndicator size={40} color="#005F9E" />
-        <Text style={styles.loadingTitle}>Generando viaje</Text>
-        <Text style={styles.loadingStep}>{currentStep}</Text>
+const LoadingModal = ({ visible, currentStep }: { visible: boolean; currentStep: string }) => {
+  const { isDarkMode, colors } = useTheme();
+  return (
+    <Modal transparent={true} visible={visible} animationType="fade">
+      <View style={styles.modalContainer}>
+        <View style={[styles.loadingCard, { backgroundColor: isDarkMode ? colors.surface : colors.white }]}>
+          <ActivityIndicator size={40} color={isDarkMode ? colors.accent : colors.primary} />
+          <Text style={[styles.loadingTitle, { color: isDarkMode ? colors.text.primary : colors.text.primary }]}>Generando viaje</Text>
+          <Text style={[styles.loadingStep, { color: isDarkMode ? colors.text.secondary : colors.text.secondary }]}>{currentStep}</Text>
+        </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 const DateRangePickerMobile: React.FC<{
   startDateProp: Date | null;
@@ -70,11 +75,15 @@ const DateRangePickerMobile: React.FC<{
   onDatesChange: (dates: [Date | null, Date | null]) => void;
   isFormCollapsed?: boolean;
   setIsFormCollapsed?: (collapsed: boolean) => void;
-}> = ({ startDateProp, endDateProp, onDatesChange, isFormCollapsed, setIsFormCollapsed }) => {
+  customButtonStyle?: any;
+  customTextStyle?: any;
+  customIconColor?: string;
+}> = ({ startDateProp, endDateProp, onDatesChange, isFormCollapsed, setIsFormCollapsed, customButtonStyle, customTextStyle, customIconColor }) => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(startDateProp);
   const [endDate, setEndDate] = useState<Date | null>(endDateProp);
   const [markedDates, setMarkedDates] = useState<any>({});
+  const { isDarkMode } = useTheme();
   // Fecha mínima: hoy (evitar seleccionar fechas pasadas)
   const today = new Date();
   today.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación
@@ -108,8 +117,8 @@ const DateRangePickerMobile: React.FC<{
     const startDateStr = start.toISOString().split('T')[0];
     newMarkedDates[startDateStr] = {
       startingDay: true,
-      color: '#005F9E',
-      textColor: 'white'
+      color: isDarkMode ? colors.accent : '#005F9E',
+      textColor: isDarkMode ? '#222F43' : 'white'
     };
 
     // Si hay fecha de fin, marcar días intermedios y fecha de fin
@@ -121,8 +130,8 @@ const DateRangePickerMobile: React.FC<{
       while (currentDate < end) {
         const dateStr = currentDate.toISOString().split('T')[0];
         newMarkedDates[dateStr] = {
-          color: '#e6f2ff',
-          textColor: '#005F9E'
+          color: isDarkMode ? '#FFD70033' : '#e6f2ff',
+          textColor: isDarkMode ? colors.accent : '#005F9E'
         };
         currentDate.setDate(currentDate.getDate() + 1);
       }
@@ -131,8 +140,8 @@ const DateRangePickerMobile: React.FC<{
       const endDateStr = end.toISOString().split('T')[0];
       newMarkedDates[endDateStr] = {
         endingDay: true,
-        color: '#005F9E',
-        textColor: 'white'
+        color: isDarkMode ? colors.accent : '#005F9E',
+        textColor: isDarkMode ? '#222F43' : 'white'
       };
     }
 
@@ -197,17 +206,24 @@ const DateRangePickerMobile: React.FC<{
   return (
     <View style={styles.datePickerContainer}>
       <TouchableOpacity
-        style={styles.datePickerButton}
+        style={[
+          styles.datePickerButton,
+          isDarkMode && {
+            backgroundColor: colors.surface,
+            borderColor: colors.accent
+          },
+          customButtonStyle
+        ]}
         onPress={onToggleCalendar}
       >
-        <Ionicons name="calendar" size={20} color="#A8DADC" style={styles.calendarIcon} />
-        <Text style={styles.datePickerText}>
+        <Ionicons name="calendar" size={20} color={customIconColor ?? (isDarkMode ? colors.accent : '#A8DADC')} style={styles.calendarIcon} />
+        <Text style={[styles.datePickerText, isDarkMode && { color: colors.accent }, customTextStyle]}>
           {formatDateRange() || "Selecciona fechas"}
         </Text>
         <Ionicons
           name={showCalendar ? "chevron-up" : "chevron-down"}
           size={20}
-          color="#666"
+          color={customIconColor ?? (isDarkMode ? colors.accent : '#666')}
         />
       </TouchableOpacity>
 
@@ -219,11 +235,14 @@ const DateRangePickerMobile: React.FC<{
           onRequestClose={() => setShowCalendar(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.calendarHeader}>
-                <Text style={styles.calendarTitle}>Selecciona fechas</Text>
+            <View style={[styles.modalContent, isDarkMode ? { backgroundColor: '#222F43', borderColor: colors.accent, borderWidth: 1 } : { backgroundColor: '#fff', borderColor: colors.primary, borderWidth: 1 }]}>
+              <View style={[styles.calendarHeader, { backgroundColor: isDarkMode ? 'transparent' : '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12 }]}>
+                <Text style={[
+                  styles.calendarTitle,
+                  isDarkMode ? { color: '#EDF6F9', textShadowColor: 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 0 } : { color: '#1A202C' }
+                ]}>Selecciona fechas</Text>
                 <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                  <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color={isDarkMode ? '#EDF6F9' : '#1A202C'} />
                 </TouchableOpacity>
               </View>
 
@@ -235,38 +254,37 @@ const DateRangePickerMobile: React.FC<{
                 hideExtraDays={true}
                 firstDay={1}
                 enableSwipeMonths={true}
-                minDate={minDate}
+                minDate={minDate.toISOString().split('T')[0]}
                 theme={{
-                  calendarBackground: '#ffffff',
-                  textSectionTitleColor: '#b6c1cd',
-                  selectedDayBackgroundColor: '#005F9E',
-                  selectedDayTextColor: '#ffffff',
-                  todayTextColor: '#005F9E',
-                  dayTextColor: '#2d4150',
-                  textDisabledColor: '#d9e1e8',
-                  dotColor: '#005F9E',
-                  selectedDotColor: '#ffffff',
-                  arrowColor: '#005F9E',
-                  monthTextColor: '#005F9E',
-                  indicatorColor: '#005F9E',
-                  textDayFontWeight: '300',
-                  textDayHeaderFontWeight: '300',
-                  textDayFontSize: 14,
-                  textMonthFontSize: 14,
-                  textDayHeaderFontSize: 12,
+                  calendarBackground: isDarkMode ? '#101828' : '#fff',
+                  textSectionTitleColor: isDarkMode ? '#EDF6F9' : '#1A202C',
+                  selectedDayBackgroundColor: isDarkMode ? colors.accent : colors.primary,
+                  selectedDayTextColor: isDarkMode ? '#222F43' : '#ffffff',
+                  todayTextColor: isDarkMode ? colors.accent : colors.primary,
+                  dayTextColor: isDarkMode ? '#EDF6F9' : '#1A202C',
+                  textDisabledColor: isDarkMode ? '#555' : '#d9e1e8',
+                  dotColor: isDarkMode ? colors.accent : colors.primary,
+                  selectedDotColor: isDarkMode ? '#222F43' : '#ffffff',
+                  arrowColor: isDarkMode ? colors.accent : colors.primary,
+                  monthTextColor: isDarkMode ? '#EDF6F9' : colors.primary,
+                  indicatorColor: isDarkMode ? colors.accent : colors.primary,
+                  textDayFontWeight: '400',
+                  textDayHeaderFontWeight: '600',
+                  textDayFontSize: 15,
+                  textMonthFontSize: 16,
+                  textDayHeaderFontSize: 13,
                   width: 300,
                 }}
               />
 
               <View style={styles.durationContainer}>
-                <Text style={styles.durationText}>
-                  Duración: {calculateDuration(startDate, endDate)} días
-                </Text>
+                <Text style={[styles.durationText, isDarkMode ? { color: '#EDF6F9' } : { color: colors.primary }]}>Duración: {calculateDuration(startDate, endDate)} días</Text>
                 <TouchableOpacity
-                  style={styles.calendarCloseButton}
+                  style={[styles.calendarCloseButton, isDarkMode ? { backgroundColor: colors.accent } : { backgroundColor: colors.primary }]}
                   onPress={() => setShowCalendar(false)}
+                  disabled={calculateDuration(startDate, endDate) === 0}
                 >
-                  <Text style={styles.calendarCloseButtonText}>Aplicar</Text>
+                  <Text style={[styles.calendarCloseButtonText, isDarkMode ? { color: calculateDuration(startDate, endDate) === 0 ? '#888' : '#222F43' } : { color: '#fff' }]}>Aplicar</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -281,6 +299,7 @@ const MapScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { isDarkMode, colors } = useTheme();
   // Referencia al WebView para poder enviar mensajes al globo
   const webViewRef = useRef<WebView>(null);
   // Añadir la referencia a GlobeView
@@ -321,6 +340,9 @@ const MapScreen = () => {
   // Nueva animación para el formulario
   const formAnimation = useRef(new Animated.Value(1)).current;
   const isSmallScreen = width < 768 || height < 600;
+
+  // Nuevo estado para mostrar el formulario
+  const [showForm, setShowForm] = useState(false);
 
   // Definir los tags disponibles
   const availableTags = [
@@ -859,218 +881,314 @@ const MapScreen = () => {
   const [showEventsModal, setShowEventsModal] = useState(false);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Barra superior con botón para expandir/colapsar */}
-      <View style={styles.headerBar}>
-        <Text style={styles.headerTitle}>TravelQuest</Text>
+    <SafeAreaView style={[commonStyles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      {/* Header */}
+      <View style={[commonStyles.header, {
+        justifyContent: 'space-between',
+        backgroundColor: isDarkMode ? colors.background : colors.primary,
+      }]}>
+        <Text style={[commonStyles.title, { color: isDarkMode ? colors.accent : '#fff' }]}>TravelQuest</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => setShowEventsModal(true)} style={styles.eventsHeaderButton}>
-            <Ionicons name="calendar" size={20} color="#FFD700" style={{ marginRight: 4 }} />
-            <Text style={styles.eventsHeaderButtonText}>Ver Eventos</Text>
+          <TouchableOpacity
+            onPress={() => setShowEventsModal(true)}
+            style={[
+              { flexDirection: 'row', alignItems: 'center', marginRight: spacing.sm },
+              !isDarkMode && {
+                backgroundColor: '#fff',
+                borderColor: '#005F9E',
+                borderWidth: 1.5,
+                paddingVertical: 6,
+                paddingHorizontal: 14,
+                borderRadius: 22,
+                shadowColor: '#005F9E22',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.10,
+                shadowRadius: 4,
+                elevation: 2,
+              }
+            ]}>
+            <Ionicons name="calendar" size={20} color={isDarkMode ? colors.accent : '#005F9E'} style={{ marginRight: 6 }} />
+            <Text style={{
+              color: isDarkMode ? colors.accent : '#005F9E',
+              fontWeight: 'bold',
+              fontSize: 17,
+              letterSpacing: 0.2
+            }}>Ver Eventos</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={toggleFormCollapse} style={styles.collapseButton}>
-            <Ionicons name={isFormCollapsed ? "chevron-down-outline" : "close"} size={24} color="white" />
-          </TouchableOpacity>
+          {showForm && (
+            <TouchableOpacity onPress={() => setShowForm(false)} style={[commonStyles.button, { backgroundColor: colors.error, padding: 8, borderRadius: borderRadius.round, marginLeft: 8 }]}>
+              <Ionicons name="close" size={24} color={colors.surface} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* Formulario de búsqueda */}
-      <Animated.View
-        style={[
-          styles.searchContainer,
-          isSmallScreen && styles.searchContainerSmall,
-          {
-            opacity: formAnimation,
-            transform: [{
-              translateY: formAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-50, 0]
-              })
-            }],
-            display: isFormCollapsed ? 'none' : 'flex'
-          }
-        ]}
-      >
-        {/* Campo de búsqueda de ciudad - puesto primero para que sea lo más visible */}
-        <View style={styles.cityInputContainer}>
-          <Ionicons name="search" size={24} style={styles.searchIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="¿Qué ciudad quieres visitar?"
-            placeholderTextColor='#26547C'
-            value={searchCity}
-            onChangeText={handleCitySearch}
-          />
-        </View>
+      {/* Mapa como fondo */}
+      <View style={{ flex: 1, position: 'relative', backgroundColor: colors.background }}>
+        <GlobeView
+          ref={globeRef}
+          region={region}
+          onRegionChange={(reg) => setRegion(reg)}
+          showsUserLocation={true}
+          style={{ flex: 1, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          onLoadingChange={(loading) => setChangingView(loading)}
+          onLoadEnd={() => setChangingView(false)}
+          onError={handleGlobeError}
+        />
 
-        {/* Sugerencias de ciudades */}
-        {showSuggestions && filteredCities.length > 0 && (
-          <View style={styles.suggestionsList}>
-            {filteredCities.map((city) => (
-              <TouchableOpacity
-                key={city.id}
-                style={styles.suggestionItem}
-                onPress={() => handleCitySelect(city)}
-              >
-                <Ionicons name="location" size={18} color="#005F9E" style={styles.locationIcon} />
-                <Text style={styles.suggestionText}>{city.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.formRow}>
-            <View style={styles.missionInputContainer}>
-              <Ionicons name="list" size={20} color="#666" style={styles.missionIcon} />
-              <TextInput
-                style={styles.smallInput}
-                placeholder="Nº misiones"
-                placeholderTextColor="#26547C"
-                value={missionCount}
-                onChangeText={setMissionCount}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <DateRangePicker
-              startDateProp={startDate}
-              endDateProp={endDate}
-              onDatesChange={onDatesChange}
-              isFormCollapsed={isFormCollapsed}
-              setIsFormCollapsed={setIsFormCollapsed}
-            />
-          </View>
-
-          <View style={styles.tagsContainer}>
-            {availableTags.map(tag => (
-              <TouchableOpacity
-                key={tag.id}
-                style={[
-                  styles.tagButton,
-                  selectedTags.includes(tag.id) && styles.tagButtonSelected
-                ]}
-                onPress={() => toggleTag(tag.id)}
-              >
-                <Text
-                  style={[
-                    styles.tagText,
-                    selectedTags.includes(tag.id) && styles.tagTextSelected
-                  ]}
-                >
-                  {tag.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.logicalOrderContainer}>
+        {/* Botón motivacional arriba, centrado */}
+        {!showForm && (
+          <View style={{ alignItems: 'center', width: '100%', position: 'absolute', top: 24, zIndex: 20 }}>
             <TouchableOpacity
               style={[
-                styles.logicalOrderButton,
-                useLogicalOrder && styles.logicalOrderButtonActive
+                styles.motivationalButton,
+                {
+                  backgroundColor: isDarkMode ? colors.accent : colors.primary,
+                  borderRadius: 24,
+                  paddingVertical: 22,
+                  paddingHorizontal: 24,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.18,
+                  shadowRadius: 6,
+                  elevation: 6,
+                  width: '90%',
+                  maxWidth: 400,
+                  justifyContent: 'center',
+                },
               ]}
-              onPress={() => setUseLogicalOrder(!useLogicalOrder)}
+              onPress={() => setShowForm(true)}
+              activeOpacity={0.93}
             >
-              <Ionicons
-                name={useLogicalOrder ? "checkmark-circle" : "checkmark-circle-outline"}
-                size={20}
-                color={useLogicalOrder ? "#FFFFFF" : "#005F9E"}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={[
-                styles.logicalOrderText,
-                useLogicalOrder && styles.logicalOrderTextActive
-              ]}>
-                Orden Lógico de Misiones
-              </Text>
+              <Ionicons name="rocket" size={32} color={'#FFF'} style={{ marginRight: 18 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 22, marginBottom: 2, textAlign: 'left' }}>
+                  ¡Comienza tu aventura!
+                </Text>
+                <Text style={{ color: '#FFF', fontSize: 15, opacity: 0.9, textAlign: 'left' }}>
+                  Descubre misiones únicas
+                </Text>
+              </View>
             </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.button,
-              (!searchCity || !startDate || !endDate) && styles.buttonDisabled
-            ]}
-            onPress={handleSearch}
-            disabled={!searchCity || !startDate || !endDate}
-          >
-            <Ionicons name="rocket" size={20} color={(!searchCity || !startDate || !endDate) ? "#EDF6F9" : "white"} style={{ marginRight: 8 }} />
-            <Text style={[
-              styles.buttonText,
-              (!searchCity || !startDate || !endDate) && styles.buttonTextDisabled
-            ]}>
-              Generar Misiones
-            </Text>
-          </TouchableOpacity>
-
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-        </ScrollView>
-      </Animated.View>
-
-      {/* Mapa debajo de todo */}
-      <View style={[
-        styles.mapContainer,
-        isFormCollapsed && styles.mapContainerExpanded
-      ]}>
-        {/* Mostrar la duración del viaje en días encima del mapa */}
-        {startDate && endDate && (
-          <View style={styles.durationOverlay}>
-            <Text style={styles.durationOverlayText}>
-              <Ionicons name="calendar" size={16} color="white" /> {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
-            </Text>
-            <Text style={styles.durationOverlayText}>
-              <Ionicons name="time" size={16} color="white" /> Duración: {calculateDuration(startDate, endDate)} días
-            </Text>
           </View>
         )}
 
-        {isLoadingLocation ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#005F9E" />
-            <Text style={styles.loadingText}>Cargando ubicación...</Text>
+        {/* Formulario: card centrado, adaptativo, con fondo blanco semitransparente */}
+        {showForm && (
+          <View style={{
+            position: 'absolute',
+            top: 90,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 30,
+          }}>
+            <View style={{
+              width: '95%',
+              maxWidth: 400,
+              backgroundColor: isDarkMode ? colors.surface : '#F5F7FA',
+              borderRadius: borderRadius.xl,
+              padding: spacing.lg,
+              borderWidth: 1,
+              borderColor: isDarkMode ? colors.border : '#E2E8F0',
+              ...shadows.large,
+            }}>
+              <ScrollView
+                style={{ maxHeight: 520 }}
+                contentContainerStyle={{ paddingBottom: spacing.lg }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Campo de búsqueda de ciudad */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDarkMode ? '#29344D' : '#FFFFFF',
+                  borderRadius: borderRadius.medium,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#334366' : colors.primary,
+                  marginBottom: spacing.md,
+                  ...shadows.small,
+                }}>
+                  <Ionicons name="search" size={20} color={isDarkMode ? colors.accent : colors.primary} style={{ marginLeft: spacing.sm, marginRight: spacing.sm }} />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'transparent',
+                      color: isDarkMode ? '#EDF6F9' : colors.text.primary,
+                      fontSize: 16,
+                      paddingVertical: spacing.sm,
+                    }}
+                    placeholder="¿Qué ciudad quieres visitar?"
+                    placeholderTextColor={isDarkMode ? '#FFF' : colors.text.secondary}
+                    value={searchCity}
+                    onChangeText={handleCitySearch}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  />
+                </View>
+                {/* Sugerencias de ciudades */}
+                {showSuggestions && filteredCities.length > 0 && (
+                  <View style={{ backgroundColor: isDarkMode ? '#29344D' : '#FFFFFF', borderRadius: borderRadius.medium, marginBottom: spacing.sm, ...shadows.small }}>
+                    {filteredCities.map((city) => (
+                      <TouchableOpacity
+                        key={city.id}
+                        style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.sm }}
+                        onPress={() => handleCitySelect(city)}
+                      >
+                        <Ionicons name="location" size={18} color={isDarkMode ? colors.accent : colors.primary} style={{ marginRight: spacing.xs }} />
+                        <Text style={{ color: isDarkMode ? '#EDF6F9' : colors.text.primary }} numberOfLines={1} ellipsizeMode="tail">{city.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                {/* Inputs de misiones y fechas */}
+                <View style={{ flexDirection: 'row', marginBottom: spacing.md }}>
+                  <View style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: isDarkMode ? '#29344D' : '#FFFFFF',
+                    borderRadius: borderRadius.medium,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? '#334366' : colors.primary,
+                    marginRight: spacing.sm,
+                    ...shadows.small,
+                  }}>
+                    <Ionicons name="list" size={20} color={isDarkMode ? colors.accent : colors.primary} style={{ marginLeft: spacing.sm, marginRight: spacing.xs }} />
+                    <TextInput
+                      style={{ flex: 1, backgroundColor: 'transparent', color: isDarkMode ? '#EDF6F9' : colors.text.primary, fontSize: 16, paddingVertical: spacing.sm }}
+                      placeholder="Nº misiones"
+                      placeholderTextColor={isDarkMode ? '#FFF' : colors.text.secondary}
+                      value={missionCount}
+                      onChangeText={setMissionCount}
+                      keyboardType="numeric"
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    />
+                  </View>
+                  <DateRangePicker
+                    startDateProp={startDate}
+                    endDateProp={endDate}
+                    onDatesChange={onDatesChange}
+                    isFormCollapsed={isFormCollapsed}
+                    setIsFormCollapsed={setIsFormCollapsed}
+                    customButtonStyle={{
+                      backgroundColor: isDarkMode ? '#101828' : '#fff',
+                      borderColor: isDarkMode ? colors.accent : colors.primary,
+                      borderWidth: 1,
+                      borderRadius: borderRadius.medium,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      marginBottom: 8,
+                    }}
+                    customTextStyle={{
+                      color: isDarkMode ? colors.accent : colors.primary,
+                      fontWeight: 'bold',
+                      fontSize: 16,
+                    }}
+                    customIconColor={isDarkMode ? colors.accent : colors.primary}
+                  />
+                </View>
+                {/* Tags */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginBottom: spacing.md }}>
+                  {availableTags.map(tag => (
+                    <TouchableOpacity
+                      key={tag.id}
+                      style={{
+                        backgroundColor: selectedTags.includes(tag.id)
+                          ? (isDarkMode ? '#FFD70033' : colors.primary)
+                          : (isDarkMode ? '#29344D' : '#F1F5F9'),
+                        borderRadius: borderRadius.round,
+                        paddingHorizontal: spacing.md,
+                        paddingVertical: spacing.xs,
+                        marginRight: spacing.xs,
+                        marginBottom: spacing.xs,
+                        borderWidth: 1,
+                        borderColor: selectedTags.includes(tag.id)
+                          ? (isDarkMode ? colors.accent : colors.primary)
+                          : (isDarkMode ? '#334366' : colors.primary),
+                        maxWidth: 110,
+                      }}
+                      onPress={() => toggleTag(tag.id)}
+                    >
+                      <Text style={{
+                        color: selectedTags.includes(tag.id)
+                          ? (isDarkMode ? colors.accent : colors.surface)
+                          : (isDarkMode ? '#EDF6F9' : colors.text.primary),
+                        ...typography.small,
+                        fontWeight: selectedTags.includes(tag.id) ? 'bold' : 'normal',
+                      }} numberOfLines={1} ellipsizeMode="tail">
+                        {tag.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {/* Orden lógico */}
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: useLogicalOrder
+                      ? (isDarkMode ? '#FFD70033' : colors.primary)
+                      : (isDarkMode ? '#29344D' : '#F1F5F9'),
+                    borderRadius: borderRadius.medium,
+                    padding: spacing.sm,
+                    borderWidth: 1,
+                    borderColor: useLogicalOrder ? (isDarkMode ? colors.accent : colors.primary) : (isDarkMode ? '#334366' : colors.primary),
+                    marginBottom: spacing.md,
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => setUseLogicalOrder(!useLogicalOrder)}
+                >
+                  <Ionicons
+                    name={useLogicalOrder ? "checkmark-circle" : "checkmark-circle-outline"}
+                    size={20}
+                    color={useLogicalOrder ? (isDarkMode ? colors.accent : colors.primary) : (isDarkMode ? '#EDF6F9' : colors.primary)}
+                    style={{ marginRight: spacing.xs }}
+                  />
+                  <Text style={{ color: useLogicalOrder ? (isDarkMode ? colors.accent : colors.primary) : (isDarkMode ? '#EDF6F9' : colors.primary), ...typography.body, fontWeight: 'bold' }} numberOfLines={1} ellipsizeMode="tail">
+                    Orden Lógico de Misiones
+                  </Text>
+                </TouchableOpacity>
+                {/* Botón de generar misiones */}
+                <TouchableOpacity
+                  style={[{
+                    flexDirection: 'row',
+                    backgroundColor: (!searchCity || !startDate || !endDate)
+                      ? (isDarkMode ? '#334366' : '#D1D5DB')
+                      : (isDarkMode ? colors.accent : colors.primary),
+                    borderRadius: borderRadius.medium,
+                    paddingVertical: spacing.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: spacing.md,
+                    marginBottom: spacing.sm,
+                    ...shadows.small,
+                  }]}
+                  onPress={handleSearch}
+                  disabled={!searchCity || !startDate || !endDate}
+                >
+                  <Ionicons name="rocket" size={20} color={(!searchCity || !startDate || !endDate)
+                    ? (isDarkMode ? '#A9D6E5' : colors.text.secondary)
+                    : (isDarkMode ? '#222F43' : '#fff')} style={{ marginRight: spacing.sm }} />
+                  <Text style={{
+                    color: (!searchCity || !startDate || !endDate)
+                      ? (isDarkMode ? '#A9D6E5' : colors.text.secondary)
+                      : (isDarkMode ? '#222F43' : '#fff'),
+                    ...typography.body,
+                    fontWeight: 'bold',
+                  }} numberOfLines={1} ellipsizeMode="tail">
+                    Generar Misiones
+                  </Text>
+                </TouchableOpacity>
+                {errorMsg ? <Text style={commonStyles.errorText}>{errorMsg}</Text> : null}
+              </ScrollView>
+            </View>
           </View>
-        ) : errorLocationMsg ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorLocationMsg}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={getLocation}>
-              <Text style={styles.retryButtonText}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Globo terráqueo */}
-            <GlobeView
-              ref={globeRef}
-              region={region}
-              onRegionChange={(reg) => {
-                // Actualizamos la región
-                setRegion(reg);
-              }}
-              showsUserLocation={true}
-              style={styles.map}
-              onLoadingChange={(loading) => {
-                console.log("Cambio de estado de carga del mapa:", loading);
-                // Si el loading es false, asegurarnos de quitar el indicador de carga
-                if (!loading) {
-                  // Pequeño retraso para asegurar que el globo esté completamente renderizado
-                  setTimeout(() => {
-                    setChangingView(false);
-                  }, 500);
-                } else {
-                  setChangingView(true);
-                }
-              }}
-              onLoadEnd={() => {
-                // Cuando la carga termine completamente
-                console.log("Carga del globo completada");
-                setChangingView(false);
-              }}
-              onError={handleGlobeError}
-            />
-          </>
         )}
       </View>
 
@@ -1094,9 +1212,9 @@ const MapScreen = () => {
 
       {/* Overlay para cambiar entre vistas */}
       {changingView && (
-        <View style={styles.changingViewOverlay}>
+        <View style={changingViewOverlay}>
           <ActivityIndicator size="small" color="#FFF" />
-          <Text style={styles.loadingText}>
+          <Text style={loadingText}>
             {currentStep || "Cargando globo terrestre..."}
           </Text>
         </View>
@@ -1104,9 +1222,21 @@ const MapScreen = () => {
 
       {/* Modal para mostrar las misiones de evento */}
       {showEventsModal && (
-        <Modal animationType="slide" onRequestClose={() => setShowEventsModal(false)}>
-          <View style={styles.eventsModalContainer}>
-            <Text style={styles.sectionTitle}>Misiones de Evento</Text>
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setShowEventsModal(false)}
+          transparent={false}
+        >
+          <SafeAreaView style={[
+            styles.eventsModalContainer,
+            { flex: 1 },
+            !isDarkMode && { backgroundColor: '#F5F7FA' },
+            isDarkMode && { backgroundColor: colors.background || '#101828' }
+          ]}>
+            <Text style={[
+              styles.sectionTitle,
+              { color: isDarkMode ? colors.accent : '#005F9E' }
+            ]}>Misiones de Evento</Text>
             <ScrollView>
               {eventMissions
                 .filter(mission => {
@@ -1137,23 +1267,35 @@ const MapScreen = () => {
                   }
                   const ciudad = mission.cityId && eventCities[mission.cityId] ? eventCities[mission.cityId] : 'Ciudad desconocida';
                   return (
-                    <View key={mission.id} style={styles.eventCard}>
-                      <Text style={styles.eventTitle}>{mission.title}</Text>
-                      <Text style={{ color: '#1D3557', fontWeight: 'bold', marginBottom: 4 }}>Ciudad: {ciudad}</Text>
-                      {rangoFechas && (
-                        <Text style={{ color: '#005F9E', fontWeight: 'bold', marginBottom: 4 }}>{rangoFechas}</Text>
-                      )}
-                      <Text>{mission.description}</Text>
+                    <View key={mission.id} style={[
+                      styles.eventCard,
+                      {
+                        borderWidth: 2,
+                        borderColor: isDarkMode ? colors.accent : '#005F9E',
+                        borderRadius: 16,
+                        marginBottom: 18,
+                        backgroundColor: 'transparent',
+                      }
+                    ]}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 28, marginBottom: 2 }}>
+                        <Text style={{ color: isDarkMode ? colors.accent : '#005F9E' }}>Ciudad:</Text>
+                        <Text style={{ color: isDarkMode ? '#FFF' : '#005F9E' }}> {ciudad}</Text>
+                      </Text>
+                      <Text style={{ color: isDarkMode ? '#FFF' : '#005F9E', fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>{mission.title}</Text>
+                      <Text style={{ color: isDarkMode ? '#E0E0E0' : '#1D3557', fontWeight: 'bold', marginBottom: 4 }}>
+                        {rangoFechas}
+                      </Text>
+                      <Text style={{ color: isDarkMode ? '#CCCCCC' : '#222' }}>{mission.description}</Text>
                       {mission.start_date && mission.end_date ? (
                         <View style={{
-                          backgroundColor: diasRestantes <= 3 ? '#FF6B6B' : '#FFD700',
+                          backgroundColor: isDarkMode ? colors.accent : '#005F9E',
                           borderRadius: 8,
                           padding: 6,
                           marginVertical: 6,
                           alignSelf: 'flex-start'
                         }}>
                           <Text style={{
-                            color: '#1D3557',
+                            color: isDarkMode ? '#222' : '#fff',
                             fontWeight: 'bold'
                           }}>
                             {diasRestantes > 0
@@ -1163,19 +1305,20 @@ const MapScreen = () => {
                         </View>
                       ) : (
                         <View style={{
-                          backgroundColor: '#70C1B3',
+                          backgroundColor: isDarkMode ? '#232A36' : '#B3D8F8',
                           borderRadius: 8,
                           padding: 6,
                           marginVertical: 6,
                           alignSelf: 'flex-start'
                         }}>
-                          <Text style={{ color: '#1D3557', fontWeight: 'bold' }}>Sin límite de tiempo</Text>
+                          <Text style={{ color: isDarkMode ? '#FFF' : '#005F9E', fontWeight: 'bold' }}>Sin límite de tiempo</Text>
                         </View>
                       )}
                       <Button
                         mode="contained"
                         onPress={() => handleAcceptEventMission(mission)}
-                        style={{ marginTop: 8 }}
+                        style={{ marginTop: 8, borderRadius: 22, backgroundColor: isDarkMode ? colors.accent : '#005F9E' }}
+                        labelStyle={{ color: isDarkMode ? '#222' : '#fff', fontWeight: 'bold' }}
                         disabled={Boolean(!haComenzado || (userEventMissions && userEventMissions[mission.id]))}
                       >
                         {!haComenzado
@@ -1193,8 +1336,14 @@ const MapScreen = () => {
                   );
                 })}
             </ScrollView>
-            <Button onPress={() => setShowEventsModal(false)} style={{ marginTop: 16 }}>Cerrar</Button>
-          </View>
+            <Button
+              onPress={() => setShowEventsModal(false)}
+              style={{ marginTop: 16, alignSelf: 'center', backgroundColor: isDarkMode ? colors.accent : '#005F9E', borderRadius: 18, paddingHorizontal: 24 }}
+              labelStyle={{ color: isDarkMode ? '#222' : '#fff', fontWeight: 'bold', fontSize: 15 }}
+            >
+              Cerrar
+            </Button>
+          </SafeAreaView>
         </Modal>
       )}
     </SafeAreaView>
@@ -1207,6 +1356,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   onClose: () => void;
   onSelect: (friends: Friend[]) => void;
 }) => {
+  const { isDarkMode, colors } = useTheme();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1302,17 +1452,17 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
       transparent
     >
       <View style={styles.shareModalOverlay}>
-        <View style={styles.shareModalContent}>
+        <View style={[styles.shareModalContent, { backgroundColor: isDarkMode ? colors.surface : colors.white }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.shareModalTitle}>Compartir Aventura</Text>
+            <Text style={[styles.shareModalTitle, { color: isDarkMode ? colors.accent : colors.primary }]}>Compartir Aventura</Text>
             {!isSharing && (
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={isDarkMode ? colors.text.secondary : "#666"} />
               </TouchableOpacity>
             )}
           </View>
 
-          <Text style={styles.shareModalSubtitle}>
+          <Text style={[styles.shareModalSubtitle, { color: isDarkMode ? colors.text.secondary : colors.text.secondary }]}>
             Selecciona a los amigos con los que quieres compartir este viaje
           </Text>
 
@@ -1320,12 +1470,12 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
             <TouchableOpacity
               style={[
                 styles.selectAllButton,
-                isSharing && styles.disabledButton
+                isDarkMode && { backgroundColor: colors.surface, borderColor: colors.accent, borderWidth: 1 }
               ]}
               onPress={selectAllFriends}
               disabled={isSharing}
             >
-              <Text style={styles.selectAllText}>
+              <Text style={[styles.selectAllText, { color: isDarkMode ? colors.accent : colors.primary }]}>
                 {selectedFriends.length === friends.length
                   ? "Deseleccionar todos"
                   : "Seleccionar todos"}
@@ -1335,15 +1485,15 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
                   ? "checkmark-circle"
                   : "checkmark-circle-outline"}
                 size={20}
-                color="#005F9E"
+                color={isDarkMode ? colors.accent : colors.primary}
               />
             </TouchableOpacity>
           )}
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#005F9E" />
-              <Text style={styles.loadingText}>Cargando amigos...</Text>
+              <ActivityIndicator size="large" color={isDarkMode ? colors.accent : colors.primary} />
+              <Text style={[styles.loadingText, { color: isDarkMode ? colors.text.primary : colors.text.primary }]}>Cargando amigos...</Text>
             </View>
           ) : (
             <ScrollView
@@ -1355,22 +1505,23 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
                   key={item.user2Id}
                   style={[
                     styles.friendItem,
-                    selectedFriends.includes(item.user2Id) && styles.friendItemSelected,
-                    isSharing && styles.disabledItem
+                    selectedFriends.includes(item.user2Id) && (isDarkMode ? { backgroundColor: '#3A4256' } : styles.friendItemSelected),
+                    isSharing && styles.disabledItem,
+                    isDarkMode && { borderBottomColor: colors.accent, borderBottomWidth: 1 }
                   ]}
                   onPress={() => toggleFriendSelection(item.user2Id)}
                   disabled={isSharing}
                 >
                   <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{item.username}</Text>
-                    <Text style={styles.friendPoints}>Puntos: {item.points}</Text>
+                    <Text style={[styles.friendName, { color: isDarkMode ? colors.accent : colors.text.primary }]}>{item.username}</Text>
+                    <Text style={[styles.friendPoints, { color: isDarkMode ? colors.white : colors.text.secondary }]}>Puntos: {item.points}</Text>
                   </View>
                   <Ionicons
                     name={selectedFriends.includes(item.user2Id)
                       ? "checkmark-circle"
                       : "ellipse-outline"}
                     size={24}
-                    color={selectedFriends.includes(item.user2Id) ? "#005F9E" : "#ccc"}
+                    color={selectedFriends.includes(item.user2Id) ? colors.accent : (isDarkMode ? colors.white : "#ccc")}
                   />
                 </TouchableOpacity>
               ))}
@@ -1385,11 +1536,12 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
           )}
 
           <View style={styles.footerContainer}>
-            {selectedFriends.length > 0 && (
-              <Text style={styles.selectedCountText}>
-                {selectedFriends.length} {selectedFriends.length === 1 ? 'amigo seleccionado' : 'amigos seleccionados'}
-              </Text>
-            )}
+            <Text style={[
+              styles.selectedCountText,
+              { color: isDarkMode ? colors.accent : colors.primary }
+            ]}>
+              {selectedFriends.length} {selectedFriends.length === 1 ? 'amigo seleccionado' : 'amigos seleccionados'}
+            </Text>
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -1406,6 +1558,9 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
               <TouchableOpacity
                 style={[
                   styles.shareButton,
+                  isDarkMode && {
+                    backgroundColor: selectedFriends.length > 0 ? colors.accent : colors.surface
+                  },
                   (selectedFriends.length === 0 || isSharing) && styles.disabledButton
                 ]}
                 onPress={handleShareWithSelected}
@@ -1413,11 +1568,16 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
               >
                 {isSharing ? (
                   <View style={styles.sharingButtonContent}>
-                    <ActivityIndicator size="small" color="#fff" />
-                    <Text style={[styles.shareButtonText, { marginLeft: 8 }]}>Compartiendo...</Text>
+                    <ActivityIndicator size="small" color={isDarkMode ? colors.white : "#fff"} />
+                    <Text style={[styles.shareButtonText, { marginLeft: 8, color: isDarkMode ? colors.white : '#fff' }]}>Compartiendo...</Text>
                   </View>
                 ) : (
-                  <Text style={styles.shareButtonText}>
+                  <Text style={{
+                    color: isDarkMode
+                      ? (selectedFriends.length > 0 ? colors.white : colors.text.secondary)
+                      : (selectedFriends.length > 0 ? '#fff' : '#EDF6F9'),
+                    fontWeight: 'bold'
+                  }}>
                     {selectedFriends.length === 0
                       ? "Selecciona amigos"
                       : `Compartir (${selectedFriends.length})`}
@@ -1439,22 +1599,6 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
     </Modal>
   );
 };
-
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
-
 
 const styles = StyleSheet.create({
   container: {
@@ -2038,7 +2182,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 30,
     right: 20,
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.accent,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
@@ -2067,7 +2211,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   eventsHeaderButtonText: {
-    color: '#FFD700',
+    color: colors.accent,
     fontWeight: 'bold',
     fontSize: 16,
   },

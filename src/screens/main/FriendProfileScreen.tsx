@@ -9,6 +9,8 @@ import { getUserJournalEntries, CityJournalEntry } from '../../services/journalS
 import { deleteFriendship, sendFriendRequest, cancelFriendRequest, getMutualFriends, getFriends } from '../../services/friendService';
 import { getRankTitle, getRankTitleStyle } from '../../utils/rankUtils';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useTheme } from '../../context/ThemeContext';
+import { getFriendProfileScreenStyles } from '../../styles/theme';
 
 interface JourneyMission {
     id: string;
@@ -56,23 +58,24 @@ interface FriendProfileScreenProps {
 const { width } = Dimensions.get('window');
 const JOURNEY_IMAGE_WIDTH = width - 40; // 20 de padding en cada lado
 
-const JournalEntryCard = ({ entry, friendId, commentsVisibility }: { 
-    entry: CityJournalEntry, 
+const JournalEntryCard = ({ entry, friendId, commentsVisibility, styles }: {
+    entry: CityJournalEntry,
     friendId: string,
-    commentsVisibility: 'public' | 'friends' | 'private'
+    commentsVisibility: 'public' | 'friends' | 'private',
+    styles: any
 }) => {
     const navigation = useNavigation<any>();
-    
+
     const handleEntryPress = () => {
-        navigation.navigate('JournalEntryDetail', { 
-            entry: { 
-                ...entry, 
+        navigation.navigate('JournalEntryDetail', {
+            entry: {
+                ...entry,
                 user_id: entry.userId || friendId,
                 comments_visibility: commentsVisibility
-            } 
+            }
         });
     };
-    
+
     return (
         <TouchableOpacity style={styles.journalCard} onPress={handleEntryPress}>
             {entry.photos && entry.photos.length > 0 ? (
@@ -119,7 +122,7 @@ const JournalEntryCard = ({ entry, friendId, commentsVisibility }: {
     );
 };
 
-const EmptyState = ({ message }: { message: string }) => (
+const EmptyState = ({ message, styles }: { message: string, styles: any }) => (
     <View style={styles.journalEmptyContainer}>
         <Ionicons name="journal-outline" size={64} color="#ccc" />
         <Text style={styles.journalEmptyText}>{message}</Text>
@@ -129,6 +132,8 @@ const EmptyState = ({ message }: { message: string }) => (
 const FriendProfileScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
+    const { colors, isDarkMode } = useTheme();
+    const styles = getFriendProfileScreenStyles(colors, isDarkMode, width);
     const { friendId, friendName: initialFriendName, rankIndex } = route.params as { friendId: string; friendName: string; rankIndex?: number };
     const user = useSelector((state: RootState) => state.auth.user);
     const [loading, setLoading] = useState(true);
@@ -505,10 +510,10 @@ const FriendProfileScreen = () => {
                 <View style={styles.headerBackground}>
                     <View style={styles.header}>
                         <TouchableOpacity
-                            style={styles.backButton}
+                            style={[styles.backButton, isDarkMode && { backgroundColor: colors.accent, borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }]}
                             onPress={() => navigation.goBack()}
                         >
-                            <Ionicons name="arrow-back" size={24} color="#fff" />
+                            <Ionicons name="arrow-back" size={24} color={isDarkMode ? '#181C22' : '#fff'} />
                         </TouchableOpacity>
                         <Text style={styles.title}>Perfil de {displayName}</Text>
                     </View>
@@ -554,8 +559,8 @@ const FriendProfileScreen = () => {
                     )}
                     {/* Estadística de amigos */}
                     <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, alignSelf: 'flex-start' }} onPress={() => setShowFriendsModal(true)}>
-                        <Ionicons name="people" size={20} color="#005F9E" style={{ marginRight: 6 }} />
-                        <Text style={{ fontSize: 16, color: '#005F9E', fontWeight: 'bold' }}>{friendsCount} Amigos</Text>
+                        <Ionicons name="people" size={20} color={isDarkMode ? colors.accent : '#005F9E'} style={{ marginRight: 6 }} />
+                        <Text style={{ fontSize: 16, color: isDarkMode ? colors.accent : '#005F9E', fontWeight: 'bold' }}>{friendsCount} Amigos</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -578,26 +583,26 @@ const FriendProfileScreen = () => {
                     onRequestClose={() => setShowFriendsModal(false)}
                 >
                     <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
-                        <View style={{ backgroundColor: 'white', borderRadius: 10, width: '90%', maxHeight: '80%' }}>
+                        <View style={{ backgroundColor: isDarkMode ? colors.surface : 'white', borderRadius: 10, width: '90%', maxHeight: '80%' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
-                                <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Amigos de {displayName}</Text>
+                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: isDarkMode ? colors.accent : undefined }}>Amigos de {displayName}</Text>
                                 <TouchableOpacity onPress={() => setShowFriendsModal(false)}>
-                                    <Ionicons name="close" size={28} color="#005F9E" />
+                                    <Ionicons name="close" size={28} color={isDarkMode ? colors.accent : '#005F9E'} />
                                 </TouchableOpacity>
                             </View>
                             {(() => {
                                 // Lógica de visibilidad de amigos
                                 if (friendsVisibility === 'private' && user?.id !== friendId) {
-                                    return <Text style={{ textAlign: 'center', margin: 20, color: '#666' }}>Este usuario prefiere no mostrar su lista de amigos.</Text>;
+                                    return <Text style={{ textAlign: 'center', margin: 20, color: isDarkMode ? colors.text.secondary : '#666' }}>Este usuario prefiere no mostrar su lista de amigos.</Text>;
                                 }
                                 if (friendsVisibility === 'friends' && !isFriend && user?.id !== friendId) {
-                                    return <Text style={{ textAlign: 'center', margin: 20, color: '#666' }}>Solo los amigos pueden ver la lista de amigos de este usuario.</Text>;
+                                    return <Text style={{ textAlign: 'center', margin: 20, color: isDarkMode ? colors.text.secondary : '#666' }}>Solo los amigos pueden ver la lista de amigos de este usuario.</Text>;
                                 }
                                 if (loadingFriends) {
-                                    return <ActivityIndicator size="large" color="#005F9E" style={{ margin: 20 }} />;
+                                    return <ActivityIndicator size="large" color={isDarkMode ? colors.accent : '#005F9E'} style={{ margin: 20 }} />;
                                 }
                                 if (friendsList.length === 0) {
-                                    return <Text style={{ textAlign: 'center', margin: 20, color: '#666' }}>No tiene amigos aún.</Text>;
+                                    return <Text style={{ textAlign: 'center', margin: 20, color: isDarkMode ? colors.text.secondary : '#666' }}>No tiene amigos aún.</Text>;
                                 }
                                 return (
                                     <FlatList
@@ -607,7 +612,7 @@ const FriendProfileScreen = () => {
                                             const isMyFriend = myFriends.some(f => f.user2Id === item.user2Id);
                                             const hasPending = myPendingRequests.includes(item.user2Id);
                                             return (
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderColor: '#eee' }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderColor: isDarkMode ? colors.border : '#eee', backgroundColor: isDarkMode ? colors.surface : 'white' }}>
                                                     <TouchableOpacity style={{ flex: 1 }} onPress={() => {
                                                         setShowFriendsModal(false);
                                                         navigation.navigate('FriendProfile', {
@@ -616,25 +621,25 @@ const FriendProfileScreen = () => {
                                                             rankIndex: item.rankIndex
                                                         });
                                                     }}>
-                                                        <Text style={{ fontSize: 16, fontWeight: 'bold' }}>{item.username}</Text>
-                                                        <Text style={{ color: '#666' }}>{item.points} puntos</Text>
+                                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: isDarkMode ? colors.text.primary : undefined }}>{item.username}</Text>
+                                                        <Text style={{ color: isDarkMode ? colors.text.secondary : '#666' }}>{item.points} puntos</Text>
                                                     </TouchableOpacity>
                                                     {item.user2Id === user.id ? (
-                                                        <Text style={{ color: '#005F9E', fontWeight: 'bold', marginLeft: 10 }}>Tú</Text>
+                                                        <Text style={{ color: isDarkMode ? colors.accent : '#005F9E', fontWeight: 'bold', marginLeft: 10 }}>Tú</Text>
                                                     ) : !isMyFriend && !hasPending ? (
                                                         <TouchableOpacity
-                                                            style={{ backgroundColor: '#005F9E', borderRadius: 20, padding: 8, marginLeft: 10 }}
+                                                            style={{ backgroundColor: isDarkMode ? colors.background : '#005F9E', borderRadius: 20, padding: 8, marginLeft: 10 }}
                                                             onPress={async () => {
                                                                 await sendFriendRequest(user.id, item.user2Id);
                                                                 fetchFriendsList();
                                                             }}
                                                         >
-                                                            <Ionicons name="person-add-outline" size={20} color="white" />
+                                                            <Ionicons name="person-add-outline" size={20} color={colors.accent} />
                                                         </TouchableOpacity>
                                                     ) : hasPending ? (
-                                                        <Ionicons name="time-outline" size={20} color="#FFA000" style={{ marginLeft: 10 }} />
+                                                        <Ionicons name="time-outline" size={20} color={isDarkMode ? colors.accent : '#FFA000'} style={{ marginLeft: 10 }} />
                                                     ) : isMyFriend ? (
-                                                        <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" style={{ marginLeft: 10 }} />
+                                                        <Ionicons name="checkmark-circle-outline" size={20} color={isDarkMode ? colors.success : '#4CAF50'} style={{ marginLeft: 10 }} />
                                                     ) : null}
                                                 </View>
                                             );
@@ -696,11 +701,12 @@ const FriendProfileScreen = () => {
                         <Text style={styles.emptyText}>No hay viajes completados</Text>
                     ) : (
                         Object.values(entriesByCity).map((cityEntries, index) => (
-                            <JournalEntryCard 
+                            <JournalEntryCard
                                 key={index}
                                 entry={cityEntries[0]}
                                 friendId={friendId}
                                 commentsVisibility={commentsVisibility}
+                                styles={styles}
                             />
                         ))
                     )}
@@ -709,380 +715,5 @@ const FriendProfileScreen = () => {
         </SafeAreaView>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerBackground: {
-        backgroundColor: '#005F9E',
-        padding: 20,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        marginRight: 16,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: 'white',
-        marginRight: 6,
-    },
-    profileSection: {
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: 'white',
-        marginBottom: 10,
-        position: 'relative',
-    },
-    actionIconProfile: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        zIndex: 2,
-        backgroundColor: 'white',
-        borderRadius: 20,
-        padding: 4,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
-        shadowRadius: 2,
-    },
-    avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        marginBottom: 10,
-        backgroundColor: '#90CAF9',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    avatarText: {
-        fontSize: 40,
-        fontWeight: 'bold',
-        color: 'white',
-    },
-    username: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 5,
-    },
-    levelContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
-    levelText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginRight: 10,
-    },
-    xpBar: {
-        height: 10,
-        backgroundColor: '#f5f5f5',
-        borderRadius: 5,
-        flex: 1,
-    },
-    xpProgress: {
-        height: '100%',
-        backgroundColor: '#005F9E',
-        borderRadius: 5,
-    },
-    xpText: {
-        fontSize: 14,
-        color: '#666',
-    },
-    points: {
-        fontSize: 16,
-        color: '#666',
-    },
-    statsSection: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        padding: 20,
-        backgroundColor: 'white',
-    },
-    statItem: {
-        alignItems: 'center',
-    },
-    statValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#005F9E',
-    },
-    statLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 5,
-    },
-    section: {
-        margin: 20,
-        backgroundColor: 'white',
-        borderRadius: 10,
-        padding: 15,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 3,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 15,
-        color: '#333',
-    },
-    journeyItem: {
-        marginBottom: 20,
-        backgroundColor: 'white',
-        borderRadius: 10,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 3,
-    },
-    journeyImagesContainer: {
-        height: 200,
-        width: '100%',
-    },
-    journeyImage: {
-        width: '100%',
-        height: 200,
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
-    },
-    noImageContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#f5f5f5',
-    },
-    journeyContent: {
-        padding: 15,
-    },
-    journeyCity: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 5,
-    },
-    journeyDescription: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 10,
-    },
-    journeyFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    journeyDate: {
-        fontSize: 12,
-        color: '#999',
-    },
-    pointsContainer: {
-        backgroundColor: '#005F9E',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 15,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    pointsText: {
-        color: 'white',
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginRight: 4,
-    },
-    pointsLabel: {
-        color: 'white',
-        fontSize: 12,
-    },
-    emptyText: {
-        textAlign: 'center',
-        color: '#666',
-        marginVertical: 20,
-    },
-    journalCard: {
-        backgroundColor: 'white',
-        borderRadius: 15,
-        marginBottom: 16,
-        overflow: 'hidden',
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-    },
-    journalCardImage: {
-        width: '100%',
-        height: 180,
-    },
-    journalCardNoImage: {
-        width: '100%',
-        height: 180,
-        backgroundColor: '#f5f5f5',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    journalCardContent: {
-        padding: 16,
-    },
-    journalCardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    journalCardTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        flex: 1,
-        marginRight: 8,
-    },
-    journalMissionBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#E8F5E9',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    journalMissionBadgeText: {
-        fontSize: 12,
-        color: '#4CAF50',
-        marginLeft: 4,
-        fontWeight: '600',
-    },
-    journalCardDate: {
-        fontSize: 13,
-        color: '#666',
-        marginBottom: 8,
-    },
-    journalCardDescription: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-        marginBottom: 12,
-    },
-    journalTags: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-    },
-    journalTag: {
-        fontSize: 12,
-        color: '#005F9E',
-        backgroundColor: '#E3F2FD',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginRight: 6,
-        marginBottom: 4,
-    },
-    journalMoreTags: {
-        fontSize: 12,
-        color: '#666',
-        marginLeft: 4,
-    },
-    friendshipDate: {
-        fontSize: 14,
-        color: '#888',
-        marginTop: 4,
-    },
-    firstPlaceText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#FFD700',
-    },
-    secondPlaceText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#C0C0C0',
-    },
-    thirdPlaceText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#CD7F32',
-    },
-    titleText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    privateContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 40,
-    },
-    privateTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    privateText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-    },
-    customTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#7F5AF0',
-        marginBottom: 2,
-        textAlign: 'center',
-    },
-    mutualFriendItem: {
-        marginRight: 10,
-        alignItems: 'center',
-    },
-    mutualFriendAvatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        marginBottom: 5,
-    },
-    mutualFriendAvatarPlaceholder: {
-        backgroundColor: '#f5f5f5',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    mutualFriendAvatarText: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#666',
-    },
-    mutualFriendName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    mutualFriendPoints: {
-        fontSize: 14,
-        color: '#666',
-    },
-});
 
 export default FriendProfileScreen; 

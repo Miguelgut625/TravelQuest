@@ -29,6 +29,8 @@ import { getGroupById } from '../../services/groupService';
 import { uploadImageToCloudinary } from '../../services/cloudinaryService';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
+import { typography, spacing, borderRadius, shadows } from '../../styles/theme';
 
 const GroupChatScreen = () => {
     const route = useRoute();
@@ -44,6 +46,8 @@ const GroupChatScreen = () => {
     const subscriptionRef = useRef(null);
     const [selectedImage, setSelectedImage] = useState(null);
     const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
+    const { colors, isDarkMode } = useTheme();
+    const styles = getGroupChatStyles(colors, isDarkMode);
 
     useEffect(() => {
         fetchGroupInfo();
@@ -80,12 +84,12 @@ const GroupChatScreen = () => {
             setMessages((prev) => {
                 if (prev.some((m) => m.id === newMsg.id)) return prev;
                 const updatedMessages = [...prev, newMsg];
-                
+
                 // Desplazar al final cuando llegue un nuevo mensaje
                 setTimeout(() => {
                     flatListRef.current?.scrollToEnd({ animated: true });
                 }, 100);
-                
+
                 return updatedMessages;
             });
         });
@@ -99,7 +103,7 @@ const GroupChatScreen = () => {
             if (selectedImage) {
                 imageUrl = await uploadImageToCloudinary(selectedImage, `group_${groupId}_${user.id}_${Date.now()}`);
             }
-            
+
             // Crear mensaje temporal para actualización inmediata
             const tempMessage = {
                 id: `temp_${Date.now()}`,
@@ -112,29 +116,29 @@ const GroupChatScreen = () => {
                 read: false,
                 isTemp: true // Marca para identificar que es temporal
             };
-            
+
             // Actualizar UI inmediatamente con el mensaje temporal
             setMessages(prev => [...prev, tempMessage]);
-            
+
             // Desplazar al final para mostrar el nuevo mensaje
             setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
-            
+
             // Enviar mensaje a la base de datos
             const sentMessage = await sendGroupMessage(
-                groupId, 
-                user.id, 
-                inputText.trim() || null, 
-                imageUrl, 
+                groupId,
+                user.id,
+                inputText.trim() || null,
+                imageUrl,
                 user.username
             );
-            
+
             // Reemplazar mensaje temporal con el real
-            setMessages(prev => prev.map(msg => 
+            setMessages(prev => prev.map(msg =>
                 msg.isTemp ? sentMessage : msg
             ));
-            
+
             // Limpiar entrada
             setInputText('');
             setSelectedImage(null);
@@ -142,7 +146,7 @@ const GroupChatScreen = () => {
         } catch (e) {
             console.error('Error al enviar mensaje:', e);
             Alert.alert('Error', 'No se pudo enviar el mensaje');
-            
+
             // Eliminar mensaje temporal en caso de error
             setMessages(prev => prev.filter(msg => !msg.isTemp));
         } finally {
@@ -154,12 +158,12 @@ const GroupChatScreen = () => {
         const isMine = item.sender_id === user.id;
         return (
             <View style={[
-                styles.messageContainer, 
+                styles.messageContainer,
                 isMine ? styles.myMessage : styles.otherMessage,
                 item.isTemp ? styles.tempMessage : {}
             ]}>
-                <Text style={styles.sender}>{item.sender_username || 'Usuario'}</Text>
-                {item.text ? <Text style={styles.messageText}>{item.text}</Text> : null}
+                <Text style={isMine ? styles.mySender : styles.sender}>{item.sender_username || 'Usuario'}</Text>
+                {item.text ? <Text style={isMine ? styles.messageText : styles.otherMessageText}>{item.text}</Text> : null}
                 {item.image_url ? (
                     <TouchableOpacity onPress={() => setImagePreviewVisible(item.image_url)}>
                         <Image source={{ uri: item.image_url }} style={{ width: 200, height: 200, borderRadius: 8, marginTop: 5 }} resizeMode="cover" />
@@ -181,11 +185,11 @@ const GroupChatScreen = () => {
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity
-                        style={styles.backButton}
+                        style={[styles.backButton, isDarkMode && { backgroundColor: colors.accent }]}
                         onPress={() => navigation.goBack()}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                        <Ionicons name="arrow-back" size={22} color={colors.secondary} />
+                        <Ionicons name="arrow-back" size={22} color={'#FFF'} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle} numberOfLines={1}>{groupName}</Text>
                     <View style={styles.headerRight} />
@@ -211,7 +215,7 @@ const GroupChatScreen = () => {
                 {/* Input Container */}
                 <View style={styles.inputContainer}>
                     <TouchableOpacity
-                        style={styles.attachButton}
+                        style={[styles.attachButton, { backgroundColor: isDarkMode ? colors.accent : colors.primary }]}
                         onPress={async () => {
                             const result = await ImagePicker.launchImageLibraryAsync({
                                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -224,7 +228,7 @@ const GroupChatScreen = () => {
                             }
                         }}
                     >
-                        <Ionicons name="image-outline" size={24} color="#005F9E" />
+                        <Ionicons name="image-outline" size={24} color={'#FFF'} />
                     </TouchableOpacity>
                     <TextInput
                         style={styles.input}
@@ -236,14 +240,18 @@ const GroupChatScreen = () => {
                         maxHeight={100}
                     />
                     <TouchableOpacity
-                        style={[styles.sendButton, (!inputText.trim() && !selectedImage || sending) && styles.sendButtonDisabled]}
+                        style={[
+                            styles.sendButton,
+                            { backgroundColor: isDarkMode ? colors.accent : colors.primary },
+                            (!inputText.trim() && !selectedImage || sending) && styles.sendButtonDisabled
+                        ]}
                         onPress={handleSend}
                         disabled={(!inputText.trim() && !selectedImage) || sending}
                     >
                         {sending ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <ActivityIndicator size="small" color="#FFF" />
                         ) : (
-                            <Ionicons name="send" size={22} color="white" />
+                            <Ionicons name="send" size={22} color={'#FFF'} />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -306,207 +314,223 @@ const GroupChatScreen = () => {
     );
 };
 
-const colors = {
-    primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-    secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-    background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-    white: '#FFFFFF',        // Blanco neutro
-    text: {
-      primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-      secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-      light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-    },
-    border: '#89C2D9',       // Azul claro (suave y limpio)
-    success: '#06D6A0',      // Verde menta (positivo y moderno)
-    error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-  };
-
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: colors.primary,
-    },
-    container: {
-        flex: 1,
-        backgroundColor: colors.primary,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.primary,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        minHeight: Platform.OS === 'ios' ? 44 : 56,
-        paddingTop: Platform.OS === 'ios' ? 0 : 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)',
-    },
-    backButton: {
-        backgroundColor: colors.primary,
-        borderRadius: 20,
-        width: 36,
-        height: 36,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-    },
-    headerTitle: {
-        flex: 1,
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: colors.text.light,
-        textAlign: 'center',
-        marginHorizontal: 16,
-    },
-    headerRight: {
-        width: 36,
-        height: 36,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    messagesContainer: {
-        padding: 16,
-        paddingBottom: 32,
-    },
-    messageContainer: {
-        maxWidth: '80%',
-        padding: 12,
-        marginVertical: 4,
-        borderRadius: 16,
-        backgroundColor: colors.background,
-    },
-    myMessage: {
-        alignSelf: 'flex-end',
-        color: colors.primary,
-        borderTopRightRadius: 4,
-    },
-    otherMessage: {
-        alignSelf: 'flex-start',
-        backgroundColor: '#F0F2F5',
-        borderTopLeftRadius: 4,
-    },
-    sender: {
-        fontSize: 12,
-        color: colors.secondary,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    messageText: {
-        fontSize: 15,
-        color: colors.text.primary,
-        lineHeight: 20,
-    },
-    messageTime: {
-        fontSize: 11,
-        color: colors.text.primary,
-        marginTop: 4,
-        textAlign: 'right',
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.secondary,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-      },
-    input: {
-        flex: 1,
-        padding: 10,
-        backgroundColor: colors.background,
-        borderRadius: 20,
-        maxHeight: 100,
-        color: colors.text.primary,
-        marginRight: 8,
-        borderColor: colors.border,
-        borderWidth: 1,
-      },
-    sendButton: {
-        backgroundColor: '#005F9E',
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    sendButtonDisabled: {
-        backgroundColor: '#CCC',
-    },
-    attachButton: {
-        padding: 8,
-        marginRight: 8,
-        borderRadius: 20,
-        borderColor: colors.border,
-        borderWidth: 1,
-        backgroundColor: colors.background,
-      },
-    modalContainer: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    imagePreviewContainer: {
-        backgroundColor: '#FFF',
-        width: '90%',
-        maxHeight: '80%',
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    previewTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    closeButton: {
-        padding: 4,
-    },
-    previewImage: {
-        width: '100%',
-        height: 300,
-        borderRadius: 8,
-        marginBottom: 16,
-    },
-    previewButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    previewButton: {
-        flex: 1,
-        padding: 12,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginHorizontal: 8,
-    },
-    cancelButton: {
-        backgroundColor: '#F0F2F5',
-    },
-    confirmButton: {
-        backgroundColor: '#005F9E',
-    },
-    previewButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFF',
-    },
-    tempMessage: {
-        opacity: 0.7,
-    },
-});
+function getGroupChatStyles(colors, isDarkMode) {
+    return StyleSheet.create({
+        safeArea: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        container: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: isDarkMode ? colors.background : colors.primary,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            minHeight: Platform.OS === 'ios' ? 44 : 56,
+            paddingTop: Platform.OS === 'ios' ? 0 : 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.divider,
+        },
+        backButton: {
+            backgroundColor: isDarkMode ? colors.accent : colors.primary,
+            borderRadius: 20,
+            width: 36,
+            height: 36,
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+        },
+        headerTitle: {
+            flex: 1,
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: isDarkMode ? colors.accent : '#FFF',
+            textAlign: 'center',
+            marginHorizontal: 16,
+        },
+        headerRight: {
+            width: 36,
+            height: 36,
+        },
+        loadingContainer: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        messagesContainer: {
+            padding: 16,
+            paddingBottom: 32,
+        },
+        messageContainer: {
+            maxWidth: '80%',
+            padding: 16,
+            marginVertical: 8,
+            borderRadius: 22,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.10,
+            shadowRadius: 4,
+            elevation: 2,
+        },
+        myMessage: {
+            alignSelf: 'flex-end',
+            backgroundColor: isDarkMode ? 'rgba(255, 200, 80, 0.95)' : colors.primary,
+            borderWidth: isDarkMode ? 1 : 0,
+            borderColor: isDarkMode ? colors.accent : 'transparent',
+            borderTopRightRadius: 4,
+            padding: 16,
+            minWidth: 80,
+        },
+        otherMessage: {
+            alignSelf: 'flex-start',
+            backgroundColor: isDarkMode ? colors.surface : colors.surface,
+            borderTopLeftRadius: 4,
+            padding: 16,
+            minWidth: 80,
+        },
+        sender: {
+            fontSize: 13,
+            fontWeight: '500',
+            marginBottom: 6,
+            color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#181C22',
+            textShadowColor: isDarkMode ? 'rgba(0,0,0,0.15)' : 'transparent',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 1,
+        },
+        mySender: {
+            fontSize: 13,
+            color: isDarkMode ? '#B1851A' : 'rgba(255,255,255,0.8)',
+            fontWeight: '500',
+            marginBottom: 6,
+            textShadowColor: 'rgba(0,0,0,0.10)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 1,
+        },
+        messageText: {
+            fontSize: 17,
+            color: isDarkMode ? '#181C22' : '#FFF',
+            lineHeight: 22,
+            fontWeight: '500',
+        },
+        otherMessageText: {
+            fontSize: 17,
+            color: isDarkMode ? '#FFF' : '#181C22',
+            lineHeight: 22,
+            fontWeight: '500',
+        },
+        messageTime: {
+            fontSize: 11,
+            color: isDarkMode ? '#444' : '#888',
+            marginTop: 4,
+            textAlign: 'right',
+        },
+        inputContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: isDarkMode ? colors.surface : '#FFF',
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+        },
+        input: {
+            flex: 1,
+            padding: 10,
+            backgroundColor: isDarkMode ? colors.background : '#FFF',
+            borderRadius: 20,
+            maxHeight: 100,
+            color: colors.text.primary,
+            marginRight: 8,
+            borderColor: colors.border,
+            borderWidth: 1,
+        },
+        sendButton: {
+            backgroundColor: colors.accent,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        sendButtonDisabled: {
+            backgroundColor: colors.text.secondary,
+        },
+        attachButton: {
+            padding: 8,
+            marginRight: 8,
+            borderRadius: 20,
+            borderColor: colors.border,
+            borderWidth: 1,
+            backgroundColor: colors.accent,
+        },
+        modalContainer: {
+            flex: 1,
+            backgroundColor: colors.overlay,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        imagePreviewContainer: {
+            backgroundColor: colors.surface,
+            width: '90%',
+            maxHeight: '80%',
+            borderRadius: 16,
+            padding: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 5,
+        },
+        modalHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+        },
+        previewTitle: {
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: colors.text.primary,
+        },
+        closeButton: {
+            padding: 4,
+        },
+        previewImage: {
+            width: '100%',
+            height: 300,
+            borderRadius: 8,
+            marginBottom: 16,
+        },
+        previewButtons: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+        },
+        previewButton: {
+            flex: 1,
+            padding: 12,
+            borderRadius: 8,
+            alignItems: 'center',
+            marginHorizontal: 8,
+        },
+        cancelButton: {
+            backgroundColor: isDarkMode ? colors.surface : '#F0F2F5',
+        },
+        confirmButton: {
+            backgroundColor: colors.accent,
+        },
+        previewButtonText: {
+            fontSize: 16,
+            fontWeight: '600',
+            color: isDarkMode ? '#181C22' : colors.surface,
+        },
+        tempMessage: {
+            opacity: 0.7,
+        },
+    });
+}
 
 export default GroupChatScreen; 

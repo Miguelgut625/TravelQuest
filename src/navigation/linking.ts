@@ -1,14 +1,15 @@
 import { Linking } from 'react-native';
+import type { LinkingOptions } from '@react-navigation/native';
+import { RootStackParamList } from './types';
 
-export const linking = {
+export const linking: LinkingOptions<RootStackParamList> = {
     prefixes: ['travelquest://', 'https://travelquest.com'],
     config: {
         screens: {
             ResetPassword: {
                 path: 'reset-password',
-                parse: (url: string) => {
-                    const token = url.split('token=')[1]?.split('&')[0];
-                    return { token };
+                parse: {
+                    token: (url: string) => url.split('token=')[1]?.split('&')[0] || '',
                 }
             },
             EmailSent: 'email-sent',
