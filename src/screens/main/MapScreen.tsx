@@ -962,6 +962,7 @@ const MapScreen = () => {
             top: 90,
             left: 0,
             right: 0,
+            bottom: 0,
             alignItems: 'center',
             zIndex: 30,
           }}>
@@ -974,11 +975,14 @@ const MapScreen = () => {
               borderWidth: 1,
               borderColor: isDarkMode ? colors.border : '#E2E8F0',
               ...shadows.large,
+              flex: 1,
+              marginBottom: 20,
             }}>
               <ScrollView
-                style={{ maxHeight: 520 }}
-                contentContainerStyle={{ paddingBottom: spacing.lg }}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={true}
               >
                 {/* Campo de búsqueda de ciudad */}
                 <View style={{
