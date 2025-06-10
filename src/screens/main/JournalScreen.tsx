@@ -264,7 +264,8 @@ const CityCard = ({ city, entries, onPress, styles }: { city: string; entries: C
 
 const JournalScreen = ({ route }: JournalScreenProps) => {
   const { colors, isDarkMode } = useTheme();
-  const styles = getStyles(colors, isDarkMode);
+  const insets = useSafeAreaInsets();
+  const styles = getStyles(colors, isDarkMode, insets);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [entriesByCity, setEntriesByCity] = useState<{ [cityName: string]: CityJournalEntry[] }>({});
   const [loading, setLoading] = useState(true);
@@ -280,7 +281,6 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   const windowWidth = Dimensions.get('window').width;
   const CARD_WIDTH = windowWidth - 60; // Reducimos el margen total (30px a cada lado)
 
-  const insets = useSafeAreaInsets();
   const HEADER_HEIGHT = 64 + (insets?.top || 0);
 
   useEffect(() => {
@@ -380,11 +380,11 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+        <View style={styles.headerSafeArea}>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Diario de Viaje</Text>
           </View>
-        </SafeAreaView>
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size={40} color={colors.primary} />
           <Text style={styles.loadingText}>Cargando diario de viaje...</Text>
@@ -396,11 +396,11 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+        <View style={styles.headerSafeArea}>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Diario de Viaje</Text>
           </View>
-        </SafeAreaView>
+        </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchJournalEntries}>
@@ -416,14 +416,14 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   if (cities.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+        <View style={styles.headerSafeArea}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Diario de Viaje</Text>
           </View>
-        </SafeAreaView>
+        </View>
         <EmptyState message="Aún no tienes entradas en tu diario. Completa misiones para añadir fotos a tu diario de viaje." styles={styles} />
       </SafeAreaView>
     );
@@ -492,7 +492,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   );
 };
 
-const getStyles = (colors, isDarkMode) => StyleSheet.create({
+const getStyles = (colors, isDarkMode, insets = { top: 0, bottom: 0 }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: isDarkMode ? colors.background : colors.surface,
@@ -500,12 +500,14 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
   headerSafeArea: {
     backgroundColor: isDarkMode ? colors.background : colors.primary,
     zIndex: 10,
+    paddingTop: insets.top,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     marginBottom: spacing.xl,
   },
   headerTitle: {

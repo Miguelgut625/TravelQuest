@@ -449,8 +449,7 @@ export const createJournalEntry = async (data: {
       content: data.content || '',
       photos: Array.isArray(data.photos) ? data.photos : [data.photos],
       tags: Array.isArray(data.tags) ? data.tags : [],
-      created_at: new Date().toISOString(),
-      comments_visibility: data.comments_visibility || 'public'
+      created_at: new Date().toISOString()
     };
 
     console.log('🔄 Intentando insertar entrada con datos:', baseData);
@@ -584,5 +583,52 @@ export const getJournalEntryById = async (entryId: string, currentUserId?: strin
   } catch (error) {
     console.error('Error al obtener entrada del diario:', error);
     throw error;
+  }
+};
+
+// Añadir foto a una entrada existente del diario
+export const addPhotoToEntry = async (entryId: string, photoUrl: string): Promise<boolean> => {
+  try {
+    console.log('📷 Añadiendo foto a entrada:', entryId, 'URL:', photoUrl);
+
+    // Primero obtener la entrada actual para conseguir las fotos existentes
+    const { data: currentEntry, error: fetchError } = await supabase
+      .from('journal_entries')
+      .select('photos')
+      .eq('id', entryId)
+      .single();
+
+    if (fetchError) {
+      console.error('❌ Error al obtener entrada actual:', fetchError);
+      throw fetchError;
+    }
+
+    if (!currentEntry) {
+      throw new Error('Entrada no encontrada');
+    }
+
+    // Obtener el array de fotos existentes
+    const existingPhotos = Array.isArray(currentEntry.photos) ? currentEntry.photos : [];
+    
+    // Añadir la nueva foto al array
+    const updatedPhotos = [...existingPhotos, photoUrl];
+
+    // Actualizar la entrada con el nuevo array de fotos
+    const { error: updateError } = await supabase
+      .from('journal_entries')
+      .update({ photos: updatedPhotos })
+      .eq('id', entryId);
+
+    if (updateError) {
+      console.error('❌ Error al actualizar fotos:', updateError);
+      throw updateError;
+    }
+
+    console.log('✅ Foto añadida correctamente a la entrada');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error en addPhotoToEntry:', error);
+    return false;
   }
 }; 

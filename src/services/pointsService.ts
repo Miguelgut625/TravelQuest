@@ -69,7 +69,6 @@ export const completeMission = async (missionId: string, userId: string, imageUr
                     id,
                     title,
                     points,
-                    type,
                     description
                 )
             `)
