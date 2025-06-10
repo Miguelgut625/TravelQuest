@@ -245,28 +245,32 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
 }) => {
   const { width } = useWindowDimensions();
   const { colors, isDarkMode } = useTheme();
-  const styles = getMissionsScreenStyles(colors, isDarkMode, width);
-
+  // Mejora de estilos para la card de ciudad
+  const cardStyle = {
+    backgroundColor: isDarkMode ? colors.surface : '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: isDarkMode ? colors.border : '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  };
   return (
-    <TouchableOpacity style={styles.cityCard} onPress={onPress}>
-      <View style={styles.cityCardContent}>
-        <View style={styles.cityInfo}>
-          <Text style={styles.cityName}>{cityName}</Text>
-          <Text style={styles.missionCount}>
-            {completedMissions}/{totalMissions} misiones completadas
-          </Text>
-        </View>
-        {/* @ts-ignore */}
-        <Ionicons name="chevron-forward" size={24} color="#666" />
+    <TouchableOpacity style={cardStyle} onPress={onPress}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDarkMode ? colors.accent : colors.primary }}>{cityName}</Text>
+        <Text style={{ color: colors.text.secondary, fontSize: 15, marginTop: 2 }}>
+          {completedMissions}/{totalMissions} misiones completadas
+        </Text>
       </View>
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${(completedMissions / totalMissions) * 100}%` }
-          ]}
-        />
-      </View>
+      {/* @ts-ignore */}
+      <Ionicons name="chevron-forward" size={24} color={isDarkMode ? colors.text.secondary : '#666'} />
     </TouchableOpacity>
   );
 };
@@ -571,7 +575,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
       // Organizar misiones por ciudad
       const missionsByCity: CityMissions = {};
-      
+
       // Función para eliminar duplicados basándose en el ID de la misión
       const removeDuplicateMissions = (missions: JourneyMission[]) => {
         const seen = new Set();
@@ -1116,15 +1120,51 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: isDarkMode ? colors.background : colors.primary,
+            flexDirection: 'row',
+            alignItems: 'center',
+            height: 56,
+            paddingLeft: 8,
+            paddingRight: 16,
+          },
+        ]}
+      >
         <TouchableOpacity
-          style={styles.backButton}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: isDarkMode ? colors.accent : '#FFF',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: 12,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.10,
+            shadowRadius: 2,
+            elevation: 2,
+          }}
           onPress={() => setSelectedCity(null)}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={20} color="#FFF" />
+          <Ionicons name="arrow-back" size={22} color={isDarkMode ? colors.background : colors.primary} />
         </TouchableOpacity>
-  
+        <Text
+          style={{
+            fontSize: 28,
+            fontWeight: 'bold',
+            color: isDarkMode ? colors.accent : '#FFF',
+            flex: 1,
+          }}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {selectedCity}
+        </Text>
       </View>
 
       {showCreateForm && isAdmin ? (
@@ -1136,12 +1176,11 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         </View>
       ) : (
         <>
-          <Text style={styles.cityTitle}>{selectedCity}</Text>
           <View style={styles.pointsCircle}>
             <Ionicons name="trophy" size={24} color={isDarkMode ? colors.accent : colors.primary} />
             <Text style={styles.pointsCircleText}>{userPoints}</Text>
           </View>
-                    <ScrollView
+          <ScrollView
             style={styles.missionsList}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -1313,7 +1352,7 @@ const MissionsScreen = (props: any) => {
   const { width } = useWindowDimensions();
   const { colors, isDarkMode } = useTheme();
   const styles = getMissionsScreenStyles(colors, isDarkMode, width);
-  
+
   return (
     <SafeAreaViewContext style={styles.container}>
       <MissionsScreenComponent {...props} />

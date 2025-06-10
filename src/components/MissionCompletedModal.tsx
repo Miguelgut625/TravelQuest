@@ -1,6 +1,9 @@
 import React, { useState, useEffect, memo } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { getMissionModalsStyles } from '../styles/theme';
+import { useWindowDimensions } from 'react-native';
 
 interface MissionCompletedModalProps {
   visible: boolean;
@@ -34,9 +37,13 @@ const MissionCompletedModal = memo(({ visible, info, onFinished }: MissionComple
 
   // Calcular porcentaje de XP para la barra de progreso
   const xpPercentage = Math.min(100, Math.max(0, (info.remainingXP / info.xpNext) * 100));
-  
+
   // Estado para mostrar la descripción completa
   const [showFullDescription, setShowFullDescription] = useState(false);
+
+  const { colors, isDarkMode } = useTheme();
+  const { width } = useWindowDimensions();
+  const styles = getMissionModalsStyles(colors, isDarkMode, width);
 
   return (
     <Modal
@@ -72,7 +79,7 @@ const MissionCompletedModal = memo(({ visible, info, onFinished }: MissionComple
                 />
               </View>
             )}
-            
+
             {/* Descripción de la imagen si existe */}
             {journalContent && (
               <View style={styles.descriptionContainer}>
@@ -138,173 +145,6 @@ const MissionCompletedModal = memo(({ visible, info, onFinished }: MissionComple
       </View>
     </Modal>
   );
-});
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 15,
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#005F9E',
-  },
-  closeButton: {
-    padding: 5,
-  },
-  missionInfoContainer: {
-    marginBottom: 15,
-  },
-  missionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  missionCity: {
-    fontSize: 16,
-    color: '#666',
-  },
-  imageContainer: {
-    marginVertical: 15,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  missionImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
-  },
-  descriptionContainer: {
-    marginVertical: 15,
-    backgroundColor: '#f9f9f9',
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    minHeight: 100,
-  },
-  descriptionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  descriptionContent: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
-  readMoreText: {
-    marginTop: 10,
-    color: '#005F9E',
-    fontSize: 12,
-    textAlign: 'right',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-  },
-  loadingText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#666',
-  },
-  rewardsContainer: {
-    marginVertical: 15,
-    backgroundColor: '#f0f8ff',
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e0f0ff',
-  },
-  rewardsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#005F9E',
-  },
-  rewardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  rewardText: {
-    fontSize: 16,
-    marginLeft: 10,
-    color: '#333',
-  },
-  levelContainer: {
-    alignItems: 'center',
-    marginVertical: 15,
-  },
-  levelUpText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 10,
-  },
-  levelText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-  },
-  xpProgressBackground: {
-    width: '100%',
-    height: 8,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  xpProgressFill: {
-    height: '100%',
-    backgroundColor: '#4CAF50',
-  },
-  xpText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 5,
-  },
-  continueButton: {
-    backgroundColor: '#005F9E',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 15,
-  },
-  continueButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
 });
 
 export default MissionCompletedModal; 

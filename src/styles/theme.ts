@@ -1667,13 +1667,13 @@ export function getBadgesScreenStyles(colors, isDarkMode, width) {
       alignItems: 'center',
       borderWidth: isDarkMode ? 1.5 : 1,
       borderColor: isDarkMode ? colors.accent : colors.primary,
+      ...shadows.large,
     },
     modalTitle: {
       fontSize: 20,
       fontWeight: 'bold',
-      color: isDarkMode ? colors.accent : colors.primary,
-      textAlign: 'center',
-      marginBottom: 16,
+      marginBottom: 10,
+      color: isDarkMode ? colors.accent : colors.text.primary,
     },
     closeButton: {
       position: 'absolute',
@@ -1693,6 +1693,8 @@ export function getBadgesScreenStyles(colors, isDarkMode, width) {
 }
 
 export function getMissionsScreenStyles(colors, isDarkMode, width) {
+  // Ajustes responsivos
+  const isSmallScreen = width < 370;
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -2141,6 +2143,339 @@ export function getMissionsScreenStyles(colors, isDarkMode, width) {
     },
     createFormContainer: {
       padding: 16,
+    },
+    completeButton: {
+      backgroundColor: isDarkMode ? colors.accent : colors.primary,
+      borderRadius: borderRadius.xl,
+      paddingVertical: isSmallScreen ? 12 : 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 16,
+      marginBottom: 0,
+      width: '100%',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+      minWidth: 120,
+      maxWidth: 300,
+      alignSelf: 'center',
+    },
+    completeButtonText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: isSmallScreen ? 16 : 18,
+      textAlign: 'center',
+    },
+  });
+}
+
+// Estilos dinámicos para los modales de misiones (completar, pista, subir foto, completando)
+export function getMissionModalsStyles(colors, isDarkMode, width) {
+  // Ajustes responsivos
+  const isSmallScreen = width < 370;
+  return StyleSheet.create({
+    // Overlay general para modales
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    // Contenido principal del modal
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: isSmallScreen ? 14 : 24,
+      width: '96%',
+      maxWidth: 420,
+      maxHeight: '90%',
+      alignItems: 'center',
+      borderWidth: isDarkMode ? 1.5 : 1,
+      borderColor: isDarkMode ? colors.accent : colors.primary,
+      ...shadows.large,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: 12,
+    },
+    modalTitle: {
+      ...typography.h2,
+      color: colors.text.primary,
+      flex: 1,
+      textAlign: 'left',
+    },
+    closeButton: {
+      padding: 6,
+      borderRadius: 20,
+      backgroundColor: isDarkMode ? colors.accent : colors.primary,
+      marginLeft: 8,
+    },
+    // Contenedor de botones principales (Tomar foto / Galería)
+    buttonRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'stretch',
+      width: '100%',
+      gap: 8,
+      marginBottom: isSmallScreen ? 10 : 18,
+    },
+    mainButton: {
+      backgroundColor: colors.primary,
+      borderRadius: borderRadius.xl,
+      paddingVertical: isSmallScreen ? 10 : spacing.md,
+      paddingHorizontal: isSmallScreen ? 6 : spacing.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flex: 1,
+      minWidth: 0,
+      marginHorizontal: 0,
+      borderWidth: 2,
+      borderColor: isDarkMode ? colors.accent : 'transparent',
+    },
+    mainButtonText: {
+      color: colors.surface,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      fontSize: isSmallScreen ? 15 : 18,
+      flexWrap: 'wrap',
+      includeFontPadding: false,
+    },
+    cancelButton: {
+      backgroundColor: isDarkMode ? colors.background : colors.divider,
+      borderRadius: borderRadius.xl,
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.sm,
+      width: '100%',
+    },
+    cancelButtonText: {
+      color: colors.text.secondary,
+      ...typography.body,
+      textAlign: 'center',
+    },
+    // Para tarjetas de imagen
+    imageCardContainer: {
+      width: '100%',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      overflow: 'hidden',
+      marginBottom: 20,
+      backgroundColor: colors.surface,
+    },
+    imageCardHeader: {
+      padding: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+      backgroundColor: isDarkMode ? colors.background : '#f9f9f9',
+    },
+    imageCardHeaderText: {
+      fontSize: 16,
+      color: colors.primary,
+      marginLeft: 8,
+      fontWeight: '500',
+    },
+    imagePreviewContainer: {
+      width: '100%',
+      height: 220,
+      backgroundColor: isDarkMode ? colors.background : '#f5f5f5',
+    },
+    previewImage: {
+      width: '100%',
+      height: '100%',
+    },
+    loadingText: {
+      marginTop: 10,
+      color: colors.text.secondary,
+      textAlign: 'center',
+    },
+    // Barra de progreso
+    progressBarContainer: {
+      height: 10,
+      backgroundColor: isDarkMode ? colors.divider : '#f0f0f0',
+      borderRadius: 10,
+      overflow: 'hidden',
+      width: '100%',
+      marginVertical: 5,
+    },
+    progressBar: {
+      height: '100%',
+      backgroundColor: colors.primary,
+    },
+    // Botón de pista
+    hintButton: {
+      backgroundColor: colors.warningCard,
+      padding: 12,
+      borderRadius: 10,
+      marginVertical: 15,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '100%',
+    },
+    hintButtonText: {
+      color: colors.surface,
+      fontWeight: 'bold',
+      marginLeft: 10,
+      fontSize: 16,
+    },
+    // Contenedor de pista
+    hintContainer: {
+      backgroundColor: isDarkMode ? colors.background : colors.eventBackground,
+      padding: 15,
+      borderRadius: 10,
+      marginVertical: 15,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.primary,
+      width: '100%',
+    },
+    hintTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.primary,
+      marginBottom: 5,
+    },
+    hintText: {
+      fontSize: 14,
+      color: colors.text.primary,
+      lineHeight: 20,
+    },
+    // Errores
+    errorContainer: {
+      width: '100%',
+      marginBottom: 15,
+      alignItems: 'center',
+    },
+    errorText: {
+      color: colors.error,
+      textAlign: 'center',
+    },
+    // Loader de completando misión
+    loadingCard: {
+      backgroundColor: colors.surface,
+      padding: 24,
+      borderRadius: 16,
+      alignItems: 'center',
+      width: '90%',
+      maxWidth: 320,
+      ...shadows.medium,
+    },
+    loadingTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.primary,
+      marginTop: 15,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    loadingDescription: {
+      color: colors.text.secondary,
+      textAlign: 'center',
+      marginBottom: 15,
+    },
+    // Otros estilos reutilizables
+    sectionTitle: {
+      ...typography.h3,
+      color: colors.primary,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    infoIcon: {
+      marginBottom: 10,
+    },
+    warningIcon: {
+      marginBottom: 10,
+    },
+    // Para imágenes en modales
+    imageContainer: {
+      marginVertical: 15,
+      borderRadius: 10,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    },
+    missionImage: {
+      width: '100%',
+      height: 200,
+    },
+    // Para XP y recompensas
+    rewardsContainer: {
+      marginTop: 18,
+      marginBottom: 10,
+      alignItems: 'center',
+      width: '100%',
+    },
+    rewardsTitle: {
+      ...typography.h3,
+      color: colors.accent,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    rewardItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    rewardText: {
+      fontSize: 16,
+      color: colors.text.primary,
+      marginLeft: 8,
+    },
+    levelContainer: {
+      marginTop: 10,
+      alignItems: 'center',
+      width: '100%',
+    },
+    levelUpText: {
+      color: colors.success,
+      fontWeight: 'bold',
+      fontSize: 16,
+      marginBottom: 6,
+      textAlign: 'center',
+    },
+    levelText: {
+      color: colors.text.secondary,
+      fontSize: 15,
+      marginBottom: 6,
+      textAlign: 'center',
+    },
+    xpProgressBackground: {
+      height: 10,
+      backgroundColor: colors.divider,
+      borderRadius: 5,
+      width: '100%',
+      marginVertical: 6,
+    },
+    xpProgressFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+      borderRadius: 5,
+    },
+    xpText: {
+      fontSize: 13,
+      color: colors.text.secondary,
+      textAlign: 'center',
+    },
+    continueButton: {
+      backgroundColor: colors.primary,
+      borderRadius: borderRadius.xl,
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.lg,
+      width: '100%',
+    },
+    continueButtonText: {
+      color: colors.surface,
+      ...typography.h3,
+      fontWeight: 'bold',
+      textAlign: 'center',
     },
   });
 } 

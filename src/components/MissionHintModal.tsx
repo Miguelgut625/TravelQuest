@@ -4,6 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { getMissionHint, HINT_COST } from '../services/missionService';
 import { useSelector } from 'react-redux';
 import { RootState } from '../features/store';
+import { useTheme } from '../context/ThemeContext';
+import { getMissionModalsStyles } from '../styles/theme';
+import { useWindowDimensions } from 'react-native';
 
 interface MissionHintModalProps {
   visible: boolean;
@@ -17,6 +20,9 @@ const MissionHintModal: React.FC<MissionHintModalProps> = ({ visible, onClose, m
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const user = useSelector((state: RootState) => state.auth.user);
+  const { colors, isDarkMode } = useTheme();
+  const { width } = useWindowDimensions();
+  const styles = getMissionModalsStyles(colors, isDarkMode, width);
 
   const handleGetHint = async () => {
     if (!user?.id) {
@@ -30,13 +36,13 @@ const MissionHintModal: React.FC<MissionHintModalProps> = ({ visible, onClose, m
       `¿Quieres gastar ${HINT_COST} puntos para obtener una pista?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Obtener pista', 
+        {
+          text: 'Obtener pista',
           onPress: async () => {
             try {
               setLoading(true);
               setError(null);
-              
+
               const hintData = await getMissionHint(user.id, missionId);
               setHint(hintData.hint);
             } catch (error: any) {
@@ -58,57 +64,135 @@ const MissionHintModal: React.FC<MissionHintModalProps> = ({ visible, onClose, m
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Pistas para la misión</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#666" />
+            <TouchableOpacity
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: isDarkMode ? colors.surface : '#fff',
+                justifyContent: 'center',
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.10,
+                shadowRadius: 2,
+                elevation: 2,
+                marginLeft: 8,
+              }}
+              onPress={onClose}
+            >
+              <Ionicons name="close" size={22} color={isDarkMode ? colors.accent : colors.primary} />
             </TouchableOpacity>
           </View>
-          
-          <Text style={styles.missionTitle}>{missionTitle}</Text>
 
+          {/* Nombre de la misión */}
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: isDarkMode ? colors.accent : colors.primary,
+              textAlign: 'center',
+              marginBottom: 4,
+            }}
+          >
+            {missionTitle}
+          </Text>
+
+          {/* Tarjeta de pista */}
           {!hint && !loading && !error && (
-            <View style={styles.hintContainer}>
-              <Ionicons name="bulb" size={40} color="#FFB900" style={styles.hintIcon} />
-              <Text style={styles.hintInfo}>
-                Obtén una pista específica generada por IA para completar esta misión.
-              </Text>
-              <Text style={styles.costInfo}>
-                Costo: {HINT_COST} puntos
-              </Text>
-              <TouchableOpacity style={styles.button} onPress={handleGetHint}>
-                <Text style={styles.buttonText}>Obtener Pista</Text>
+            <View
+              style={{
+                backgroundColor: isDarkMode ? colors.surface : '#FFF9E3',
+                borderRadius: 14,
+                padding: 18,
+                marginVertical: 18,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 6,
+                elevation: 2,
+                width: '100%',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 }}>
+                <Ionicons name="bulb" size={28} color={colors.accent} style={{ marginRight: 12, marginTop: 2 }} />
+                <Text style={{ fontSize: 16, color: colors.text.primary, fontWeight: '400', flex: 1, textAlign: 'left' }}>
+                  Obtén una pista específica generada por IA para completar esta misión.
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 15, color: colors.text.secondary, marginRight: 4 }}>Costo:</Text>
+                <Text style={{ fontSize: 15, color: colors.accent, fontWeight: 'bold' }}>{HINT_COST} puntos</Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.mainButton,
+                  {
+                    alignSelf: 'center',
+                    minWidth: 160,
+                    backgroundColor: isDarkMode ? colors.accent : colors.primary,
+                  },
+                ]}
+                onPress={handleGetHint}
+              >
+                <Text style={[styles.mainButtonText, { color: colors.surface }]}>Obtener Pista</Text>
               </TouchableOpacity>
             </View>
           )}
 
+          {/* Loader */}
           {loading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#005F9E" />
-              <Text style={styles.loadingText}>Generando pista...</Text>
+            <View style={{ alignItems: 'center', justifyContent: 'center', padding: 30 }}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={{ marginTop: 15, fontSize: 16, color: colors.text.secondary, textAlign: 'center' }}>
+                Generando pista...
+              </Text>
             </View>
           )}
 
+          {/* Resultado de pista */}
           {hint && (
-            <View style={styles.hintResultContainer}>
-              <Ionicons name="information-circle" size={30} color="#005F9E" style={styles.infoIcon} />
-              <Text style={styles.hintTitle}>Tu pista:</Text>
-              <Text style={styles.hintText}>{hint}</Text>
-              <TouchableOpacity style={[styles.button, styles.closeHintButton]} onPress={onClose}>
-                <Text style={styles.buttonText}>Entendido</Text>
+            <View style={{
+              alignItems: 'center',
+              padding: 18,
+              backgroundColor: isDarkMode ? colors.surface : '#F3F7FF',
+              borderRadius: 14,
+              marginVertical: 18
+            }}>
+              <Ionicons name="information-circle" size={30} color={isDarkMode ? colors.accent : colors.primary} style={{ marginBottom: 8 }} />
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: isDarkMode ? colors.accent : colors.primary, marginBottom: 6 }}>Tu pista:</Text>
+              <Text style={{ fontSize: 15, color: colors.text.primary, textAlign: 'center', marginBottom: 12 }}>{hint}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.mainButton,
+                  { alignSelf: 'center', minWidth: 120, backgroundColor: isDarkMode ? colors.accent : colors.primary },
+                ]}
+                onPress={onClose}
+              >
+                <Text style={[styles.mainButtonText, { color: colors.surface }]}>Entendido</Text>
               </TouchableOpacity>
             </View>
           )}
 
+          {/* Error */}
           {error && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="warning" size={30} color="#D32F2F" style={styles.warningIcon} />
-              <Text style={styles.errorTitle}>No se pudo obtener la pista</Text>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={[styles.button, styles.tryAgainButton]} onPress={() => setError(null)}>
-                <Text style={styles.buttonText}>Volver a intentar</Text>
+            <View style={{ alignItems: 'center', padding: 18, backgroundColor: isDarkMode ? colors.error + '22' : '#FFEBEE', borderRadius: 14, marginVertical: 18 }}>
+              <Ionicons name="warning" size={30} color={colors.error} style={{ marginBottom: 8 }} />
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.error, marginBottom: 6 }}>No se pudo obtener la pista</Text>
+              <Text style={{ fontSize: 15, color: colors.text.primary, textAlign: 'center', marginBottom: 12 }}>{error}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.mainButton,
+                  { alignSelf: 'center', minWidth: 120, backgroundColor: colors.error },
+                ]}
+                onPress={() => setError(null)}
+              >
+                <Text style={[styles.mainButtonText, { color: colors.surface }]}>Volver a intentar</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -117,143 +201,5 @@ const MissionHintModal: React.FC<MissionHintModalProps> = ({ visible, onClose, m
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 20
-  },
-  modalView: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    width: '100%',
-    maxWidth: 500,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333'
-  },
-  closeButton: {
-    padding: 5
-  },
-  missionTitle: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#555',
-    marginBottom: 20,
-    textAlign: 'center'
-  },
-  hintContainer: {
-    alignItems: 'center',
-    padding: 20
-  },
-  hintIcon: {
-    marginBottom: 15
-  },
-  hintInfo: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 10
-  },
-  costInfo: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#005F9E',
-    marginBottom: 20
-  },
-  button: {
-    backgroundColor: '#005F9E',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-    marginTop: 10
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center'
-  },
-  loadingContainer: {
-    padding: 30,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center'
-  },
-  hintResultContainer: {
-    padding: 15,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 10,
-    alignItems: 'center'
-  },
-  infoIcon: {
-    marginBottom: 10
-  },
-  hintTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10
-  },
-  hintText: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20
-  },
-  closeHintButton: {
-    backgroundColor: '#4CAF50'
-  },
-  errorContainer: {
-    padding: 15,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 10,
-    alignItems: 'center'
-  },
-  warningIcon: {
-    marginBottom: 10
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#D32F2F',
-    marginBottom: 10
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 20
-  },
-  tryAgainButton: {
-    backgroundColor: '#FF5722'
-  }
-});
 
 export default MissionHintModal; 

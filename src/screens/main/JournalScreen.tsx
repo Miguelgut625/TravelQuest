@@ -438,7 +438,7 @@ const JournalScreen = ({ route }: JournalScreenProps) => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header fijo y separado */}
-      <View style={styles.headerSafeArea}>
+      <View style={[styles.headerSafeArea, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Diario de Viaje</Text>
           <View style={styles.headerRight} />
@@ -506,7 +506,7 @@ const getStyles = (colors, isDarkMode) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.xl,
+    marginBottom: 0,
   },
   headerTitle: {
     ...typography.h2,

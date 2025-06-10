@@ -8,7 +8,9 @@ import {
   Image,
   ActivityIndicator,
   Platform,
-  Alert
+  Alert,
+  useWindowDimensions,
+  ScrollView
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +19,8 @@ import CloudinaryConfigGuide from './CloudinaryConfigGuide';
 import { getMissionHint, HINT_COST } from '../services/missionService';
 import { useSelector } from 'react-redux';
 import { RootState } from '../features/store';
+import { useTheme } from '../context/ThemeContext';
+import { getMissionModalsStyles } from '../styles/theme';
 
 interface ImageUploadModalProps {
   visible: boolean;
@@ -48,6 +52,12 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [imageLoading, setImageLoading] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(0);
   const [verificationMessage, setVerificationMessage] = useState('');
+  const { colors, isDarkMode } = useTheme();
+  const { width } = useWindowDimensions();
+  const styles = getMissionModalsStyles(colors, isDarkMode, width);
+
+  // Utilidad para color dinámico
+  const getPrimaryOrAccent = (isDarkMode, colors) => isDarkMode ? colors.accent : colors.primary;
 
   const pickImage = async () => {
     setError(null);
@@ -599,42 +609,74 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       visible={visible}
       onRequestClose={handleClose}
     >
-      <View style={styles.centeredView}>
+      <View style={styles.modalOverlay}>
         {showConfigGuide ? (
           <CloudinaryConfigGuide onClose={() => setShowConfigGuide(false)} />
         ) : (
-          <View style={styles.modalView}>
+          <ScrollView style={{ maxHeight: '90%', width: '100%' }} contentContainerStyle={[styles.modalContent, { flexGrow: 1 }]}>
+            {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Completa la misión</Text>
-              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#666" />
+              <TouchableOpacity
+                onPress={handleClose}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: isDarkMode ? colors.surface : '#fff',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.10,
+                  shadowRadius: 2,
+                  elevation: 2,
+                  marginLeft: 8,
+                }}
+              >
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color={getPrimaryOrAccent(isDarkMode, colors)}
+                />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.missionTitle}>{missionTitle}</Text>
-
+            {/* Título de la misión */}
+            <Text
+              style={[
+                styles.sectionTitle,
+                {
+                  marginBottom: 4,
+                  color: getPrimaryOrAccent(isDarkMode, colors),
+                },
+              ]}
+            >
+              {missionTitle}
+            </Text>
             {missionDescription ? (
-              <Text style={styles.missionDescription}>{missionDescription}</Text>
+              <Text style={[styles.hintText, { textAlign: 'center', marginBottom: 10, fontStyle: 'italic' }]}>{missionDescription}</Text>
             ) : null}
 
-            <Text style={styles.instructions}>
+            {/* Instrucción */}
+            <Text style={[styles.hintText, { textAlign: 'center', marginBottom: 16 }]}>
               {image ? 'Foto lista para completar la misión' : 'Sube una foto para completar esta misión'}
             </Text>
 
+            {/* Si hay imagen seleccionada */}
             {image ? (
               <>
                 <View style={styles.imageCardContainer}>
                   <View style={styles.imageCardHeader}>
-                    <View style={styles.imageIconContainer}>
-                      <Ionicons name="image-outline" size={20} color="#005F9E" />
-                      <Text style={styles.imageCardHeaderText}>Imagen seleccionada</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="image-outline" size={20} color={getPrimaryOrAccent(isDarkMode, colors)} />
+                      <Text style={[styles.imageCardHeaderText, { color: getPrimaryOrAccent(isDarkMode, colors) }]}>Imagen seleccionada</Text>
                     </View>
                   </View>
-
                   <View style={styles.imagePreviewContainer}>
                     {imageLoading ? (
-                      <View style={styles.previewImageLoading}>
-                        <ActivityIndicator size="large" color="#005F9E" />
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={getPrimaryOrAccent(isDarkMode, colors)} />
                         <Text style={styles.loadingText}>Cargando imagen...</Text>
                       </View>
                     ) : (
@@ -645,25 +687,20 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                       />
                     )}
                   </View>
-
-                  <View style={styles.imageCardActions}>
-                    <TouchableOpacity style={styles.imageActionButton} onPress={() => {
-                      setImage(null);
-                      setCloudinaryUrl(null);
-                    }}>
-                      <Ionicons name="refresh-outline" size={18} color="#005F9E" />
-                      <Text style={styles.imageActionText}>Cambiar foto</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 10, borderTopWidth: 1, borderTopColor: colors.divider, backgroundColor: colors.surface }}>
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => { setImage(null); setCloudinaryUrl(null); }}>
+                      <Ionicons name="refresh-outline" size={18} color={getPrimaryOrAccent(isDarkMode, colors)} />
+                      <Text style={[styles.imageActionText, { color: getPrimaryOrAccent(isDarkMode, colors) }]}>Cambiar foto</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.imageActionButton}>
-                      <Ionicons name="expand-outline" size={18} color="#005F9E" />
-                      <Text style={styles.imageActionText}>Ver a tamaño completo</Text>
+                    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="expand-outline" size={18} color={getPrimaryOrAccent(isDarkMode, colors)} />
+                      <Text style={[styles.imageActionText, { color: getPrimaryOrAccent(isDarkMode, colors) }]}>Ver a tamaño completo</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {(uploading || verifyingImage) && (
-                  <View style={styles.progressContainer}>
+                  <View style={{ width: '100%', marginBottom: 12 }}>
                     {verifyingImage ? (
                       <>
                         <View style={styles.verificationContainer}>
@@ -673,7 +710,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                               style={styles.verificationThumbnail}
                               resizeMode="cover"
                             />
-                            <ActivityIndicator size="small" color="#005F9E" style={styles.verificationLoader} />
+                            <ActivityIndicator size="small" color={getPrimaryOrAccent(isDarkMode, colors)} style={styles.verificationLoader} />
                           </View>
                           <View style={styles.verificationTextContainer}>
                             <Text style={styles.verificationTitle}>Analizando foto</Text>
@@ -681,441 +718,247 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                           </View>
                         </View>
                         <View style={styles.progressBarContainer}>
-                          <View style={[styles.progressBar, { width: `${verificationProgress}%` }]} />
+                          <View style={[styles.progressBar, { width: `${verificationProgress}%`, backgroundColor: isDarkMode ? colors.accent : colors.primary }]} />
                         </View>
                       </>
                     ) : (
                       <>
                         <Text style={styles.progressText}>Subiendo imagen...</Text>
                         <View style={styles.progressBarContainer}>
-                          <View style={[styles.progressBar, { width: `${uploadProgress}%` }]} />
+                          <View style={[styles.progressBar, { width: `${uploadProgress}%`, backgroundColor: isDarkMode ? colors.accent : colors.primary }]} />
                         </View>
                       </>
                     )}
                   </View>
                 )}
 
+                {/* Pista */}
                 {hint ? (
-                  <View style={styles.hintContainer}>
-                    <Text style={styles.hintTitle}>Pista:</Text>
-                    <Text style={styles.hintText}>{hint}</Text>
+                  <View
+                    style={{
+                      backgroundColor: isDarkMode ? colors.surface : '#E3F2FD',
+                      padding: 15,
+                      borderRadius: 10,
+                      marginVertical: 15,
+                      borderLeftWidth: 4,
+                      borderLeftColor: getPrimaryOrAccent(isDarkMode, colors),
+                      width: '100%',
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: getPrimaryOrAccent(isDarkMode, colors), marginBottom: 5 }}>
+                      Pista:
+                    </Text>
+                    <Text style={{ fontSize: 14, color: colors.text.primary, lineHeight: 20 }}>
+                      {hint}
+                    </Text>
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={styles.hintButton}
+                    style={[styles.hintButton, { marginVertical: 12 }]}
                     onPress={getHint}
                     disabled={loadingHint}
                   >
                     {loadingHint ? (
-                      <ActivityIndicator size="small" color="white" />
+                      <ActivityIndicator size="small" color={colors.surface} />
                     ) : (
                       <>
-                        <Ionicons name="bulb" size={20} color="white" />
+                        <Ionicons name="bulb" size={20} color={colors.surface} />
                         <Text style={styles.hintButtonText}>Dar pista ({HINT_COST} puntos)</Text>
                       </>
                     )}
                   </TouchableOpacity>
                 )}
 
+                {/* Error */}
                 {error && (
                   <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{error}</Text>
                   </View>
                 )}
 
-                <View style={styles.actionButtonsContainer}>
-                  <View style={styles.actionButtonGroup}>
-                    <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={handleClose}
-                      disabled={uploading || verifyingImage}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancelar</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.completeButton}
-                      onPress={uploadImage}
-                      disabled={uploading || verifyingImage || !image}
-                    >
-                      {uploading || verifyingImage ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.completeButtonText}>Completar misión</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                {/* Botones de acción */}
+                <View style={{ width: '100%', alignItems: 'center', marginTop: 8 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.completeButton,
+                      {
+                        backgroundColor: getPrimaryOrAccent(isDarkMode, colors),
+                        borderRadius: 16,
+                        paddingVertical: 16,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginTop: 8,
+                        marginBottom: 0,
+                        width: '100%',
+                        maxWidth: 400,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 4,
+                        elevation: 3,
+                        minWidth: 120,
+                        borderWidth: isDarkMode ? 2 : 0,
+                        borderColor: isDarkMode ? colors.accent : 'transparent',
+                      },
+                    ]}
+                    onPress={uploadImage}
+                    disabled={uploading || verifyingImage || !image}
+                  >
+                    {uploading || verifyingImage ? (
+                      <ActivityIndicator color={isDarkMode ? '#181C22' : colors.surface} size="small" />
+                    ) : (
+                      <Text style={[styles.completeButtonText, { color: isDarkMode ? '#181C22' : colors.surface, fontWeight: 'bold', fontSize: 18 }]}>Completar misión</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
               </>
             ) : (
               <>
-                <View style={styles.photoOptions}>
+                {/* Opciones de foto */}
+                <View style={styles.buttonRow}>
                   <TouchableOpacity
-                    style={styles.photoOptionButton}
+                    style={[
+                      styles.mainButton,
+                      {
+                        flex: 1,
+                        marginRight: 8,
+                        flexDirection: 'column',
+                        gap: 4,
+                        backgroundColor: isDarkMode ? colors.surface : colors.primary,
+                        borderWidth: 2,
+                        borderColor: isDarkMode ? colors.accent : 'transparent',
+                      },
+                    ]}
                     onPress={takePhoto}
                     disabled={imageLoading}
                   >
                     {imageLoading ? (
-                      <ActivityIndicator size="small" color="#005F9E" />
+                      <ActivityIndicator size="small" color={isDarkMode ? colors.text.primary : colors.surface} />
                     ) : (
-                      <Ionicons name="camera" size={36} color="#005F9E" />
+                      <Ionicons name="camera" size={32} color={isDarkMode ? colors.accent : colors.surface} />
                     )}
-                    <Text style={styles.photoOptionText}>Tomar foto</Text>
+                    <Text
+                      style={[styles.mainButtonText, { color: isDarkMode ? colors.text.primary : colors.surface }]}
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                    >
+                      Tomar foto
+                    </Text>
                   </TouchableOpacity>
-
                   <TouchableOpacity
-                    style={styles.photoOptionButton}
+                    style={[
+                      styles.mainButton,
+                      {
+                        flex: 1,
+                        marginLeft: 8,
+                        flexDirection: 'column',
+                        gap: 4,
+                        backgroundColor: isDarkMode ? colors.surface : colors.primary,
+                        borderWidth: 2,
+                        borderColor: isDarkMode ? colors.accent : 'transparent',
+                      },
+                    ]}
                     onPress={pickImage}
                     disabled={imageLoading}
                   >
                     {imageLoading ? (
-                      <ActivityIndicator size="small" color="#005F9E" />
+                      <ActivityIndicator size="small" color={isDarkMode ? colors.text.primary : colors.surface} />
                     ) : (
-                      <Ionicons name="images" size={36} color="#005F9E" />
+                      <Ionicons name="images" size={32} color={isDarkMode ? colors.accent : colors.surface} />
                     )}
-                    <Text style={styles.photoOptionText}>Galería</Text>
+                    <Text
+                      style={[styles.mainButtonText, { color: isDarkMode ? colors.text.primary : colors.surface }]}
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                    >
+                      Galería
+                    </Text>
                   </TouchableOpacity>
                 </View>
 
+                {/* Pista */}
                 {hint ? (
-                  <View style={styles.hintContainer}>
-                    <Text style={styles.hintTitle}>Pista:</Text>
-                    <Text style={styles.hintText}>{hint}</Text>
+                  <View
+                    style={{
+                      backgroundColor: isDarkMode ? colors.surface : '#E3F2FD',
+                      padding: 15,
+                      borderRadius: 10,
+                      marginVertical: 15,
+                      borderLeftWidth: 4,
+                      borderLeftColor: getPrimaryOrAccent(isDarkMode, colors),
+                      width: '100%',
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: getPrimaryOrAccent(isDarkMode, colors), marginBottom: 5 }}>
+                      Pista:
+                    </Text>
+                    <Text style={{ fontSize: 14, color: colors.text.primary, lineHeight: 20 }}>
+                      {hint}
+                    </Text>
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={styles.hintButton}
+                    style={[styles.hintButton, { marginVertical: 12 }]}
                     onPress={getHint}
                     disabled={loadingHint}
                   >
                     {loadingHint ? (
-                      <ActivityIndicator size="small" color="white" />
+                      <ActivityIndicator size="small" color={colors.surface} />
                     ) : (
                       <>
-                        <Ionicons name="bulb" size={20} color="white" />
+                        <Ionicons name="bulb" size={20} color={colors.surface} />
                         <Text style={styles.hintButtonText}>Dar pista ({HINT_COST} puntos)</Text>
                       </>
                     )}
                   </TouchableOpacity>
                 )}
 
+                {/* Error */}
                 {error && (
                   <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{error}</Text>
                   </View>
                 )}
 
+                {/* Botón cancelar */}
                 <View style={styles.actionButtonsContainer}>
                   <View style={styles.actionButtonGroup}>
                     <TouchableOpacity
-                      style={styles.cancelButton}
+                      style={[
+                        styles.cancelButton,
+                        {
+                          backgroundColor: isDarkMode ? colors.divider : '#E2E8F0',
+                          paddingVertical: 12,
+                          paddingHorizontal: 24,
+                          borderRadius: 16,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.15,
+                          shadowRadius: 4,
+                          elevation: 3,
+                          width: 'auto',
+                          minWidth: 120,
+                          maxWidth: 200,
+                          alignSelf: 'center',
+                          alignItems: 'center',
+                          marginTop: 16,
+                          marginBottom: 0,
+                        },
+                      ]}
                       onPress={handleClose}
+                      disabled={uploading || verifyingImage}
                     >
-                      <Text style={styles.cancelButtonText}>Cancelar</Text>
+                      <Text style={{ fontSize: 16, color: colors.text.secondary, fontWeight: '500' }}>Cancelar</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               </>
             )}
-          </View>
+          </ScrollView>
         )}
       </View>
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalView: {
-    width: '90%',
-    maxHeight: '90%',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 15,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  closeButton: {
-    padding: 5,
-  },
-  missionTitle: {
-    fontSize: 18,
-    color: '#005F9E',
-    marginBottom: 10,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  missionDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  instructions: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  photoOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-    width: '100%',
-  },
-  photoOptionButton: {
-    alignItems: 'center',
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    width: '45%',
-  },
-  photoOptionText: {
-    marginTop: 8,
-    color: '#333',
-    fontSize: 14,
-  },
-  imageCardContainer: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  imageCardHeader: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#f9f9f9',
-  },
-  imageIconContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  imageCardHeaderText: {
-    fontSize: 16,
-    color: '#005F9E',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  imagePreviewContainer: {
-    width: '100%',
-    height: 220,
-    backgroundColor: '#f5f5f5',
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  previewImageLoading: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-  },
-  imageCardActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#f9f9f9',
-  },
-  imageActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 20,
-  },
-  imageActionText: {
-    color: '#005F9E',
-    marginLeft: 5,
-    fontSize: 14,
-  },
-  progressContainer: {
-    width: '100%',
-    marginVertical: 15,
-  },
-  progressText: {
-    textAlign: 'center',
-    marginBottom: 8,
-    color: '#666',
-  },
-  progressBarContainer: {
-    height: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    overflow: 'hidden',
-    width: '100%',
-    marginVertical: 5,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#005F9E',
-  },
-  actionButtonsContainer: {
-    width: '100%',
-    marginTop: 15,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  actionButtonGroup: {
-    flexDirection: 'row',
-    backgroundColor: '#EFEFEF',
-    borderRadius: 30,
-    width: '100%',
-    overflow: 'hidden',
-  },
-  actionButton: {
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-  completeButton: {
-    backgroundColor: '#005F9E',
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    borderTopRightRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  cancelButton: {
-    backgroundColor: '#EFEFEF',
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    borderTopLeftRadius: 30,
-    borderBottomLeftRadius: 30,
-  },
-  completeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  cancelButtonText: {
-    color: '#555',
-    fontSize: 16,
-  },
-  hintButton: {
-    backgroundColor: '#FFB74D',
-    padding: 12,
-    borderRadius: 10,
-    marginVertical: 15,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  hintButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    marginLeft: 10,
-    fontSize: 16,
-  },
-  hintContainer: {
-    backgroundColor: '#E3F2FD',
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 15,
-    borderLeftWidth: 4,
-    borderLeftColor: '#005F9E',
-    width: '100%',
-  },
-  hintTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#005F9E',
-    marginBottom: 5,
-  },
-  hintText: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-  },
-  errorContainer: {
-    width: '100%',
-    marginBottom: 15,
-  },
-  errorText: {
-    color: '#D32F2F',
-    textAlign: 'center',
-  },
-  verificationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    width: '100%',
-    paddingHorizontal: 10,
-  },
-  verificationImageContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-    marginRight: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  verificationThumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  verificationLoader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  verificationTextContainer: {
-    flex: 1,
-  },
-  verificationTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#005F9E',
-    marginBottom: 4,
-  },
-  verificationMessage: {
-    fontSize: 14,
-    color: '#666',
-  },
-});
 
 export default ImageUploadModal; 
