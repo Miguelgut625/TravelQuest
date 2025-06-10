@@ -44,7 +44,8 @@ const darkTheme = {
   },
 };
 
-const App = () => {
+// Componente interno que tiene acceso al ThemeProvider
+const AppContent = () => {
   const { isDarkMode, colors } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,28 +210,35 @@ const App = () => {
   }
 
   return (
+    <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <NavigationContainer linking={linking} theme={{
+            dark: isDarkMode,
+            colors: {
+              background: colors.background,
+              border: colors.border,
+              card: colors.surface,
+              text: colors.text.primary,
+              notification: colors.primary,
+              primary: colors.primary,
+            },
+          }}>
+            <AppNavigator />
+          </NavigationContainer>
+        </View>
+      </SafeAreaProvider>
+    </PaperProvider>
+  );
+};
+
+// Componente principal que envuelve todo con los providers necesarios
+const App = () => {
+  return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <ThemeProvider>
-          <PaperProvider theme={isDarkMode ? darkTheme : lightTheme}>
-            <SafeAreaProvider>
-              <View style={{ flex: 1, backgroundColor: colors.background }}>
-                <NavigationContainer linking={linking} theme={{
-                  dark: isDarkMode,
-                  colors: {
-                    background: colors.background,
-                    border: colors.border,
-                    card: colors.surface,
-                    text: colors.text.primary,
-                    notification: colors.primary,
-                    primary: colors.primary,
-                  },
-                }}>
-                  <AppNavigator />
-                </NavigationContainer>
-              </View>
-            </SafeAreaProvider>
-          </PaperProvider>
+          <AppContent />
         </ThemeProvider>
       </PersistGate>
     </Provider>

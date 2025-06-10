@@ -14,7 +14,7 @@ import MissionCompletedModal from '../../components/MissionCompletedModal';
 import CompletingMissionModal from '../../components/CompletingMissionModal';
 import { awardSpecificBadges } from '../../services/badgeService';
 import { analyzeImage, updateJournalWithAIDescription } from '../../services/aiService';
-import { useTheme } from 'react-native-paper';
+import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView as SafeAreaViewContext } from 'react-native-safe-area-context';
 import { RouteProp } from '@react-navigation/native';
@@ -123,10 +123,12 @@ const getTimeRemaining = (endDate: string) => {
   }
 };
 
-const MissionCard = ({ mission, onComplete, onShare }: {
+const MissionCard = ({ mission, onComplete, onShare, colors, styles }: {
   mission: JourneyMission;
   onComplete: (imageUrl?: string) => void;
   onShare: () => void;
+  colors: any;
+  styles: any;
 }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showHintModal, setShowHintModal] = useState(false);
@@ -180,7 +182,7 @@ const MissionCard = ({ mission, onComplete, onShare }: {
           <View style={styles.badgeContainer}>
             <Text style={[
               styles.badge,
-              { backgroundColor: mission.completed ? colors.success : isExpired ? '#D32F2F' : '#FFB74D' }
+              { backgroundColor: mission.completed ? colors.success : isExpired ? colors.error : colors.warning }
             ]}>
               {mission.completed ? 'Completada' : isExpired ? 'Expirada' : isNotStarted ? 'Próximamente' : 'Pendiente'}
             </Text>
@@ -202,11 +204,11 @@ const MissionCard = ({ mission, onComplete, onShare }: {
               <>
                 <TouchableOpacity onPress={onShare} style={styles.shareIcon}>
                   {/* @ts-ignore */}
-                  <Ionicons name="share-social" size={20} color="#005F9E" />
+                  <Ionicons name="share-social" size={20} color={colors.shareIcon} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleShowHint} style={styles.hintIcon}>
                   {/* @ts-ignore */}
-                  <Ionicons name="bulb" size={20} color="#FFB900" />
+                  <Ionicons name="bulb" size={20} color={colors.hintIcon} />
                 </TouchableOpacity>
               </>
             )}
@@ -232,12 +234,14 @@ const MissionCard = ({ mission, onComplete, onShare }: {
   );
 };
 
-const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress }: {
+const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions, onPress, styles, colors }: {
   cityName: string;
   totalMissions: number;
   completedMissions: number;
   expiredMissions?: number;
   onPress: () => void;
+  styles: any;
+  colors: any;
 }) => (
   <TouchableOpacity style={styles.cityCard} onPress={onPress}>
     <View style={styles.cityCardContent}>
@@ -248,7 +252,7 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
         </Text>
       </View>
       {/* @ts-ignore */}
-      <Ionicons name="chevron-forward" size={24} color="#666" />
+      <Ionicons name="chevron-forward" size={24} color={colors.text.secondary} />
     </View>
     <View style={styles.progressBar}>
       <View
@@ -261,14 +265,62 @@ const CityCard = ({ cityName, totalMissions, completedMissions, expiredMissions,
   </TouchableOpacity>
 );
 
-const FriendSelectionModal = ({ visible, onClose, onSelect }: {
+const FriendSelectionModal = ({ visible, onClose, onSelect, colors }: {
   visible: boolean;
   onClose: () => void;
   onSelect: (friend: Friend) => void;
+  colors: any;
 }) => {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
   const user = useSelector((state: RootState) => state.auth.user);
+
+  // Crear estilos dinámicos usando colores recibidos como props
+  const modalStyles = {
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center'
+    },
+    modalContent: {
+      width: '80%',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 20,
+      maxHeight: '80%'
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginBottom: 10,
+      color: colors.text.primary,
+    },
+    friendItem: {
+      padding: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border
+    },
+    friendName: {
+      fontSize: 16,
+      color: colors.text.primary,
+    },
+    friendPoints: {
+      fontSize: 14,
+      color: colors.text.secondary,
+    },
+    cancelButton: {
+      marginTop: 10,
+      backgroundColor: colors.error,
+      padding: 10,
+      borderRadius: 5,
+      alignItems: 'center'
+    },
+    cancelButtonText: {
+      color: 'white',
+      fontWeight: 'bold'
+    }
+  };
 
   useEffect(() => {
     if (visible) {
@@ -318,7 +370,7 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
         <View style={modalStyles.modalContent}>
           <Text style={modalStyles.modalTitle}>Selecciona un amigo</Text>
           {loading ? (
-            <ActivityIndicator size={40} color="#4CAF50" />
+            <ActivityIndicator size={40} color={colors.success} />
           ) : (
             <FlatList
               data={friends}
@@ -340,51 +392,20 @@ const FriendSelectionModal = ({ visible, onClose, onSelect }: {
   );
 };
 
-const modalStyles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    maxHeight: '80%'
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10
-  },
-  friendItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc'
-  },
-  friendName: {
-    fontSize: 16
-  },
-  friendPoints: {
-    fontSize: 14,
-    color: '#666'
-  },
-  cancelButton: {
-    marginTop: 10,
-    backgroundColor: '#f44336',
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center'
-  },
-  cancelButtonText: {
-    color: 'white',
-    fontWeight: 'bold'
-  }
-});
-
 const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => {
+  const { colors, isDarkMode } = useTheme();
+  
+  // Verificación defensiva para evitar errores cuando colors no esté disponible
+  if (!colors) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 10, color: colors.text.primary }}>Cargando tema...</Text>
+      </View>
+    );
+  }
+  
+  const styles = getStyles(colors, isDarkMode);
   const { journeyId } = route.params || {};
   const { user } = useSelector((state: RootState) => state.auth);
   const [cityMissions, setCityMissions] = useState<CityMissions>({});
@@ -412,7 +433,6 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [missionToShare, setMissionToShare] = useState<JourneyMission | null>(null);
   const dispatch = useDispatch();
-  const theme = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [showRoutesModal, setShowRoutesModal] = useState(false);
   const [currentRoute, setCurrentRoute] = useState<any>(null);
@@ -943,7 +963,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
       return (
         <View style={styles.generatingLoaderOverlay}>
           <View style={styles.generatingLoaderContainer}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator size="large" color={colors.surface} />
             <Text style={styles.generatingText}>Generando descripción del diario...</Text>
             <Text style={styles.generatingSubtext}>Esto puede tardar unos momentos...</Text>
           </View>
@@ -1032,7 +1052,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size={40} color="#4CAF50" />
+                    <ActivityIndicator size={40} color={colors.success} />
         <Text style={styles.loadingText}>Cargando misiones...</Text>
       </View>
     );
@@ -1055,12 +1075,12 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         <View style={styles.header}>
           <Text style={styles.title}>Tus Ciudades</Text>
           <View style={styles.headerRight}>
-            <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-              {refreshing ? (
-                <ActivityIndicator size="small" color="#005F9E" />
-              ) : (
-                <Ionicons name="refresh" size={24} color="#005F9E" />
-              )}
+                      <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="refresh" size={24} color={colors.primary} />
+            )}
             </TouchableOpacity>
             <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
           </View>
@@ -1069,7 +1089,12 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           style={styles.citiesList}
           contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
           }
         >
           {Object.entries(cityMissions).map(([cityName, missions]) => (
@@ -1089,6 +1114,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 missions.expired.length
               }
               onPress={() => setSelectedCity(cityName)}
+              styles={styles}
+              colors={colors}
             />
           ))}
         </ScrollView>
@@ -1112,9 +1139,9 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
             {refreshing ? (
-              <ActivityIndicator size="small" color="#005F9E" />
+                              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Ionicons name="refresh" size={24} color="#005F9E" />
+                              <Ionicons name="refresh" size={24} color={colors.primary} />
             )}
           </TouchableOpacity>
           <Text style={styles.pointsText}>Puntos: {userPoints}</Text>
@@ -1134,7 +1161,12 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
           <ScrollView
             style={styles.missionsList}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={handleRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
+              />
             }
           >
             {cityData.pending.length > 0 && (
@@ -1142,10 +1174,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 <Text style={styles.sectionTitle}>Misiones Pendientes</Text>
                 {sortMissions(cityData.pending).map((mission, index) =>
                   mission.challenge && mission.challenge.is_event ? (
-                    <View key={`pending-event-${mission.id}-${index}`} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
-                      <Text>{mission.challenge.description}</Text>
-                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                    <View key={`pending-event-${mission.id}-${index}`} style={{ backgroundColor: colors.eventBackground, borderColor: colors.eventBorder, borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                      <Text style={{ fontWeight: 'bold', color: colors.eventText, fontSize: 18 }}>{mission.challenge.title}</Text>
+                      <Text style={{ color: colors.text.primary }}>{mission.challenge.description}</Text>
+                      <Text style={{ color: colors.eventText, marginTop: 8 }}>Misión de Evento</Text>
                     </View>
                   ) : (
                     <MissionCard
@@ -1153,11 +1185,13 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       mission={mission}
                       onComplete={(imageUrl) => handleCompleteMission(mission.id, imageUrl)}
                       onShare={() => handleShareMission(mission)}
+                      colors={colors}
+                      styles={styles}
                     />
                   )
                 )}
                 {cityData.expired.length > 0 && (
-                  <View style={{ height: 2, backgroundColor: '#E0E0E0', marginVertical: 16, borderRadius: 2 }} />
+                  <View style={{ height: 2, backgroundColor: colors.divider, marginVertical: 16, borderRadius: 2 }} />
                 )}
               </>
             )}
@@ -1166,15 +1200,15 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
               <>
                 <View style={styles.completedDivider}>
                   <View style={styles.dividerLine} />
-                  <Text style={[styles.completedText, { color: '#f44336' }]}>Expiradas</Text>
+                  <Text style={[styles.completedText, { color: colors.error }]}>Expiradas</Text>
                   <View style={styles.dividerLine} />
                 </View>
                 {sortMissions(cityData.expired).map((mission, index) =>
                   mission.challenge && mission.challenge.is_event ? (
-                    <View key={`expired-event-${mission.id}-${index}`} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
-                      <Text>{mission.challenge.description}</Text>
-                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                    <View key={`expired-event-${mission.id}-${index}`} style={{ backgroundColor: colors.eventBackground, borderColor: colors.eventBorder, borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                      <Text style={{ fontWeight: 'bold', color: colors.eventText, fontSize: 18 }}>{mission.challenge.title}</Text>
+                      <Text style={{ color: colors.text.primary }}>{mission.challenge.description}</Text>
+                      <Text style={{ color: colors.eventText, marginTop: 8 }}>Misión de Evento</Text>
                     </View>
                   ) : (
                     <MissionCard
@@ -1182,6 +1216,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       mission={mission}
                       onComplete={() => { }}
                       onShare={() => handleShareMission(mission)}
+                      colors={colors}
+                      styles={styles}
                     />
                   )
                 )}
@@ -1197,10 +1233,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                 </View>
                 {sortMissions(cityData.completed).map((mission, index) =>
                   mission.challenge && mission.challenge.is_event ? (
-                    <View key={`completed-event-${mission.id}-${index}`} style={{ backgroundColor: '#FFF3CD', borderColor: '#FFD700', borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                      <Text style={{ fontWeight: 'bold', color: '#B8860B', fontSize: 18 }}>{mission.challenge.title}</Text>
-                      <Text>{mission.challenge.description}</Text>
-                      <Text style={{ color: '#B8860B', marginTop: 8 }}>Misión de Evento</Text>
+                    <View key={`completed-event-${mission.id}-${index}`} style={{ backgroundColor: colors.eventBackground, borderColor: colors.eventBorder, borderWidth: 2, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                      <Text style={{ fontWeight: 'bold', color: colors.eventText, fontSize: 18 }}>{mission.challenge.title}</Text>
+                      <Text style={{ color: colors.text.primary }}>{mission.challenge.description}</Text>
+                      <Text style={{ color: colors.eventText, marginTop: 8 }}>Misión de Evento</Text>
                     </View>
                   ) : (
                     <MissionCard
@@ -1208,6 +1244,8 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
                       mission={mission}
                       onComplete={() => { }}
                       onShare={() => handleShareMission(mission)}
+                      colors={colors}
+                      styles={styles}
                     />
                   )
                 )}
@@ -1234,6 +1272,7 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
             visible={isShareModalVisible}
             onClose={() => setIsShareModalVisible(false)}
             onSelect={handleShareJourney}
+            colors={colors}
           />
 
           {renderGeneratingLoader()}
@@ -1299,27 +1338,10 @@ const MissionsScreenComponent = ({ route, navigation }: MissionsScreenProps) => 
   );
 };
 
-// Colores definidos
-const colors = {
-  primary: '#26547C',      // Azul oscuro (fuerte pero amigable)
-  secondary: '#70C1B3',    // Verde agua (fresco y cálido)
-  background: '#F1FAEE',   // Verde muy claro casi blanco (limpio y suave)
-  white: '#FFFFFF',        // Blanco neutro
-  text: {
-    primary: '#1D3557',    // Azul muy oscuro (excelente legibilidad)
-    secondary: '#52B788',  // Verde medio (agradable para texto secundario)
-    light: '#A8DADC',      // Verde-azulado pastel (ligero, decorativo)
-  },
-  border: '#89C2D9',       // Azul claro (suave y limpio)
-  success: '#06D6A0',      // Verde menta (positivo y moderno)
-  error: '#FF6B6B',        // Rojo coral (alerta suave y visualmente amigable)
-};
-
-
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     paddingHorizontal: 6,
   },
   header: {
@@ -1342,7 +1364,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 20,
     marginLeft: 5,
-    color: colors.white,
+    color: colors.surface,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
@@ -1354,7 +1376,7 @@ const styles = StyleSheet.create({
   refreshButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#E4EAFF',
+    backgroundColor: colors.surface,
     width: 40,
     height: 40,
     justifyContent: 'center',
@@ -1363,7 +1385,7 @@ const styles = StyleSheet.create({
   cityTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.secondary,
+    color: colors.text.primary,
     marginBottom: 20,
     letterSpacing: 1,
   },
@@ -1375,7 +1397,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: colors.section,
+    color: colors.text.primary,
   },
   errorContainer: {
     flex: 1,
@@ -1392,19 +1414,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.background,
+    color: colors.text.primary,
     letterSpacing: 1,
   },
   pointsText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.background,
+    color: colors.text.secondary,
   },
   citiesList: {
     flex: 1,
   },
   cityCard: {
-    backgroundColor: colors.text.light,
+    backgroundColor: colors.surface,
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
@@ -1413,6 +1435,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   cityCardContent: {
     flexDirection: 'row',
@@ -1426,23 +1450,23 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.text.primary,
     marginBottom: 5,
     letterSpacing: 1,
   },
   missionCount: {
     fontSize: 14,
-    color: colors.primary,
+    color: colors.text.secondary,
   },
   progressBar: {
     height: 4,
-    backgroundColor: colors.background,
+    backgroundColor: colors.border,
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.text.secondary,
+    backgroundColor: colors.primary,
   },
   missionsList: {
     flex: 1,
@@ -1450,7 +1474,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text.light,
+    color: colors.text.primary,
     marginBottom: 15,
     letterSpacing: 1,
   },
@@ -1462,17 +1486,17 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.text.light,
+    backgroundColor: colors.border,
   },
   completedText: {
-    color: colors.secondary,
+    color: colors.text.secondary,
     fontWeight: 'bold',
     marginHorizontal: 10,
     fontSize: 16,
     letterSpacing: 1,
   },
   card: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 15,
     marginBottom: 10,
@@ -1481,6 +1505,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   completedCard: {
     opacity: 0.8,
@@ -1495,17 +1521,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     flex: 1,
-    color: colors.section,
+    color: colors.text.primary,
     letterSpacing: 1,
   },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 15,
-    color: colors.text.primary,
+    color: colors.surface,
     fontSize: 12,
     fontWeight: 'bold',
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
     overflow: 'hidden',
   },
   badgeContainer: {
@@ -1513,7 +1539,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   cardDescription: {
-    color: colors.section,
+    color: colors.text.primary,
     marginBottom: 10,
   },
   cardFooter: {
@@ -1530,13 +1556,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   retryButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
   },
   retryButtonText: {
-    color: 'white',
+    color: colors.surface,
     textAlign: 'center',
     fontWeight: 'bold',
   },
@@ -1564,7 +1590,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   generatingLoaderContainer: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.surface,
     padding: 20,
     borderRadius: 10,
     width: '80%',
@@ -1574,16 +1600,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   generatingText: {
-    color: 'white',
+    color: colors.text.primary,
     marginTop: 10,
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   generatingSubtext: {
-    color: 'white',
+    color: colors.text.secondary,
     marginTop: 5,
     fontSize: 14,
     textAlign: 'center',
@@ -1599,29 +1627,31 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '80%',
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 20,
-    maxHeight: '80%'
+    maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: colors.section,
+    color: colors.text.primary,
   },
   friendItem: {
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.pastel
+    borderBottomColor: colors.border
   },
   friendName: {
     fontSize: 16,
-    color: colors.section,
+    color: colors.text.primary,
   },
   friendPoints: {
     fontSize: 14,
-    color: colors.primary,
+    color: colors.text.secondary,
   },
   cancelButton: {
     marginTop: 10,
@@ -1631,19 +1661,19 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   cancelButtonText: {
-    color: 'white',
+    color: colors.surface,
     fontWeight: 'bold'
   },
   levelUpContainer: {
     marginTop: 15,
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.success,
     padding: 10,
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
   },
   levelUpText: {
-    color: '#FFFFFF',
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -1654,7 +1684,7 @@ const styles = StyleSheet.create({
   },
   hintIcon: {
     padding: 5,
-    backgroundColor: 'rgba(255, 185, 0, 0.15)',
+    backgroundColor: colors.warning + '26', // Agregar transparencia usando hex
     borderRadius: 20,
     width: 30,
     height: 30,
@@ -1664,14 +1694,14 @@ const styles = StyleSheet.create({
   routeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E4EAFF',
+    backgroundColor: colors.info + '26', // Agregar transparencia usando hex
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 10,
   },
   routeButtonText: {
-    color: '#005F9E',
+    color: colors.info,
     marginLeft: 5,
     fontWeight: '500',
   },
@@ -1700,7 +1730,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   routeNumberText: {
-    color: colors.white,
+    color: colors.surface,
     fontWeight: 'bold',
   },
   routeMissionInfo: {
@@ -1709,7 +1739,7 @@ const styles = StyleSheet.create({
   routeMissionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.text.primary,
     marginBottom: 5,
   },
   routeMissionDescription: {
@@ -1736,6 +1766,20 @@ const styles = StyleSheet.create({
 });
 
 const MissionsScreen = (props: any) => {
+  const { colors, isDarkMode } = useTheme();
+  
+  // Verificación defensiva para evitar errores cuando colors no esté disponible
+  if (!colors) {
+    return (
+      <SafeAreaViewContext style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 10, color: colors.text.primary }}>Cargando tema...</Text>
+      </SafeAreaViewContext>
+    );
+  }
+  
+  const styles = getStyles(colors, isDarkMode);
+  
   return (
     <SafeAreaViewContext style={styles.container}>
       <MissionsScreenComponent {...props} />
