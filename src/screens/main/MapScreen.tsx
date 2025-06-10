@@ -1224,8 +1224,8 @@ const MapScreen = () => {
             <ScrollView>
               {eventMissions
                 .filter(mission => {
-                  // Si tiene fecha de fin, solo mostrar si no ha expirado
-                  if (mission.start_date && mission.end_date) {
+                  // Mostrar todos los eventos que no han expirado
+                  if (mission.end_date) {
                     const fechaFin = new Date(mission.end_date);
                     const hoy = new Date();
                     hoy.setHours(0, 0, 0, 0);
